@@ -216,15 +216,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
-# 프로젝트 전용 (webapp)
-webapp/.venv/
-webapp/hf_cache/
-webapp/pylibs/
-webapp/pw_browsers/
-webapp/syslibs/
-webapp/__pycache__/
-webapp/*.log
-
-# API 키 파일 (.env 외에 api_key.env 같은 변형도 커밋되지 않도록)
-*.env
