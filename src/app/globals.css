@@ -2232,6 +2232,324 @@ summary:focus-visible {
   font-size: 0.68rem;
 }
 
+/* Dual LLM comparison */
+
+.comparison-chat-panel {
+  overflow: visible;
+}
+
+.comparison-chat-body {
+  height: min(720px, 72vh);
+}
+
+.comparison-block {
+  margin: 20px 0 30px;
+  width: 100%;
+}
+
+.comparison-summary {
+  align-items: flex-start;
+  background: #f4f3ff;
+  border-left: 3px solid #7771db;
+  border-radius: 0 10px 10px 0;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 13px 15px;
+}
+
+.comparison-summary > div {
+  display: grid;
+  gap: 4px;
+}
+
+.comparison-summary > span,
+.comparison-kicker {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.provider-answer-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.provider-answer {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgb(18 18 18 / 5%);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.provider-answer-head {
+  align-items: center;
+  background: #f8f8f6;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 13px 15px;
+}
+
+.provider-answer-head > div {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.provider-answer-head small {
+  color: var(--muted);
+}
+
+.provider-dot {
+  background: #7771db;
+  border-radius: 50%;
+  display: inline-block;
+  height: 7px;
+  width: 7px;
+}
+
+.provider-dot-skt {
+  background: #159f86;
+}
+
+.provider-run-status {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  padding: 4px 8px;
+}
+
+.provider-run-guardrail_replaced,
+.provider-run-fallback,
+.provider-run-policy_short_circuit {
+  background: #fff4df;
+  border-color: #e8c274;
+  color: #77550f;
+}
+
+.provider-error {
+  background: #fff4f1;
+  border-bottom: 1px solid #efc4bb;
+  color: #7a3226;
+  display: grid;
+  font-size: 0.76rem;
+  gap: 2px;
+  padding: 10px 15px;
+}
+
+.provider-answer-copy {
+  line-height: 1.75;
+  min-height: 240px;
+  padding: 18px 16px;
+  white-space: pre-wrap;
+}
+
+.provider-quick-metrics {
+  border-block: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.provider-quick-metrics span {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.67rem;
+  gap: 2px;
+  padding: 10px;
+  text-align: center;
+}
+
+.provider-quick-metrics span + span {
+  border-left: 1px solid var(--line);
+}
+
+.provider-quick-metrics strong {
+  color: var(--ink);
+  font-size: 0.83rem;
+}
+
+.provider-trace,
+.provider-sources {
+  border-bottom: 1px solid var(--line);
+  padding: 0 16px;
+}
+
+.provider-trace summary,
+.provider-sources summary {
+  cursor: pointer;
+  font-size: 0.79rem;
+  font-weight: 700;
+  padding: 13px 0;
+}
+
+.provider-trace dl {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 0 14px;
+}
+
+.provider-trace dl div {
+  border-top: 1px dashed var(--line);
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 6px;
+}
+
+.provider-trace dt {
+  color: var(--muted);
+  font-size: 0.67rem;
+}
+
+.provider-trace dd {
+  font-size: 0.74rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.trace-security-note {
+  background: #f5f5f2;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  margin: 0 0 14px;
+  padding: 9px;
+}
+
+.provider-actions {
+  padding: 15px 16px 5px;
+}
+
+.provider-actions > strong {
+  font-size: 0.78rem;
+}
+
+.provider-actions ul,
+.provider-sources ul {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 10px 0 14px;
+  padding: 0;
+}
+
+.provider-actions li {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+}
+
+.provider-actions li > span {
+  background: var(--yellow-soft);
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  padding: 3px 6px;
+}
+
+.provider-actions li strong,
+.provider-actions li p,
+.provider-sources li {
+  font-size: 0.72rem;
+}
+
+.provider-actions li p {
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
+.comparison-feedback {
+  align-items: center;
+  background: #faf9f3;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding: 13px 15px;
+}
+
+.comparison-feedback > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.comparison-feedback span,
+.comparison-feedback > p {
+  color: var(--muted);
+  font-size: 0.69rem;
+  margin: 0;
+}
+
+.feedback-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.feedback-buttons button {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  padding: 7px 10px;
+}
+
+.feedback-buttons button.selected {
+  background: var(--ink);
+  color: #fff;
+}
+
+.dual-loading {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+  padding: 16px;
+}
+
+.dual-loading > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dual-loading span {
+  align-items: center;
+  background: #f5f5f2;
+  border-radius: 999px;
+  display: flex;
+  font-size: 0.75rem;
+  gap: 7px;
+  padding: 7px 10px;
+}
+
+.dual-loading small,
+.dual-api-note {
+  color: var(--muted);
+  font-size: 0.69rem;
+}
+
+.dual-api-note {
+  margin: 0;
+  padding: 0 18px 12px;
+}
+
 /* Responsive */
 
 @media (max-width: 960px) {
@@ -2258,6 +2576,14 @@ summary:focus-visible {
 
   .contract-result-grid {
     grid-template-columns: 1fr;
+  }
+
+  .provider-answer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .provider-answer-copy {
+    min-height: 0;
   }
 }
 
@@ -2420,6 +2746,10 @@ summary:focus-visible {
     padding: 16px;
   }
 
+  .comparison-chat-body {
+    height: min(680px, 72vh);
+  }
+
   .chat-message {
     max-width: 88%;
   }
@@ -2514,6 +2844,23 @@ summary:focus-visible {
 
   .source-list small {
     text-align: left;
+  }
+
+  .comparison-summary,
+  .comparison-feedback,
+  .provider-answer-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .provider-trace dl,
+  .provider-quick-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .provider-quick-metrics span + span {
+    border-left: 0;
+    border-top: 1px solid var(--line);
   }
 }
 

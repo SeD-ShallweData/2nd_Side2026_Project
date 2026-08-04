@@ -395,6 +395,44 @@ interface InternalSignalResult {
 
 ## 5. 챗봇
 
+### 현재 구현: 듀얼 LLM 비교 응답
+
+`POST /api/chat`은 내부 정책 기준 응답을 만든 뒤 동일한 사용자 질문과 공개 컨텍스트를 Upstage Solar와 SKT A.X에 병렬 전달한다. 기존 `ChatResponse`는 각 모델 결과의 정책 메타데이터 기준으로 내부에서 사용하며, 브라우저에는 다음 비교 응답을 반환한다.
+
+```ts
+interface ChatComparisonResponse {
+  comparison_id: string;
+  conversation_id: string;
+  execution_mode: "dual_api" | "policy_short_circuit";
+  started_at: string;
+  completed_at: string;
+  fair_comparison: {
+    concurrent: true;
+    same_context: true;
+    same_temperature: true;
+    same_max_tokens: true;
+  };
+  results: ProviderComparisonResult[]; // upstage, skt
+}
+```
+
+각 `ProviderComparisonResult`에는 공급자·실제 모델명, 답변, 출처·행동·한계, `success | guardrail_replaced | fallback` 상태와 다음 안전한 성능 정보가 포함된다.
+
+- 전체 지연시간
+- 입력·출력·전체·캐시·추론 토큰
+- 종료 사유와 답변 글자 수
+- 회사 컨텍스트 연결 여부와 최근 대화 수
+- 정책 버전과 가드레일 처리 결과
+- 공급자 요청 추적 ID
+
+API 키, Authorization 헤더, 전체 시스템 프롬프트, 원시 공급자 오류 본문은 응답하지 않는다. 한 공급자 오류는 다른 공급자 결과를 취소하지 않으며, 실패한 카드만 정책 기준 답변으로 대체하고 오류 상태를 표시한다.
+
+즉각적인 사고·부상 표현은 모델 응답을 기다리지 않는다. 이 경우 `execution_mode: policy_short_circuit`, `guardrail_action: short_circuit`로 공통 긴급 안내를 즉시 반환한다.
+
+### 비교 피드백
+
+`POST /api/chat/feedback`은 `upstage | skt | tie` 선택과 모델별 지연시간·토큰·가드레일 상태만 저장한다. 질문과 답변 원문은 저장하지 않는다.
+
 ### `POST /api/chat`
 
 #### 목적

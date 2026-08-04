@@ -7,7 +7,7 @@ import { CompanySearchResultCard } from "@/components/company/CompanySearchResul
 import type { CompanySearchResponse } from "@/domain/company";
 import { readApiResponse } from "@/utils/clientApi";
 
-const DEMO_QUERIES = ["OO건설", "한빛", "Hanbit Tech", "없는회사", "error"] as const;
+const DEMO_QUERIES = ["OO건설", "한빛", "없는회사", "오류확인사업장", "error"] as const;
 
 export function CompanySearch() {
   const router = useRouter();
