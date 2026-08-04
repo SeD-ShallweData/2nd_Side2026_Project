@@ -211,6 +211,7 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 coverage/
+.runtime/
 
 # Local environment files (keep examples)
 .env.local

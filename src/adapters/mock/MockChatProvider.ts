@@ -7,8 +7,9 @@ import type {
 } from "@/domain/chat";
 import type { RiskProvider, SourceReference } from "@/domain/risk";
 import { CHAT_COPY } from "@/mocks/chatResponses";
+import { MOCK_COMPANIES } from "@/mocks/companies";
 import { ServiceError } from "@/utils/errors";
-import { containsAny } from "@/utils/text";
+import { containsAny, normalizeSearchText } from "@/utils/text";
 
 const SEARCH_ACTION: SuggestedAction = {
   code: "SEARCH_COMPANY",
@@ -43,6 +44,17 @@ function conversationId(value?: string): string {
 function evidenceSummary(labels: string[]): string {
   if (labels.length === 0) return "세부 확인 신호가 제공되지 않았습니다.";
   return labels.join(", ");
+}
+
+function findOtherReferencedCompany(message: string, selectedCompanyId: string) {
+  const normalizedMessage = normalizeSearchText(message);
+  return MOCK_COMPANIES.find(
+    (candidate) =>
+      candidate.company_id !== selectedCompanyId &&
+      [candidate.company_name, ...candidate.aliases].some((name) =>
+        normalizedMessage.includes(normalizeSearchText(name)),
+      ),
+  );
 }
 
 export class MockChatProvider implements ChatProvider {
@@ -82,6 +94,21 @@ export class MockChatProvider implements ChatProvider {
     const risk = company ? await this.risks.getCompanyRisk(company.company_id) : null;
     if (company && !risk) {
       throw new ServiceError("RISK_RESULT_NOT_FOUND", "사업장 분석 결과를 찾을 수 없습니다.", 404, false);
+    }
+
+    if (company) {
+      const otherCompany = findOtherReferencedCompany(message, company.company_id);
+      if (otherCompany) {
+        return {
+          answer: `현재 상담에는 ${company.company_name}만 연결되어 있습니다. ${otherCompany.company_name} 정보를 확인하려면 주소와 업종을 보고 해당 사업장을 다시 선택해 주세요.`,
+          answer_type: "clarification",
+          sources: [],
+          suggested_actions: [SEARCH_ACTION],
+          limitations: ["선택되지 않은 사업장의 정보는 현재 회사 응답에 섞지 않습니다."],
+          guardrail_status: "limited",
+          conversation_id: id,
+        };
+      }
     }
 
     if (!company && containsAny(message, ["이 회사", "여기", "사업장", "입사", "회사 안전", "왜 추가 확인"])) {
@@ -165,6 +192,21 @@ export class MockChatProvider implements ChatProvider {
     const wage = risk.wage_risk;
     const safety = risk.safety_context;
     const baseLimitations = [CHAT_COPY.dataLimitation, CHAT_COPY.safetyScope];
+
+    if (containsAny(message, ["체불할 거", "체불할거", "체불할 것", "임금이 밀릴", "월급이 밀릴"])) {
+      return {
+        answer: `${company.company_name}에서 향후 임금체불이 발생할지는 현재 정보만으로 확정할 수 없습니다. ${wage.summary} 입사 전에는 근로계약서의 임금 지급일과 지급 방법, 4대보험 가입 시점을 확인하세요.`,
+        answer_type: "company_context",
+        sources: risk.sources,
+        suggested_actions: [
+          { code: "CHECK_PAYDAY", label: "임금 지급일 확인", priority: "now" },
+          { code: "CHECK_INSURANCE", label: "4대보험 가입 시점 확인", priority: "next" },
+        ],
+        limitations: baseLimitations,
+        guardrail_status: "limited",
+        conversation_id: id,
+      };
+    }
 
     if (containsAny(message, ["안전", "괜찮은 회사", "입사해도", "결론"])) {
       const safetyDetail =

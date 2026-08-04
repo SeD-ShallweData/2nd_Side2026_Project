@@ -81,4 +81,14 @@ export const MOCK_COMPANIES: Company[] = [
     aliases: ["한빛 테크", "Hanbit Tech", "HANBIT TECH"],
     data_as_of: "2026-07-31",
   },
+  {
+    company_id: "ERROR_001",
+    company_name: "오류확인사업장",
+    address: "대전광역시 유성구 데모로 503",
+    region: "대전광역시",
+    industry: "사업지원 서비스업",
+    size_label: "10~49명",
+    aliases: ["오류 확인 사업장", "Risk Error Demo"],
+    data_as_of: "2026-07-31",
+  },
 ];
