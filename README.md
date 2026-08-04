@@ -31,6 +31,40 @@ npm run dev
 
 브라우저에서 `http://서버주소:3000`으로 접속합니다. 다른 포트를 사용하려면 `npm run dev -- -p 3001`처럼 실행합니다.
 
+## 팀 시연용 임시 배포
+
+현재 서버의 실제 LLM 연동을 유지한 채 외부에 잠시 공개할 때는 Cloudflare Quick Tunnel을 사용합니다. 공개 전에 반드시 팀 전용 Basic 인증을 설정합니다.
+
+```bash
+export DEMO_BASIC_AUTH_USER="팀에 공유할 아이디"
+export DEMO_BASIC_AUTH_PASSWORD="충분히 긴 임시 비밀번호"
+npm run build
+npm run start -- -H 127.0.0.1 -p 3111
+```
+
+별도 터미널에서 프로젝트 외부의 개인 도구 폴더에 설치한 `cloudflared`로 터널을 실행합니다.
+
+```bash
+/data/shared-SeD/jcu0304/.local/bin/cloudflared tunnel \
+  --url http://127.0.0.1:3111 \
+  --no-autoupdate
+```
+
+출력된 `https://...trycloudflare.com` 주소와 시연 계정만 팀원에게 전달합니다. 이 주소는 터널 프로세스가 실행되는 동안만 유효하며 재실행할 때 바뀔 수 있습니다. API 키는 URL, 브라우저 코드 또는 Git에 넣지 않습니다.
+
+현재 AI Rookie 서버에서는 Cloudflare Tunnel 연결에 필요한 외부 7844 포트가 차단되어 있어 위 방식이 바로 동작하지 않습니다. 서버 관리자에게 네트워크 정책을 확인하기 전에는 아래 단일 HTML 시연본을 사용합니다.
+
+### 서버 없는 단일 HTML 시연본
+
+`exports/돈워리-통합프로토타입.html`을 내려받아 브라우저로 열면 됩니다. 사업장 검색, 정보 카드, 두 모델의 사전 생성 답변 비교, 계약서 Mock 검토가 파일 안에서 동작합니다.
+
+- 실제 API와 LLM을 호출하지 않습니다.
+- API 키나 내부 프롬프트를 포함하지 않습니다.
+- 질문과 파일이 외부로 전송되지 않습니다.
+- 답변 지연시간과 토큰 수는 실제 서비스 화면을 설명하기 위한 고정 예시입니다.
+
+실제 LLM이 동작하는 공개 사이트 구조와 배포 선택지는 [배포 가이드](docs/deployment-guide.md)를 참고하세요.
+
 ## 검증 명령
 
 ```bash
