@@ -40,6 +40,9 @@ for f in scored_active_full.csv 감독관_위험큐_full.csv safe_recommendation
   [[ -f "$OUT/$f" ]] || { echo "파일 없음: $OUT/$f" >&2; exit 1; }
 done
 
+# .env.local 의 DB_PASSWORD 를 psql 에 넘긴다.
+# 이게 없으면 ~/.pgpass 가 있는 사람만 동작하고, 새로 clone 한 사람은 비밀번호 입력을 요구받는다.
+export PGPASSWORD="${DB_PASSWORD}"
 PSQL=(psql -h 127.0.0.1 -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -q)
 
 echo "▶ 적재 시작"
