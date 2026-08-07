@@ -216,5 +216,22 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-.context
-CLUADE.md
+
+.context/
+CLAUDE.md
+api_key.env
+_service_bundle/
+node_modules/
+.next/
+next-env.d.ts
+tsconfig.tsbuildinfo
+.data/
+.env.local
+/.env.example
+/src/
+/data/
+/next.config.ts
+/postcss.config.mjs
+/tsconfig.json
+/package.json
+/package-lock.json
