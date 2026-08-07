@@ -1,0 +1,35 @@
+# 돈워리 로컬 DB.
+#
+# 이 서버는 사용자가 9명이고 Docker 컨테이너·볼륨·포트는 머신 전역이다.
+# 그래서 프로젝트 접두사(COMPOSE_PROJECT_NAME)와 호스트 포트(DB_PORT)를
+# .env.local 에서 각자 다르게 잡는다. 그러면 같은 파일로 여러 사람이 동시에 띄울 수 있다.
+#
+#   cd infra && docker compose --env-file ../.env.local up -d
+name: ${COMPOSE_PROJECT_NAME:-wageguard}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # 127.0.0.1 로 묶는다 — 공용 머신이라 사내망에 DB 를 열지 않는다.
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME:-wageguard}
+      POSTGRES_USER: ${DB_USER:-wageguard}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?.env.local 에 DB_PASSWORD 를 설정하세요}
+      # 한글 사업장명 정렬을 위해 ko_KR 대신 C.UTF-8 + ICU 를 쓴다.
+      # alpine 이미지는 ko_KR 로케일이 없어 initdb 가 실패한다.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-wageguard} -d ${DB_NAME:-wageguard}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  # named volume — repo 안에 바인드 마운트하면 컨테이너의 postgres(uid 999)와
+  # 권한이 꼬이고 git clean 한 번에 날아간다.
+  pgdata:
