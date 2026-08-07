@@ -28,6 +28,8 @@ if [[ -z "${BOT_PASSWORD:-}" ]]; then
 fi
 
 BOT_USER="${BOT_USER:-wg_bot}"
+# .env.local 의 DB_PASSWORD 를 psql 에 넘긴다 (~/.pgpass 없이도 동작하도록)
+export PGPASSWORD="${DB_PASSWORD}"
 PSQL=(psql -h 127.0.0.1 -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -q)
 
 "${PSQL[@]}" <<SQL
