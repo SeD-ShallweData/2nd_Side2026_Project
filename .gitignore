@@ -216,3 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# 프로젝트 전용 (webapp)
+webapp/.venv/
+webapp/hf_cache/
+webapp/pylibs/
+webapp/pw_browsers/
+webapp/syslibs/
+webapp/__pycache__/
+webapp/*.log
