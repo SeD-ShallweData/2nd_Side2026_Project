@@ -1,0 +1,1355 @@
+{
+  "id": "a1443503-55ed-4945-bdeb-5e8dda024062",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.batches": {
+      "name": "batches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "batches_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "as_of_date": {
+          "name": "as_of_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model_version": {
+          "name": "model_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ingested_at": {
+          "name": "ingested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "n_scored": {
+          "name": "n_scored",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "n_queue": {
+          "name": "n_queue",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "n_safe": {
+          "name": "n_safe",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "batches_asof_model_uq": {
+          "name": "batches_asof_model_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "as_of_date",
+            "model_version"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.comments": {
+      "name": "comments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "post_id": {
+          "name": "post_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anonymous": {
+          "name": "anonymous",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "comments_post_idx": {
+          "name": "comments_post_idx",
+          "columns": [
+            {
+              "expression": "post_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "comments_post_id_posts_id_fk": {
+          "name": "comments_post_id_posts_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "posts",
+          "columnsFrom": [
+            "post_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "comments_author_id_users_id_fk": {
+          "name": "comments_author_id_users_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.firms": {
+      "name": "firms",
+      "schema": "",
+      "columns": {
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "corp_key": {
+          "name": "corp_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "biz_no": {
+          "name": "biz_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sido": {
+          "name": "sido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "industry": {
+          "name": "industry",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_seen": {
+          "name": "first_seen",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_seen": {
+          "name": "last_seen",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "firms_name_idx": {
+          "name": "firms_name_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "firms_biz_no_idx": {
+          "name": "firms_biz_no_idx",
+          "columns": [
+            {
+              "expression": "biz_no",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "firms_corp_key_idx": {
+          "name": "firms_corp_key_idx",
+          "columns": [
+            {
+              "expression": "corp_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "firms_sido_idx": {
+          "name": "firms_sido_idx",
+          "columns": [
+            {
+              "expression": "sido",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.inspector_queue": {
+      "name": "inspector_queue",
+      "schema": "",
+      "columns": {
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rank": {
+          "name": "rank",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grade": {
+          "name": "grade",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "risk_full": {
+          "name": "risk_full",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_체납이력": {
+          "name": "door1_체납이력",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "이미_임금체불공개": {
+          "name": "이미_임금체불공개",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reasons": {
+          "name": "reasons",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "queue_batch_rank_idx": {
+          "name": "queue_batch_rank_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "rank",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "queue_batch_grade_idx": {
+          "name": "queue_batch_grade_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "grade",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "inspector_queue_firm_id_firms_firm_id_fk": {
+          "name": "inspector_queue_firm_id_firms_firm_id_fk",
+          "tableFrom": "inspector_queue",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "inspector_queue_batch_id_batches_id_fk": {
+          "name": "inspector_queue_batch_id_batches_id_fk",
+          "tableFrom": "inspector_queue",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "inspector_queue_firm_id_batch_id_pk": {
+          "name": "inspector_queue_firm_id_batch_id_pk",
+          "columns": [
+            "firm_id",
+            "batch_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.posts": {
+      "name": "posts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anonymous": {
+          "name": "anonymous",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "posts_created_idx": {
+          "name": "posts_created_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "posts_firm_idx": {
+          "name": "posts_firm_idx",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "posts_author_id_users_id_fk": {
+          "name": "posts_author_id_users_id_fk",
+          "tableFrom": "posts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "posts_firm_id_firms_firm_id_fk": {
+          "name": "posts_firm_id_firms_firm_id_fk",
+          "tableFrom": "posts",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.reviews": {
+      "name": "reviews",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anonymous": {
+          "name": "anonymous",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating_pay": {
+          "name": "rating_pay",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating_worklife": {
+          "name": "rating_worklife",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating_culture": {
+          "name": "rating_culture",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating_management": {
+          "name": "rating_management",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pros": {
+          "name": "pros",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cons": {
+          "name": "cons",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "reviews_firm_created_idx": {
+          "name": "reviews_firm_created_idx",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "reviews_author_id_users_id_fk": {
+          "name": "reviews_author_id_users_id_fk",
+          "tableFrom": "reviews",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "reviews_firm_id_firms_firm_id_fk": {
+          "name": "reviews_firm_id_firms_firm_id_fk",
+          "tableFrom": "reviews",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "reviews_firm_author_uq": {
+          "name": "reviews_firm_author_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "firm_id",
+            "author_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.safe_recommendation": {
+      "name": "safe_recommendation",
+      "schema": "",
+      "columns": {
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n_months": {
+          "name": "n_months",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "n_green": {
+          "name": "n_green",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk_full": {
+          "name": "risk_full",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "체불배제": {
+          "name": "체불배제",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "체납배제": {
+          "name": "체납배제",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_ever": {
+          "name": "door1_ever",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "판정": {
+          "name": "판정",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "safe_batch_verdict_idx": {
+          "name": "safe_batch_verdict_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "판정",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "safe_batch_risk_idx": {
+          "name": "safe_batch_risk_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "risk_full",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "safe_recommendation_firm_id_firms_firm_id_fk": {
+          "name": "safe_recommendation_firm_id_firms_firm_id_fk",
+          "tableFrom": "safe_recommendation",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "safe_recommendation_batch_id_batches_id_fk": {
+          "name": "safe_recommendation_batch_id_batches_id_fk",
+          "tableFrom": "safe_recommendation",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "safe_recommendation_firm_id_batch_id_pk": {
+          "name": "safe_recommendation_firm_id_batch_id_pk",
+          "columns": [
+            "firm_id",
+            "batch_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.scored_active": {
+      "name": "scored_active",
+      "schema": "",
+      "columns": {
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n_months": {
+          "name": "n_months",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g1_고용안정": {
+          "name": "g1_고용안정",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g2_성실납부": {
+          "name": "g2_성실납부",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g3_인건비안정": {
+          "name": "g3_인건비안정",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g4_인력유지": {
+          "name": "g4_인력유지",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g5_업력3년": {
+          "name": "g5_업력3년",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g6_낮은변동성": {
+          "name": "g6_낮은변동성",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "n_green": {
+          "name": "n_green",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "체불배제": {
+          "name": "체불배제",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "체납배제": {
+          "name": "체납배제",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk_full": {
+          "name": "risk_full",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk_calibrated": {
+          "name": "risk_calibrated",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turnover_avg_12m": {
+          "name": "turnover_avg_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turnover_avg_3m": {
+          "name": "turnover_avg_3m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turnover_max_12m": {
+          "name": "turnover_max_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turnover_std_12m": {
+          "name": "turnover_std_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emp_change_3m": {
+          "name": "emp_change_3m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emp_change_6m": {
+          "name": "emp_change_6m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emp_change_12m": {
+          "name": "emp_change_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_avg_12m": {
+          "name": "salary_avg_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_last": {
+          "name": "salary_last",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_change_6m": {
+          "name": "salary_change_6m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_change_12m": {
+          "name": "salary_change_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replacement_avg_12m": {
+          "name": "replacement_avg_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replacement_avg_3m": {
+          "name": "replacement_avg_3m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replacement_min_12m": {
+          "name": "replacement_min_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_drop_consecutive": {
+          "name": "salary_drop_consecutive",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turnover_momentum": {
+          "name": "turnover_momentum",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "zero_emp_months": {
+          "name": "zero_emp_months",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emp_volatility": {
+          "name": "emp_volatility",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "log_emp_count": {
+          "name": "log_emp_count",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "firm_age_months": {
+          "name": "firm_age_months",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sido_code": {
+          "name": "sido_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "industry_category": {
+          "name": "industry_category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imputed_months_count": {
+          "name": "imputed_months_count",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imputed_ratio": {
+          "name": "imputed_ratio",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "has_missing_recent_3m": {
+          "name": "has_missing_recent_3m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_bill_last_ratio": {
+          "name": "nf_bill_last_ratio",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_bill_maxdrop": {
+          "name": "nf_bill_maxdrop",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_pc_slope": {
+          "name": "nf_pc_slope",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_pay_divergence": {
+          "name": "nf_pay_divergence",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_bill_cv": {
+          "name": "nf_bill_cv",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_emp_slope": {
+          "name": "nf_emp_slope",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_drawdown": {
+          "name": "nf_drawdown",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_ever": {
+          "name": "door1_ever",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_n_insu": {
+          "name": "door1_n_insu",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_maxamt": {
+          "name": "door1_maxamt",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_maxmonths": {
+          "name": "door1_maxmonths",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_health": {
+          "name": "door1_health",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_pension": {
+          "name": "door1_pension",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_labor": {
+          "name": "door1_labor",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "scored_batch_risk_idx": {
+          "name": "scored_batch_risk_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "risk_full",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "scored_batch_idx": {
+          "name": "scored_batch_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "scored_active_firm_id_firms_firm_id_fk": {
+          "name": "scored_active_firm_id_firms_firm_id_fk",
+          "tableFrom": "scored_active",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scored_active_batch_id_batches_id_fk": {
+          "name": "scored_active_batch_id_batches_id_fk",
+          "tableFrom": "scored_active",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "scored_active_firm_id_batch_id_pk": {
+          "name": "scored_active_firm_id_batch_id_pk",
+          "columns": [
+            "firm_id",
+            "batch_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "users_firm_id_firms_firm_id_fk": {
+          "name": "users_firm_id_firms_firm_id_fk",
+          "tableFrom": "users",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

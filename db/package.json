@@ -1,0 +1,26 @@
+{
+  "name": "wageguard-db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "돈워리 데이터베이스 — 스키마·마이그레이션·ML export 적재",
+  "type": "module",
+  "scripts": {
+    "up": "docker compose --env-file .env.local up -d",
+    "down": "docker compose --env-file .env.local down",
+    "psql": "docker compose --env-file .env.local exec db psql -U $npm_config_user",
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "studio": "drizzle-kit studio",
+    "ingest": "tsx scripts/ingest.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "dotenv": "^17.2.3",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3"
+  }
+}
