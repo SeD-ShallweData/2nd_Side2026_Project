@@ -149,6 +149,8 @@ activemq-data/
 
 # Environments
 .env
+*.env
+!*.example.env
 .envrc
 .venv
 env/
@@ -216,3 +218,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ── 프로젝트 전용 ────────────────────────────────────────────
+# /data/shared-SeD/csh/ 로 이어지는 심볼릭 링크. 내용도 링크 자체도 추적하지 않습니다.
+/cshproj/data
+/cshproj/outputs
+/cshproj/design
+
+# 로컬 로그
+/cshproj/logs/
+
+# 개인 설정 (config.example.env 는 위 !*.example.env 규칙으로 추적됩니다)
+config.env
+
+# 웹폰트 — scripts/fetch_fonts.sh 로 내려받습니다 (3.7MB, git에는 올리지 않음)
+/cshproj/web/assets/fonts/notosanskr/
+/cshproj/web/css/fonts.css
