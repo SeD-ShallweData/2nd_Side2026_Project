@@ -1,0 +1,12 @@
+flask==3.1.3
+requests==2.34.2
+python-dotenv==1.2.2
+
+# 더미 근로계약서 PDF 생성용 (scripts/make_contract_samples.py).
+# 서버 구동에는 필요 없습니다 — 계약서를 다시 만들 때만 씁니다.
+reportlab==5.0.0
+
+# 스캔본 시뮬레이션 (--scan). 없으면 그 단계만 조용히 건너뜁니다.
+# pypdfium2
+# Pillow
+

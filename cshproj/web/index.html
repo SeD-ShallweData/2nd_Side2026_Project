@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>돈워리 — 일터의 위험, 미리 알고 대비하세요</title>
+<meta name="description" content="커뮤니티 기반 AI 일터위험 조기경보 플랫폼. 임금체불·산업재해 위험을 공공데이터로 미리 살펴봅니다.">
+<link rel="icon" href="/assets/logo/favicon.svg">
+<link rel="stylesheet" href="/css/fonts.css">
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/landing.css">
+</head>
+<body>
+
+<div class="protobar">
+  <b>프로토타입</b> — 화면의 사업장·지표·게시글은 전부 <b>가상 데이터</b>입니다. AI 상담만 실제 모델(Upstage·SKT)에 연결되어 있습니다.
+</div>
+
+<header class="nav">
+  <div class="container nav__inner">
+    <a class="brand" href="/">
+      <span class="brand__mark"><svg viewBox="0 0 24 24" fill="none" stroke="#191f28" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+      <span class="brand__name">돈워리</span>
+    </a>
+    <nav class="nav__links">
+      <a href="#how">서비스 소개</a>
+      <a href="#risk">위험카드</a>
+      <a href="#community">커뮤니티</a>
+      <a href="/chat">AI 상담</a>
+      <a href="/contract">계약서 진단</a>
+    </nav>
+    <div class="nav__actions">
+      <a class="nav__login" href="#">로그인</a>
+      <a class="btn btn--primary btn--sm" href="/chat">시작하기</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Hero ──────────────────────────────────────── -->
+  <section class="hero">
+    <div class="container">
+      <span class="hero__badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg> 커뮤니티 기반 AI 일터위험 조기경보</span>
+
+      <h1 class="hero__title">일터의 위험,<br><span class="mark">미리 알고</span> 대비하세요</h1>
+
+      <p class="hero__sub">
+        공공데이터로 분석한 사업장 관측 지표, 같은 업종 동료들의 실제 경험,
+        그리고 AI 상담까지 &mdash; 혼자 감당하지 않아도 됩니다.
+      </p>
+
+      <div class="hero__cta">
+        <a class="btn btn--primary" href="#risk">내 사업장 위험카드 보기 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+        <a class="btn btn--ghost" href="/chat">AI 상담 해보기</a>
+      </div>
+
+      <div class="stats" id="stats"></div>
+    </div>
+  </section>
+
+  <!-- ── 커뮤니티 ──────────────────────────────────── -->
+  <section class="section community" id="community">
+    <div class="container">
+      <div class="sec-head">
+        <div>
+          <span class="eyebrow">커뮤니티</span>
+          <h2 class="h2 sec-head__title">같은 현장, 같은 고민</h2>
+          <p class="sec-head__sub">지역·업종별로 실제 경험을 나누는 익명 커뮤니티</p>
+        </div>
+        <a class="btn btn--primary btn--sm" href="#">전체 게시판 보기 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+      </div>
+
+      <div class="filters" id="filters"></div>
+      <div class="posts" id="posts"></div>
+    </div>
+  </section>
+
+  <!-- ── 4단계 ─────────────────────────────────────── -->
+  <section class="section section--page" id="how">
+    <div class="container">
+      <span class="eyebrow">how it works</span>
+      <h2 class="h2" style="margin-top:8px">4단계로 알아보는 돈워리</h2>
+      <p class="sec-head__sub" style="margin-bottom:36px">사업장 등록부터 AI 상담까지, 일터 위험을 체계적으로 파악하세요.</p>
+
+      <div class="steps">
+        <article class="card step">
+          <div class="step__icon" style="background:var(--brand-soft);color:#b38f00"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01"/></svg></div>
+          <span class="step__no">STEP 1</span>
+          <h3 class="step__title">사업장 등록</h3>
+          <p class="step__body">확인하고 싶은 회사명 또는 사업장명을 등록해 검색합니다.</p>
+          <ul class="step__list" style="color:#b38f00">
+            <li><i></i><span style="color:var(--ink)">회사명</span></li>
+            <li><i></i><span style="color:var(--ink)">지역 선택</span></li>
+            <li><i></i><span style="color:var(--ink)">업종 선택</span></li>
+          </ul>
+          <span class="badge badge--brand step__tag">내가 다니는 곳</span>
+        </article>
+
+        <article class="card step">
+          <div class="step__icon" style="background:var(--info-soft);color:#2b6fd6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1 1 0 0 1 1.6 0C14.6 3.8 17 5 19 5a1 1 0 0 1 1 1Z"/></svg></div>
+          <span class="step__no">STEP 2</span>
+          <h3 class="step__title">위험카드 확인</h3>
+          <p class="step__body">공개 데이터에서 관측된 사실과, 입사 전 확인할 항목을 카드로 봅니다.</p>
+          <ul class="step__list" style="color:#2b6fd6">
+            <li><i></i><span style="color:var(--ink)">명단 등재 여부</span></li>
+            <li><i></i><span style="color:var(--ink)">고용·인건비 추이</span></li>
+            <li><i></i><span style="color:var(--ink)">확인 체크리스트</span></li>
+            <li><i></i><span style="color:var(--ink)">데이터 신뢰도</span></li>
+          </ul>
+          <span class="badge badge--info step__tag">점수 대신 확인할 것</span>
+        </article>
+
+        <article class="card step">
+          <div class="step__icon" style="background:var(--safe-soft);color:#1f9c7d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/></svg></div>
+          <span class="step__no">STEP 3</span>
+          <h3 class="step__title">지역·업종 게시판</h3>
+          <p class="step__body">같은 지역·업종에서 일하는 사람들의 실제 경험과 위험 맥락을 비교합니다.</p>
+          <ul class="step__list" style="color:#1f9c7d">
+            <li><i></i><span style="color:var(--ink)">인천 건설업</span></li>
+            <li><i></i><span style="color:var(--ink)">경기 제조업</span></li>
+            <li><i></i><span style="color:var(--ink)">울산 화학</span></li>
+          </ul>
+          <span class="badge badge--safe step__tag">숫자 뒤의 현장 경험</span>
+        </article>
+
+        <article class="card step">
+          <div class="step__icon" style="background:var(--violet-soft);color:#5b52d1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg></div>
+          <span class="step__no">STEP 4</span>
+          <h3 class="step__title">AI 상담</h3>
+          <p class="step__body">공식 자료와 관측 지표를 학습한 AI가 상담·이직 판단에 필요한 행동을 안내합니다.</p>
+          <ul class="step__list" style="color:#5b52d1">
+            <li><i></i><span style="color:var(--ink)">"돈을 안 줘요"</span></li>
+            <li><i></i><span style="color:var(--ink)">"현장이 위험해요"</span></li>
+            <li><i></i><span style="color:var(--ink)">"이직해야 할까요?"</span></li>
+          </ul>
+          <span class="badge step__tag" style="background:var(--violet-soft);color:#5b52d1">다음 선택지까지 안내</span>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 위험카드 (3레이어) ────────────────────────── -->
+  <section class="section" id="risk">
+    <div class="container risk">
+      <div>
+        <span class="eyebrow">위험카드</span>
+        <h2 class="h2" style="margin-top:8px">위험을 점수 대신<br>확인할 것으로</h2>
+        <p class="lead" style="margin-top:16px">
+          저희는 특정 사업장에 위험 점수나 등급을 매기지 않습니다.
+          공개 데이터에서 <b>관측된 사실</b>과, 그래서 <b>무엇을 확인하면 좋을지</b>를 알려드립니다.
+        </p>
+
+        <div class="risk__features">
+          <div class="risk__feature">
+            <span class="risk__feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg></span>
+            <div>
+              <h3>관측 사실</h3>
+              <p>명단 등재 여부, 국민연금 가입자 추이 등 실제로 기록된 것만</p>
+            </div>
+          </div>
+          <div class="risk__feature">
+            <span class="risk__feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h6"/></svg></span>
+            <div>
+              <h3>확인 체크리스트</h3>
+              <p>예측 신호를 "이걸 물어보세요"라는 질문으로 바꿔 전달</p>
+            </div>
+          </div>
+          <div class="risk__feature">
+            <span class="risk__feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12.8 2.5 8.1 4a.7.7 0 0 1 0 1.2l-8.1 4a1.7 1.7 0 0 1-1.6 0l-8.1-4a.7.7 0 0 1 0-1.2l8.1-4a1.7 1.7 0 0 1 1.6 0Z"/><path d="m22 12.5-9.2 4.6a1.7 1.7 0 0 1-1.6 0L2 12.5"/><path d="m22 17.5-9.2 4.6a1.7 1.7 0 0 1-1.6 0L2 17.5"/></svg></span>
+            <div>
+              <h3>지역·업종 맥락</h3>
+              <p>산재 경보는 시도×업종 집계입니다. 사업장 카드와 분리해 표시합니다</p>
+            </div>
+          </div>
+          <div class="risk__feature">
+            <span class="risk__feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><path d="m9 11 3 3L22 4"/></svg></span>
+            <div>
+              <h3>데이터 신뢰도</h3>
+              <p>결측·매칭 신뢰도를 함께 공개하고, 부족하면 부족하다고 말합니다</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="risk__picker" id="wpicker"></div>
+        <div id="wcard"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── AI 상담 ───────────────────────────────────── -->
+  <section class="section section--page">
+    <div class="container consult">
+      <div>
+        <span class="eyebrow">AI 상담</span>
+        <h2 class="h2" style="margin-top:8px">막막할 때<br>AI가 먼저 답합니다</h2>
+        <p class="lead" style="margin-top:16px">
+          공식 법령과 고용노동부 자료, 관측 지표를 학습한 AI가
+          상황에 맞는 구체적인 행동 방안을 안내합니다.
+        </p>
+        <div class="consult__prompts" id="prompts"></div>
+      </div>
+
+      <div class="botcard">
+        <div class="botcard__head">
+          <span class="botcard__avatar"><svg viewBox="0 0 24 24" fill="none" stroke="#191f28" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg></span>
+          <div>
+            <div class="botcard__name">Money Worry AI</div>
+            <div class="botcard__status"><i></i> Upstage Solar · SKT A.X 동시 비교</div>
+          </div>
+        </div>
+
+        <p class="botcard__bubble">
+          안녕하세요. 일터에서 겪고 있는 어려움을 말씀해 주세요.
+          임금 체불, 산업재해, 부당해고 등 어떤 상황이든 도와드릴 수 있어요.
+        </p>
+
+        <form class="botcard__form" id="quick-form">
+          <input class="botcard__input" id="quick-input" placeholder="궁금한 것을 질문해 보세요..." aria-label="질문 입력">
+          <button class="botcard__send" type="submit" aria-label="상담 시작">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#191f28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 마무리 CTA ────────────────────────────────── -->
+  <section class="section--dark">
+    <div class="container cta">
+      <span class="eyebrow">지금 시작하세요</span>
+      <h2 class="cta__title">내 사업장, 지금 무엇을<br>확인해야 하는지 알아보세요</h2>
+      <p class="cta__sub">3분이면 충분합니다. 회사명만 입력하면 공개 데이터에서 관측된 사실과 확인할 항목을 정리해 드립니다.</p>
+      <div class="cta__buttons">
+        <a class="btn btn--primary" href="#risk">무료로 위험카드 보기 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+        <a class="btn btn--dark" href="/chat">AI 상담 먼저 해보기</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer__top">
+      <div>
+        <div class="brand">
+          <span class="brand__mark"><svg viewBox="0 0 24 24" fill="none" stroke="#191f28" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+          <span class="brand__name">돈워리</span>
+        </div>
+        <p class="footer__desc">커뮤니티 기반 AI 일터위험<br>조기경보 플랫폼</p>
+      </div>
+      <div class="footer__col">
+        <h3>서비스</h3>
+        <ul><li><a href="#risk">위험카드 조회</a></li><li><a href="#community">커뮤니티</a></li><li><a href="/chat">AI 상담</a></li><li><a href="#how">업종별 통계</a></li></ul>
+      </div>
+      <div class="footer__col">
+        <h3>정보</h3>
+        <ul><li><a href="#">이용약관</a></li><li><a href="#">개인정보처리방침</a></li><li><a href="#">공지사항</a></li><li><a href="#">FAQ</a></li></ul>
+      </div>
+      <div class="footer__col">
+        <h3>문의</h3>
+        <ul><li><a href="#">고객센터</a></li><li><a href="#">제보하기</a></li><li><a href="#">제휴 문의</a></li><li><a href="#">오픈소스</a></li></ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span>&copy; 2026 돈워리. All rights reserved.</span>
+      <span>본 플랫폼의 정보는 참고용이며 법적 효력을 갖지 않습니다.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="/js/icons.js"></script>
+<script src="/js/landing.js"></script>
+</body>
+</html>

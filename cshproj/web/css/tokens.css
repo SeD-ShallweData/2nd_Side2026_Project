@@ -1,0 +1,58 @@
+/* 디자인 토큰
+ *
+ * 출처: design/source/figma-extract/design-tokens.css (Figma Dev Mode 추출본)
+ * 시안이 바뀌면 이 파일만 갱신합니다. 개별 규칙에 색을 직접 쓰지 않습니다.
+ */
+
+:root {
+  /* ── 색 (Figma 추출값) ── */
+  --ink: #191f28;          /* 본문·제목 */
+  --muted: #8b95a1;        /* 보조 텍스트 */
+  --subtle: #6a7282;       /* 더 진한 보조 텍스트 */
+  --brand: #ffd600;        /* 돈워리 옐로 */
+  --page: #f7f8fa;         /* 페이지 배경 */
+  --surface: #f2f4f6;      /* 카드 안쪽 면 */
+  --line: #e5e8eb;         /* 경계선 */
+  --safe: #48cfad;         /* 안정 신호 */
+  --danger: #e53935;       /* 위험·긴급 */
+  --info: #4e9aff;         /* 정보 */
+  --violet: #a29bfe;       /* 보조 강조 */
+  --white: #ffffff;
+
+  /* ── 파생값 ── */
+  --brand-soft: #fff8cc;   /* 옐로 배경 pill */
+  --brand-ink: #b38f00;    /* 옐로 배경 위 텍스트 */
+  --safe-soft: #e6f9f3;
+  --danger-soft: #fdecea;
+  --info-soft: #eaf2ff;
+  --violet-soft: #f0eeff;
+  --dark: #1c1f26;         /* 다크 섹션 배경 */
+  --dark-2: #22262e;       /* 다크 섹션 카드 */
+  --dark-line: #2f343d;
+
+  /* ── 타이포 ── */
+  --font: "Noto Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo",
+          "Malgun Gothic", sans-serif;
+  --fw-regular: 400;
+  --fw-bold: 700;
+  --fw-black: 900;
+
+  /* ── 레이아웃 ── */
+  --container: 1152px;
+  --gutter: 24px;
+  --nav-h: 64px;
+  --section-y: 96px;
+
+  /* ── 모서리 ── */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-2xl: 24px;
+  --r-pill: 999px;
+
+  /* ── 그림자 ── */
+  --shadow-sm: 0 1px 2px rgba(25, 31, 40, .04);
+  --shadow-md: 0 4px 16px rgba(25, 31, 40, .06);
+  --shadow-lg: 0 12px 32px rgba(25, 31, 40, .10);
+}

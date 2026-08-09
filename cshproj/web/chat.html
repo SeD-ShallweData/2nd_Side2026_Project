@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 상담 — 돈워리</title>
+<link rel="icon" href="/assets/logo/favicon.svg">
+<link rel="stylesheet" href="/css/fonts.css">
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/chat.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="container nav__inner">
+    <a class="brand" href="/">
+      <span class="brand__mark"><svg viewBox="0 0 24 24" fill="none" stroke="#191f28" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+      <span class="brand__name">돈워리</span>
+    </a>
+    <nav class="nav__links">
+      <a href="/#how">서비스 소개</a>
+      <a href="/#risk">위험카드</a>
+      <a href="/#community">커뮤니티</a>
+      <a href="/chat" aria-current="page">AI 상담</a>
+      <a href="/contract">계약서 진단</a>
+    </nav>
+    <div class="nav__actions">
+      <button class="btn btn--ghost btn--sm" id="reset">대화 초기화</button>
+    </div>
+  </div>
+</header>
+
+<div class="app">
+
+  <aside class="side">
+    <div class="side__block">
+      <h3>상담 유형</h3>
+      <div class="persona" id="persona"></div>
+    </div>
+
+    <div class="side__block">
+      <h3>예시 질문</h3>
+      <div class="samples" id="samples"></div>
+    </div>
+
+    <div class="side__block">
+      <h3>파이프라인</h3>
+      <div class="side__status" id="status"></div>
+    </div>
+
+    <p class="side__foot">
+      프로토타입 · 프롬프트 엔지니어링 단계<br>
+      두 모델의 답변을 나란히 비교합니다.<br><br>
+      법률 자문이 아닙니다. 상담 1350
+    </p>
+  </aside>
+
+  <main class="main">
+    <div class="thread" id="thread">
+      <div class="thread__inner">
+        <div class="empty" id="empty">
+          <div class="empty__avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#191f28" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg>
+          </div>
+          <h2>무엇을 도와드릴까요?</h2>
+          <p>임금 체불, 산업재해, 근로조건 — 어떤 상황이든 말씀해 주세요.<br>
+             같은 질문을 Upstage Solar와 SKT A.X에 동시에 보내 답변을 나란히 보여드립니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <form class="composer" id="composer">
+      <div class="composer__inner">
+        <textarea id="input" rows="1" placeholder="질문을 입력하세요.  (Enter 전송 · Shift+Enter 줄바꿈)"></textarea>
+        <button class="composer__send" type="submit" id="send" aria-label="전송">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#191f28" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+        </button>
+      </div>
+      <p class="composer__hint" id="hint"></p>
+    </form>
+  </main>
+
+</div>
+
+<script src="/js/icons.js"></script>
+<script src="/js/chat.js"></script>
+</body>
+</html>
