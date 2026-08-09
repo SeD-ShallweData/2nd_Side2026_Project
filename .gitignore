@@ -234,3 +234,21 @@ config.env
 # 웹폰트 — scripts/fetch_fonts.sh 로 내려받습니다 (3.7MB, git에는 올리지 않음)
 /cshproj/web/assets/fonts/notosanskr/
 /cshproj/web/css/fonts.css
+.context/
+CLAUDE.md
+api_key.env
+_service_bundle/
+node_modules/
+.next/
+next-env.d.ts
+tsconfig.tsbuildinfo
+.data/
+.env.local
+/.env.example
+/src/
+/data/
+/next.config.ts
+/postcss.config.mjs
+/tsconfig.json
+/package.json
+/package-lock.json
