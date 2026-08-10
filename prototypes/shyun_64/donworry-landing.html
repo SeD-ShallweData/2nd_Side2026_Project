@@ -1,0 +1,1301 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>돈워리 — 일터의 위험, 미리 알고 대비하세요</title>
+<style>
+  :root {
+    --ink: #16181d;
+    --ink-soft: #363941;
+    --paper: #faf9f5;
+    --surface: #ffffff;
+    --muted: #6b6f76;
+    --line: rgba(22, 24, 29, 0.1);
+    --line-strong: rgba(22, 24, 29, 0.16);
+    --hazard: #ffc22e;
+    --hazard-ink: #4a3600;
+    --alert: #c6432e;
+    --alert-soft: #fbe9e5;
+    --safe: #4f8a5b;
+    --c-construction: #d97b2b;
+    --c-manufacturing: #3e6fa6;
+    --c-chemical: #a63e3e;
+    --c-service: #5b8a72;
+    --c-logistics: #5b6e96;
+    --step-violet: #7c6fdc;
+    --step-indigo: #6d5fe0;
+    --footer-bg: #14151a;
+    --footer-line: rgba(255, 255, 255, 0.08);
+    --footer-muted: #9a9ca3;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(22, 24, 29, 0.06), 0 10px 28px -14px rgba(22, 24, 29, 0.22);
+    --font-kr: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Roboto Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #ece9e2;
+      --ink-soft: #c7c4bd;
+      --paper: #131417;
+      --surface: #1b1d21;
+      --muted: #97999f;
+      --line: rgba(236, 233, 226, 0.12);
+      --line-strong: rgba(236, 233, 226, 0.2);
+      --hazard-ink: #2c2000;
+      --alert-soft: rgba(198, 67, 46, 0.18);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 32px -16px rgba(0, 0, 0, 0.65);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #ece9e2;
+    --ink-soft: #c7c4bd;
+    --paper: #131417;
+    --surface: #1b1d21;
+    --muted: #97999f;
+    --line: rgba(236, 233, 226, 0.12);
+    --line-strong: rgba(236, 233, 226, 0.2);
+    --hazard-ink: #2c2000;
+    --alert-soft: rgba(198, 67, 46, 0.18);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 32px -16px rgba(0, 0, 0, 0.65);
+  }
+  :root[data-theme="light"] {
+    --ink: #16181d;
+    --ink-soft: #363941;
+    --paper: #faf9f5;
+    --surface: #ffffff;
+    --muted: #6b6f76;
+    --line: rgba(22, 24, 29, 0.1);
+    --line-strong: rgba(22, 24, 29, 0.16);
+    --hazard-ink: #4a3600;
+    --alert-soft: #fbe9e5;
+    --shadow: 0 1px 2px rgba(22, 24, 29, 0.06), 0 10px 28px -14px rgba(22, 24, 29, 0.22);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  html, body { max-width: 100%; overflow-x: hidden; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-kr);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  h1, h2, h3, p { margin: 0; text-wrap: balance; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; }
+
+  /* ---- caution strip ---- */
+  .tape-strip {
+    height: 6px;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--hazard) 0 14px,
+      var(--ink) 14px 28px
+    );
+  }
+
+  /* ---- header ---- */
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .header-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+    margin-right: auto;
+  }
+  .logo svg { flex: none; }
+  .main-nav {
+    display: flex;
+    gap: 28px;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+  }
+  .main-nav a {
+    padding-bottom: 4px;
+    box-shadow: 0 2px 0 0 transparent;
+    transition: color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .main-nav a:hover, .main-nav a:focus-visible { color: var(--ink); }
+  .main-nav a.active { color: var(--ink); font-weight: 700; box-shadow: 0 2px 0 0 var(--hazard); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .header-actions { display: flex; align-items: center; gap: 18px; }
+  .link-btn { font-size: 0.92rem; color: var(--ink-soft); }
+  .link-btn:hover { color: var(--ink); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.92rem;
+    padding: 9px 18px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    white-space: nowrap;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
+  .btn-primary { background: var(--hazard); color: var(--hazard-ink); }
+  .btn-primary:hover { box-shadow: 0 8px 20px -8px rgba(255, 194, 46, 0.7); }
+  .btn-ghost { background: transparent; border-color: var(--line-strong); color: var(--ink); }
+  .btn-ghost:hover { border-color: var(--ink); }
+  .btn-lg { padding: 13px 24px; font-size: 0.98rem; }
+
+  @media (max-width: 860px) {
+    .main-nav { display: none; }
+  }
+
+  /* ---- hero ---- */
+  .hero { max-width: 1180px; margin: 0 auto; padding: 64px 28px 0; }
+  .hero-inner {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 56px;
+    align-items: center;
+  }
+  @media (max-width: 900px) {
+    .hero-inner { grid-template-columns: 1fr; gap: 44px; }
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--hazard-ink);
+    background: color-mix(in srgb, var(--hazard) 35%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--hazard) 55%, transparent);
+    padding: 6px 14px;
+    border-radius: 999px;
+  }
+  @media (prefers-color-scheme: dark) { .badge { color: var(--hazard); background: color-mix(in srgb, var(--hazard) 16%, var(--surface)); } }
+  :root[data-theme="dark"] .badge { color: var(--hazard); background: color-mix(in srgb, var(--hazard) 16%, var(--surface)); }
+
+  .hero h1 {
+    margin-top: 20px;
+    font-size: clamp(2.1rem, 4.2vw, 3.4rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.18;
+  }
+  .hero h1 .accent { color: var(--hazard); }
+  @media (prefers-color-scheme: dark) { .hero h1 .accent { color: #ffd15c; } }
+  :root[data-theme="dark"] .hero h1 .accent { color: #ffd15c; }
+
+  .lede {
+    margin-top: 20px;
+    max-width: 46ch;
+    font-size: 1.02rem;
+    color: var(--muted);
+  }
+  .hero-actions { display: flex; gap: 14px; margin-top: 32px; flex-wrap: wrap; }
+
+  /* ---- hero risk card visual ---- */
+  .hero-visual { display: flex; justify-content: center; }
+  .risk-card {
+    width: min(360px, 100%);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 22px;
+    transform: rotate(1.5deg);
+  }
+  .risk-card-head { display: flex; align-items: center; gap: 12px; }
+  .risk-card-icon {
+    flex: none;
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--hazard) 30%, var(--surface));
+    display: grid; place-items: center;
+  }
+  .risk-card-title { font-weight: 700; font-size: 0.95rem; }
+  .risk-card-sub { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+  .risk-pill {
+    margin-left: auto;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--alert-soft);
+    color: var(--alert);
+  }
+
+  .risk-meter { margin-top: 20px; }
+  .risk-meter-track {
+    position: relative;
+    height: 8px;
+    border-radius: 999px;
+    display: flex;
+    overflow: visible;
+  }
+  .risk-meter-track .seg { height: 100%; }
+  .risk-meter-track .seg:first-child { border-radius: 999px 0 0 999px; }
+  .risk-meter-track .seg:last-child { border-radius: 0 999px 999px 0; }
+  .seg.low { flex: 1; background: color-mix(in srgb, var(--safe) 55%, var(--line)); }
+  .seg.mid { flex: 1; background: var(--hazard); }
+  .seg.high { flex: 1; background: var(--alert); }
+  .risk-meter-pointer {
+    position: absolute;
+    top: -22px;
+    left: 78%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--alert);
+  }
+  .risk-meter-pointer::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -8px;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--alert);
+  }
+  .risk-meter-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+
+  .risk-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
+  .risk-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.86rem;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .risk-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+  .risk-list b { margin-left: auto; font-weight: 700; color: var(--ink-soft); font-size: 0.78rem; }
+
+  .risk-card-foot {
+    margin-top: 16px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+
+  /* ---- stats ---- */
+  .stats {
+    max-width: 1180px;
+    margin: 68px auto 0;
+    padding: 30px 28px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .stats > div {
+    padding: 6px 24px;
+    border-left: 1px solid var(--line);
+  }
+  .stats > div:first-child { border-left: none; padding-left: 0; }
+  .stats dt {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .stats dt span { font-family: var(--font-kr); font-size: 0.95rem; font-weight: 600; color: var(--muted); }
+  .stats dd { margin: 6px 0 0; font-size: 0.84rem; color: var(--muted); }
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: repeat(2, 1fr); row-gap: 22px; }
+    .stats > div:nth-child(3) { border-left: none; padding-left: 0; }
+  }
+
+  /* ---- how it works ---- */
+  .how-it-works { max-width: 1180px; margin: 0 auto; padding: 76px 28px 0; scroll-margin-top: 84px; }
+  .how-it-works h2 { font-size: clamp(1.5rem, 2.6vw, 1.9rem); font-weight: 800; letter-spacing: -0.01em; }
+  .how-it-works .lede { margin-top: 8px; max-width: none; font-size: 0.94rem; }
+
+  .step-grid {
+    margin-top: 32px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .step-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .step-grid { grid-template-columns: 1fr; } }
+
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+  }
+  .step-card.step-1 { --accent: var(--step-violet); }
+  .step-card.step-2 { --accent: var(--c-manufacturing); }
+  .step-card.step-3 { --accent: var(--c-service); }
+  .step-card.step-4 { --accent: var(--step-indigo); }
+
+  .step-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  }
+  .step-badge {
+    margin-top: 18px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .step-title { margin-top: 6px; font-size: 1rem; font-weight: 800; }
+  .step-desc { margin-top: 8px; font-size: 0.86rem; color: var(--muted); line-height: 1.6; }
+
+  .step-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+  .step-list li { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: var(--ink-soft); }
+  .step-list li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+
+  .step-quotes { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+  .step-quotes li { font-size: 0.84rem; color: var(--ink-soft); font-style: italic; }
+
+  .step-tag {
+    margin-top: 16px;
+    padding-top: 0;
+    width: fit-content;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+    color: var(--accent);
+  }
+
+  /* ---- risk cards showcase ---- */
+  .risk-cards { max-width: 1180px; margin: 0 auto; padding: 76px 28px 0; scroll-margin-top: 84px; }
+  .risk-cards-inner {
+    display: grid;
+    grid-template-columns: 0.85fr 1.15fr;
+    gap: 64px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .risk-cards-inner { grid-template-columns: 1fr; gap: 40px; }
+  }
+  .risk-cards-copy h2 { margin-top: 12px; font-size: clamp(1.6rem, 2.8vw, 2.1rem); font-weight: 800; letter-spacing: -0.01em; line-height: 1.3; }
+  .risk-cards-copy .lede { margin-top: 14px; max-width: 42ch; }
+
+  .feature-list { list-style: none; margin: 32px 0 0; padding: 0; display: grid; gap: 20px; }
+  .feature-item { display: flex; align-items: flex-start; gap: 14px; }
+  .feature-icon {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    color: var(--hazard-ink);
+    background: color-mix(in srgb, var(--hazard) 16%, var(--surface));
+  }
+  @media (prefers-color-scheme: dark) { .feature-icon { color: var(--hazard); } }
+  :root[data-theme="dark"] .feature-icon { color: var(--hazard); }
+  .feature-title { font-size: 0.92rem; font-weight: 700; }
+  .feature-desc { margin-top: 3px; font-size: 0.82rem; color: var(--muted); }
+
+  .risk-card-list { display: grid; gap: 18px; }
+  .risk-mini-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px 22px;
+  }
+  .risk-mini-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .risk-mini-title { font-size: 0.94rem; font-weight: 700; }
+  .risk-mini-sub {
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .risk-mini-sub svg { flex: none; }
+  .risk-mini-sub .sep { margin: 0 2px; }
+
+  .risk-badge { flex: none; font-size: 0.74rem; font-weight: 700; padding: 4px 11px; border-radius: 999px; white-space: nowrap; }
+  .risk-badge.low { background: color-mix(in srgb, var(--safe) 18%, var(--surface)); color: var(--safe); }
+  .risk-badge.mid { background: color-mix(in srgb, var(--hazard) 25%, var(--surface)); color: var(--hazard-ink); }
+  .risk-badge.high { background: var(--alert-soft); color: var(--alert); }
+  @media (prefers-color-scheme: dark) { .risk-badge.mid { color: var(--hazard); } }
+  :root[data-theme="dark"] .risk-badge.mid { color: var(--hazard); }
+
+  .metric { margin-top: 16px; }
+  .metric-label { font-size: 0.78rem; color: var(--muted); }
+  .metric-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .metric-bar-track { flex: 1; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .metric-bar-fill { height: 100%; border-radius: 999px; }
+  .metric-bar-fill.low { background: var(--safe); }
+  .metric-bar-fill.mid { background: var(--hazard); }
+  .metric-bar-fill.high { background: var(--alert); }
+  .metric-value {
+    flex: none;
+    min-width: 20px;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+  }
+
+  .risk-mini-foot {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .risk-detail-link { font-weight: 700; color: var(--ink); }
+
+  /* ---- community ---- */
+  .community { max-width: 1180px; margin: 0 auto; padding: 76px 28px 96px; }
+  .community-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .eyebrow {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--hazard-ink);
+    background: color-mix(in srgb, var(--hazard) 35%, transparent);
+    width: fit-content;
+    padding: 3px 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+  }
+  @media (prefers-color-scheme: dark) { .eyebrow { color: var(--hazard); background: color-mix(in srgb, var(--hazard) 18%, transparent); } }
+  :root[data-theme="dark"] .eyebrow { color: var(--hazard); background: color-mix(in srgb, var(--hazard) 18%, transparent); }
+  .community-head h2 { font-size: clamp(1.5rem, 2.6vw, 1.9rem); font-weight: 800; letter-spacing: -0.01em; }
+  .community-head p { margin-top: 8px; color: var(--muted); font-size: 0.94rem; }
+  .link-arrow {
+    font-size: 0.9rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .link-arrow:hover { border-color: var(--ink); }
+
+  .filter-tabs {
+    display: flex;
+    gap: 8px;
+    margin-top: 32px;
+    flex-wrap: wrap;
+  }
+  .tab {
+    background: transparent;
+    border: 1px solid var(--line-strong);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .tab:hover { border-color: var(--ink); color: var(--ink); }
+  .tab.active { background: var(--hazard); border-color: var(--hazard); color: var(--hazard-ink); }
+  .tab:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
+
+  .post-grid {
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+  .post-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    border-top: 4px solid var(--accent);
+    box-shadow: var(--shadow);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    display: flex;
+    flex-direction: column;
+  }
+  .post-card:hover { transform: translateY(-3px); }
+  .post-card.construction { --accent: var(--c-construction); }
+  .post-card.manufacturing { --accent: var(--c-manufacturing); }
+  .post-card.chemical { --accent: var(--c-chemical); }
+  .post-card.service { --accent: var(--c-service); }
+  .post-card.logistics { --accent: var(--c-logistics); }
+
+  .post-tags { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .post-tag {
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+    color: var(--accent);
+  }
+  .post-tag.urgent {
+    background: var(--alert-soft);
+    color: var(--alert);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .post-title { margin-top: 14px; font-size: 1rem; font-weight: 700; line-height: 1.4; }
+  .post-desc {
+    margin-top: 8px;
+    font-size: 0.86rem;
+    color: var(--muted);
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .post-foot {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  .post-foot span { display: inline-flex; align-items: center; gap: 4px; }
+  .post-foot .time { margin-right: auto; font-family: var(--font-kr); }
+  .post-foot svg { flex: none; }
+
+  /* ---- ai consult ---- */
+  .ai-consult { max-width: 1180px; margin: 0 auto; padding: 76px 28px 96px; scroll-margin-top: 84px; }
+  .ai-consult-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    padding: 48px;
+  }
+  @media (max-width: 640px) { .ai-consult-card { padding: 32px 24px; } }
+
+  .ai-consult-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+    align-items: center;
+  }
+  @media (max-width: 900px) { .ai-consult-inner { grid-template-columns: 1fr; gap: 36px; } }
+
+  .ai-consult-copy h2 { margin-top: 12px; font-size: clamp(1.6rem, 2.8vw, 2.1rem); font-weight: 800; letter-spacing: -0.01em; line-height: 1.3; }
+  .ai-consult-copy .lede { margin-top: 14px; max-width: 44ch; }
+
+  .question-list { list-style: none; margin: 28px 0 0; padding: 0; display: grid; gap: 10px; }
+  .question-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: color-mix(in srgb, var(--ink) 4%, var(--surface));
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 0.86rem;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .question-item:hover, .question-item:focus-visible { border-color: var(--line-strong); background: color-mix(in srgb, var(--ink) 7%, var(--surface)); }
+
+  .chat-widget {
+    background: color-mix(in srgb, var(--ink) 4%, var(--surface));
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 20px;
+  }
+  .chat-widget-head { display: flex; align-items: center; gap: 12px; }
+  .chat-avatar {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--hazard);
+    display: grid;
+    place-items: center;
+  }
+  .chat-widget-title { font-weight: 700; font-size: 0.94rem; }
+  .chat-widget-sub { margin-top: 2px; display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--muted); }
+  .chat-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--safe); flex: none; }
+
+  .chat-bubble {
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    font-size: 0.86rem;
+    line-height: 1.6;
+    color: var(--ink-soft);
+  }
+
+  .chat-input-row {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 6px 6px 18px;
+  }
+  .chat-input-row input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: none;
+    font-size: 0.86rem;
+    color: var(--ink);
+  }
+  .chat-input-row input::placeholder { color: var(--muted); }
+  .chat-input-row input:focus { outline: none; }
+  .chat-send-btn {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--hazard);
+    color: var(--hazard-ink);
+    display: grid;
+    place-items: center;
+    border: none;
+    cursor: pointer;
+  }
+  .chat-send-btn:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
+
+  /* ---- final cta ---- */
+  .final-cta { background: var(--footer-bg); padding: 88px 28px 64px; text-align: center; }
+  .final-cta-inner { max-width: 720px; margin: 0 auto; }
+  .final-cta .cta-eyebrow { display: block; font-size: 0.82rem; font-weight: 700; color: var(--hazard); letter-spacing: 0.02em; }
+  .final-cta h2 { margin-top: 14px; color: #fff; font-size: clamp(1.6rem, 3vw, 2.1rem); font-weight: 800; line-height: 1.4; letter-spacing: -0.01em; }
+  .final-cta p { margin-top: 16px; color: var(--footer-muted); font-size: 0.95rem; line-height: 1.6; }
+  .final-cta-actions { margin-top: 32px; display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .final-cta .btn-ghost { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.16); color: #fff; }
+  .final-cta .btn-ghost:hover { border-color: rgba(255, 255, 255, 0.32); }
+
+  /* ---- footer ---- */
+  .site-footer { background: var(--footer-bg); padding: 0 28px 32px; }
+  .footer-top {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    gap: 32px;
+    padding: 8px 0 40px;
+  }
+  @media (max-width: 760px) { .footer-top { grid-template-columns: repeat(2, 1fr); row-gap: 32px; } }
+  @media (max-width: 480px) { .footer-top { grid-template-columns: 1fr; } }
+
+  .footer-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1rem; color: #fff; }
+  .footer-brand p { margin-top: 10px; max-width: 32ch; font-size: 0.82rem; color: var(--footer-muted); line-height: 1.6; }
+
+  .footer-col { display: flex; flex-direction: column; gap: 10px; }
+  .footer-col-title { font-size: 0.82rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .footer-col a { font-size: 0.84rem; color: var(--footer-muted); transition: color 0.15s ease; }
+  .footer-col a:hover { color: #fff; }
+
+  .footer-bottom {
+    max-width: 1180px;
+    margin: 0 auto;
+    border-top: 1px solid var(--footer-line);
+    padding-top: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.78rem;
+    color: var(--footer-muted);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-copy { animation: rise 0.6s ease both; }
+    .hero-visual { animation: rise 0.6s 0.1s ease both; }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="tape-strip" aria-hidden="true"></div>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="logo" href="#">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3 L22 20 L2 20 Z" fill="var(--hazard)" stroke="var(--ink)" stroke-width="1.4" stroke-linejoin="round"/>
+        <rect x="11.15" y="9.5" width="1.7" height="6" rx="0.8" fill="var(--ink)"/>
+        <circle cx="12" cy="17.2" r="1" fill="var(--ink)"/>
+      </svg>
+      돈워리
+    </a>
+    <nav class="main-nav">
+      <a href="#how-it-works" data-tab="how-it-works">서비스 소개</a>
+      <a href="#risk-cards" data-tab="risk-cards">위험카드</a>
+      <a href="#community" data-tab="community">커뮤니티</a>
+      <a href="#ai-consult" data-tab="ai-consult">AI 상담</a>
+    </nav>
+    <div class="header-actions">
+      <a class="link-btn" href="#">로그인</a>
+      <a class="btn btn-primary" href="#">시작하기</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <span class="badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 11-14h-7l0-6Z" fill="currentColor"/></svg>
+          커뮤니티 기반 AI 일터위험 조기경보
+        </span>
+        <h1>일터의 위험,<br><span class="accent">미리 알고 대비하세요</span></h1>
+        <p class="lede">AI가 분석한 사업장 위험카드, 같은 업종 동료들의 실제 경험, 그리고 RAG AI 상담까지 — 혼자 감당하지 않아도 됩니다.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-lg" href="#">내 사업장 위험카드 보기 →</a>
+          <a class="btn btn-ghost btn-lg" href="#">AI 상담 해보기</a>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="risk-card">
+          <div class="risk-card-head">
+            <span class="risk-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="10" width="7" height="11" fill="var(--hazard-ink)" opacity="0.8"/>
+                <rect x="12" y="4" width="9" height="17" fill="var(--hazard-ink)"/>
+                <rect x="14.5" y="7" width="2" height="2" fill="var(--surface)"/>
+                <rect x="18" y="7" width="2" height="2" fill="var(--surface)"/>
+                <rect x="14.5" y="11" width="2" height="2" fill="var(--surface)"/>
+                <rect x="18" y="11" width="2" height="2" fill="var(--surface)"/>
+              </svg>
+            </span>
+            <div>
+              <p class="risk-card-title">동편 물류센터 신축현장</p>
+              <p class="risk-card-sub">건설업 · 골조 공사</p>
+            </div>
+            <span class="risk-pill">위험</span>
+          </div>
+
+          <div class="risk-meter">
+            <div class="risk-meter-track">
+              <span class="seg low"></span><span class="seg mid"></span><span class="seg high"></span>
+              <span class="risk-meter-pointer" style="left:78%">78</span>
+            </div>
+            <div class="risk-meter-labels"><span>안전</span><span>주의</span><span>위험</span></div>
+          </div>
+
+          <ul class="risk-list">
+            <li><span class="risk-dot" style="--c:var(--alert)"></span>추락 위험<b>고위험</b></li>
+            <li><span class="risk-dot" style="--c:var(--hazard)"></span>낙하물<b>주의</b></li>
+            <li><span class="risk-dot" style="--c:var(--c-manufacturing)"></span>소음·분진<b>보통</b></li>
+          </ul>
+
+          <p class="risk-card-foot">AI 분석 · 3분 전 업데이트</p>
+        </div>
+      </div>
+    </div>
+
+    <dl class="stats">
+      <div><dt>12,480<span>개</span></dt><dd>등록된 사업장</dd></div>
+      <div><dt>8,930<span>건</span></dt><dd>위험카드 발급</dd></div>
+      <div><dt>34,200<span>건</span></dt><dd>커뮤니티 글</dd></div>
+      <div><dt>21,600<span>건</span></dt><dd>AI 상담 건수</dd></div>
+    </dl>
+  </section>
+
+  <section class="how-it-works tab-panel" id="how-it-works">
+    <span class="eyebrow">HOW IT WORKS</span>
+    <h2>4단계로 알아보는 Money Worry</h2>
+    <p class="lede">사업장 등록부터 AI 상담까지, 일터 위험을 체계적으로 파악하세요.</p>
+
+    <div class="step-grid">
+      <div class="step-card step-1">
+        <span class="step-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/>
+          </svg>
+        </span>
+        <p class="step-badge">STEP 1</p>
+        <h3 class="step-title">사업장 등록</h3>
+        <p class="step-desc">사용자가 회사명 또는 사업장명을 등록해 확인하고 싶은 대상을 검색한다.</p>
+        <ul class="step-list">
+          <li>회사명</li>
+          <li>지역 선택</li>
+          <li>업종 선택</li>
+        </ul>
+        <span class="step-tag">내가 다니는 곳</span>
+      </div>
+
+      <div class="step-card step-2">
+        <span class="step-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6Z"/><path d="m9 12 2 2 4-4"/>
+          </svg>
+        </span>
+        <p class="step-badge">STEP 2</p>
+        <h3 class="step-title">위험카드 확인</h3>
+        <p class="step-desc">등록된 사업장의 위험 수준과 상태를 한눈에 확인 가능한 카드 형태로 제공한다.</p>
+        <ul class="step-list">
+          <li>체불 위험(수치/텍스트)</li>
+          <li>산재 위험(수치/텍스트)</li>
+          <li>고용 안정성(수치)</li>
+          <li>데이터 신뢰도(수치)</li>
+        </ul>
+        <span class="step-tag">위험을 등급과 근거로 제시</span>
+      </div>
+
+      <div class="step-card step-3">
+        <span class="step-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.3c2.4.4 4.5 2.5 4.5 5.7"/>
+          </svg>
+        </span>
+        <p class="step-badge">STEP 3</p>
+        <h3 class="step-title">지역·업종 게시판 활용</h3>
+        <p class="step-desc">같은 지역·업종에서 일하는 사람들의 실제 경험을 나누고 위험 맥락을 비교한다.</p>
+        <ul class="step-list">
+          <li>인천 건설업</li>
+          <li>경기 제조업</li>
+          <li>울산 화학 관련 제조업</li>
+        </ul>
+        <span class="step-tag">혼자 겪는 현장 경험 확인</span>
+      </div>
+
+      <div class="step-card step-4">
+        <span class="step-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 5h16v11H8l-4 4Z"/><path d="M8 10h8M8 13h5"/>
+          </svg>
+        </span>
+        <p class="step-badge">STEP 4</p>
+        <h3 class="step-title">RAG AI 상담</h3>
+        <p class="step-desc">공식자료의 위험카드를 우선 학습한 LLM을 통해 상담, 이직 판단에 필요한 행동을 안내한다.</p>
+        <ul class="step-quotes">
+          <li>“돈을 안 줘요”</li>
+          <li>“산재 위험해요”</li>
+          <li>“이직해야 할까요?”</li>
+        </ul>
+        <span class="step-tag">다음 선택지까지 안내</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="risk-cards tab-panel" id="risk-cards">
+    <div class="risk-cards-inner">
+      <div class="risk-cards-copy">
+        <span class="eyebrow">위험카드</span>
+        <h2>사업장 위험을<br>숫자로 보세요</h2>
+        <p class="lede">체불 위험, 산재 위험, 고용 안정성을 AI가 분석해 누구나 이해할 수 있는 카드 형태로 제공합니다. 데이터 신뢰도까지 함께 표시해 투명하게 공개합니다.</p>
+
+        <ul class="feature-list">
+          <li class="feature-item">
+            <span class="feature-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+                <path d="M3 17 9 10 13 14 21 5"/><path d="M15 5h6v6"/>
+              </svg>
+            </span>
+            <div>
+              <p class="feature-title">체불 위험</p>
+              <p class="feature-desc">임금 체불 가능성을 수치로 표현</p>
+            </div>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3 21 19H3Z"/><path d="M12 9.5v4.5"/><circle cx="12" cy="16.3" r="0.9" fill="currentColor" stroke="none"/>
+              </svg>
+            </span>
+            <div>
+              <p class="feature-title">산재 위험</p>
+              <p class="feature-desc">사고·질병 위험도를 지수화</p>
+            </div>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <path d="M4 20v-6"/><path d="M10 20V9"/><path d="M16 20V4"/>
+              </svg>
+            </span>
+            <div>
+              <p class="feature-title">고용 안정성</p>
+              <p class="feature-desc">근속 가능성 및 고용 형태 분석</p>
+            </div>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.6 2.6L16.5 9"/>
+              </svg>
+            </span>
+            <div>
+              <p class="feature-title">데이터 신뢰도</p>
+              <p class="feature-desc">분석에 사용된 데이터 신뢰 수준</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="risk-card-list">
+        <div class="risk-mini-card">
+          <div class="risk-mini-head">
+            <div>
+              <p class="risk-mini-title">삼성전자 반도체 기흥사업장</p>
+              <p class="risk-mini-sub">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/></svg>
+                경기 용인 <span class="sep">·</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V10l5 3V10l5 3V10l5 3v8Z"/></svg>
+                반도체 제조
+              </p>
+            </div>
+            <span class="risk-badge low">위험 낮음</span>
+          </div>
+
+          <div class="metric">
+            <p class="metric-label">체불 위험</p>
+            <div class="metric-row"><div class="metric-bar-track"><span class="metric-bar-fill low" style="width:5%"></span></div><span class="metric-value">5</span></div>
+          </div>
+          <div class="metric">
+            <p class="metric-label">산재 위험</p>
+            <div class="metric-row"><div class="metric-bar-track"><span class="metric-bar-fill low" style="width:12%"></span></div><span class="metric-value">12</span></div>
+          </div>
+          <div class="metric">
+            <p class="metric-label">고용 안정성</p>
+            <div class="metric-row"><div class="metric-bar-track"><span class="metric-bar-fill low" style="width:88%"></span></div><span class="metric-value">88</span></div>
+          </div>
+
+          <div class="risk-mini-foot">
+            <span>데이터 신뢰도 94%</span>
+            <a class="risk-detail-link" href="#">상세 보기 →</a>
+          </div>
+        </div>
+
+        <div class="risk-mini-card">
+          <div class="risk-mini-head">
+            <div>
+              <p class="risk-mini-title">현대건설 인천 2공구</p>
+              <p class="risk-mini-sub">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/></svg>
+                인천 서구 <span class="sep">·</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V10l5 3V10l5 3V10l5 3v8Z"/></svg>
+                건설업
+              </p>
+            </div>
+            <span class="risk-badge high">위험 높음</span>
+          </div>
+
+          <div class="metric">
+            <p class="metric-label">체불 위험</p>
+            <div class="metric-row"><div class="metric-bar-track"><span class="metric-bar-fill high" style="width:68%"></span></div><span class="metric-value">68</span></div>
+          </div>
+          <div class="metric">
+            <p class="metric-label">산재 위험</p>
+            <div class="metric-row"><div class="metric-bar-track"><span class="metric-bar-fill high" style="width:71%"></span></div><span class="metric-value">71</span></div>
+          </div>
+          <div class="metric">
+            <p class="metric-label">고용 안정성</p>
+            <div class="metric-row"><div class="metric-bar-track"><span class="metric-bar-fill low" style="width:42%"></span></div><span class="metric-value">42</span></div>
+          </div>
+
+          <div class="risk-mini-foot">
+            <span>데이터 신뢰도 81%</span>
+            <a class="risk-detail-link" href="#">상세 보기 →</a>
+          </div>
+        </div>
+
+        <div class="risk-mini-card">
+          <div class="risk-mini-head">
+            <div>
+              <p class="risk-mini-title">OO화학 울산공장</p>
+              <p class="risk-mini-sub">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/></svg>
+                울산 남구 <span class="sep">·</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V10l5 3V10l5 3V10l5 3v8Z"/></svg>
+                화학제조업
+              </p>
+            </div>
+            <span class="risk-badge mid">위험 중간</span>
+          </div>
+
+          <div class="metric">
+            <p class="metric-label">체불 위험</p>
+            <div class="metric-row"><div class="metric-bar-track"><span class="metric-bar-fill mid" style="width:31%"></span></div><span class="metric-value">31</span></div>
+          </div>
+          <div class="metric">
+            <p class="metric-label">산재 위험</p>
+            <div class="metric-row"><div class="metric-bar-track"><span class="metric-bar-fill mid" style="width:48%"></span></div><span class="metric-value">48</span></div>
+          </div>
+          <div class="metric">
+            <p class="metric-label">고용 안정성</p>
+            <div class="metric-row"><div class="metric-bar-track"><span class="metric-bar-fill low" style="width:65%"></span></div><span class="metric-value">65</span></div>
+          </div>
+
+          <div class="risk-mini-foot">
+            <span>데이터 신뢰도 87%</span>
+            <a class="risk-detail-link" href="#">상세 보기 →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="community tab-panel" id="community">
+    <div class="community-head">
+      <div>
+        <span class="eyebrow">커뮤니티</span>
+        <h2>같은 현장, 같은 고민</h2>
+        <p>지역·업종별로 실제 경험을 나누는 익명 커뮤니티</p>
+      </div>
+      <a class="link-arrow" href="#">전체 게시판 보기 →</a>
+    </div>
+
+    <div class="filter-tabs" role="tablist" aria-label="업종 필터">
+      <button class="tab active" role="tab" aria-selected="true">전체</button>
+      <button class="tab" role="tab" aria-selected="false">건설업</button>
+      <button class="tab" role="tab" aria-selected="false">제조업</button>
+      <button class="tab" role="tab" aria-selected="false">화학</button>
+      <button class="tab" role="tab" aria-selected="false">서비스업</button>
+      <button class="tab" role="tab" aria-selected="false">물류</button>
+    </div>
+
+    <div class="post-grid">
+      <article class="post-card construction">
+        <div class="post-tags">
+          <span class="post-tag">인력 · 건설업</span>
+          <span class="post-tag urgent">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 1 21h22Z"/><rect x="11" y="9" width="2" height="6" fill="var(--surface)"/><circle cx="12" cy="17.3" r="1.1" fill="var(--surface)"/></svg>
+            체불
+          </span>
+        </div>
+        <h3 class="post-title">현장에서 2달째 임금 체불 중입니다</h3>
+        <p class="post-desc">소장님께 몇 번을 말씀드려도 계속 미뤄지고 있는데 어떻게 해야 할까요? 같은 현장 동료들도 사정이 비슷하다고 합니다.</p>
+        <div class="post-foot">
+          <span class="time">3시간 전</span>
+          <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16v11H8l-4 4Z"/></svg>24</span>
+          <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 14.5 9.5 21 10 16 14.5 17.5 21 12 17.5 6.5 21 8 14.5 3 10 9.5 9.5Z"/></svg>47</span>
+        </div>
+      </article>
+
+      <article class="post-card manufacturing">
+        <div class="post-tags">
+          <span class="post-tag">경기 · 제조업</span>
+        </div>
+        <h3 class="post-title">안전모 없이 작업 지시 받았을 때 대처법</h3>
+        <p class="post-desc">입사한 지 얼마 안 됐는데 반장님이 안전모 없이 먼저 들어가라고 하셔서 당황했습니다. 이럴 땐 어떻게 대응해야 하나요?</p>
+        <div class="post-foot">
+          <span class="time">1일 전</span>
+          <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16v11H8l-4 4Z"/></svg>18</span>
+          <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 14.5 9.5 21 10 16 14.5 17.5 21 12 17.5 6.5 21 8 14.5 3 10 9.5 9.5Z"/></svg>63</span>
+        </div>
+      </article>
+
+      <article class="post-card chemical">
+        <div class="post-tags">
+          <span class="post-tag">울산 · 화학</span>
+        </div>
+        <h3 class="post-title">화학물질 취급 중 이상 증상, 신고해야 하나요?</h3>
+        <p class="post-desc">MSDS를 확인했는데 저희 현장 물질과 표기가 조금 다른 것 같습니다. 배출 신고는 어디서부터 시작해야 하는지 궁금합니다.</p>
+        <div class="post-foot">
+          <span class="time">2일 전</span>
+          <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16v11H8l-4 4Z"/></svg>31</span>
+          <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 14.5 9.5 21 10 16 14.5 17.5 21 12 17.5 6.5 21 8 14.5 3 10 9.5 9.5Z"/></svg>88</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="ai-consult tab-panel" id="ai-consult">
+    <div class="ai-consult-card">
+      <div class="ai-consult-inner">
+        <div class="ai-consult-copy">
+          <span class="eyebrow">RAG AI 상담</span>
+          <h2>막막할 때<br>AI가 먼저 답합니다</h2>
+          <p class="lede">공식 법령, 고용노동부 자료, 위험카드 데이터를 학습한 AI가 여러분의 상황에 맞는 구체적인 행동 방안을 안내합니다.</p>
+
+          <ul class="question-list">
+            <li><button type="button" class="question-item">돈을 못 받고 있어요. 어떻게 해야 하나요?</button></li>
+            <li><button type="button" class="question-item">현장이 너무 위험한데 신고할 수 있나요?</button></li>
+            <li><button type="button" class="question-item">이직해야 할까요? 이 회사 괜찮아요?</button></li>
+            <li><button type="button" class="question-item">산재 신청 방법을 알고 싶어요.</button></li>
+            <li><button type="button" class="question-item">부당해고를 당한 것 같아요.</button></li>
+          </ul>
+        </div>
+
+        <div class="chat-widget">
+          <div class="chat-widget-head">
+            <span class="chat-avatar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 3 L22 20 L2 20 Z" fill="var(--hazard-ink)" opacity="0.9"/>
+                <rect x="11.15" y="9.5" width="1.7" height="6" rx="0.8" fill="var(--hazard)"/>
+                <circle cx="12" cy="17.2" r="1" fill="var(--hazard)"/>
+              </svg>
+            </span>
+            <div>
+              <p class="chat-widget-title">Money Worry AI</p>
+              <p class="chat-widget-sub"><span class="chat-status-dot"></span>RAG 기반 · 법정 언급</p>
+            </div>
+          </div>
+
+          <div class="chat-bubble">안녕하세요! 일터에서 겪고 있는 어려움을 말씀해 주세요. 임금 체불, 산업재해, 부당해고 등 어떤 상황이든 도와드릴 수 있어요. 🤝</div>
+
+          <div class="chat-input-row">
+            <input type="text" placeholder="궁금한 것을 물어보세요..." aria-label="질문 입력">
+            <button type="button" class="chat-send-btn" aria-label="질문 보내기">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<section class="final-cta" id="get-started">
+  <div class="final-cta-inner">
+    <span class="cta-eyebrow">지금 시작하세요</span>
+    <h2>내 사업장, 지금 얼마나 위험한지<br>확인해 보세요</h2>
+    <p>3분이면 충분합니다. 회사명만 입력하면 AI가 체불·산재·고용 위험을 즉시 분석해 드립니다.</p>
+    <div class="final-cta-actions">
+      <a class="btn btn-primary btn-lg" href="#risk-cards">무료로 위험카드 발급받기 →</a>
+      <a class="btn btn-ghost btn-lg" href="#ai-consult">AI 상담 먼저 해보기</a>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a class="footer-logo" href="#">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3 L22 20 L2 20 Z" fill="var(--hazard)" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>
+          <rect x="11.15" y="9.5" width="1.7" height="6" rx="0.8" fill="var(--ink)"/>
+          <circle cx="12" cy="17.2" r="1" fill="var(--ink)"/>
+        </svg>
+        돈워리
+      </a>
+      <p>커뮤니티 기반 AI 일터안전 조기경보 플랫폼</p>
+    </div>
+
+    <div class="footer-col">
+      <p class="footer-col-title">서비스</p>
+      <a href="#risk-cards">위험카드 조회</a>
+      <a href="#">커뮤니티</a>
+      <a href="#ai-consult">AI 상담</a>
+      <a href="#">업종별 통계</a>
+    </div>
+
+    <div class="footer-col">
+      <p class="footer-col-title">정보</p>
+      <a href="#">이용약관</a>
+      <a href="#">개인정보처리방침</a>
+      <a href="#">공지사항</a>
+      <a href="#">FAQ</a>
+    </div>
+
+    <div class="footer-col">
+      <p class="footer-col-title">문의</p>
+      <a href="#">고객센터</a>
+      <a href="#">제보하기</a>
+      <a href="#">채용 문의</a>
+      <a href="#">오픈소스</a>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <span>© 2026 돈워리. All rights reserved.</span>
+    <span>본 플랫폼의 위험 정보는 참고용이며 법적 효력을 갖지 않습니다.</span>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var navLinks = document.querySelectorAll('.main-nav a[data-tab]');
+    var panels = document.querySelectorAll('.tab-panel');
+
+    function activate(tabId) {
+      panels.forEach(function (panel) {
+        panel.classList.toggle('active', panel.id === tabId);
+      });
+      navLinks.forEach(function (link) {
+        link.classList.toggle('active', link.dataset.tab === tabId);
+      });
+    }
+
+    navLinks.forEach(function (link) {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        activate(link.dataset.tab);
+      });
+    });
+
+    activate(navLinks[0].dataset.tab);
+  })();
+</script>
+
+</body>
+</html>

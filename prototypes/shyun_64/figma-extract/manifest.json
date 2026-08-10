@@ -1,0 +1,81 @@
+{
+  "source": {
+    "name": "초안",
+    "fileKey": "MzekCEqO2RCQ6ixK9yvPbP",
+    "requestedNodeId": "4:2",
+    "url": "https://www.figma.com/design/MzekCEqO2RCQ6ixK9yvPbP/%EC%B4%88%EC%95%88?node-id=4-2&m=dev&t=5hIVWNpQhIO345W5-1"
+  },
+  "format": "React TSX with Tailwind utility classes",
+  "font": "Noto Sans KR",
+  "contentFrames": [
+    {
+      "nodeId": "13:9",
+      "name": "Navigation",
+      "component": "components/Navigation.tsx",
+      "screenshot": "screenshots/navigation.png",
+      "size": [1339.3334, 64.6667]
+    },
+    {
+      "nodeId": "13:303",
+      "name": "Hero and community",
+      "component": "components/HeroCommunity.tsx",
+      "screenshot": "screenshots/hero-and-community.png",
+      "size": [1307.3334, 901.9163]
+    },
+    {
+      "nodeId": "13:120",
+      "name": "How it works",
+      "component": "components/HowItWorks.tsx",
+      "screenshot": "screenshots/service-features.png",
+      "size": [1339.3334, 743.583]
+    },
+    {
+      "nodeId": "13:304",
+      "name": "Risk analysis",
+      "component": "components/RiskAnalysis.tsx",
+      "screenshot": "screenshots/risk-analysis.png",
+      "size": [1339.3334, 1010]
+    },
+    {
+      "nodeId": "13:738",
+      "name": "AI consultation",
+      "component": "components/AIConsultation.tsx",
+      "screenshot": "screenshots/ai-consultation.png",
+      "size": [1339.3334, 640]
+    },
+    {
+      "nodeId": "13:7",
+      "name": "CTA and footer",
+      "component": "components/FooterCTA.tsx",
+      "screenshot": "screenshots/footer-cta.png",
+      "size": [1339.3334, 883.3334]
+    }
+  ],
+  "nonContentFrames": [
+    {
+      "nodeId": "13:3",
+      "name": "Community AI Workplace Alert Platform",
+      "note": "Background-only frame"
+    },
+    {
+      "nodeId": "13:41",
+      "name": "Section",
+      "note": "Empty background frame"
+    },
+    {
+      "nodeId": "13:592",
+      "name": "Section",
+      "note": "Empty background frame"
+    }
+  ],
+  "assets": {
+    "directory": "assets",
+    "count": 21,
+    "format": "svg",
+    "componentUrlPrefix": "/assets/"
+  },
+  "figmaVariables": {
+    "--color-bg": "#ffffff",
+    "--ramp-white-1000": "#ffffff"
+  }
+}
