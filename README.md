@@ -20,8 +20,8 @@ AI Rookie 및 창의종합설계 경진대회를 위한 팀 프로젝트 저장�
 | --- | --- | --- |
 | [`prototypes/jcu/`](prototypes/jcu/) | `jcu_branch` | Next.js 기반 통합 UI, Mock/Real 어댑터, 두 LLM 비교 |
 | [`prototypes/csh/`](prototypes/csh/) | PR #1의 `cshproj/` | Flask 상담, 프롬프트·가드레일, 계약서 규칙 엔진 |
-| [`prototypes/hb-rag/`](prototypes/hb-rag/) | `hb-rag-bot`의 `webapp/` | 법령 Chroma RAG, 계약서 검토, 검색·생성 평가 |
-| [`prototypes/hss-db/`](prototypes/hss-db/) | `feat/db` | DB 기여 범위와 원본 커밋 안내 |
+| [`prototypes/hb/`](prototypes/hb/) | `hb-rag-bot`의 `webapp/` | 법령 Chroma RAG, 계약서 검토, 검색·생성 평가 |
+| [`prototypes/hss/`](prototypes/hss/) | `feat/db` | DB 기여 범위와 원본 커밋 안내 |
 | [`prototypes/shyun_64/`](prototypes/shyun_64/) | 서버 보존본 | Figma 추출 컴포넌트·에셋과 단일 HTML 랜딩 |
 
 프로토타입은 개인 작업을 보존하고 비교하기 위한 공간입니다. 실제 통합 개발은 [`product/`](product/)에서 진행하며, 프로토타입을 직접 운영 코드로 간주하지 않습니다. 현재 제품 기준본은 `jcu_branch`의 Next.js 통합 프로토타입입니다.
