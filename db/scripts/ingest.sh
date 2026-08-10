@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # ML export CSV → Postgres 적재.
 #
-#   ./scripts/ingest.sh --bundle ../_service_bundle --model-version 260807
-#   ./scripts/ingest.sh --bundle ../_service_bundle --model-version 260807 --as-of 2026-02
+#   ./scripts/ingest.sh --bundle ../_service_bundle --model-version 260807 --as-of 2026-04
 #
-# --as-of 는 데이터 기준월(어느 국민연금 데이터로 채점했는지). 생략하면 NULL 로 들어간다.
-# 확정되면 아래 한 줄로 나중에 채울 수 있다:
-#   UPDATE batches SET as_of_date='2026-02' WHERE id=<batch>;
+# --as-of 는 **관측창의 끝(t-6)** = 채점에 넣은 국민연금 파일의 마지막 달이다.
+# 예측 대상월(t)은 자동으로 as_of + 6개월이 된다.
+#
+#   [t-18 ── 관측창 13개월 ── t-6] ·· 공백 6개월 ·· t(명단공개)
+#         2025-04            2026-04                2026-10
+#          └── --as-of 2026-04 ──┘                    ↑ target_month 자동
+#
+# 매달 새 연금 파일로 재채점하면 --as-of 만 한 칸 밀면 된다(재학습 아님, 같은 pkl).
+# 생략하면 NULL 로 들어가고, 그 경우 화면에 "언제 기준" 이라고 쓸 수 없다.
 #
 # 설계
 #  - 모든 CSV 를 **전부 TEXT 인 staging 테이블**에 \copy 로 벌크 적재한 뒤 SQL 로 변환한다.
@@ -48,7 +53,12 @@ PSQL=(psql -h 127.0.0.1 -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ER
 echo "▶ 적재 시작"
 echo "  번들       : $BUNDLE"
 echo "  model_ver  : $MODEL_VERSION"
+# 예측 대상월 = 관측 기준월 + 6개월
+TARGET=""
+[[ -n "$AS_OF" ]] && TARGET=$(date -d "${AS_OF}-01 +6 months" +%Y-%m 2>/dev/null || true)
+
 echo "  as_of_date : ${AS_OF:-(NULL — 미확정)}"
+echo "  target(t)  : ${TARGET:-(NULL)}   ← as_of + 6개월, 명단공개 예측 대상월"
 
 # firm_id  = sha1(사업장명 || '|' || 사업자번호)[:16]   ← **원본 이름 그대로**
 # corp_key = sha1(정규화(사업장명) || '|' || 사업자번호)[:16]
@@ -108,11 +118,12 @@ CREATE UNLOGGED TABLE stg_safe (
 
 -- ── batch 확보 (같은 as_of+model 이면 재적재) ───────────────
 DELETE FROM batches
- WHERE as_of_date IS NOT DISTINCT FROM $( [[ -n "$AS_OF" ]] && echo "DATE '$AS_OF'" || echo "NULL" )
+ WHERE as_of_date IS NOT DISTINCT FROM $( [[ -n "$AS_OF" ]] && echo "DATE '$AS_OF-01'" || echo "NULL" )
    AND model_version = '$MODEL_VERSION';
 
-INSERT INTO batches (as_of_date, model_version, source, n_scored, n_queue, n_safe)
-VALUES ($( [[ -n "$AS_OF" ]] && echo "DATE '$AS_OF'" || echo "NULL" ),
+INSERT INTO batches (as_of_date, target_month, model_version, source, n_scored, n_queue, n_safe)
+VALUES ($( [[ -n "$AS_OF" ]] && echo "DATE '$AS_OF-01'" || echo "NULL" ),
+        $( [[ -n "$TARGET" ]] && echo "DATE '$TARGET-01'" || echo "NULL" ),
         '$MODEL_VERSION', '_service_bundle/outputs', 0, 0, 0);
 
 CREATE TEMP TABLE cur AS SELECT currval(pg_get_serial_sequence('batches','id')) AS id;
@@ -210,5 +221,8 @@ SQL
 
 echo "✔ 적재 완료"
 "${PSQL[@]}" -c "\pset border 2" -c "
-SELECT id AS batch, coalesce(as_of_date::text,'(NULL)') AS as_of, model_version,
-       n_scored, n_queue, n_safe FROM batches ORDER BY id DESC LIMIT 3;"
+SELECT id AS batch,
+       coalesce(to_char(as_of_date,'YYYY-MM'),'(NULL)') AS 기준월,
+       coalesce(to_char(target_month,'YYYY-MM'),'(NULL)') AS 예측대상월,
+       model_version, n_scored, n_queue, n_safe
+FROM batches ORDER BY id DESC LIMIT 3;"
