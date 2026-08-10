@@ -1,0 +1,19 @@
+import type { SourceReference } from "@/domain/risk";
+
+export function DataSourceList({ sources }: { sources: SourceReference[] }) {
+  if (sources.length === 0) {
+    return <p className="muted-text">확인 가능한 출처가 없습니다.</p>;
+  }
+  return (
+    <ul className="source-list">
+      {sources.map((source, index) => (
+        <li key={`${source.name}-${source.as_of ?? index}`}>
+          <span>{source.name}</span>
+          <small>
+            {[source.organization, source.as_of && `기준 ${source.as_of}`].filter(Boolean).join(" · ")}
+          </small>
+        </li>
+      ))}
+    </ul>
+  );
+}
