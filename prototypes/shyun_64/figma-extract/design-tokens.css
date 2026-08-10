@@ -1,0 +1,15 @@
+:root {
+  --mw-font-family: "Noto Sans KR", sans-serif;
+  --mw-color-ink: #191f28;
+  --mw-color-muted: #8b95a1;
+  --mw-color-subtle: #6a7282;
+  --mw-color-brand: #ffd600;
+  --mw-color-page: #f7f8fa;
+  --mw-color-surface: #f2f4f6;
+  --mw-color-line: #e5e8eb;
+  --mw-color-safe: #48cfad;
+  --mw-color-danger: #e53935;
+  --mw-color-info: #4e9aff;
+  --mw-color-violet: #a29bfe;
+  --mw-color-white: #ffffff;
+}

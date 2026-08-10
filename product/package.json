@@ -1,0 +1,32 @@
+{
+  "name": "donworry-integrated-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "description": "돈워리 구직자·근로자용 Mock 통합 프로토타입",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "next": "16.3.0",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "@types/react": "19.1.9",
+    "@types/react-dom": "19.1.7",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "16.3.0",
+    "typescript": "5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22 <23"
+  }
+}
