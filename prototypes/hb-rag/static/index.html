@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>돈워리 챗봇</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f7f7f5;
+    --border: #e5e5e2;
+    --text: #1f1f1e;
+    --muted: #7a7a76;
+    --user-bubble: #2f6f4f;
+    --user-text: #ffffff;
+    --bot-bubble: #f0efec;
+    --bot-text: #1f1f1e;
+    --accent: #2f6f4f;
+    --accent-soft: #4fae7c;
+    --danger: #c0392b;
+    --danger-on: #ffffff;
+    --shadow: 0 12px 30px rgba(0, 0, 0, 0.13);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1b1a;
+      --panel: #242422;
+      --border: #35342f;
+      --text: #ececea;
+      --muted: #9a9a94;
+      --user-bubble: #3f8f66;
+      --user-text: #ffffff;
+      --bot-bubble: #2c2c29;
+      --bot-text: #ececea;
+      --accent: #4fae7c;
+      --accent-soft: #6fc79a;
+      --danger: #ff7b6b;
+      --danger-on: #2a1310;
+      --shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, Roboto, sans-serif;
+  }
+
+  .shell {
+    display: flex;
+    height: 100vh;
+  }
+
+  /* --- 사이드바 --- */
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.15s ease;
+  }
+  .shell.sidebar-collapsed .sidebar {
+    width: 0;
+    border-right: none;
+  }
+  /* 사이드바가 접힐 때 내용이 찌그러지지 않도록 폭을 고정한다. */
+  .sidebar-brand,
+  .sidebar-header,
+  .convo-list {
+    min-width: 260px;
+  }
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 14px 6px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .brand-mark {
+    display: flex;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 5px rgba(47, 111, 79, 0.35));
+  }
+  /* stop-color는 프레젠테이션 속성에서 var()가 안 먹는 브라우저가 있어 CSS로 지정한다. */
+  .dw-stop-a { stop-color: var(--accent-soft); }
+  .dw-stop-b { stop-color: var(--accent); }
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+    min-width: 0;
+  }
+  .brand-text b {
+    font-size: 15px;
+    letter-spacing: -0.2px;
+  }
+  .brand-text small {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .sidebar-header {
+    padding: 10px 12px 12px;
+    flex-shrink: 0;
+  }
+  .new-chat-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .convo-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .convo-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 6px 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .convo-item:hover { background: var(--border); }
+  .convo-item.active { background: var(--border); font-weight: 600; }
+  .convo-item.menu-open { background: var(--border); }
+  .convo-title {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .convo-menu-btn {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+  .convo-item:hover .convo-menu-btn,
+  .convo-item.active .convo-menu-btn,
+  .convo-item.menu-open .convo-menu-btn,
+  .convo-menu-btn:focus-visible { opacity: 1; }
+  .convo-menu-btn:hover { background: var(--bg); color: var(--text); }
+  .convo-rename {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    padding: 2px 6px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+  }
+  .convo-empty {
+    padding: 10px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  /* --- 대화 우클릭/⋯ 메뉴 --- */
+  .ctx-menu {
+    position: fixed;
+    z-index: 50;
+    min-width: 170px;
+    padding: 5px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .ctx-menu[hidden] { display: none; }
+  .ctx-menu button {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 10px;
+    background: none;
+    border: none;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .ctx-menu button:hover { background: var(--panel); }
+  .ctx-menu button.danger { color: var(--danger); }
+  .ctx-menu .ctx-icon {
+    width: 15px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  /* --- 삭제 확인 --- */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 0, 0, 0.38);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  .modal {
+    width: min(340px, 100%);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  .modal h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+  }
+  .modal p {
+    margin: 0 0 18px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--muted);
+    word-break: break-word;
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .modal-actions button {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-ghost {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-ghost:hover { border-color: var(--muted); }
+  .btn-danger {
+    background: var(--danger);
+    border: 1px solid var(--danger);
+    color: var(--danger-on);
+  }
+  .btn-danger:hover { filter: brightness(1.08); }
+
+  /* --- 메인 --- */
+  .main {
+    flex: 1;
+    min-width: 0;
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1;
+    padding: 6px 8px;
+    border-radius: 6px;
+  }
+  .toggle-btn:hover { background: var(--border); }
+  .header-mark { margin-left: -2px; }
+  header h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 600;
+  }
+  header .sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .msg {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    line-height: 1.5;
+    font-size: 14.5px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: var(--user-bubble);
+    color: var(--user-text);
+    border-bottom-right-radius: 4px;
+  }
+  .msg.bot {
+    align-self: flex-start;
+    background: var(--bot-bubble);
+    color: var(--bot-text);
+    border-bottom-left-radius: 4px;
+  }
+  .msg.bot.pending {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* --- 페르소나 선택 --- */
+  .persona-picker {
+    margin: auto;
+    text-align: left;
+    padding: 24px;
+    max-width: 380px;
+    width: 100%;
+  }
+  .persona-picker h2 {
+    font-size: 15px;
+    margin: 0 0 14px;
+    text-align: center;
+    color: var(--text);
+  }
+  .persona-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .persona-btn:hover { border-color: var(--accent); }
+  .persona-btn b { display: block; margin-bottom: 2px; }
+  .persona-btn span { font-size: 12px; color: var(--muted); }
+
+  #composerWrap {
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  form#composer {
+    display: flex;
+    gap: 8px;
+    padding: 14px;
+  }
+  #attachPreview {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 14px 0;
+    padding: 8px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  #attachPreview[hidden] { display: none; }
+  #attachThumb {
+    width: 34px;
+    height: 34px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  #attachName {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #attachRemove {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  #attachRemove:hover { background: var(--border); color: var(--text); }
+  textarea#input {
+    flex: 1;
+    resize: none;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14.5px;
+    font-family: inherit;
+    background: var(--panel);
+    color: var(--text);
+    max-height: 140px;
+  }
+  textarea#input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  textarea#input:disabled {
+    opacity: 0.5;
+  }
+  button#send {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button#send:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  button#attachBtn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 16px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  button#attachBtn:hover { border-color: var(--accent); }
+  button#attachBtn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 32 32" role="img">
+          <defs>
+            <linearGradient id="dwLogo" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" class="dw-stop-a"/>
+              <stop offset="1" class="dw-stop-b"/>
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="9" fill="url(#dwLogo)"/>
+          <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 10.2 L12.8 20.4 L16 14.2 L19.2 20.4 L23 10.2" stroke-width="2.1"/>
+            <path d="M8.2 15.4 H23.8" stroke-width="1.4"/>
+            <path d="M8.2 18.4 H23.8" stroke-width="1.4"/>
+          </g>
+        </svg>
+      </span>
+      <span class="brand-text">
+        <b>돈워리</b>
+        <small>근로·노무 AI 상담</small>
+      </span>
+    </div>
+    <div class="sidebar-header">
+      <button class="new-chat-btn" id="newChatBtn">+ 새 채팅</button>
+    </div>
+    <div class="convo-list" id="convoList"></div>
+  </div>
+
+  <div class="main">
+    <header>
+      <button class="toggle-btn" id="toggleBtn" title="사이드바 접기/펼치기">☰</button>
+      <span class="brand-mark header-mark" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 32 32">
+          <defs>
+            <linearGradient id="dwLogoSm" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" class="dw-stop-a"/>
+              <stop offset="1" class="dw-stop-b"/>
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="9" fill="url(#dwLogoSm)"/>
+          <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 10.2 L12.8 20.4 L16 14.2 L19.2 20.4 L23 10.2" stroke-width="2.1"/>
+            <path d="M8.2 15.4 H23.8" stroke-width="1.4"/>
+            <path d="M8.2 18.4 H23.8" stroke-width="1.4"/>
+          </g>
+        </svg>
+      </span>
+      <div>
+        <h1>돈워리 챗봇</h1>
+        <div class="sub">근로/노무 상담 데모</div>
+      </div>
+    </header>
+
+    <div id="messages"></div>
+
+    <div id="composerWrap">
+      <div id="attachPreview" hidden>
+        <img id="attachThumb" alt="" hidden>
+        <span id="attachName"></span>
+        <button type="button" id="attachRemove" title="첨부 취소">✕</button>
+      </div>
+      <form id="composer">
+        <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.bmp,.tiff,.heic" hidden>
+        <button type="button" id="attachBtn" title="근로계약서 첨부 (PDF/이미지)">📎</button>
+        <textarea id="input" rows="1" placeholder="메시지를 입력하세요..." autofocus></textarea>
+        <button id="send" type="submit">전송</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="ctx-menu" id="ctxMenu" hidden>
+  <button type="button" data-action="rename"><span class="ctx-icon">✏️</span>이름 변경</button>
+  <button type="button" data-action="delete" class="danger"><span class="ctx-icon">🗑</span>대화 삭제</button>
+</div>
+
+<div class="modal-backdrop" id="confirmBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h3 id="confirmTitle">대화를 삭제할까요?</h3>
+    <p id="confirmBody"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" id="confirmCancel">취소</button>
+      <button type="button" class="btn-danger" id="confirmOk">삭제</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'donworry_conversations_v1';
+const ACTIVE_KEY = 'donworry_active_id_v1';
+const COLLAPSE_KEY = 'donworry_sidebar_collapsed_v1';
+
+const PERSONAS = [
+  { key: '구직자', label: '구직자', desc: '아직 입사하지 않았고, 이 회사에 들어가도 되는지 확인하고 싶어요' },
+  { key: '근로자', label: '근로자', desc: '현재 재직 중이거나 퇴사 직후로, 실제 문제를 겪고 있어요' },
+  { key: '사업주', label: '사업주', desc: '소규모 사업장을 운영 중이고, 법적 의무를 확인하고 싶어요' },
+];
+
+const shellEl = document.getElementById('shell');
+const sidebarEl = document.getElementById('sidebar');
+const convoListEl = document.getElementById('convoList');
+const newChatBtn = document.getElementById('newChatBtn');
+const toggleBtn = document.getElementById('toggleBtn');
+const messagesEl = document.getElementById('messages');
+const form = document.getElementById('composer');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const attachBtn = document.getElementById('attachBtn');
+const fileInput = document.getElementById('fileInput');
+const attachPreview = document.getElementById('attachPreview');
+const attachThumb = document.getElementById('attachThumb');
+const attachName = document.getElementById('attachName');
+const attachRemove = document.getElementById('attachRemove');
+const ctxMenu = document.getElementById('ctxMenu');
+const confirmBackdrop = document.getElementById('confirmBackdrop');
+const confirmTitle = document.getElementById('confirmTitle');
+const confirmBody = document.getElementById('confirmBody');
+const confirmOk = document.getElementById('confirmOk');
+const confirmCancel = document.getElementById('confirmCancel');
+
+let pendingFile = null;  // 전송 대기 중인 첨부 파일
+let busy = false;        // 요청 처리 중 여부
+
+let conversations = loadConversations();
+let activeId = localStorage.getItem(ACTIVE_KEY);
+
+function loadConversations() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveConversations() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+}
+
+function setActive(id) {
+  activeId = id;
+  localStorage.setItem(ACTIVE_KEY, id);
+}
+
+function getActive() {
+  return conversations.find(c => c.id === activeId) || null;
+}
+
+function truncateTitle(text) {
+  const t = text.trim();
+  return t.length > 30 ? t.slice(0, 30) + '…' : t;
+}
+
+function createConversation() {
+  const conv = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    title: null,
+    persona: null,
+    messages: [],
+    createdAt: Date.now(),
+  };
+  conversations.unshift(conv);
+  setActive(conv.id);
+  saveConversations();
+  clearPendingFile();
+  renderSidebar();
+  renderMain();
+}
+
+function switchConversation(id) {
+  setActive(id);
+  clearPendingFile();
+  renderSidebar();
+  renderMain();
+}
+
+function renderSidebar() {
+  convoListEl.innerHTML = '';
+  if (conversations.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'convo-empty';
+    empty.textContent = '대화가 없습니다';
+    convoListEl.appendChild(empty);
+    return;
+  }
+  conversations
+    .slice()
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .forEach(conv => {
+      const item = document.createElement('div');
+      item.className = 'convo-item' + (conv.id === activeId ? ' active' : '');
+      item.dataset.id = conv.id;
+
+      const title = document.createElement('span');
+      title.className = 'convo-title';
+      title.textContent = conv.title || '새 대화';
+      item.appendChild(title);
+
+      const menuBtn = document.createElement('button');
+      menuBtn.type = 'button';
+      menuBtn.className = 'convo-menu-btn';
+      menuBtn.textContent = '⋯';
+      menuBtn.title = '대화 옵션';
+      menuBtn.setAttribute('aria-label', '대화 옵션');
+      menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const r = menuBtn.getBoundingClientRect();
+        openContextMenu(conv.id, r.right, r.bottom + 4);
+      });
+      item.appendChild(menuBtn);
+
+      item.addEventListener('click', () => switchConversation(conv.id));
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        openContextMenu(conv.id, e.clientX, e.clientY);
+      });
+      convoListEl.appendChild(item);
+    });
+}
+
+/* --- 대화 옵션 메뉴(우클릭 / ⋯ 버튼) --- */
+let menuTargetId = null;
+
+function openContextMenu(id, x, y) {
+  menuTargetId = id;
+  ctxMenu.hidden = false;
+  // 화면 밖으로 넘치지 않도록 실제 크기를 재고 위치를 보정한다.
+  const rect = ctxMenu.getBoundingClientRect();
+  const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
+  const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
+  ctxMenu.style.left = left + 'px';
+  ctxMenu.style.top = top + 'px';
+  markMenuOpen(id);
+}
+
+function closeContextMenu() {
+  if (ctxMenu.hidden) return;
+  ctxMenu.hidden = true;
+  menuTargetId = null;
+  markMenuOpen(null);
+}
+
+function markMenuOpen(id) {
+  convoListEl.querySelectorAll('.convo-item').forEach(el => {
+    el.classList.toggle('menu-open', el.dataset.id === id);
+  });
+}
+
+ctxMenu.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const id = menuTargetId;
+  closeContextMenu();
+  if (btn.dataset.action === 'rename') startRename(id);
+  else if (btn.dataset.action === 'delete') requestDelete(id);
+});
+
+document.addEventListener('click', (e) => {
+  if (!ctxMenu.contains(e.target)) closeContextMenu();
+});
+document.addEventListener('contextmenu', (e) => {
+  if (!e.target.closest('.convo-item')) closeContextMenu();
+});
+window.addEventListener('resize', closeContextMenu);
+convoListEl.addEventListener('scroll', closeContextMenu);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  closeContextMenu();
+  if (!confirmBackdrop.hidden) closeConfirm();
+});
+
+/* --- 이름 변경 (사이드바에서 바로 편집) --- */
+function startRename(id) {
+  const conv = conversations.find(c => c.id === id);
+  const item = convoListEl.querySelector('.convo-item[data-id="' + id + '"]');
+  if (!conv || !item) return;
+
+  const titleEl = item.querySelector('.convo-title');
+  const editor = document.createElement('input');
+  editor.type = 'text';
+  editor.className = 'convo-rename';
+  editor.value = conv.title || '새 대화';
+  editor.maxLength = 60;
+  titleEl.replaceWith(editor);
+  editor.focus();
+  editor.select();
+
+  let done = false;
+  const commit = (save) => {
+    if (done) return;
+    done = true;
+    const value = editor.value.trim();
+    if (save && value) {
+      conv.title = value;
+      saveConversations();
+    }
+    renderSidebar();
+  };
+
+  // 편집 중 클릭이 대화 전환으로 이어지지 않게 막는다.
+  ['click', 'mousedown', 'dblclick'].forEach(type =>
+    editor.addEventListener(type, e => e.stopPropagation()));
+  editor.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+  });
+  editor.addEventListener('blur', () => commit(true));
+}
+
+/* --- 삭제 --- */
+function requestDelete(id) {
+  const conv = conversations.find(c => c.id === id);
+  if (!conv) return;
+  openConfirm(
+    '대화를 삭제할까요?',
+    '"' + (conv.title || '새 대화') + '" 대화가 영구적으로 삭제됩니다. 되돌릴 수 없습니다.',
+    () => deleteConversation(id)
+  );
+}
+
+function deleteConversation(id) {
+  const idx = conversations.findIndex(c => c.id === id);
+  if (idx === -1) return;
+
+  const wasActive = conversations[idx].id === activeId;
+  conversations.splice(idx, 1);
+  saveConversations();
+
+  if (!wasActive) {
+    renderSidebar();
+    return;
+  }
+
+  clearPendingFile();
+  if (conversations.length > 0) {
+    // 삭제한 자리에 가장 가까운 대화로 옮겨간다.
+    setActive(conversations[Math.min(idx, conversations.length - 1)].id);
+    renderSidebar();
+    renderMain();
+  } else {
+    activeId = null;
+    localStorage.removeItem(ACTIVE_KEY);
+    createConversation();
+  }
+}
+
+/* --- 확인 모달 --- */
+let confirmAction = null;
+
+function openConfirm(title, body, onConfirm) {
+  confirmTitle.textContent = title;
+  confirmBody.textContent = body;
+  confirmAction = onConfirm;
+  confirmBackdrop.hidden = false;
+  confirmOk.focus();
+}
+
+function closeConfirm() {
+  confirmBackdrop.hidden = true;
+  confirmAction = null;
+}
+
+confirmOk.addEventListener('click', () => {
+  const action = confirmAction;
+  closeConfirm();
+  if (action) action();
+});
+confirmCancel.addEventListener('click', () => closeConfirm());
+confirmBackdrop.addEventListener('click', (e) => {
+  if (e.target === confirmBackdrop) closeConfirm();
+});
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// 굵은 글씨(**텍스트**)만 처리하는 최소한의 마크다운 렌더러.
+// 개행은 CSS(white-space: pre-wrap)가 그대로 살려주므로 별도 변환이 필요 없다.
+function renderBotText(text) {
+  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+function setMessageText(div, role, text) {
+  if (role.startsWith('bot')) {
+    div.innerHTML = renderBotText(text);
+  } else {
+    div.textContent = text;
+  }
+}
+
+function addMessageDom(role, text) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  setMessageText(div, role, text);
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+function renderPersonaPicker() {
+  messagesEl.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'persona-picker';
+
+  const h2 = document.createElement('h2');
+  h2.textContent = '이 대화는 어떤 입장에서 시작할까요?';
+  wrap.appendChild(h2);
+
+  PERSONAS.forEach(p => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'persona-btn';
+    btn.innerHTML = '<b>' + p.label + '</b><span>' + p.desc + '</span>';
+    btn.addEventListener('click', () => selectPersona(p.key));
+    wrap.appendChild(btn);
+  });
+
+  messagesEl.appendChild(wrap);
+
+  input.disabled = true;
+  sendBtn.disabled = true;
+  attachBtn.disabled = true;
+}
+
+function selectPersona(personaKey) {
+  const conv = getActive();
+  if (!conv) return;
+  conv.persona = personaKey;
+  saveConversations();
+  renderMain();
+  input.disabled = false;
+  updateSendState();
+  input.focus();
+}
+
+function renderMain() {
+  const conv = getActive();
+  messagesEl.innerHTML = '';
+
+  if (!conv) {
+    createConversation();
+    return;
+  }
+
+  if (!conv.persona) {
+    renderPersonaPicker();
+    return;
+  }
+
+  input.disabled = false;
+  attachBtn.disabled = false;
+  updateSendState();
+  conv.messages.forEach(m => addMessageDom(m.role, m.text));
+}
+
+function autoResize() {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+}
+input.addEventListener('input', () => {
+  autoResize();
+  updateSendState();
+});
+
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    form.requestSubmit();
+  }
+});
+
+newChatBtn.addEventListener('click', () => createConversation());
+
+toggleBtn.addEventListener('click', () => {
+  shellEl.classList.toggle('sidebar-collapsed');
+  localStorage.setItem(COLLAPSE_KEY, shellEl.classList.contains('sidebar-collapsed') ? '1' : '0');
+});
+
+// 직전 대화 몇 턴을 서버에 함께 보내, 이미 지적한 내용을 반복하지 않게 한다.
+const HISTORY_TURNS = 6;
+
+function recentHistory(conv) {
+  return conv.messages.slice(-HISTORY_TURNS).map(m => ({
+    role: m.role.startsWith('bot') ? 'bot' : 'user',
+    text: m.text,
+  }));
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text || busy) return;   // 질문이 비어 있으면 전송하지 않는다(첨부만 있어도 마찬가지)
+
+  const conv = getActive();
+  if (!conv || !conv.persona) return;
+
+  const fileToSend = pendingFile;
+  const history = recentHistory(conv);   // 이번 질문을 push하기 전 시점의 히스토리
+
+  const shownText = fileToSend ? `📎 ${fileToSend.name}\n${text}` : text;
+  conv.messages.push({ role: 'user', text: shownText });
+  if (!conv.title) conv.title = truncateTitle(text);
+  saveConversations();
+  renderSidebar();
+
+  addMessageDom('user', shownText);
+  input.value = '';
+  autoResize();
+  clearPendingFile();
+  busy = true;
+  updateSendState();
+  attachBtn.disabled = true;
+
+  const pending = addMessageDom(
+    'bot pending', fileToSend ? '계약서 검토 중...' : '생각 중...');
+
+  try {
+    let res;
+    if (fileToSend) {
+      const formData = new FormData();
+      formData.append('file', fileToSend);
+      formData.append('message', text);
+      formData.append('persona', conv.persona);
+      formData.append('history', JSON.stringify(history));
+      res = await fetch('/check-contract', { method: 'POST', body: formData });
+    } else {
+      res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          persona: conv.persona,
+          contract_context: conv.contractContext || null,
+          history: history,
+        })
+      });
+    }
+    const data = await res.json();
+    const answerText = res.ok ? data.answer : ('오류: ' + data.error);
+    pending.classList.remove('pending');
+    setMessageText(pending, 'bot', answerText);
+    conv.messages.push({ role: 'bot', text: answerText });
+    if (res.ok && data.missing_items !== undefined) {
+      conv.contractContext = { missing_items: data.missing_items, extracted: data.extracted };
+    }
+    saveConversations();
+  } catch (err) {
+    pending.classList.remove('pending');
+    setMessageText(pending, 'bot', '오류: 서버에 연결할 수 없습니다.');
+  } finally {
+    busy = false;
+    attachBtn.disabled = false;
+    updateSendState();
+    input.focus();
+  }
+});
+
+attachBtn.addEventListener('click', () => fileInput.click());
+
+// 파일을 고르면 '첨부 대기' 상태로만 두고, 전송은 하지 않는다.
+// 실제 전송은 사용자가 질문을 입력하고 전송을 눌렀을 때 form submit에서 일어난다.
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  fileInput.value = ''; // 같은 파일 다시 선택해도 change가 발생하도록 초기화
+  if (!file) return;
+  setPendingFile(file);
+});
+
+attachRemove.addEventListener('click', () => clearPendingFile());
+
+function setPendingFile(file) {
+  pendingFile = file;
+  attachName.textContent = file.name;
+  attachPreview.hidden = false;
+
+  if (file.type && file.type.startsWith('image/')) {
+    attachThumb.src = URL.createObjectURL(file);
+    attachThumb.hidden = false;
+  } else {
+    attachThumb.removeAttribute('src');
+    attachThumb.hidden = true;
+  }
+
+  input.placeholder = '이 파일에 대해 무엇이 궁금한지 입력해주세요...';
+  updateSendState();
+  input.focus();
+}
+
+function clearPendingFile() {
+  pendingFile = null;
+  attachPreview.hidden = true;
+  attachThumb.removeAttribute('src');
+  attachThumb.hidden = true;
+  attachName.textContent = '';
+  input.placeholder = '메시지를 입력하세요...';
+  updateSendState();
+}
+
+// 질문 텍스트가 비어 있으면 전송 불가(첨부만 있어도 마찬가지).
+function updateSendState() {
+  if (busy) {
+    sendBtn.disabled = true;
+    return;
+  }
+  sendBtn.disabled = input.value.trim().length === 0;
+}
+
+// --- 초기화 ---
+if (localStorage.getItem(COLLAPSE_KEY) === '1') {
+  shellEl.classList.add('sidebar-collapsed');
+}
+if (!activeId || !conversations.find(c => c.id === activeId)) {
+  if (conversations.length > 0) {
+    setActive(conversations[0].id);
+  }
+}
+renderSidebar();
+renderMain();
+</script>
+</body>
+</html>
