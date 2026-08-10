@@ -1,0 +1,107 @@
+{
+  "contract_version": "industrial_safety.v1.0",
+  "timezone": "Asia/Seoul",
+  "roots": {
+    "v2": "/data/shared-SeD/shared/model/weekly_workplace_risk_v2_201512_202604",
+    "extension": "/data/shared-SeD/shared/model/weekly_workplace_risk_api_extension_v3_201512_202604"
+  },
+  "artifacts": {
+    "v2_cell": {
+      "root": "v2",
+      "path": "data/processed/cell_week_predictions.parquet",
+      "bytes": 3106731,
+      "rows": 92140,
+      "sha256": "8b44d736f822b242e51393163e3d38697cfe9589e6129b93da636ee72e39edda"
+    },
+    "api_occurrence_bounded": {
+      "root": "extension",
+      "path": "data/processed/api_labels/occurrence_week_sido_industry_big_v2_compatible_bounded_panel.parquet",
+      "bytes": 55821,
+      "rows": 92140,
+      "sha256": "e81fc976c15099166e801a8a30125f740dbd7e783aba26777d3146ce61c93e40"
+    },
+    "nps_workplace": {
+      "root": "v2",
+      "path": "outputs/predictions/workplace_week/year=2026/month=04/week=2026-04-20.parquet",
+      "bytes": 19114304,
+      "rows": 549558,
+      "sha256": "39dcf06f71f30c5756d0877ac593c16c3386b12cf8611b286f2c80cad8c59047"
+    },
+    "nps_display": {
+      "root": "v2",
+      "path": "outputs/workplace_week_scores_2026_04_20.csv.gz",
+      "bytes": 53574287,
+      "rows": 549558,
+      "sha256": "581b7a4092905900f38590fe082e7e074d9b4357a42d0b828e2fa73ba31f8ab3"
+    },
+    "nps_quality": {
+      "root": "v2",
+      "path": "reports/workplace_scoring_quality.json",
+      "bytes": 4560,
+      "sha256": "b4a6fe86f8f33a5210138cbabd0fe83e41c5bd6b121a719be661287d6aa10bc0"
+    },
+    "kcomwel_workplace": {
+      "root": "v2",
+      "path": "outputs/workplace_week_scores_2026_04_20_kcomwel_2024_expanded.parquet",
+      "bytes": 176862669,
+      "rows": 2418021,
+      "sha256": "cefe9b82aab5b9b4b3c370d2b372f9112af10925ec272369b6dbadfa557d7f80"
+    },
+    "kcomwel_quality": {
+      "root": "v2",
+      "path": "reports/expanded_latest_tier_quality.json",
+      "bytes": 10453,
+      "sha256": "9556eac87cd05a58b491c203c25543d3e16465dd60240b2edf2674b91ee76f70"
+    }
+  },
+  "constants": {
+    "conservation_claim_scope": "represented_business_cells_only",
+    "probability_formula_tolerance": 1e-7,
+    "cell_conservation_tolerance": 1e-4,
+    "allocation_weight_tolerance": 1e-6,
+    "sido": ["강원", "경기", "경남", "경북", "광주", "대구", "대전", "부산", "서울", "세종", "울산", "인천", "전남", "전북", "제주", "충남", "충북"],
+    "industry_big": ["건설업", "광업", "금융및보험업", "기타의사업", "농업", "어업", "운수·창고·통신업", "임업", "전기·가스·증기·수도사업", "제조업"],
+    "cell": {
+      "cell_model_name": "historical_rate_baseline",
+      "cell_model_version": "bounded_maturity_gap_baseline_v1_20260801",
+      "cell_target_definition": "accident_occurs_in_target_week_and_first_care_approval_record_is_observed_by_end_of_next_calendar_year",
+      "cell_approval_year_inference": "sequence_reset",
+      "cell_label_maturity_window": "occurrence_month_to_end_next_calendar_year_about_12_to_24_months_not_fixed_52_weeks",
+      "api_target_definition": "accident_occurs_in_target_week_and_first_care_approval_record_is_observed_by_end_of_next_calendar_year",
+      "api_approval_year_inference": "exact_public_api_approval_date",
+      "api_record_unit": "public_first_care_approval_record_not_unique_accident_event"
+    },
+    "workplace": {
+      "nps": {
+        "model_name": "industrial_accident_workplace_week_allocation",
+        "model_version": "v2.1.0-p0-contract",
+        "population_tier": "nps_public_observed_population",
+        "scenario_id": "poisson_equal_unit_risk_coverage_allocation",
+        "target_definition": "accident_occurs_in_target_week_and_first_care_approval_record_is_observed_by_end_of_next_calendar_year",
+        "approval_year_inference": "sequence_reset",
+        "label_maturity_window": "occurrence_month_to_end_of_next_calendar_year_about_12_to_24_months_not_fixed_52_weeks",
+        "calibration_status": "bounded_cell_allocation_scenario_only",
+        "probability_status": "research_only_bounded_target_not_workplace_identified_or_validated",
+        "risk_value_type": "provisional_probability_from_next_calendar_year_bounded_cell_count_allocation_not_validated",
+        "priority_reference_population": "all_scored_workplaces_national_not_similar_workplace_peers",
+        "cell_model_name": "historical_rate_baseline",
+        "cell_model_version": "bounded_maturity_gap_baseline_v1_20260801"
+      },
+      "kcomwel": {
+        "model_name": "industrial_accident_workplace_week_allocation",
+        "model_version": "v2.1.0-p0-contract",
+        "population_tier": "kcomwel_2024_annual_expanded_alternative_not_union",
+        "scenario_id": "kcomwel_2024_expanded_poisson_equal_unit_risk_coverage_allocation",
+        "target_definition": "accident_occurs_in_target_week_and_first_care_approval_record_is_observed_by_end_of_next_calendar_year",
+        "approval_year_inference": "sequence_reset",
+        "label_maturity_window": "occurrence_month_to_end_of_next_calendar_year_about_12_to_24_months_not_fixed_52_weeks",
+        "calibration_status": "bounded_cell_allocation_scenario_only",
+        "probability_status": "research_only_bounded_target_not_workplace_identified_or_validated",
+        "risk_value_type": "provisional_probability_from_next_calendar_year_bounded_cell_count_allocation_not_validated",
+        "priority_reference_population": "all_scored_workplaces_national_not_similar_workplace_peers",
+        "cell_model_name": "historical_rate_baseline",
+        "cell_model_version": "bounded_maturity_gap_baseline_v1_20260801"
+      }
+    }
+  }
+}
