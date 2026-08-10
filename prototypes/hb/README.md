@@ -3,7 +3,7 @@
 - 원본 브랜치: `hb-rag-bot`
 - 보존 기준 커밋: `fb46e43`
 - 원본 경로: `webapp/`
-- 보존 경로: `prototypes/hb-rag/`
+- 보존 경로: `prototypes/hb/`
 
 Flask 기반 노동법 상담, Chroma 벡터 검색, 계약서 검토와 검색·생성 단계 평가 도구를 포함합니다.
 
