@@ -11,7 +11,9 @@
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "studio": "drizzle-kit studio",
-    "ingest": "tsx scripts/ingest.ts"
+    "ingest": "tsx scripts/ingest.ts",
+    "ingest:industrial-safety": "bash scripts/ingest-industrial-safety.sh",
+    "test:industrial-safety-loader": "${INDUSTRIAL_SAFETY_PYTHON:-/data/shared-SeD/shared/model/weekly_workplace_risk_api_extension_v3_201512_202604/.venv/bin/python} -m unittest tests/test_industrial_safety_loader.py"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
