@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { DataSourceList } from "@/components/common/DataSourceList";
-import type { RecentMessage } from "@/domain/chat";
+import type { ChatMode, RecentMessage } from "@/domain/chat";
 import type {
   ChatComparisonResponse,
   LlmProviderId,
@@ -37,6 +37,18 @@ function metric(value: number | null, suffix = ""): string {
   return value === null ? "미제공" : `${value.toLocaleString("ko-KR")}${suffix}`;
 }
 
+function comparisonHistoryContent(
+  comparison: ChatComparisonResponse,
+  selection?: LlmProviderId | "tie",
+): string {
+  const selected = selection && selection !== "tie"
+    ? comparison.results.filter((result) => result.provider === selection)
+    : comparison.results;
+  return selected
+    .map((result) => `${result.provider_label}: ${result.answer.slice(0, 900)}`)
+    .join("\n");
+}
+
 function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
   const statusLabel =
     result.status === "success"
@@ -67,19 +79,31 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
 
       <div className="provider-answer-copy">{result.answer}</div>
 
-      <div className="provider-quick-metrics" aria-label={`${result.provider_label} 핵심 성능 지표`}>
-        <span><strong>{metric(result.metrics.latency_ms, "ms")}</strong> 응답시간</span>
-        <span><strong>{metric(result.metrics.usage.total_tokens)}</strong> 전체 토큰</span>
-        <span><strong>{metric(result.metrics.answer_chars)}</strong> 글자</span>
-      </div>
+      <section className="provider-evidence" aria-label={`${result.provider_label} 답변 근거와 한계`}>
+        <div>
+          <strong>공식 근거</strong>
+          <DataSourceList sources={result.sources} />
+        </div>
+        <div>
+          <strong>답변 한계</strong>
+          {result.limitations.length > 0 ? (
+            <ul>{result.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
+          ) : <p className="muted-text">별도로 표시된 한계가 없습니다.</p>}
+        </div>
+      </section>
 
       <details className="provider-trace">
-        <summary>답변 생성 과정과 상세 지표</summary>
+        <summary>응답 상세 · 속도, 토큰, 생성 과정</summary>
         <dl>
+          <div><dt>전체 응답시간</dt><dd>{metric(result.metrics.latency_ms, "ms")}</dd></div>
+          <div><dt>전체 토큰</dt><dd>{metric(result.metrics.usage.total_tokens)}</dd></div>
+          <div><dt>답변 길이</dt><dd>{metric(result.metrics.answer_chars, "자")}</dd></div>
           <div><dt>실행 상태</dt><dd>{statusLabel}</dd></div>
           <div><dt>컨텍스트</dt><dd>{result.trace.context_mode === "company" ? "선택 사업장 연결" : "일반 상담"}</dd></div>
-          <div><dt>질의 재작성</dt><dd>{result.trace.query_transform === "none" ? "사용 안 함" : result.trace.query_transform}</dd></div>
+          <div><dt>질의 재작성</dt><dd>{result.trace.query_transform === "none" ? "사용 안 함" : "후속 질문 독립형 재작성"}</dd></div>
           <div><dt>최근 대화</dt><dd>{result.trace.recent_message_count}개 전달</dd></div>
+          <div><dt>공식 근거 검색</dt><dd>{result.trace.rag_status}</dd></div>
+          <div><dt>공유 근거</dt><dd>{result.trace.retrieved_document_count}개</dd></div>
           <div><dt>정책 버전</dt><dd>{result.trace.prompt_policy_version}</dd></div>
           <div><dt>가드레일</dt><dd>{result.trace.guardrail_action}</dd></div>
           <div><dt>가드레일 규칙</dt><dd>{result.trace.guardrail_hits.join(", ") || "탐지 없음"}</dd></div>
@@ -108,13 +132,6 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
         </div>
       ) : null}
 
-      <details className="provider-sources">
-        <summary>출처와 답변 한계</summary>
-        <DataSourceList sources={result.sources} />
-        {result.limitations.length > 0 ? (
-          <ul>{result.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
-        ) : null}
-      </details>
     </article>
   );
 }
@@ -128,12 +145,24 @@ function ComparisonBlock({
   selected?: LlmProviderId | "tie";
   onSelect: (selection: LlmProviderId | "tie") => void;
 }) {
+  const retrieval = comparison.results[0]?.trace;
+  const ragLabel = !retrieval
+    ? "공식 근거 상태 미확인"
+    : retrieval.rag_status === "matched"
+      ? `공식 근거 ${retrieval.retrieved_document_count}개 연결`
+      : retrieval.rag_status === "no_match"
+        ? "직접 관련 공식 근거 없음"
+        : comparison.execution_mode === "policy_short_circuit"
+          ? "긴급 안내 우선"
+          : "공식 근거 검색 연결 안 됨";
+
   return (
     <div className="comparison-block">
       <div className="comparison-summary">
         <div>
           <span className="comparison-kicker">{comparison.execution_mode === "dual_api" ? "동일 조건 병렬 비교" : "긴급 안전정책 우선"}</span>
-          <strong>{comparison.execution_mode === "dual_api" ? "두 모델이 같은 질문·컨텍스트·생성 설정을 사용했습니다." : "긴급 상황은 모델 응답을 기다리지 않고 공통 안전 안내를 즉시 표시합니다."}</strong>
+          <strong>{comparison.execution_mode === "dual_api" ? "두 모델이 같은 질문·사업장·공식 검색 결과·생성 설정을 사용했습니다." : "긴급 상황은 모델 응답을 기다리지 않고 공통 안전 안내를 즉시 표시합니다."}</strong>
+          <span className={`rag-status rag-status-${retrieval?.rag_status ?? "unavailable"}`}>{ragLabel}</span>
         </div>
         <span>{new Date(comparison.completed_at).toLocaleTimeString("ko-KR")}</span>
       </div>
@@ -170,10 +199,12 @@ export function ChatPanel({
   companyId,
   companyName,
   suggestedPrompt,
+  chatMode = "general",
 }: {
   companyId?: string;
   companyName?: string;
   suggestedPrompt?: string;
+  chatMode?: ChatMode;
 }) {
   const inputId = useId();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -201,9 +232,14 @@ export function ChatPanel({
     if (!message || loading) return;
 
     const recentMessages: RecentMessage[] = messages
-      .filter((item) => !item.comparison)
+      .filter((item) => item.id !== "welcome")
       .slice(-8)
-      .map((item) => ({ role: item.role, content: item.content }));
+      .map((item) => ({
+        role: item.role,
+        content: item.comparison
+          ? comparisonHistoryContent(item.comparison, feedback[item.comparison.comparison_id])
+          : item.content,
+      }));
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: message }]);
     setDraft("");
     setError(null);
@@ -217,7 +253,7 @@ export function ChatPanel({
           message,
           conversation_id: conversationId,
           company_id: companyId,
-          chat_mode: "general",
+          chat_mode: chatMode,
           recent_messages: recentMessages,
         }),
       });
@@ -270,7 +306,7 @@ export function ChatPanel({
     <div className="chat-panel comparison-chat-panel">
       <div className="chat-topbar">
         <div><span className="online-dot" aria-hidden="true" /><strong>실제 LLM 동시 비교</strong></div>
-        <span>{companyName ? `${companyName} 컨텍스트 연결됨` : "일반 노동 상담"}</span>
+        <span>{companyName ? `${companyName} 컨텍스트 연결됨` : chatMode === "contract" ? "계약서 후속 상담" : "일반 노동 상담"}</span>
       </div>
 
       <div className="chat-body comparison-chat-body" aria-live="polite" aria-busy={loading}>

@@ -26,6 +26,11 @@ export interface LlmCallResult {
   upstreamRequestId: string | null;
 }
 
+export interface LlmCompletionOptions {
+  temperature?: number;
+  maxTokens?: number;
+}
+
 export class LlmCallError extends Error {
   constructor(
     public readonly code: string,
@@ -50,6 +55,7 @@ export class OpenAICompatibleChatClient {
   async complete(
     config: LlmProviderConfig,
     messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+    options: LlmCompletionOptions = {},
   ): Promise<LlmCallResult> {
     const started = performance.now();
     if (!config.apiKey) {
@@ -67,8 +73,8 @@ export class OpenAICompatibleChatClient {
         body: JSON.stringify({
           model: config.model,
           messages,
-          temperature: 0.1,
-          max_tokens: 700,
+          temperature: options.temperature ?? 0.1,
+          max_tokens: options.maxTokens ?? 700,
           stream: false,
         }),
         signal: AbortSignal.timeout(this.timeoutMs),

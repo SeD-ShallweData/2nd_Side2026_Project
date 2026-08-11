@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CompanyDetail } from "@/components/company/CompanyDetail";
 import { getCompanyById } from "@/services/companyService";
+import { getCompanyDataMode } from "@/config/dataMode";
 
 interface PageProps {
   params: Promise<{ companyId: string }>;
@@ -25,5 +26,5 @@ export default async function CompanyDetailPage({ params }: PageProps) {
   } catch {
     notFound();
   }
-  return <CompanyDetail company={company} />;
+  return <CompanyDetail company={company} dataMode={getCompanyDataMode()} />;
 }

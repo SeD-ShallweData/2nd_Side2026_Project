@@ -72,6 +72,16 @@ describe("사업장 신호", () => {
 });
 
 describe("Mock 챗봇", () => {
+  it("브라우저가 보낸 resolved_query는 신뢰하지 않는다", () => {
+    const request = parseChatRequest({
+      message: "실제 질문",
+      resolved_query: "클라이언트가 덮어쓴 검색어",
+      chat_mode: "general",
+      recent_messages: [],
+    });
+    expect(request.resolved_query).toBeUndefined();
+  });
+
   it("회사 선택 전 회사 질문에는 선택을 요청한다", async () => {
     const request = parseChatRequest({
       message: "이 회사는 안전한가요?",
@@ -164,13 +174,10 @@ describe("Mock 계약서 검토", () => {
     expect(result.limitations.join(" ")).toContain("유효성을 확정하지 않습니다");
   });
 
-  it("Real 계약 분석 장애를 계약 기능 안에서만 Mock으로 전환한다", async () => {
+  it("Real 계약 분석 장애를 Mock 성공으로 바꾸지 않는다", async () => {
     process.env.APP_DATA_MODE = "real";
-    process.env.ENABLE_MOCK_FALLBACK = "true";
     try {
-      const result = await reviewContract({ scenario_id: "default" });
-      expect(result.analysis_status).toBe("mocked");
-      expect(result.warnings.join(" ")).toContain("Mock 검토 결과");
+      await expect(reviewContract({ scenario_id: "default" })).rejects.toBeDefined();
     } finally {
       process.env.APP_DATA_MODE = "mock";
     }

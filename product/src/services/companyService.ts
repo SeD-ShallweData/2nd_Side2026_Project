@@ -1,4 +1,4 @@
-import { getMockDelayMs } from "@/config/dataMode";
+import { getCompanyDataMode, getMockDelayMs } from "@/config/dataMode";
 import type { Company, CompanySearchResponse } from "@/domain/company";
 import { delay } from "@/utils/delay";
 import { ServiceError } from "@/utils/errors";
@@ -25,7 +25,7 @@ export async function searchCompanies(query: string, limit = 10): Promise<Compan
     );
   }
 
-  await delay(getMockDelayMs());
+  if (getCompanyDataMode() === "mock") await delay(getMockDelayMs());
   const items = await getCompanyRepository().search(normalizedQuery, limit);
   return {
     query: normalizedQuery,

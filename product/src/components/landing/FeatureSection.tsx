@@ -55,7 +55,7 @@ export function HowItWorks() {
           <span className="eyebrow">간단한 이용 흐름</span>
           <h2 id="how-title">회사명을 찾고, 확인하고, 물어보세요</h2>
           <p>
-            실제 ML과 LLM이 연결되지 않은 현재 프로토타입에서도 전체 흐름을 Mock 데이터로 체험할 수 있습니다.
+            정확한 사업장을 선택한 뒤 서로 다른 신호와 공식 근거를 확인하고 다음 행동으로 이어집니다.
           </p>
           <Link href="/companies" className="text-link">
             데모 시작하기 <span aria-hidden="true">→</span>
@@ -73,7 +73,7 @@ export function HowItWorks() {
             <span>2</span>
             <div>
               <strong>서로 다른 신호 확인</strong>
-              <p>임금 지급 관련 정보와 지역·업종 산업재해 정보를 분리해 봅니다.</p>
+              <p>임금 공개 판정과 산업안전 확인 우선순위를 분리해 봅니다.</p>
             </div>
           </li>
           <li>
@@ -101,6 +101,36 @@ export function FinalCta() {
         <Link href="/companies" className="button button-dark button-large">
           사업장 확인하기 <span aria-hidden="true">→</span>
         </Link>
+      </div>
+    </section>
+  );
+}
+
+const COMMUNITY_PREVIEW = [
+  { tag: "입사 전 확인", title: "면접에서 임금 지급일은 어떻게 물어보면 좋을까요?", meta: "구직자 · 답변 4" },
+  { tag: "근로계약서", title: "포괄임금 조항을 받았을 때 먼저 확인할 항목", meta: "근로자 · 답변 7" },
+  { tag: "현장 안전", title: "보호구와 안전교육 여부를 확인한 경험을 나눠요", meta: "익명 · 답변 3" },
+] as const;
+
+export function CommunityPreview() {
+  return (
+    <section className="section community-preview-section" aria-labelledby="community-preview-title">
+      <div className="shell community-preview-grid">
+        <div className="community-preview-copy">
+          <span className="eyebrow">경험을 근거와 구분해서</span>
+          <h2 id="community-preview-title">혼자 묻기 어려운 질문도 함께 정리해요</h2>
+          <p>커뮤니티 글은 사용자 경험이며 공공데이터나 공식 법령과 섞지 않고 별도 출처로 표시합니다.</p>
+          <Link href="/community" className="button button-outline">커뮤니티 미리보기 <span aria-hidden="true">→</span></Link>
+        </div>
+        <div className="community-preview-list">
+          {COMMUNITY_PREVIEW.map((post) => (
+            <article key={post.title}>
+              <span>{post.tag}</span>
+              <h3>{post.title}</h3>
+              <small>{post.meta}</small>
+            </article>
+          ))}
+        </div>
       </div>
     </section>
   );

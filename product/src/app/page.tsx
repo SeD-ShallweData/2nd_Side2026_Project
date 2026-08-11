@@ -1,4 +1,4 @@
-import { FeatureSection, FinalCta, HowItWorks } from "@/components/landing/FeatureSection";
+import { CommunityPreview, FeatureSection, FinalCta, HowItWorks } from "@/components/landing/FeatureSection";
 import { LandingHero } from "@/components/landing/LandingHero";
 
 export default function HomePage() {
@@ -7,6 +7,7 @@ export default function HomePage() {
       <LandingHero />
       <FeatureSection />
       <HowItWorks />
+      <CommunityPreview />
       <FinalCta />
     </>
   );
