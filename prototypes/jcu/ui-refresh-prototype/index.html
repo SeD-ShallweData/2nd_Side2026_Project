@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="돈워리 공개 사용자 UI 보완 프로토타입">
+  <title>돈워리 UI 보완 프로토타입</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">본문으로 바로가기</a>
+
+  <div class="prototype-bar"><b>프로토타입</b> — 화면의 사업장·지표·게시글과 AI 답변은 모두 <b>가상 데이터</b>입니다.</div>
+
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand route-link" href="#home" aria-label="돈워리 홈">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        </span>
+        <span>돈워리</span>
+      </a>
+      <nav class="desktop-nav" aria-label="주요 메뉴">
+        <a class="route-link" data-nav="home" href="#home">서비스 소개</a>
+        <a class="route-link" data-nav="companies" href="#companies">사업장 확인</a>
+        <a class="route-link" data-nav="community" href="#community">커뮤니티</a>
+        <a class="route-link" data-nav="contracts" href="#contracts">계약서 진단</a>
+      </nav>
+      <a class="button button-ai route-link header-ai" data-nav="chat" href="#chat">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5.8h14v9.6H11l-4.4 3v-3H5z"/><path d="M8.2 9.2h7.6M8.2 12h5.2"/></svg>
+        AI 노동 상담
+      </a>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section class="view is-active" data-view="home" aria-labelledby="home-title">
+      <div class="hero">
+        <div class="shell">
+          <div class="hero-copy">
+            <span class="hero-badge">⚡ 커뮤니티 기반 AI 일터위험 조기경보</span>
+            <h1 id="home-title">일터의 위험,<br><mark>미리 알고</mark> 대비하세요</h1>
+            <p>공공데이터로 분석한 사업장 관측 지표, 같은 업종 동료들의 실제 경험, 그리고 AI 상담까지 — 혼자 감당하지 않아도 됩니다.</p>
+            <div class="button-row">
+              <a class="button button-ai button-large route-link" href="#companies">내 사업장 위험카드 보기 <span>→</span></a>
+              <a class="button button-ghost button-large route-link" href="#chat">AI 상담 해보기</a>
+            </div>
+          </div>
+          <button class="hero-quicklook" type="button" data-go="company" aria-label="OO건설 위험카드 상세 보기">
+            <span class="quicklook-label"><i></i> DEMO · 위험카드 미리보기</span>
+            <span class="quicklook-company"><b>OO건설</b><small>인천광역시 · 건설업</small><em>전체 카드 보기 →</em></span>
+            <span class="quicklook-layers">
+              <span><small>관측 사실</small><b>명단 미등재</b><em>고용 변동 확인</em></span>
+              <span><small>확인 체크리스트</small><b>급여일 질문</b><em>서면 조건 확인</em></span>
+              <span><small>지역·업종 맥락</small><b>주의 · 1.8배</b><em>개별 사업장 판정 아님</em></span>
+            </span>
+          </button>
+          <div class="hero-stats" aria-label="프로토타입 서비스 지표">
+            <div><strong>4</strong><span>개</span><small>위험카드 데모</small></div>
+            <div><strong>5</strong><span>개</span><small>지역·업종 게시글</small></div>
+            <div><strong>2</strong><span>개</span><small>AI 모델 비교</small></div>
+            <div><strong>3</strong><span>단계</span><small>카드 정보 레이어</small></div>
+          </div>
+        </div>
+      </div>
+
+      <section class="section csh-community-preview" aria-labelledby="home-community-title">
+        <div class="shell">
+          <div class="csh-section-head">
+            <div><span class="eyebrow">커뮤니티</span><h2 id="home-community-title">같은 현장, 같은 고민</h2><p>지역·업종별로 실제 경험을 나누는 익명 커뮤니티</p></div>
+            <a class="button button-ai route-link" href="#community">전체 게시판 보기 →</a>
+          </div>
+          <div class="preview-toolbar"><div class="preview-filters" aria-label="커뮤니티 미리보기 업종 필터"><button type="button" class="chip is-active" data-preview-category="전체">전체</button><button type="button" class="chip" data-preview-category="건설업">건설업</button><button type="button" class="chip" data-preview-category="제조업">제조업</button><button type="button" class="chip" data-preview-category="서비스업">서비스업</button></div><span>익명으로 직접 글을 작성할 수 있어요</span></div>
+          <div class="community-card-grid">
+            <article data-preview-post="건설업"><div><span class="post-icon">♧</span><b>인천 · 건설업</b><em>급여</em></div><h3>급여일이 자꾸 밀리는데 다들 어떻게 확인하셨나요?</h3><p>입사할 때 들었던 날짜와 실제 지급일이 달라서 계약서를 다시 보고 있어요.</p><small>12분 전　댓글 4　공감 11</small></article>
+            <article data-preview-post="제조업"><div><span class="post-icon">⌁</span><b>경기 · 제조업</b></div><h3>첫 출근 전 안전교육 시간을 물어봐도 될까요?</h3><p>보호구 지급과 교육 일정을 미리 확인했던 분들의 경험이 궁금합니다.</p><small>35분 전　댓글 7　공감 18</small></article>
+            <article data-preview-post="서비스업"><div><span class="post-icon">□</span><b>서울 · 서비스업</b></div><h3>포괄임금 조항에서 먼저 볼 항목을 정리했어요</h3><p>기본급과 고정 연장수당이 분리되어 있는지부터 확인했습니다.</p><small>1시간 전　댓글 3　공감 9</small></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section csh-how" aria-labelledby="how-title">
+        <div class="shell">
+          <span class="eyebrow">HOW IT WORKS</span>
+          <h2 id="how-title">4단계로 알아보는 돈워리</h2>
+          <p class="section-sub">사업장 등록부터 AI 상담까지, 일터 위험을 체계적으로 파악하세요.</p>
+          <div class="csh-step-grid">
+            <article><i>⌕</i><span>STEP 1</span><h3>사업장 등록</h3><p>회사명·주소·업종을 확인해 정확한 사업장을 선택합니다.</p><b>내가 다니는 곳</b></article>
+            <article><i>◇</i><span>STEP 2</span><h3>위험카드 확인</h3><p>관측 사실, 확인 질문, 지역·업종 맥락을 한 장에서 봅니다.</p><b>한 장의 3레이어 카드</b></article>
+            <article><i>♧</i><span>STEP 3</span><h3>지역·업종 게시판</h3><p>숫자 뒤에 있는 같은 업종 사람들의 실제 경험을 비교합니다.</p><b>숫자 뒤의 현장 경험</b></article>
+            <article><i>AI</i><span>STEP 4</span><h3>AI 상담</h3><p>두 모델 답변과 공식 근거, 지금 할 일을 함께 확인합니다.</p><b>다음 선택지까지 안내</b></article>
+          </div>
+          <div class="trust-strip"><strong>돈워리가 지키는 원칙</strong><span>사업장 위험을 한 점수로 단정하지 않아요</span><span>서로 다른 데이터의 범위를 구분해요</span><span>결과를 다음 질문과 행동으로 연결해요</span></div>
+        </div>
+      </section>
+
+      <section class="section csh-risk-section" aria-labelledby="risk-showcase-title">
+        <div class="shell csh-risk-layout">
+          <div class="risk-intro">
+            <span class="eyebrow">위험카드</span>
+            <h2 id="risk-showcase-title">내 일터의 신호를<br>한 장에서 확인하세요</h2>
+            <p>공개 데이터에서 관측된 사실과, 그래서 무엇을 확인하면 좋을지를 한 장에 정리합니다. 지역·업종 경보도 범위를 구분해 함께 보여드립니다.</p>
+            <div class="risk-feature-list">
+              <div><i>↗</i><p><strong>관측 사실</strong><span>명단 등재 여부와 고용 흐름처럼 실제 기록된 정보</span></p></div>
+              <div><i>✓</i><p><strong>확인 체크리스트</strong><span>신호를 면접과 입사 전에 물어볼 질문으로 변환</span></p></div>
+              <div><i>▱</i><p><strong>지역·업종 맥락</strong><span>개별 사업장 판정과 분리한 집계 경보</span></p></div>
+              <div><i>◎</i><p><strong>데이터 신뢰도</strong><span>기준일·결측·매칭 범위를 카드에 함께 표시</span></p></div>
+            </div>
+          </div>
+          <div class="risk-demo-column">
+            <div class="home-risk-picker" id="home-risk-picker" aria-label="더미 사업장 선택"></div>
+            <div id="home-risk-card"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section csh-consult-preview" aria-labelledby="consult-preview-title">
+        <div class="shell consult-preview-grid">
+          <div><span class="eyebrow">AI 상담</span><h2 id="consult-preview-title">막막할 때<br>AI가 먼저 답합니다</h2><p>위험카드에서 확인한 질문을 두 모델에 그대로 이어 묻고, 공식 근거와 다음 행동을 비교합니다.</p><div class="prompt-list"><button data-ask="급여가 밀릴 때 어떤 자료부터 준비해야 하나요?">“급여가 밀릴 때 뭘 준비하나요?” <span>→</span></button><button data-ask="첫 출근 전에 안전교육과 보호구를 어떻게 확인하나요?">“현장 안전은 뭘 확인하나요?” <span>→</span></button><button data-ask="근로계약서에서 꼭 확인할 항목을 알려주세요.">“계약서에서 꼭 볼 것은?” <span>→</span></button></div></div>
+          <div class="consult-card"><div class="consult-head"><span>AI</span><p><strong>Money Worry AI</strong><small><i></i> Upstage Solar · SKT A.X 동시 비교</small></p></div><div class="consult-bubble">안녕하세요. 일터에서 겪고 있는 어려움을 말씀해 주세요. 임금 체불, 산업재해, 부당해고 등 어떤 상황이든 함께 확인할 수 있어요.</div><button class="consult-input" type="button" data-go="chat"><span>궁금한 것을 질문해 보세요...</span><b>⌕</b></button></div>
+        </div>
+      </section>
+
+      <section class="csh-final-cta"><div class="shell"><span class="eyebrow">지금 시작하세요</span><h2>내 사업장, 지금 무엇을<br>확인해야 하는지 알아보세요</h2><p>회사명을 입력하면 공개 데이터에서 관측된 사실과 확인할 항목을 한 장으로 정리합니다.</p><div class="button-row"><a class="button button-ai button-large" href="#companies">무료로 위험카드 보기 →</a><a class="button button-dark-alt button-large" href="#chat">AI 상담 먼저 해보기</a></div></div></section>
+    </section>
+
+    <section class="view page-view" data-view="companies" aria-labelledby="companies-title">
+      <div class="shell narrow-shell">
+        <div class="page-heading compact-heading search-heading">
+          <span class="eyebrow">사업장 확인</span>
+          <h1 id="companies-title">어느 사업장을 찾고 있나요?</h1>
+          <p>같은 이름의 사업장이 있을 수 있으니 주소와 업종을 함께 확인하세요.</p>
+        </div>
+        <div class="demo-notice"><span>UI DEMO</span> 이 화면의 회사와 결과는 인터페이스 확인을 위한 더미 데이터입니다.</div>
+        <form class="search-card" id="company-search-form">
+          <label for="company-search">회사명 또는 사업장명</label>
+          <div class="search-row">
+            <span aria-hidden="true">⌕</span>
+            <input id="company-search" name="query" placeholder="예: OO건설, 다온제조" autocomplete="off">
+            <button class="button button-dark" type="submit">검색</button>
+          </div>
+          <div class="quick-queries" aria-label="데모 검색어">
+            <span>빠른 검색</span>
+            <button type="button" data-query="OO건설">OO건설</button>
+            <button type="button" data-query="다온제조">다온제조</button>
+            <button type="button" data-query="미래산업">미래산업</button>
+            <button type="button" data-query="없는회사">없는회사</button>
+          </div>
+        </form>
+        <section class="search-output" id="search-output" aria-live="polite">
+          <div class="empty-state">
+            <span aria-hidden="true">⌕</span>
+            <h2>확인할 사업장을 검색해 보세요</h2>
+            <p>검색 결과에서 주소와 업종을 본 뒤 직접 선택합니다.</p>
+          </div>
+        </section>
+        <div class="search-flow-note"><span>다음 단계</span><p><strong>사업장 선택 → 한 장의 위험카드 → AI 상담</strong><small>선택한 주소와 업종 맥락이 상담 질문까지 이어집니다.</small></p></div>
+      </div>
+    </section>
+
+    <section class="view page-view detail-view" data-view="company" aria-labelledby="company-title">
+      <div class="detail-hero">
+        <div class="shell">
+          <button class="back-link" type="button" data-go="companies">← 검색 결과로</button>
+          <div class="detail-title-row">
+            <span class="company-logo company-logo-large" id="detail-logo">OO</span>
+            <div><span class="demo-pill">DEMO 사업장</span><h1 id="company-title">OO건설</h1><p id="company-address">인천광역시 서구 검단로 00</p></div>
+            <button class="button button-light" type="button" data-go="companies">사업장 변경</button>
+          </div>
+          <div class="detail-tags" id="detail-tags"><span>인천광역시</span><span>건설업</span><span>50~99명</span></div>
+        </div>
+      </div>
+      <div class="shell detail-content">
+        <div class="freshness"><span><i></i> 최신 더미 시나리오</span><strong>기준 2026-07-31</strong></div>
+        <div class="risk-context-title">
+          <div><span class="eyebrow">위험카드</span><h2>내 일터의 신호를 한 장에서</h2></div>
+          <p>사업장 관측 사실과 지역·업종 집계는 카드 안의 레이어로 구분합니다.</p>
+        </div>
+        <div class="risk-grid" id="risk-grid"></div>
+        <section class="connected-questions" aria-labelledby="connected-title">
+          <div class="section-heading-left"><span class="eyebrow">NEXT QUESTIONS</span><h2 id="connected-title">카드를 보고 바로 물어볼 질문</h2></div>
+          <div class="question-action-grid" id="company-question-actions"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="view page-view chat-view" data-view="chat" aria-labelledby="chat-title">
+      <div class="shell chat-shell">
+        <div class="page-heading compact-heading left-heading">
+          <span class="eyebrow">AI 노동 상담</span>
+          <h1 id="chat-title">같은 질문, 두 관점으로 확인하세요</h1>
+          <p>답변보다 공식 근거와 다음 행동을 먼저 볼 수 있게 구성했습니다.</p>
+        </div>
+        <div class="chat-layout">
+          <aside class="question-guide">
+            <div class="guide-title"><span class="bot-symbol" aria-hidden="true">AI</span><div><strong>질문 가이드</strong><small>무엇부터 물을지 막막하다면</small></div></div>
+            <div class="guide-context" id="chat-company-context" hidden></div>
+            <div class="guide-group">
+              <strong>입사 전 확인</strong>
+              <button type="button" data-prompt="입사 전에 임금과 4대보험에서 무엇을 확인해야 하나요?">임금·4대보험 확인</button>
+              <button type="button" data-prompt="현장 안전교육과 보호구는 어떻게 확인해야 하나요?">현장 안전 확인</button>
+            </div>
+            <div class="guide-group">
+              <strong>문제가 생겼을 때</strong>
+              <button type="button" data-prompt="임금이 밀렸을 때 어떤 자료부터 준비해야 하나요?">임금이 밀렸을 때</button>
+              <button type="button" data-prompt="산재 신청은 회사 동의가 꼭 필요한가요?">산재 신청 절차</button>
+            </div>
+          </aside>
+          <section class="chat-panel" aria-label="두 AI 모델 비교 상담">
+            <div class="chat-topbar"><div><i></i><strong>두 모델 답변 비교</strong></div><span>더미 응답 · 외부 전송 없음</span></div>
+            <div class="chat-messages" id="chat-messages" aria-live="polite">
+              <div class="chat-row assistant-row"><span class="chat-avatar">돈</span><div class="bubble assistant-bubble"><p>궁금한 상황을 알려주세요. 두 답변을 나란히 보여드리고, 공식 근거와 지금 할 일을 구분해 드릴게요.</p></div></div>
+            </div>
+            <div class="chat-suggestions" id="chat-suggestions">
+              <button type="button" data-prompt="입사 전에 무엇을 확인해야 하나요?">입사 전 확인</button>
+              <button type="button" data-prompt="근로계약서에서 꼭 봐야 할 항목은 무엇인가요?">계약서 확인</button>
+              <button type="button" data-prompt="임금이 밀리면 어떻게 해야 하나요?">임금체불 대응</button>
+            </div>
+            <form class="chat-form" id="chat-form">
+              <label class="sr-only" for="chat-input">상담 질문</label>
+              <textarea id="chat-input" rows="2" maxlength="1000" placeholder="노동 관련 질문을 입력하세요"></textarea>
+              <button type="submit" aria-label="질문 보내기">↑</button>
+            </form>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="view page-view" data-view="contracts" aria-labelledby="contracts-title">
+      <div class="shell narrow-shell">
+        <div class="page-heading compact-heading">
+          <span class="eyebrow">근로계약서 확인</span>
+          <h1 id="contracts-title">계약서에서 놓친 항목이 있나요?</h1>
+          <p>문서의 법적 효력을 판정하지 않고, 원문에서 다시 확인할 부분을 정리합니다.</p>
+        </div>
+        <section class="contract-workspace">
+          <div class="contract-upload" id="contract-upload">
+            <span class="upload-icon" aria-hidden="true">⇧</span>
+            <h2>PDF·PNG·JPG 파일을 선택하세요</h2>
+            <p>이 UI 프로토타입은 파일을 외부로 보내거나 읽지 않고 더미 결과만 표시합니다.</p>
+            <label class="button button-dark" for="contract-file">파일 선택</label>
+            <input id="contract-file" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg">
+            <small>10MB 이하 · 실제 분석 아님</small>
+            <div class="contract-or"><span>또는</span></div>
+            <button class="button button-light" type="button" data-ask="근로계약서에서 꼭 확인해야 할 항목을 먼저 알려주세요.">파일 없이 AI에게 먼저 묻기</button>
+          </div>
+          <div class="contract-result" id="contract-result" hidden></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="view page-view" data-view="community" aria-labelledby="community-title">
+      <div class="shell community-shell">
+        <div class="community-heading-row">
+          <div class="page-heading compact-heading left-heading">
+            <span class="eyebrow">익명 커뮤니티</span>
+            <h1 id="community-title">일하는 사람들의 확인 경험</h1>
+            <p>사용자 경험은 공공데이터나 공식 법률 근거가 아닙니다.</p>
+          </div>
+          <button class="button button-dark" id="open-write" type="button">익명 글쓰기</button>
+        </div>
+        <div class="community-toolbar">
+          <div class="category-tabs" role="tablist" aria-label="게시글 분류">
+            <button class="is-active" type="button" data-category="전체">전체</button>
+            <button type="button" data-category="입사 전 확인">입사 전 확인</button>
+            <button type="button" data-category="근로계약서">근로계약서</button>
+            <button type="button" data-category="현장 안전">현장 안전</button>
+          </div>
+          <label class="community-search"><span aria-hidden="true">⌕</span><input id="community-search" placeholder="게시글 검색"></label>
+        </div>
+        <div class="community-note"><strong>DEMO</strong> 작성한 글은 이 브라우저 화면에만 잠시 추가됩니다.</div>
+        <section class="post-list" id="post-list" aria-live="polite"></section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <div><span class="brand footer-brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><span>돈워리</span></span><p>공개 정보와 공식 노동 자료를 다음 행동으로 연결합니다.</p></div>
+      <nav aria-label="하단 메뉴"><a href="#companies">사업장 확인</a><a href="#chat">AI 노동 상담</a><a href="#contracts">계약서 확인</a><a href="#community">커뮤니티</a></nav>
+      <small>UI 보완 검토용 정적 프로토타입 · 모든 데이터와 답변은 더미입니다.</small>
+    </div>
+  </footer>
+
+  <a class="floating-chat route-link" href="#chat" aria-label="AI 노동 상담 열기"><span aria-hidden="true">AI</span><strong>바로 상담</strong></a>
+
+  <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
+    <a href="#home" data-nav="home"><span aria-hidden="true">⌂</span>홈</a>
+    <a href="#companies" data-nav="companies"><span aria-hidden="true">⌕</span>사업장</a>
+    <a class="mobile-ai" href="#chat" data-nav="chat"><span aria-hidden="true">AI</span>상담</a>
+    <a href="#contracts" data-nav="contracts"><span aria-hidden="true">✓</span>계약서</a>
+    <a href="#community" data-nav="community"><span aria-hidden="true">♧</span>커뮤니티</a>
+  </nav>
+
+  <dialog class="write-dialog" id="write-dialog">
+    <form method="dialog" id="write-form">
+      <div class="dialog-head"><div><span class="eyebrow">DEMO POST</span><h2>경험 나누기</h2></div><button type="button" id="close-write" aria-label="닫기">×</button></div>
+      <label>분류<select id="post-category"><option>입사 전 확인</option><option>근로계약서</option><option>현장 안전</option></select></label>
+      <label>제목<input id="post-title" maxlength="60" required placeholder="어떤 경험을 나누고 싶나요?"></label>
+      <label>내용<textarea id="post-body" rows="5" maxlength="400" required placeholder="회사명이나 개인정보는 적지 않는 것을 권장합니다."></textarea></label>
+      <p>게시글은 사용자 경험이며 공식 자료가 아닙니다.</p>
+      <button class="button button-dark" type="submit">더미 게시글 등록</button>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
