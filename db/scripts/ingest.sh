@@ -25,6 +25,7 @@
 set -euo pipefail
 
 BUNDLE="../_service_bundle"
+OUT_DIR=""
 MODEL_VERSION=""
 AS_OF=""
 MODEL_SHA=""
@@ -33,6 +34,9 @@ EXPECT_ROWS=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --bundle)        BUNDLE="$2"; shift 2 ;;
+    # CSV 3종이 든 디렉터리를 직접 지정한다. 기본은 "$BUNDLE/outputs".
+    # 과거월 백필(backfill/outputs_YYYYMM/)처럼 번들 구조가 아닌 폴더를 적재할 때 쓴다.
+    --outputs)       OUT_DIR="$2"; shift 2 ;;
     --model-version) MODEL_VERSION="$2"; shift 2 ;;
     --as-of)         AS_OF="$2"; shift 2 ;;
     --model-sha)     MODEL_SHA="$2"; shift 2 ;;
@@ -55,7 +59,7 @@ cd "$(dirname "$0")/.."
 [[ -f .env.local ]] || { echo ".env.local 이 없습니다" >&2; exit 1; }
 set -a; . ./.env.local; set +a
 
-OUT="$BUNDLE/outputs"
+OUT="${OUT_DIR:-$BUNDLE/outputs}"
 for f in scored_active_full.csv 감독관_위험큐_full.csv safe_recommendation_full.csv; do
   [[ -f "$OUT/$f" ]] || { echo "파일 없음: $OUT/$f" >&2; exit 1; }
 done
@@ -151,7 +155,7 @@ VALUES ($( [[ -n "$AS_OF" ]] && echo "DATE '$AS_OF-01'" || echo "NULL" ),
         $( [[ -n "$TARGET" ]] && echo "DATE '$TARGET-01'" || echo "NULL" ),
         '$MODEL_VERSION',
         $( [[ -n "$MODEL_SHA" ]] && echo "'$MODEL_SHA'" || echo "NULL" ),
-        '$(basename "$BUNDLE")/outputs', 0, 0, 0);
+        '$(basename "$(dirname "$OUT")")/$(basename "$OUT")', 0, 0, 0);
 
 CREATE TEMP TABLE cur AS SELECT currval(pg_get_serial_sequence('batches','id')) AS id;
 
