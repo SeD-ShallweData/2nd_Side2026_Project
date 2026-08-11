@@ -80,6 +80,12 @@ GRANT USAGE ON SCHEMA public TO :"bot_user";
 
 -- ① ML 산출물 — 전부 읽기 허용
 GRANT SELECT ON firms, scored_active, inspector_queue, safe_recommendation, batches TO :"bot_user";
+-- 위험등급 해설표. 챗봇이 "매우높음이 무슨 뜻이냐" 에 답하려면 필요하다.
+-- (테이블이 아직 없는 DB 도 있으므로 있을 때만 부여)
+SELECT to_regclass('public.risk_tier_meta') IS NOT NULL AS has_tier_meta \gset
+\if :has_tier_meta
+GRANT SELECT ON risk_tier_meta TO :"bot_user";
+\endif
 
 -- ② 커뮤니티·리뷰 — 원본이 아니라 신원 제거 뷰만
 GRANT SELECT ON v_posts, v_comments, v_reviews TO :"bot_user";

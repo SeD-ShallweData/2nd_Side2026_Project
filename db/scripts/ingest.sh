@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # ML export CSV → Postgres 적재.
 #
-#   ./scripts/ingest.sh --bundle ../_service_bundle --model-version 260807 --as-of 2026-04
+#   ./scripts/ingest.sh --bundle ../_service_bundle \
+#                       --model-version door1-voting-39f-v1 --as-of 2026-06 \
+#                       --expect-rows 553598,3000,503887
 #
 # --as-of 는 **관측창의 끝(t-6)** = 채점에 넣은 국민연금 파일의 마지막 달이다.
 # 예측 대상월(t)은 자동으로 as_of + 6개월이 된다.
@@ -19,28 +21,45 @@
 #  - 숫자 캐스팅은 변환 단계에서만 한다. 빈 문자열은 NULL 로 (0 으로 채우지 않는다).
 #  - `사업자번호`·`sido_code`·`industry_category` 는 끝까지 TEXT 로 둔다.
 #  - 같은 (as_of_date, model_version) 을 다시 적재하면 그 batch 만 갈아끼운다. 멱등.
+#  - 적재가 끝나면 risk_tier 를 **그 batch 안에서만** 계산한다(§risk_tier).
 set -euo pipefail
 
 BUNDLE="../_service_bundle"
+OUT_DIR=""
 MODEL_VERSION=""
 AS_OF=""
+MODEL_SHA=""
+EXPECT_ROWS=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --bundle)        BUNDLE="$2"; shift 2 ;;
+    # CSV 3종이 든 디렉터리를 직접 지정한다. 기본은 "$BUNDLE/outputs".
+    # 과거월 백필(backfill/outputs_YYYYMM/)처럼 번들 구조가 아닌 폴더를 적재할 때 쓴다.
+    --outputs)       OUT_DIR="$2"; shift 2 ;;
     --model-version) MODEL_VERSION="$2"; shift 2 ;;
     --as-of)         AS_OF="$2"; shift 2 ;;
+    --model-sha)     MODEL_SHA="$2"; shift 2 ;;
+    # ML팀이 알려준 기대 행수. 주면 다르면 롤백한다. "scored,queue,safe"
+    --expect-rows)   EXPECT_ROWS="$2"; shift 2 ;;
     *) echo "알 수 없는 인자: $1" >&2; exit 1 ;;
   esac
 done
 
 [[ -z "$MODEL_VERSION" ]] && { echo "--model-version 은 필수입니다" >&2; exit 1; }
 
+EXP_S=0; EXP_Q=0; EXP_F=0
+if [[ -n "$EXPECT_ROWS" ]]; then
+  IFS=',' read -r EXP_S EXP_Q EXP_F <<< "$EXPECT_ROWS"
+  [[ "$EXP_S" =~ ^[0-9]+$ && "$EXP_Q" =~ ^[0-9]+$ && "$EXP_F" =~ ^[0-9]+$ ]] \
+    || { echo "--expect-rows 형식: scored,queue,safe (숫자 3개)" >&2; exit 1; }
+fi
+
 cd "$(dirname "$0")/.."
 [[ -f .env.local ]] || { echo ".env.local 이 없습니다" >&2; exit 1; }
 set -a; . ./.env.local; set +a
 
-OUT="$BUNDLE/outputs"
+OUT="${OUT_DIR:-$BUNDLE/outputs}"
 for f in scored_active_full.csv 감독관_위험큐_full.csv safe_recommendation_full.csv; do
   [[ -f "$OUT/$f" ]] || { echo "파일 없음: $OUT/$f" >&2; exit 1; }
 done
@@ -50,15 +69,25 @@ done
 export PGPASSWORD="${DB_PASSWORD}"
 PSQL=(psql -h 127.0.0.1 -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -q)
 
+# 모델 지문. model_version 은 레시피 이름이라 월 갱신에도 안 바뀌므로,
+# "이번 달 점수가 정말 같은 모델에서 나왔는가" 를 이 해시로 남긴다.
+# 월 재추론은 매 실행 재학습하지만 학습셋·파라미터·시드가 고정이라 결정론적이다
+# — 단 동일 환경(lightgbm==4.6.0 등)에서만 성립한다.
+if [[ -z "$MODEL_SHA" && -f "$BUNDLE/model/door1_final_model.pkl" ]]; then
+  MODEL_SHA=$(sha256sum "$BUNDLE/model/door1_final_model.pkl" | cut -c1-16)
+fi
+
 echo "▶ 적재 시작"
 echo "  번들       : $BUNDLE"
 echo "  model_ver  : $MODEL_VERSION"
+echo "  model_sha  : ${MODEL_SHA:-(pkl 없음 — 기록 안 함)}"
 # 예측 대상월 = 관측 기준월 + 6개월
 TARGET=""
 [[ -n "$AS_OF" ]] && TARGET=$(date -d "${AS_OF}-01 +6 months" +%Y-%m 2>/dev/null || true)
 
 echo "  as_of_date : ${AS_OF:-(NULL — 미확정)}"
 echo "  target(t)  : ${TARGET:-(NULL)}   ← as_of + 6개월, 명단공개 예측 대상월"
+[[ -n "$EXPECT_ROWS" ]] && echo "  기대 행수  : scored=$EXP_S queue=$EXP_Q safe=$EXP_F"
 
 # firm_id  = sha1(사업장명 || '|' || 사업자번호)[:16]   ← **원본 이름 그대로**
 # corp_key = sha1(정규화(사업장명) || '|' || 사업자번호)[:16]
@@ -121,10 +150,12 @@ DELETE FROM batches
  WHERE as_of_date IS NOT DISTINCT FROM $( [[ -n "$AS_OF" ]] && echo "DATE '$AS_OF-01'" || echo "NULL" )
    AND model_version = '$MODEL_VERSION';
 
-INSERT INTO batches (as_of_date, target_month, model_version, source, n_scored, n_queue, n_safe)
+INSERT INTO batches (as_of_date, target_month, model_version, model_sha, source, n_scored, n_queue, n_safe)
 VALUES ($( [[ -n "$AS_OF" ]] && echo "DATE '$AS_OF-01'" || echo "NULL" ),
         $( [[ -n "$TARGET" ]] && echo "DATE '$TARGET-01'" || echo "NULL" ),
-        '$MODEL_VERSION', '_service_bundle/outputs', 0, 0, 0);
+        '$MODEL_VERSION',
+        $( [[ -n "$MODEL_SHA" ]] && echo "'$MODEL_SHA'" || echo "NULL" ),
+        '$(basename "$(dirname "$OUT")")/$(basename "$OUT")', 0, 0, 0);
 
 CREATE TEMP TABLE cur AS SELECT currval(pg_get_serial_sequence('batches','id')) AS id;
 
@@ -190,6 +221,35 @@ SELECT (SELECT $FIRM_ID_SQL FROM (SELECT f."사업장명" nm, f."사업자번호
   nullif(door1_ever,'')::real, "판정"
 FROM stg_safe f;
 
+-- ── risk_tier — 전체 분포 기준 위험등급 ────────────────────
+--
+-- 모집단은 **이 batch 안에서** risk_full 이 있고 아직 명단공개 안 된 곳만이다.
+-- batch_id 를 빼면 지난달 데이터와 섞여 백분위가 틀어진다 — 여러 달을 쌓는 구조이므로
+-- 이 조건이 빠지면 조용히 잘못된 등급이 나온다.
+--
+-- 판정 순서: ① 이미공개(사실) → ② 정보부족 → ③ 백분위. 순서를 바꾸면 안 된다.
+-- 라벨(매우높음/높음/…)은 inspector_queue.queue_priority(긴급/우선/…)와 **일부러 다르다**.
+-- 큐 3,000곳은 전부 전체 상위 0.6% 안이라 같은 척도를 쓰면 84%가 한 등급에 몰린다.
+WITH pop AS (
+  SELECT firm_id, PERCENT_RANK() OVER (ORDER BY risk_full DESC) AS pr
+  FROM scored_active
+  WHERE batch_id=(SELECT id FROM cur)
+    AND risk_full IS NOT NULL
+    AND "체불배제" IS NOT TRUE
+)
+UPDATE scored_active t SET risk_tier = CASE
+    WHEN p.pr <= 0.005 THEN '매우높음'
+    WHEN p.pr <= 0.02  THEN '높음'
+    WHEN p.pr <= 0.10  THEN '다소높음'
+    ELSE '일반' END
+FROM pop p
+WHERE t.batch_id=(SELECT id FROM cur) AND p.firm_id=t.firm_id;
+
+-- 모집단에서 빠진 행 = 이미공개 이거나 정보부족. 등급이 아니라 상태다.
+UPDATE scored_active SET risk_tier =
+  CASE WHEN "체불배제" IS TRUE THEN '이미공개' ELSE '정보부족' END
+WHERE batch_id=(SELECT id FROM cur) AND risk_tier IS NULL;
+
 -- ── 행수 기록 ─────────────────────────────────────────────
 UPDATE batches SET
   n_scored=(SELECT count(*) FROM scored_active       WHERE batch_id=(SELECT id FROM cur)),
@@ -199,7 +259,7 @@ WHERE id=(SELECT id FROM cur);
 
 -- ── 행수 단언: staging 과 적재 결과가 다르면 롤백 ──────────
 DO \$\$
-DECLARE b int; s1 int; s2 int; q1 int; q2 int; f1 int; f2 int;
+DECLARE b int; s1 int; s2 int; q1 int; q2 int; f1 int; f2 int; untiered int;
 BEGIN
   SELECT id INTO b FROM cur;
   SELECT count(*) INTO s1 FROM stg_scored;
@@ -209,7 +269,19 @@ BEGIN
   SELECT count(*) INTO f1 FROM stg_safe;
   SELECT count(*) INTO f2 FROM safe_recommendation WHERE batch_id=b;
   IF s1<>s2 OR q1<>q2 OR f1<>f2 THEN
-    RAISE EXCEPTION '행수 불일치 — scored %/%, queue %/%, safe %/%', s2,s1,q2,q1,f2,f1;
+    RAISE EXCEPTION 'CSV 와 적재 결과의 행수가 다릅니다 — scored %/%, queue %/%, safe %/%', s2,s1,q2,q1,f2,f1;
+  END IF;
+
+  -- ML팀이 알려준 기대 행수와도 맞는지. 다르면 엉뚱한 번들을 읽은 것이다.
+  IF $EXP_S > 0 AND (s2<>$EXP_S OR q2<>$EXP_Q OR f2<>$EXP_F) THEN
+    RAISE EXCEPTION '기대 행수와 다릅니다 — scored %(기대 %), queue %(기대 %), safe %(기대 %)',
+      s2,$EXP_S, q2,$EXP_Q, f2,$EXP_F;
+  END IF;
+
+  -- 등급이 안 매겨진 행이 남으면 안 된다. 남았다면 위 두 UPDATE 의 조건이 어긋난 것이다.
+  SELECT count(*) INTO untiered FROM scored_active WHERE batch_id=b AND risk_tier IS NULL;
+  IF untiered > 0 THEN
+    RAISE EXCEPTION 'risk_tier 가 비어 있는 행이 % 건 남았습니다', untiered;
   END IF;
 END \$\$;
 
@@ -224,5 +296,18 @@ echo "✔ 적재 완료"
 SELECT id AS batch,
        coalesce(to_char(as_of_date,'YYYY-MM'),'(NULL)') AS 기준월,
        coalesce(to_char(target_month,'YYYY-MM'),'(NULL)') AS 예측대상월,
-       model_version, n_scored, n_queue, n_safe
+       model_version, coalesce(model_sha,'-') AS model_sha, n_scored, n_queue, n_safe
 FROM batches ORDER BY id DESC LIMIT 3;"
+
+echo
+echo "▶ 위험등급 분포 (방금 적재한 batch)"
+"${PSQL[@]}" -c "\pset border 2" -c "
+WITH b AS (SELECT max(id) AS id FROM batches)
+SELECT s.risk_tier AS 등급, count(*) AS 사업장수,
+       round(100.0*count(*)/sum(count(*)) OVER (), 2) AS 비율,
+       coalesce(m.label,'-') AS 표기문구
+FROM scored_active s
+LEFT JOIN risk_tier_meta m ON m.tier = s.risk_tier
+WHERE s.batch_id=(SELECT id FROM b)
+GROUP BY s.risk_tier, m.label, m.sort_order
+ORDER BY m.sort_order;"
