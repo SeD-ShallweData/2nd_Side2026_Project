@@ -247,6 +247,7 @@ api_key.env
 _service_bundle/
 _service_bundle_v*/
 /_server_transfer/
+/_server_deploy/
 node_modules/
 .next/
 next-env.d.ts
