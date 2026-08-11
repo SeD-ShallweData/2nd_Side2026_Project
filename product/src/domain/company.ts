@@ -3,21 +3,21 @@ export type CompanyMatchType = "exact" | "normalized" | "partial" | "alias";
 export interface Company {
   company_id: string;
   company_name: string;
-  address: string;
-  region: string;
-  industry: string;
-  size_label: string;
+  address: string | null;
+  region: string | null;
+  industry: string | null;
+  size_label: string | null;
   aliases: string[];
-  data_as_of: string;
+  data_as_of: string | null;
 }
 
 export interface CompanySearchResult {
   company_id: string;
   company_name: string;
-  address: string;
-  region: string;
-  industry: string;
-  size_label: string;
+  address: string | null;
+  region: string | null;
+  industry: string | null;
+  size_label: string | null;
   matched_name: string;
   match_type: CompanyMatchType;
 }

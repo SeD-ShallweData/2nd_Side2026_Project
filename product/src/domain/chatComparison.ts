@@ -6,6 +6,7 @@ import type {
   SuggestedAction,
 } from "@/domain/chat";
 import type { SourceReference } from "@/domain/risk";
+import type { RagRetrievalResult } from "@/domain/rag";
 
 export type LlmProviderId = "upstage" | "skt";
 export type ProviderRunStatus = "success" | "guardrail_replaced" | "fallback" | "policy_short_circuit";
@@ -36,6 +37,8 @@ export interface SafeExecutionTrace {
   guardrail_action: "passed" | "replaced" | "fallback" | "short_circuit";
   guardrail_hits: string[];
   upstream_request_id: string | null;
+  rag_status: RagRetrievalResult["status"];
+  retrieved_document_count: number;
 }
 
 export interface ProviderComparisonResult {
@@ -69,6 +72,7 @@ export interface ChatComparisonResponse {
     same_context: boolean;
     same_temperature: boolean;
     same_max_tokens: boolean;
+    same_retrieval: boolean;
   };
   results: ProviderComparisonResult[];
 }
@@ -79,12 +83,13 @@ export interface ComparisonContext {
   companyContext?: {
     company_id: string;
     company_name: string;
-    address: string;
-    region: string;
-    industry: string;
-    size_label: string;
+    address: string | null;
+    region: string | null;
+    industry: string | null;
+    size_label: string | null;
     risk: unknown;
   };
+  ragRetrieval: RagRetrievalResult;
 }
 
 export interface ChatComparisonProvider {

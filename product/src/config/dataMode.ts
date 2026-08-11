@@ -11,5 +11,5 @@ export function getMockDelayMs(): number {
 }
 
 export function isMockFallbackEnabled(): boolean {
-  return process.env.ENABLE_MOCK_FALLBACK !== "false";
+  return process.env.ENABLE_MOCK_FALLBACK === "true";
 }

@@ -18,14 +18,14 @@ type CardProps =
   | {
       kind: "wage";
       data: WageRiskPublic;
-      dataAsOf: string;
+      dataAsOf: string | null;
       sources: SourceReference[];
       onAsk: (question: string) => void;
     }
   | {
       kind: "safety";
       data: SafetyContextPublic;
-      dataAsOf: string;
+      dataAsOf: string | null;
       sources: SourceReference[];
       onAsk: (question: string) => void;
     };
@@ -53,7 +53,7 @@ export function RiskInformationCard(props: CardProps) {
         <div className="scope-strip">
           <strong>분석 범위</strong>
           <span>
-            {props.data.region} · {props.data.industry}
+            {props.data.region ?? "지역 정보 없음"} · {props.data.industry ?? "업종 정보 없음"}
           </span>
         </div>
       ) : null}
@@ -108,7 +108,7 @@ export function RiskInformationCard(props: CardProps) {
         </div>
         <div>
           <dt>데이터 기준일</dt>
-          <dd>{props.dataAsOf}</dd>
+          <dd>{props.dataAsOf ?? "미확정"}</dd>
         </div>
       </dl>
 

@@ -9,6 +9,7 @@ export interface ContractFileMetadata {
 export interface ContractReviewRequest {
   text?: string;
   file_metadata?: ContractFileMetadata;
+  file?: File;
   scenario_id?: string;
 }
 
@@ -29,6 +30,8 @@ export interface ContractReviewResult {
   warnings: string[];
   suggested_questions: string[];
   limitations: string[];
+  review_id?: string;
+  file_name?: string;
 }
 
 export interface ContractReviewProvider {
