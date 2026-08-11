@@ -36,11 +36,27 @@ OUT_DIR = Path(__file__).resolve().parent / "results"
 
 # '근로기준법 제43조의2제1항제3호' / '시행령 제30조제1항' / '제36조' 형태를 잡는다.
 # 모델은 '근로기준법 시행령'을 두 번째 언급부터 그냥 '시행령'으로 줄여 쓰는 일이 잦다.
-CITATION_RE = re.compile(
-    r"(?:(?P<law>[가-힣]{2,10}법(?:\s*시행령)?|시행령)\s*)?"
-    r"(?P<article>제\d+조(?:의\d+)?)"
-    r"(?P<clause>(?:제\d+항)?(?:제\d+호)?(?:제\d+목)?)"
-)
+#
+# 주의: 법령명에 공백이 들어가는 것들이 있다('근로자퇴직급여 보장법',
+# '남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률'). 단순히 [가-힣]{2,10}법 으로 잡으면
+# 뒷토막('보장법')만 잡혀 'DB에 없는 법령'으로 오판한다. DB에 실재하는 법령명을
+# 먼저 통째로 시도하고, 그다음에 일반 패턴을 쓴다.
+GENERIC_LAW = r"[가-힣]{2,12}법(?:\s*시행령)?|시행령"
+
+
+def build_citation_re(known_laws):
+    names = sorted(known_laws, key=len, reverse=True)
+    alts = "|".join(re.escape(n) for n in names if n)
+    law_pat = (alts + "|" + GENERIC_LAW) if alts else GENERIC_LAW
+    return re.compile(
+        r"(?:「?(?P<law>" + law_pat + r")」?\s*)?"
+        r"(?P<article>제\d+조(?:의\d+)?)"
+        r"(?P<clause>(?:제\d+항)?(?:제\d+호)?(?:제\d+목)?)"
+    )
+
+
+# DB를 읽기 전에도 쓸 수 있도록 기본형을 두고, main()에서 실제 법령명으로 교체한다.
+CITATION_RE = build_citation_re([])
 
 # 프롬프트가 안내를 허용한 공식 창구. 이 외의 번호가 나오면 지어냈을 가능성이 있다.
 KNOWN_NUMBERS = {"1350", "132", "1588-0075", "1644-0083"}
@@ -176,7 +192,10 @@ def normalize_law(name, known_laws):
     return name
 
 
-def classify(cit, retrieved, have):
+def classify(cit, retrieved, have, ctx=""):
+    """ctx: 이번 질문에서 프롬프트에 들어간 조항 원문. 조문이 본문에서 다른 법률을
+    인용하는 경우(예: 남녀고용평등법 제19조가 「한부모가족지원법」을 언급)를
+    환각으로 오판하지 않기 위해 함께 본다."""
     known = set(have)
     law = normalize_law(cit["law"], known)
     art = cit["article"]
@@ -190,6 +209,8 @@ def classify(cit, retrieved, have):
         return "존재안함", "법령명 없이 인용, DB에 없는 조문"
 
     if law not in known:
+        if law and law.replace(" ", "") in ctx.replace(" ", ""):
+            return "OK", None  # 검색된 조문이 본문에서 인용하고 있는 법률
         return "존재안함", f"DB에 없는 법령: {law}"
     if art not in have[law]:
         return "존재안함", f"{law}에 없는 조문: {art}"
@@ -209,10 +230,11 @@ def run_one(item, persona_mode, have, docs):
     answer = bot.ask_donworry(q, persona, n_results=5)
 
     gated = (gate is None or gate > bot.NO_MATCH_DISTANCE_THRESHOLD)
+    ctx = context_text(retrieved, docs)
     cits = [] if gated else extract_citations(answer)
     results = []
     for c in cits:
-        verdict, reason = classify(c, retrieved, have)
+        verdict, reason = classify(c, retrieved, have, ctx)
         results.append({**c, "verdict": verdict, "reason": reason})
 
     phones = {p for p in PHONE_RE.findall(answer)} - KNOWN_NUMBERS
@@ -231,6 +253,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=15,
                     help="검사할 positive 문항 수 (0이면 전체). 기본 15")
+    ap.add_argument("--per-law", type=int, default=0,
+                    help="법령별로 N문항씩 고르게 뽑는다(--limit 대신 사용). 새 법이 "
+                         "표본에서 빠지지 않게 하려면 이쪽을 쓴다")
     ap.add_argument("--negatives", type=int, default=3,
                     help="같이 돌릴 negative 문항 수. 기본 3")
     ap.add_argument("--persona", default="auto",
@@ -241,6 +266,8 @@ def main():
 
     have = db_index()
     docs = doc_index()
+    global CITATION_RE
+    CITATION_RE = build_citation_re(have.keys())
 
     if args.reanalyze:
         src = OUT_DIR / "citation_check.json"
@@ -253,8 +280,9 @@ def main():
             r["citations"] = []
             r["numbers"] = []
             if not r["gated"]:
+                ctx = context_text(retrieved, docs)
                 for c in extract_citations(r["answer"]):
-                    verdict, reason = classify(c, retrieved, have)
+                    verdict, reason = classify(c, retrieved, have, ctx)
                     r["citations"].append({**c, "verdict": verdict, "reason": reason})
                 r["numbers"] = check_numbers(r["answer"], context_text(retrieved, docs))
         print(f"저장된 답변 {len(rows)}건 재채점 (LLM 호출 0회)\n")
@@ -262,7 +290,15 @@ def main():
         src.write_text(json.dumps(rows, ensure_ascii=False, indent=2))
         return 0
 
-    items = POSITIVES if args.limit == 0 else POSITIVES[:args.limit]
+    if args.per_law:
+        seen, items = {}, []
+        for it in POSITIVES:
+            n = seen.get(it["law"], 0)
+            if n < args.per_law:
+                items.append(it)
+                seen[it["law"]] = n + 1
+    else:
+        items = POSITIVES if args.limit == 0 else POSITIVES[:args.limit]
     negs = NEGATIVES[:args.negatives]
     calls = len(items) + len(negs)
     print(f"검사 문항 {len(items)} (+negative {len(negs)}) / "
