@@ -1,5 +1,4 @@
-import { MockContractReviewProvider } from "@/adapters/mock/MockContractReviewProvider";
-import { getContractDataMode, getMockDelayMs, isMockFallbackEnabled } from "@/config/dataMode";
+import { getContractDataMode, getMockDelayMs } from "@/config/dataMode";
 import type { ContractReviewRequest, ContractReviewResult } from "@/domain/contract";
 import { getContractReviewProvider } from "@/services/providers";
 import { delay } from "@/utils/delay";
@@ -40,11 +39,6 @@ export function validateContractRequest(request: ContractReviewRequest): void {
 
 export async function reviewContract(request: ContractReviewRequest): Promise<ContractReviewResult> {
   validateContractRequest(request);
-  await delay(getMockDelayMs());
-  try {
-    return await getContractReviewProvider().review(request);
-  } catch (error) {
-    if (getContractDataMode() !== "real" || !isMockFallbackEnabled()) throw error;
-    return new MockContractReviewProvider().review(request);
-  }
+  if (getContractDataMode() === "mock") await delay(getMockDelayMs());
+  return getContractReviewProvider().review(request);
 }

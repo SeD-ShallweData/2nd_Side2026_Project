@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { MockChatProvider } from "@/adapters/mock/MockChatProvider";
+import { PolicyChatProvider } from "@/adapters/mock/MockChatProvider";
 import { MockCompanyRepository } from "@/adapters/mock/MockCompanyRepository";
 import { MockContractReviewProvider } from "@/adapters/mock/MockContractReviewProvider";
 import { MockRiskProvider } from "@/adapters/mock/MockRiskProvider";
@@ -238,7 +238,7 @@ describe("Adapter 선택", () => {
   it("Mock Mode에서 모든 Mock Adapter를 선택한다", () => {
     expect(getCompanyRepository()).toBeInstanceOf(MockCompanyRepository);
     expect(getRiskProvider()).toBeInstanceOf(MockRiskProvider);
-    expect(getChatProvider()).toBeInstanceOf(MockChatProvider);
+    expect(getChatProvider()).toBeInstanceOf(PolicyChatProvider);
     expect(getContractReviewProvider()).toBeInstanceOf(MockContractReviewProvider);
   });
 });

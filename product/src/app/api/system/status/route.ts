@@ -3,9 +3,9 @@ import {
   getCompanyDataMode,
   getContractDataMode,
   getDataMode,
-  isMockFallbackEnabled,
 } from "@/config/dataMode";
 import { getLlmProviderConfigs } from "@/server/llmConfig";
+import { probeDualLlmStatus } from "@/server/llmHealth";
 import { isDatabaseConfigured, isDatabaseReady } from "@/server/postgres";
 
 type IntegrationStatus = "ready" | "configured_unreachable" | "unavailable";
@@ -28,7 +28,8 @@ async function probe(
 }
 
 export async function GET(): Promise<NextResponse> {
-  const [databaseReady, rag, contractAnalysis] = await Promise.all([
+  const llmConfigs = getLlmProviderConfigs();
+  const [databaseReady, rag, contractAnalysis, dualLlm] = await Promise.all([
     isDatabaseReady(),
     probe(process.env.RAG_API_URL, (payload) => {
       if (typeof payload !== "object" || payload === null) return false;
@@ -43,8 +44,8 @@ export async function GET(): Promise<NextResponse> {
       };
       return health.contract?.enabled === true && health.providers?.upstage?.key === true;
     }),
+    probeDualLlmStatus(llmConfigs),
   ]);
-  const llmConfigs = getLlmProviderConfigs();
 
   return NextResponse.json({
     api_contract: "donworry.v2",
@@ -53,12 +54,11 @@ export async function GET(): Promise<NextResponse> {
       company: getCompanyDataMode(),
       contract: getContractDataMode(),
     },
-    mock_fallback_enabled: isMockFallbackEnabled(),
     integrations: {
       database: !isDatabaseConfigured() ? "unavailable" : databaseReady ? "ready" : "configured_unreachable",
       rag,
       contract_analysis: contractAnalysis,
-      dual_llm: llmConfigs.every((config) => Boolean(config.apiKey)) ? "ready" : "unavailable",
+      dual_llm: dualLlm,
     },
   });
 }

@@ -7,7 +7,6 @@ import type {
 } from "@/domain/chat";
 import type { RiskProvider, SourceReference } from "@/domain/risk";
 import { CHAT_COPY } from "@/mocks/chatResponses";
-import { MOCK_COMPANIES } from "@/mocks/companies";
 import { ServiceError } from "@/utils/errors";
 import { containsAny, normalizeSearchText } from "@/utils/text";
 
@@ -46,18 +45,23 @@ function evidenceSummary(labels: string[]): string {
   return labels.join(", ");
 }
 
-function findOtherReferencedCompany(message: string, selectedCompanyId: string) {
-  const normalizedMessage = normalizeSearchText(message);
-  return MOCK_COMPANIES.find(
-    (candidate) =>
-      candidate.company_id !== selectedCompanyId &&
-      [candidate.company_name, ...candidate.aliases].some((name) =>
-        normalizedMessage.includes(normalizeSearchText(name)),
-      ),
-  );
+const COMPANY_NAME_PATTERN = /(?:주식회사\s*)?[가-힣A-Za-z0-9㈜()·]{2,30}(?:건설|산업|제조|물류|화학|전기|공사|식자재|디자인|요양|테크|중공업|엔지니어링|회사|기업)/g;
+
+async function findOtherReferencedCompany(
+  message: string,
+  selectedCompanyId: string,
+  companies: CompanyRepository,
+) {
+  const candidates = [...new Set(message.match(COMPANY_NAME_PATTERN) ?? [])];
+  for (const candidate of candidates) {
+    const results = await companies.search(candidate, 3);
+    const other = results.find((result) => result.company_id !== selectedCompanyId);
+    if (other && normalizeSearchText(other.company_name) === normalizeSearchText(candidate)) return other;
+  }
+  return null;
 }
 
-export class MockChatProvider implements ChatProvider {
+export class PolicyChatProvider implements ChatProvider {
   constructor(
     private readonly companies: CompanyRepository,
     private readonly risks: RiskProvider,
@@ -97,7 +101,7 @@ export class MockChatProvider implements ChatProvider {
     }
 
     if (company) {
-      const otherCompany = findOtherReferencedCompany(message, company.company_id);
+      const otherCompany = await findOtherReferencedCompany(message, company.company_id, this.companies);
       if (otherCompany) {
         return {
           answer: `현재 상담에는 ${company.company_name}만 연결되어 있습니다. ${otherCompany.company_name} 정보를 확인하려면 주소와 업종을 보고 해당 사업장을 다시 선택해 주세요.`,
@@ -131,7 +135,7 @@ export class MockChatProvider implements ChatProvider {
           answer_type: "insufficient_evidence",
           sources: [],
           suggested_actions: [CALL_1350],
-          limitations: ["현재 Mock 공식 문서 검색 범위에서 직접적인 근거를 찾지 못했습니다."],
+          limitations: ["현재 연결된 공식 문서 검색 범위에서 직접적인 근거를 찾지 못했습니다."],
           guardrail_status: "limited",
           conversation_id: id,
         };
@@ -183,7 +187,7 @@ export class MockChatProvider implements ChatProvider {
         answer_type: "clarification",
         sources: [],
         suggested_actions: [SEARCH_ACTION, CALL_1350],
-        limitations: ["현재 답변은 Mock 규칙 기반 상담입니다."],
+        limitations: ["현재 답변은 안전정책에 따른 기본 안내입니다."],
         guardrail_status: "passed",
         conversation_id: id,
       };

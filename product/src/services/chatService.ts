@@ -1,4 +1,4 @@
-import { getMockDelayMs } from "@/config/dataMode";
+import { getDataMode, getMockDelayMs } from "@/config/dataMode";
 import type { ChatMode, ChatRequest, ChatResponse, RecentMessage } from "@/domain/chat";
 import { getChatProvider } from "@/services/providers";
 import { delay } from "@/utils/delay";
@@ -48,13 +48,12 @@ export function parseChatRequest(value: unknown): ChatRequest {
     message,
     conversation_id: typeof input.conversation_id === "string" ? input.conversation_id : undefined,
     company_id: typeof input.company_id === "string" ? input.company_id : undefined,
-    resolved_query: typeof input.resolved_query === "string" ? input.resolved_query : undefined,
     chat_mode: chatMode as ChatMode,
     recent_messages: normalizeMessages(input.recent_messages),
   };
 }
 
 export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
-  await delay(getMockDelayMs());
+  if (getDataMode() === "mock") await delay(getMockDelayMs());
   return getChatProvider().sendMessage(request);
 }

@@ -61,12 +61,17 @@ export function InspectorChatPanel({ companyId }: { companyId?: string }) {
   async function sendMessage(value: string) {
     const message = value.trim();
     if (!message || !detail || loading || !externalContextConsent) return;
-    const recentMessages: InspectorRecentMessage[] = messages.slice(-6).map((item) => ({
-      role: item.role,
-      content: item.comparison
-        ? item.comparison.results.map((result) => `${result.provider_label}: ${result.answer}`).join("\n").slice(0, 2_000)
-        : item.content,
-    }));
+    const recentMessages: InspectorRecentMessage[] = messages
+      .filter((item) => item.id !== "welcome")
+      .slice(-6)
+      .map((item) => ({
+        role: item.role,
+        content: item.comparison
+          ? item.comparison.results
+              .map((result) => `${result.provider_label}: ${result.answer.slice(0, 900)}`)
+              .join("\n")
+          : item.content,
+      }));
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: message }]);
     setDraft("");
     setError(null);
@@ -119,8 +124,7 @@ export function InspectorChatPanel({ companyId }: { companyId?: string }) {
             <p>{[detail.company.region, detail.company.industry].filter(Boolean).join(" · ") || "지역·업종 정보 없음"}</p>
             <dl>
               <div><dt>모델 원점수</dt><dd>{detail.wage_risk.model_score === null ? "채점 불가" : detail.wage_risk.model_score.toFixed(4)}</dd></div>
-              <div><dt>상대 위험등급</dt><dd>{detail.wage_risk.risk_tier ?? "미분류"}</dd></div>
-              <div><dt>위험큐</dt><dd>{detail.wage_risk.rank === null ? "상위 3,000 밖" : `${detail.wage_risk.rank}위 · ${detail.wage_risk.queue_priority}`}</dd></div>
+              <div><dt>위험큐</dt><dd>{detail.wage_risk.rank === null ? "상위 3,000 밖" : `${detail.wage_risk.rank}위 · ${detail.wage_risk.grade}`}</dd></div>
               <div><dt>기준월</dt><dd>{detail.batch.data_as_of ?? "미확정"}</dd></div>
               <div><dt>예측 대상월</dt><dd>{detail.batch.target_month ?? "미확정"}</dd></div>
             </dl>
@@ -175,18 +179,31 @@ export function InspectorChatPanel({ companyId }: { companyId?: string }) {
           {SUGGESTED_QUESTIONS.map((question) => <button type="button" key={question} onClick={() => void sendMessage(question)} disabled={loading || !detail || !externalContextConsent}>{question}</button>)}
         </div>
         {error ? <p className="inspector-chat-error" role="alert">{error}</p> : null}
-        <label className="inspector-external-consent">
-          <input
-            type="checkbox"
-            checked={externalContextConsent}
-            onChange={(event) => setExternalContextConsent(event.target.checked)}
-          />
-          <span>
-            <strong>외부 AI 분석자료 전송 확인</strong>
-            사업장명·지역·업종·모델 원점수·상대등급·큐 순위·저장된 SHAP 사유가 Upstage와 SKT에 전달됩니다.
-            마스킹 사업자번호와 내부 식별키는 전달하지 않습니다.
-          </span>
-        </label>
+        <div className="inspector-external-consent">
+          <label>
+            <input
+              type="checkbox"
+              checked={externalContextConsent}
+              onChange={(event) => setExternalContextConsent(event.target.checked)}
+            />
+            <span>
+              <strong>외부 AI 분석자료 전송 확인</strong>
+              점검 보조에 필요한 사업장·ML·산업안전 자료가 Upstage와 SKT에 전달됩니다.
+            </span>
+          </label>
+          <details>
+            <summary>전달되는 자료 자세히 보기</summary>
+            <ul>
+              <li><strong>사업장 정보</strong><span>사업장명, 지역, 업종</span></li>
+              <li><strong>배치 정보</strong><span>기준월, 예측 대상월, 모델 버전, 적재 시각</span></li>
+              <li><strong>임금체불 ML</strong><span>모델 원점수, 점검 등급·큐 순위, 저장된 SHAP 사유, 체납·공개명단 확인 플래그</span></li>
+              <li><strong>관측 지표</strong><span>관측 개월 수, G1~G6 안정신호와 개수</span></li>
+              <li><strong>산업안전</strong><span>현장 확인 우선순위 구간, 대상 주차, 모델 정보, 시점 상태</span></li>
+              <li><strong>답변 안전정보</strong><span>데이터 해석 한계와 같은 질문에 검색된 노동법 문서</span></li>
+            </ul>
+            <p>마스킹 사업자번호, <code>firm_id</code>, DB 접속정보와 API 키는 전달하지 않습니다.</p>
+          </details>
+        </div>
         <form className="inspector-chat-form" onSubmit={handleSubmit}>
           <label className="sr-only" htmlFor="inspector-chat-input">점검 보조 질문</label>
           <textarea id="inspector-chat-input" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="현장 확인 항목이나 적용 법령을 질문하세요" rows={2} maxLength={2_000} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(draft); } }} />

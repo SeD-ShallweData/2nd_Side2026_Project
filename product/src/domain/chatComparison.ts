@@ -30,7 +30,7 @@ export interface ProviderMetrics {
 
 export interface SafeExecutionTrace {
   prompt_policy_version: string;
-  query_transform: "none";
+  query_transform: "none" | "llm_rewrite";
   context_mode: "general" | "company";
   company_context_attached: boolean;
   recent_message_count: number;

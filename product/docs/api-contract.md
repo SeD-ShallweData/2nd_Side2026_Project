@@ -28,7 +28,7 @@ DB가 데이터 의미의 기준이다.
 - 감독관 사유는 `inspector_queue`에 실제 존재하는 행에만 제공할 수 있다.
 - 산업안전은 `industrial_safety.v_llm_firm_safety_context`만 읽고 연구용 확률은 읽지 않는다.
 - DB에 없는 주소·사업장 규모·기준월은 만들어내지 않고 `null`로 반환한다.
-- Real 모드의 자동 Mock 전환은 기본적으로 금지한다. 시연자가 명시적으로 설정한 경우에만 허용한다.
+- Real 모드의 오류를 Mock 성공 응답으로 자동 전환하지 않는다. Mock은 명시적인 테스트 모드에서만 사용한다.
 
 ## 2. 공통 규칙
 
@@ -135,14 +135,14 @@ interface ChatRequest {
   message: string;                 // 1..2000자
   conversation_id?: string;
   company_id?: string;
-  resolved_query?: string;
   chat_mode: "general" | "wage" | "safety" | "contract";
   recent_messages: Array<{ role: "user" | "assistant"; content: string }>;
 }
 ```
 
 Next 서버는 회사 컨텍스트를 `company_id`로 다시 조회한다. 클라이언트가 보낸 위험 설명은 신뢰하지 않는다.
-긴급 상황이 아니면 HB 검색 서비스에서 근거를 **한 번만** 검색하고 같은 문서 배열을 두 LLM에 전달한다.
+후속 질문은 서버가 CSH 재작성 규칙으로 독립 질문으로 바꾼 뒤 HB 검색 서비스에서 근거를 **한 번만**
+검색하고 같은 문서 배열을 두 LLM에 전달한다. 클라이언트는 `resolved_query`를 지정할 수 없다.
 
 ### 내부: `POST {RAG_API_URL}/api/retrieve`
 
@@ -201,9 +201,11 @@ interface ContractReviewResponse {
 
 ### `GET /api/system/status`
 
-비밀값 없이 계약 버전, 전체 및 기능별 `mock | real`, 명시적 Mock fallback 여부와 통합 상태만 반환한다.
+비밀값 없이 계약 버전, 전체 및 기능별 `mock | real`과 통합 상태만 반환한다.
 DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`로 표시한다. DB의 `ready`는
-읽기 전용 연결에서 `SELECT 1`이 성공했다는 뜻이다. 이 상태 API는 비밀값이나 원문 데이터를 반환하지 않는다.
+읽기 전용 연결에서 `SELECT 1`이 성공했다는 뜻이다. LLM의 `ready`는 키 문자열 존재 여부가 아니라 두
+공급자에 대한 최소 실제 요청이 모두 성공했다는 뜻이며 결과는 60초 캐시한다. 이 상태 API는 비밀값이나
+질문·답변 원문을 반환하지 않는다.
 
 ## 8. 근로감독관 시연용 내부 API
 
@@ -213,17 +215,18 @@ DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`
 
 - `GET /api/inspector/overview`: 최신 배치 요약, 큐 우선순위별 건수, 최상위 큐를 반환한다.
 - `GET /api/inspector/companies/search?q=...`: 실제 `firms`에서 동명 사업장을 검색한다.
-- `GET /api/inspector/companies/{companyId}`: 최신 `risk_tier`, `risk_full`, 큐 순위·우선순위, 실제
+- `GET /api/inspector/companies/{companyId}`: 최신 `risk_full`, 큐 순위·`grade`, 실제
   `reasons`, G1~G6 지표와 별도 산업안전 공표 구간을 반환한다.
 - `POST /api/inspector/chat`: 선택 사업장 내부 컨텍스트와 노동법 RAG를 두 LLM에 동일하게 전달한다.
 
 감독관 응답에서도 `risk_full`은 **모델 원점수**로만 표시하고 확률이나 백분율로 바꾸지 않는다.
-`risk_full IS NULL`은 `채점 불가`이며 0점이 아니다. `risk_tier`는 전체 채점 사업장 상대 등급,
-`queue_priority`는 상위 3,000곳 내부 점검 순서이므로 서로 대신하지 않는다. `reasons`는 DB에 실제
+`risk_full IS NULL`은 `채점 불가`이며 0점이 아니다. `grade`는 `risk_full` 내림차순 상위 3,000곳
+내부의 점검 등급이며 전체 사업장의 별도 위험등급이 아니다. `reasons`는 DB에 실제
 저장된 큐 행에만 제공한다. 산업안전 순위는 임금체불 점수와 결합하지 않는다.
 
-내부 챗봇은 외부 모델 전송 전에 화면에서 명시적 확인을 요구한다. 확인 대상은 사업장명·지역·업종,
-모델 원점수·등급·순위·실제 SHAP 사유이며, `firm_id`와 마스킹 사업자번호는 LLM 컨텍스트에서 제외한다.
+내부 챗봇은 외부 모델 전송 전에 화면에서 명시적 확인을 요구한다. 확인 대상은 사업장 기본정보, 배치 시점,
+모델 원점수·점검 등급·순위·실제 SHAP 사유, G1~G6 관측지표, 산업안전 참고정보, 해석 한계와 질문에
+검색된 노동법 문서다. `firm_id`와 마스킹 사업자번호는 LLM 컨텍스트에서 제외한다.
 API도 `confirm_external_context: true`가 없으면 호출을 거부한다. 응답은 조사·위법 판단·행정처분을
 대신하지 않는다.
 

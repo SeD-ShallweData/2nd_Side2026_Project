@@ -1,38 +1,20 @@
-import { DualLlmChatProvider } from "@/adapters/real/DualLlmChatProvider";
+import { CHAT_POLICY_VERSION, DualLlmChatProvider } from "@/adapters/real/DualLlmChatProvider";
 import { OpenAICompatibleChatClient } from "@/adapters/real/OpenAICompatibleChatClient";
 import type { ChatComparisonResponse } from "@/domain/chatComparison";
 import { getCompanyById } from "@/services/companyService";
 import { parseChatRequest, sendChatMessage } from "@/services/chatService";
 import { getCompanyRisk } from "@/services/riskService";
 import { retrieveLaborLawContext } from "@/services/ragService";
+import { rewriteFollowupQuery } from "@/services/queryRewriteService";
 import { getLlmProviderConfigs, getLlmTimeoutMs } from "@/server/llmConfig";
 
 export async function sendComparedChatMessage(value: unknown): Promise<ChatComparisonResponse> {
-  const request = parseChatRequest(value);
-  const policyBaseline = await sendChatMessage(request);
+  const parsedRequest = parseChatRequest(value);
+  const policyBaseline = await sendChatMessage(parsedRequest);
   const configs = getLlmProviderConfigs();
-  const ragRetrieval =
-    policyBaseline.answer_type === "emergency_guidance"
-      ? { query: request.message, status: "unavailable" as const, threshold: null, documents: [] }
-      : await retrieveLaborLawContext(request.resolved_query ?? request.message);
-
-  if (ragRetrieval.status === "matched") {
-    policyBaseline.sources = ragRetrieval.documents.map((document) => document.source);
-  } else if (ragRetrieval.status === "no_match") {
-    policyBaseline.sources = [];
-    policyBaseline.limitations = [
-      ...policyBaseline.limitations,
-      "연결된 공식 노동법 검색 범위에서 직접 관련된 근거를 찾지 못했습니다.",
-    ];
-  } else if (policyBaseline.answer_type !== "emergency_guidance") {
-    policyBaseline.sources = [];
-    policyBaseline.limitations = [
-      ...policyBaseline.limitations,
-      "공식 노동법 검색 서비스에 연결하지 못해 이 답변에는 확인된 법령 근거가 첨부되지 않았습니다.",
-    ];
-  }
 
   if (policyBaseline.answer_type === "emergency_guidance") {
+    const ragRetrieval = { query: parsedRequest.message, status: "unavailable" as const, threshold: null, documents: [] };
     const now = new Date().toISOString();
     return {
       comparison_id: `cmp_${crypto.randomUUID()}`,
@@ -73,11 +55,11 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
           },
         },
         trace: {
-          prompt_policy_version: "donworry-chat-policy-2026-08-04-v2",
+          prompt_policy_version: CHAT_POLICY_VERSION,
           query_transform: "none",
-          context_mode: request.company_id ? "company" : "general",
-          company_context_attached: Boolean(request.company_id),
-          recent_message_count: request.recent_messages.slice(-6).length,
+          context_mode: parsedRequest.company_id ? "company" : "general",
+          company_context_attached: Boolean(parsedRequest.company_id),
+          recent_message_count: parsedRequest.recent_messages.slice(-6).length,
           guardrail_action: "short_circuit",
           guardrail_hits: ["EMERGENCY_PRIORITY"],
           upstream_request_id: null,
@@ -86,6 +68,28 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
         },
       })),
     };
+  }
+
+  const rewrite = await rewriteFollowupQuery(parsedRequest, configs);
+  const request = rewrite.changed
+    ? { ...parsedRequest, resolved_query: rewrite.query }
+    : parsedRequest;
+  const ragRetrieval = await retrieveLaborLawContext(rewrite.query);
+
+  if (ragRetrieval.status === "matched") {
+    policyBaseline.sources = ragRetrieval.documents.map((document) => document.source);
+  } else if (ragRetrieval.status === "no_match") {
+    policyBaseline.sources = [];
+    policyBaseline.limitations = [
+      ...policyBaseline.limitations,
+      "연결된 공식 노동법 검색 범위에서 직접 관련된 근거를 찾지 못했습니다.",
+    ];
+  } else {
+    policyBaseline.sources = [];
+    policyBaseline.limitations = [
+      ...policyBaseline.limitations,
+      "공식 노동법 검색 서비스에 연결하지 못해 이 답변에는 확인된 법령 근거가 첨부되지 않았습니다.",
+    ];
   }
   let companyContext;
 

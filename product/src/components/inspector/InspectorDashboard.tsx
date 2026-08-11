@@ -28,7 +28,7 @@ function QueueTable({ items, onSelect }: { items: InspectorQueueItem[]; onSelect
     <div className="inspector-queue-table-wrap">
       <table className="inspector-queue-table">
         <thead>
-          <tr><th>순위</th><th>사업장</th><th>점검 순서</th><th>상대 등급</th></tr>
+          <tr><th>순위</th><th>사업장</th><th>점검 등급</th></tr>
         </thead>
         <tbody>
           {items.map((item) => (
@@ -38,8 +38,7 @@ function QueueTable({ items, onSelect }: { items: InspectorQueueItem[]; onSelect
                 <button type="button" onClick={() => onSelect(item.company_id)}>{item.company_name}</button>
                 <small>{[item.region, item.industry].filter(Boolean).join(" · ") || "지역·업종 정보 없음"}</small>
               </td>
-              <td><span className={`inspector-priority priority-${priorityClass(item.queue_priority)}`}>{item.queue_priority}</span></td>
-              <td>{item.risk_tier ?? "미분류"}</td>
+              <td><span className={`inspector-priority priority-${priorityClass(item.grade)}`}>{item.grade}</span></td>
             </tr>
           ))}
         </tbody>
@@ -63,8 +62,8 @@ function DetailPanel({ detail }: { detail: InspectorCompanyDetail }) {
           <h2>{detail.company.company_name}</h2>
           <p>{[detail.company.region, detail.company.industry, `사업자번호 ${detail.company.masked_business_number}`].filter(Boolean).join(" · ")}</p>
         </div>
-        {wage.queue_priority ? (
-          <span className={`inspector-priority priority-${priorityClass(wage.queue_priority)}`}>{wage.queue_priority}</span>
+        {wage.grade ? (
+          <span className={`inspector-priority priority-${priorityClass(wage.grade)}`}>{wage.grade}</span>
         ) : <span className="inspector-priority priority-outside">큐 미포함</span>}
       </header>
 
@@ -79,9 +78,8 @@ function DetailPanel({ detail }: { detail: InspectorCompanyDetail }) {
           <p>원점수의 상대적 위치를 시각화한 것으로 확률 막대가 아닙니다.</p>
         </div>
         <dl className="inspector-score-meta">
-          <div><dt>전체 상대 등급</dt><dd>{wage.risk_tier ?? "미분류"}</dd></div>
           <div><dt>위험큐 순위</dt><dd>{wage.rank === null ? "상위 3,000 밖" : `${wage.rank.toLocaleString("ko-KR")}위`}</dd></div>
-          <div><dt>큐 내부 점검 순서</dt><dd>{wage.queue_priority ?? "해당 없음"}</dd></div>
+          <div><dt>큐 내부 점검 등급</dt><dd>{wage.grade ?? "해당 없음"}</dd></div>
         </dl>
       </section>
 
@@ -215,12 +213,12 @@ export function InspectorDashboard() {
           <div>
             <span className="eyebrow">Workplace Risk Monitoring</span>
             <h1>확인이 필요한 사업장을<br /><mark>데이터로 먼저 살펴보세요.</mark></h1>
-            <p>최신 ML 배치의 상대 위험등급과 감독관 큐, 실제 SHAP 사유를 한 화면에서 확인하는 내부용 시연 대시보드입니다.</p>
+            <p>최신 ML 배치의 감독관 점검 등급과 큐 순위, 실제 SHAP 사유를 한 화면에서 확인하는 내부용 시연 대시보드입니다.</p>
           </div>
           <aside>
             <span>해석 원칙</span>
             <strong>점수는 확률이 아닙니다.</strong>
-            <p>위험등급은 전체 채점 사업장 기준, 점검 순서는 상위 3,000곳 큐 내부 기준입니다.</p>
+            <p>점검 등급은 모델 원점수 내림차순 상위 3,000곳의 현장 확인 순서를 구간화한 값입니다.</p>
           </aside>
         </div>
       </section>

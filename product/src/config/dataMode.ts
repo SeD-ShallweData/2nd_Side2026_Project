@@ -6,7 +6,7 @@ function parseDataMode(value: string | undefined): DataMode | undefined {
 }
 
 export function getDataMode(): DataMode {
-  return parseDataMode(process.env.APP_DATA_MODE) ?? "mock";
+  return parseDataMode(process.env.APP_DATA_MODE) ?? "real";
 }
 
 export function getCompanyDataMode(): DataMode {
@@ -21,8 +21,4 @@ export function getMockDelayMs(): number {
   const parsed = Number(process.env.MOCK_DELAY_MS ?? 250);
   if (!Number.isFinite(parsed)) return 250;
   return Math.min(Math.max(parsed, 0), 2_000);
-}
-
-export function isMockFallbackEnabled(): boolean {
-  return process.env.ENABLE_MOCK_FALLBACK === "true";
 }

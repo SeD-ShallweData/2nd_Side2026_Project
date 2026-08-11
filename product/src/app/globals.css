@@ -3715,10 +3715,17 @@ summary:focus-visible {
 .inspector-question-chips button { background: #fff; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; flex: 0 0 auto; font-size: 0.65rem; padding: 6px 9px; }
 .inspector-question-chips button:hover:not(:disabled) { background: var(--brand-soft); border-color: #dbc43b; }
 .inspector-chat-error { background: var(--danger-bg); color: var(--review); font-size: 0.7rem; margin: 0; padding: 8px 16px; }
-.inspector-external-consent { align-items: flex-start; background: #fff8df; border-top: 1px solid #ead791; color: #684f08; cursor: pointer; display: flex; gap: 9px; padding: 11px 15px; }
+.inspector-external-consent { background: #fff8df; border-top: 1px solid #ead791; color: #684f08; padding: 11px 15px; }
+.inspector-external-consent > label { align-items: flex-start; cursor: pointer; display: flex; gap: 9px; }
 .inspector-external-consent input { flex: 0 0 auto; margin-top: 3px; }
-.inspector-external-consent span { font-size: 0.63rem; line-height: 1.5; }
-.inspector-external-consent strong { display: block; font-size: 0.68rem; }
+.inspector-external-consent label span { font-size: 0.63rem; line-height: 1.5; }
+.inspector-external-consent label strong { display: block; font-size: 0.68rem; }
+.inspector-external-consent details { border-top: 1px dashed rgb(104 79 8 / 24%); margin: 9px 0 0 23px; }
+.inspector-external-consent summary { cursor: pointer; font-size: 0.63rem; font-weight: 800; padding: 8px 0 2px; }
+.inspector-external-consent ul { display: grid; gap: 6px; list-style: none; margin: 8px 0; padding: 0; }
+.inspector-external-consent li { display: grid; font-size: 0.61rem; gap: 1px; grid-template-columns: 88px 1fr; line-height: 1.45; }
+.inspector-external-consent li strong { color: #4f3b04; }
+.inspector-external-consent details p { background: rgb(255 255 255 / 45%); border-radius: 7px; font-size: 0.59rem; line-height: 1.45; margin: 8px 0 2px; padding: 7px 8px; }
 .inspector-chat-form { align-items: end; border-top: 1px solid var(--line); display: grid; gap: 8px; grid-template-columns: 1fr auto; padding: 13px 15px; }
 .inspector-chat-form textarea { background: #f7f7f4; border: 1px solid var(--line); border-radius: 11px; max-height: 160px; min-height: 52px; padding: 11px; resize: vertical; }
 .inspector-chat-form textarea:focus { border-color: var(--inspector-blue); outline: 3px solid rgb(85 121 184 / 13%); }
