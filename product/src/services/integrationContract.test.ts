@@ -129,30 +129,38 @@ describe("RAG 내부 계약", () => {
 describe("계약서 분석 내부 계약", () => {
   it("CSH 규칙 엔진 결과를 제품 DTO로 정규화한다", async () => {
     vi.stubEnv("CONTRACT_ANALYSIS_URL", "http://contract.test");
-    const fakeFetch = (async () => new Response(JSON.stringify({
-      ok: true,
-      review_id: "review-1",
-      filename: "contract.pdf",
-      verdict: {
-        headline: "누락 가능 항목을 확인하세요.",
-        findings: [
-          {
-            code: "missing_required_wage",
-            level: "violation",
-            title: "임금 지급일",
-            message: "서면 명시를 찾지 못했습니다.",
-            law: "근기법 제17조",
-            evidence: "임금: 월 250만원",
-          },
-          {
-            code: "working_hours",
-            level: "ok",
-            title: "소정근로시간",
-            message: "근로시간이 확인됩니다.",
-          },
-        ],
-      },
-    }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    let requestedUrl = "";
+    let requestedBody: FormData | undefined;
+    const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestedUrl = String(input);
+      requestedBody = init?.body instanceof FormData ? init.body : undefined;
+      return new Response(JSON.stringify({
+        ok: true,
+        review_id: "review-1",
+        filename: "contract.pdf",
+        verdict: {
+          headline: "누락 가능 항목을 확인하세요.",
+          findings: [
+            {
+              code: "missing_required_wage",
+              level: "violation",
+              title: "임금 지급일",
+              message: "서면 명시를 찾지 못했습니다.",
+              detail: "지급일을 특정할 수 없습니다.",
+              law: "근기법 제17조",
+              evidence: "임금: 월 250만원",
+              fix: "임금 지급일을 서면으로 확인하세요.",
+            },
+            {
+              code: "working_hours",
+              level: "ok",
+              title: "소정근로시간",
+              message: "근로시간이 확인됩니다.",
+            },
+          ],
+        },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
 
     const file = new File(["pdf"], "contract.pdf", { type: "application/pdf" });
     const result = await new RealContractReviewProvider(fakeFetch).review({ file });
@@ -161,7 +169,15 @@ describe("계약서 분석 내부 계약", () => {
       review_id: "review-1",
       file_name: "contract.pdf",
     });
-    expect(result.missing_items[0]).toMatchObject({ code: "missing_required_wage", legal_basis: "근기법 제17조" });
+    expect(requestedUrl).toBe("http://contract.test/api/contract/review");
+    expect(requestedBody?.get("ocr")).toBe("auto");
+    expect(requestedBody?.get("file")).toBeInstanceOf(File);
+    expect(result.missing_items[0]).toMatchObject({
+      code: "missing_required_wage",
+      legal_basis: "근기법 제17조",
+      extracted_text: "임금: 월 250만원",
+    });
+    expect(result.missing_items[0].description).toContain("임금 지급일을 서면으로 확인하세요.");
     expect(result.detected_items[0]).toMatchObject({ code: "working_hours" });
   });
 
@@ -173,5 +189,21 @@ describe("계약서 분석 내부 계약", () => {
     const file = new File(["pdf"], "contract.pdf", { type: "application/pdf" });
 
     await expect(new RealContractReviewProvider(fakeFetch).review({ file })).rejects.toThrow("Upstage API 키가 없습니다.");
+  });
+
+  it("근로계약서가 아닌 문서는 명시적인 사용자 오류로 구분한다", async () => {
+    vi.stubEnv("CONTRACT_ANALYSIS_URL", "http://contract.test");
+    const fakeFetch = (async () => new Response(JSON.stringify({
+      ok: false,
+      reason: "not_a_contract",
+      message: "근로계약서로 볼 만한 내용을 찾지 못했습니다.",
+    }), { status: 422, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    const file = new File(["image"], "not-contract.png", { type: "image/png" });
+
+    await expect(new RealContractReviewProvider(fakeFetch).review({ file })).rejects.toMatchObject({
+      code: "NOT_A_CONTRACT",
+      status: 422,
+      retryable: true,
+    });
   });
 });

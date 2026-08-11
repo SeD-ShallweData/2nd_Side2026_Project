@@ -29,8 +29,8 @@ interface CshReviewResponse {
 }
 
 function timeoutMs(): number {
-  const value = Number(process.env.CONTRACT_TIMEOUT_MS ?? 90_000);
-  return Number.isFinite(value) && value > 0 ? Math.min(value, 300_000) : 90_000;
+  const value = Number(process.env.CONTRACT_TIMEOUT_MS ?? 240_000);
+  return Number.isFinite(value) && value > 0 ? Math.min(value, 300_000) : 240_000;
 }
 
 function upstreamMessage(payload: CshReviewResponse): string | undefined {
