@@ -1,7 +1,7 @@
 # 돈워리 통합 프로토타입 시스템 아키텍처
 
-- 문서 상태: Draft v1
-- 기준일: 2026-08-04
+- 문서 상태: Final v2
+- 기준일: 2026-08-11
 
 ## 1. 설계 목표
 
@@ -9,12 +9,12 @@
 
 핵심 원칙은 다음과 같다.
 
-- 모든 사업장 조회는 `company_id`를 기준으로 한다.
+- 공개 API의 `company_id`는 PostgreSQL `firms.firm_id`와 동일한 값이다.
 - 임금체불 신호와 산업재해 맥락은 결합하지 않는다.
 - 산업재해 결과는 개별 사업장 판정이 아니라 `지역×업종` 단위 `safety_context`로 다룬다.
 - 내부 모델 값과 사용자용 응답 DTO를 분리한다.
 - LLM은 DB 결과를 재계산하거나 추정하지 않고 설명만 한다.
-- Real 공급자가 실패해도 각 기능이 독립적으로 Mock 또는 제한 응답으로 전환된다.
+- Real 공급자 실패는 기본적으로 명시적 오류가 되며, 운영자가 허용한 데모 환경에서만 Mock으로 전환된다.
 
 ## 2. 전체 구조
 
@@ -85,7 +85,8 @@ flowchart TB
     DTO --> FE
 ```
 
-한 요청에서 Mock과 Real을 동시에 호출하지 않는다. 기능별 설정과 상태 점검 결과에 따라 하나의 구현을 선택한다.
+브라우저가 호출하는 공개 API의 주인은 Next.js 하나다. RAG는 답변을 생성하지 않고 검색 근거만 반환하며,
+Next.js가 그 근거를 두 LLM에 동일하게 전달한다. DB 조회는 읽기 전용 계정과 read-only 세션으로 제한한다.
 
 ## 3. Frontend
 
@@ -234,7 +235,8 @@ interface ContractReviewProvider {
 - `company_id`를 조회 키로 사용한다.
 - 임금체불 사업장 신호와 산업재해 지역·업종 신호를 분리 저장한다.
 - `data_as_of`, `generated_at`, `valid_until`, 모델·데이터 버전을 보존한다.
-- 현재 공용 폴더에 바로 사용할 수 있는 운영 DB·확정 ML export가 없으므로 초기 통합은 Mock을 기본값으로 한다.
+- 운영 PostgreSQL의 `firms`, `batches`, `scored_active`, `safe_recommendation`과 허용된 산업안전 뷰를 읽는다.
+- DB에 없는 주소·규모·미확정 기준월은 `null`로 유지한다.
 
 ### 프롬프트·LLM 서버
 

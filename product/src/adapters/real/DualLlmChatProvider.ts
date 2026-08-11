@@ -50,6 +50,14 @@ function buildSystemPrompt(context: ComparisonContext): string {
         }
       : null,
     verified_sources: context.policyBaseline.sources,
+    retrieved_labor_law:
+      context.ragRetrieval.status === "matched"
+        ? context.ragRetrieval.documents.map((document) => ({
+            citation: document.citation,
+            content: document.content,
+          }))
+        : [],
+    retrieval_status: context.ragRetrieval.status,
     policy_baseline: context.policyBaseline.answer,
     required_limitations: context.policyBaseline.limitations,
     suggested_actions: context.policyBaseline.suggested_actions,
@@ -87,6 +95,8 @@ function baseTrace(context: ComparisonContext): Omit<SafeExecutionTrace, "guardr
     context_mode: context.companyContext ? "company" : "general",
     company_context_attached: Boolean(context.companyContext),
     recent_message_count: context.request.recent_messages.slice(-6).length,
+    rag_status: context.ragRetrieval.status,
+    retrieved_document_count: context.ragRetrieval.documents.length,
   };
 }
 
@@ -189,6 +199,7 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
         same_context: true,
         same_temperature: true,
         same_max_tokens: true,
+        same_retrieval: true,
       },
       results,
     };

@@ -8,7 +8,8 @@ import { ServiceError } from "@/utils/errors";
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-export function getFreshnessFromValidUntil(validUntil: string, now = new Date()): CompanyRiskResult["freshness"] {
+export function getFreshnessFromValidUntil(validUntil: string | null, now = new Date()): CompanyRiskResult["freshness"] {
+  if (validUntil === null) return "unknown";
   if (!DATE_ONLY_PATTERN.test(validUntil)) {
     throw new ServiceError("INVALID_RISK_RESULT", "분석 결과의 유효기간 형식이 올바르지 않습니다.", 502, true);
   }

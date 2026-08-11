@@ -4,12 +4,27 @@ import type { ChatComparisonResponse } from "@/domain/chatComparison";
 import { getCompanyById } from "@/services/companyService";
 import { parseChatRequest, sendChatMessage } from "@/services/chatService";
 import { getCompanyRisk } from "@/services/riskService";
+import { retrieveLaborLawContext } from "@/services/ragService";
 import { getLlmProviderConfigs, getLlmTimeoutMs } from "@/server/llmConfig";
 
 export async function sendComparedChatMessage(value: unknown): Promise<ChatComparisonResponse> {
   const request = parseChatRequest(value);
   const policyBaseline = await sendChatMessage(request);
   const configs = getLlmProviderConfigs();
+  const ragRetrieval =
+    policyBaseline.answer_type === "emergency_guidance"
+      ? { query: request.message, status: "unavailable" as const, threshold: null, documents: [] }
+      : await retrieveLaborLawContext(request.resolved_query ?? request.message);
+
+  if (ragRetrieval.status === "matched") {
+    policyBaseline.sources = ragRetrieval.documents.map((document) => document.source);
+  } else if (ragRetrieval.status === "no_match") {
+    policyBaseline.sources = [];
+    policyBaseline.limitations = [
+      ...policyBaseline.limitations,
+      "연결된 공식 노동법 검색 범위에서 직접 관련된 근거를 찾지 못했습니다.",
+    ];
+  }
 
   if (policyBaseline.answer_type === "emergency_guidance") {
     const now = new Date().toISOString();
@@ -24,6 +39,7 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
         same_context: true,
         same_temperature: false,
         same_max_tokens: false,
+        same_retrieval: true,
       },
       results: configs.map((config) => ({
         provider: config.id,
@@ -59,6 +75,8 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
           guardrail_action: "short_circuit",
           guardrail_hits: ["EMERGENCY_PRIORITY"],
           upstream_request_id: null,
+          rag_status: ragRetrieval.status,
+          retrieved_document_count: ragRetrieval.documents.length,
         },
       })),
     };
@@ -85,5 +103,5 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
     configs,
     new OpenAICompatibleChatClient(fetch, getLlmTimeoutMs()),
   );
-  return provider.compare({ request, policyBaseline, companyContext });
+  return provider.compare({ request, policyBaseline, companyContext, ragRetrieval });
 }

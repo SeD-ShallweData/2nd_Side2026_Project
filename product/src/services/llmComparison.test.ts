@@ -27,6 +27,19 @@ const CONTEXT: ComparisonContext = {
     recent_messages: [],
   },
   policyBaseline: BASELINE,
+  ragRetrieval: {
+    query: "입사해도 될까요?",
+    status: "matched",
+    threshold: 0.42,
+    documents: [
+      {
+        content: "근로조건은 서면으로 명시한다.",
+        citation: "근로기준법 제17조",
+        distance: 0.2,
+        source: { name: "근로기준법 제17조", organization: "국가법령정보센터" },
+      },
+    ],
+  },
 };
 
 function payload(answer: string, model: string) {

@@ -1,6 +1,6 @@
 export type SignalLevel = "normal" | "watch" | "review" | "unknown";
 export type Confidence = "sufficient" | "limited" | "unavailable";
-export type Freshness = "current" | "expired";
+export type Freshness = "current" | "expired" | "unknown";
 
 export interface SourceReference {
   name: string;
@@ -32,11 +32,11 @@ export interface WageRiskPublic {
 }
 
 export interface SafetyContextPublic {
-  scope: "region_industry";
+  scope: "region_industry" | "validated_firm_context";
   level: SignalLevel;
   summary: string;
-  region: string;
-  industry: string;
+  region: string | null;
+  industry: string | null;
   target_start?: string;
   target_end?: string;
   evidence_codes: string[];
@@ -48,9 +48,10 @@ export interface SafetyContextPublic {
 export interface CompanyRiskResult {
   company_id: string;
   company_name: string;
-  data_as_of: string;
-  generated_at: string;
-  valid_until: string;
+  data_as_of: string | null;
+  target_month?: string | null;
+  generated_at: string | null;
+  valid_until: string | null;
   freshness: Freshness;
   wage_risk: WageRiskPublic;
   safety_context: SafetyContextPublic;
