@@ -11,7 +11,7 @@
 
 - 공개 API의 `company_id`는 PostgreSQL `firms.firm_id`와 동일한 값이다.
 - 임금체불 신호와 산업재해 맥락은 결합하지 않는다.
-- 산업재해 결과는 개별 사업장 판정이 아니라 `지역×업종` 단위 `safety_context`로 다룬다.
+- 산업재해 결과는 `region_industry | validated_firm_context` 범위의 `safety_context`로 다루며 사고 확률로 해석하지 않는다.
 - 내부 모델 값과 사용자용 응답 DTO를 분리한다.
 - LLM은 DB 결과를 재계산하거나 추정하지 않고 설명만 한다.
 - Real 공급자 실패는 기본적으로 명시적 오류가 되며, 운영자가 허용한 데모 환경에서만 Mock으로 전환된다.
@@ -25,7 +25,7 @@ flowchart TB
         SEARCH[사업장 검색 화면]
         DETAIL[사업장 상세 화면]
         WAGE[임금체불 신뢰 정보 카드]
-        SAFETY[지역·업종 산업재해 신호 카드]
+        SAFETY[산업재해 공표 우선순위 카드]
         CHAT[챗봇 UI]
         CONTRACT[근로계약서 업로드·검토 UI]
     end
@@ -117,10 +117,11 @@ Next.js가 그 근거를 두 LLM에 동일하게 전달한다. DB 조회는 읽�
 - 근거 항목, 데이터 충분도, 공식 명단 상태, 기준일과 출처를 제공한다.
 - 확률, 백분위, SHAP 값은 받지도 렌더링하지도 않는다.
 
-### 지역·업종 산업재해 신호 카드
+### 산업재해 확인 신호 카드
 
 - API의 `safety_context`를 사용한다.
-- `scope=region_industry`와 대상 지역·업종을 화면에 명시한다.
+- `scope=region_industry`면 대상 지역·업종을, `scope=validated_firm_context`면 검증된 사업장 연결임을 명시한다.
+- `validated_firm_context`도 공표 우선순위이며 검증된 사업장 사고 확률이 아님을 표시한다.
 - 개별 사업장의 사고 가능성으로 해석할 수 있는 문구를 금지한다.
 - `unknown`이면 카드 껍데기는 유지하고 “분석 가능한 자료가 부족합니다”만 표시한다.
 
@@ -233,9 +234,11 @@ interface ContractReviewProvider {
 ### ML 운영 DB
 
 - `company_id`를 조회 키로 사용한다.
-- 임금체불 사업장 신호와 산업재해 지역·업종 신호를 분리 저장한다.
+- 임금체불 사용자 공개 판정과 산업재해 공표 우선순위를 분리 저장한다.
 - `data_as_of`, `generated_at`, `valid_until`, 모델·데이터 버전을 보존한다.
-- 운영 PostgreSQL의 `firms`, `batches`, `scored_active`, `safe_recommendation`과 허용된 산업안전 뷰를 읽는다.
+- 운영 PostgreSQL의 `firms`, `batches`, `scored_active`, `safe_recommendation`과 허용된
+  `industrial_safety.v_llm_firm_safety_context`만 읽는다.
+- 구직자 응답은 `safe_recommendation.판정`을 사용하고, 감독관 전용 `risk_tier`·`risk_full`·SHAP는 노출하지 않는다.
 - DB에 없는 주소·규모·미확정 기준월은 `null`로 유지한다.
 
 ### 프롬프트·LLM 서버

@@ -73,7 +73,7 @@ export function HowItWorks() {
             <span>2</span>
             <div>
               <strong>서로 다른 신호 확인</strong>
-              <p>임금 지급 관련 정보와 지역·업종 산업재해 정보를 분리해 봅니다.</p>
+              <p>임금 공개 판정과 산업안전 확인 우선순위를 분리해 봅니다.</p>
             </div>
           </li>
           <li>

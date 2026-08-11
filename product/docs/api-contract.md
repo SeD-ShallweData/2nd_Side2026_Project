@@ -202,13 +202,13 @@ interface ContractReviewResponse {
 ### `GET /api/system/status`
 
 비밀값 없이 계약 버전, 전체 및 기능별 `mock | real`, 명시적 Mock fallback 여부와 통합 상태만 반환한다.
-RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`, DB는 접속정보 설정 여부만
-`configured | unavailable`로 표시한다. 이 상태 API는 비밀값이나 원문 데이터를 반환하지 않는다.
+DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`로 표시한다. DB의 `ready`는
+읽기 전용 연결에서 `SELECT 1`이 성공했다는 뜻이다. 이 상태 API는 비밀값이나 원문 데이터를 반환하지 않는다.
 
 ## 8. 아직 공개하지 않는 API
 
 - 근로감독관 queue: 인증·권한 분리가 완성되기 전에는 공개 route를 만들지 않는다. 이후
-  `inspector_queue.rank`, `grade`, 실제 `reasons`만 사용하며 `risk_full`을 확률로 표현하지 않는다.
+  `inspector_queue.rank`, `queue_priority`, 실제 `reasons`만 사용하며 `risk_full`을 확률로 표현하지 않는다.
 - 커뮤니티 쓰기: 팀원 구현과 인증 계약이 합쳐진 뒤 확정한다. 읽기 계층은 신원이 제거된 `v_posts`,
   `v_comments`, `v_reviews`만 사용한다.
 

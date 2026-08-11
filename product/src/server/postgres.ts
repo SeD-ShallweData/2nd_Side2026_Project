@@ -1,11 +1,12 @@
 import { Pool, type QueryResultRow } from "pg";
+import { getDatabaseConnectionString } from "@/server/databaseConfig";
 import { ServiceError } from "@/utils/errors";
 
 let pool: Pool | undefined;
 
 function getPool(): Pool {
   if (pool) return pool;
-  const connectionString = process.env.DATABASE_URL?.trim();
+  const connectionString = getDatabaseConnectionString();
   if (!connectionString) {
     throw new ServiceError(
       "DATABASE_NOT_CONFIGURED",
@@ -54,5 +55,15 @@ export async function queryReadOnly<T extends QueryResultRow>(sql: string, value
 }
 
 export function isDatabaseConfigured(): boolean {
-  return Boolean(process.env.DATABASE_URL?.trim());
+  return Boolean(getDatabaseConnectionString());
+}
+
+export async function isDatabaseReady(): Promise<boolean> {
+  if (!isDatabaseConfigured()) return false;
+  try {
+    await queryReadOnly<{ ready: number }>("SELECT 1 AS ready");
+    return true;
+  } catch {
+    return false;
+  }
 }

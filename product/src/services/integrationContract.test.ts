@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HttpRagRetriever } from "@/adapters/real/HttpRagRetriever";
 import { RealContractReviewProvider } from "@/adapters/real/RealContractReviewProvider";
+import { toWageRiskPublic } from "@/adapters/real/MlRiskProvider";
 import { getCompanyDataMode, getContractDataMode } from "@/config/dataMode";
+import { buildBotDatabaseUrl } from "@/server/databaseConfig";
 import { queryReadOnly } from "@/server/postgres";
 
 afterEach(() => {
@@ -15,6 +17,57 @@ describe("기능별 데이터 모드", () => {
     vi.stubEnv("CONTRACT_DATA_MODE", "real");
     expect(getCompanyDataMode()).toBe("mock");
     expect(getContractDataMode()).toBe("real");
+  });
+});
+
+describe("실제 ML DB 공개 경계", () => {
+  const baseRow = {
+    firm_id: "firm-1",
+    name: "테스트사업장",
+    sido: "서울특별시",
+    industry: "정보통신업",
+    batch_id: 4,
+    score_batch_id: 4,
+    model_version: "model-v1",
+    as_of_date: "2026-06-01",
+    target_month: "2026-12-01",
+    ingested_at: "2026-08-11T00:00:00Z",
+    n_months: 12,
+    n_green: 4,
+    excluded_wage: false,
+  };
+
+  it.each([
+    ["안정신호", "normal"],
+    ["유보", "watch"],
+    ["유보_정보부족", "unknown"],
+    ["배제_4대보험체납(door1)", "review"],
+  ] as const)("실제 판정 %s를 사용자 상태 %s로 변환한다", (verdict, level) => {
+    expect(toWageRiskPublic({ ...baseRow, verdict }).level).toBe(level);
+  });
+
+  it("원시 점수 없이 공식 명단 상태와 확인 근거만 반환한다", () => {
+    const result = toWageRiskPublic({
+      ...baseRow,
+      verdict: "배제_임금체불공개",
+      excluded_wage: true,
+    });
+    expect(result.official_listing.status).toBe("listed");
+    expect(result.evidence_codes).toContain("OFFICIAL_WAGE_LISTING_MATCH");
+    expect(JSON.stringify(result)).not.toMatch(/risk_full|probability|percentile|shap/i);
+  });
+
+  it("공유 DB 파일에서는 관리자 계정이 아니라 bot 계정 URL만 만든다", () => {
+    const url = buildBotDatabaseUrl({
+      DB_NAME: "wageguard",
+      DB_PORT: "5433",
+      DB_USER: "admin",
+      DB_PASSWORD: "admin-secret",
+      BOT_NAME: "wg_bot",
+      BOT_PASSWORD: "bot:secret@value",
+    });
+    expect(url).toBe("postgresql://wg_bot:bot%3Asecret%40value@127.0.0.1:5433/wageguard");
+    expect(url).not.toContain("admin");
   });
 });
 
