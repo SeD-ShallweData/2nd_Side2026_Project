@@ -21,6 +21,7 @@ async function parseRequest(request: Request): Promise<ContractReviewRequest> {
             size_bytes: file.size,
           }
         : undefined,
+      file: file ?? undefined,
     };
   }
   if (contentType.includes("application/json")) {

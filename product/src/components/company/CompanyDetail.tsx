@@ -1,23 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ActionChecklist } from "@/components/common/ActionChecklist";
 import { DataFreshnessNotice } from "@/components/common/DataFreshnessNotice";
 import { ErrorState, LimitationNotice, LoadingSkeleton } from "@/components/common/AsyncStates";
-import { ChatPanel } from "@/components/chat/ChatPanel";
-import { ContractReviewPanel } from "@/components/contract/ContractReviewPanel";
 import { RiskInformationCard } from "@/components/risk/RiskInformationCard";
 import type { Company } from "@/domain/company";
 import type { CompanyRiskResult } from "@/domain/risk";
 import { readApiResponse } from "@/utils/clientApi";
 
-export function CompanyDetail({ company }: { company: Company }) {
+export function CompanyDetail({ company, dataMode }: { company: Company; dataMode: "mock" | "real" }) {
+  const router = useRouter();
   const [risk, setRisk] = useState<CompanyRiskResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [chatPrompt, setChatPrompt] = useState("");
-  const chatRef = useRef<HTMLElement>(null);
 
   async function loadRisk(signal?: AbortSignal) {
     setLoading(true);
@@ -49,8 +47,8 @@ export function CompanyDetail({ company }: { company: Company }) {
   }, [company.company_id]);
 
   function ask(question: string) {
-    setChatPrompt(question);
-    window.setTimeout(() => chatRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    const params = new URLSearchParams({ company_id: company.company_id, prompt: question });
+    router.push(`/chat?${params.toString()}`);
   }
 
   return (
@@ -67,13 +65,13 @@ export function CompanyDetail({ company }: { company: Company }) {
               {company.company_name.slice(0, 2)}
             </div>
             <div className="detail-company-copy">
-              <span className="demo-pill">데모 사업장</span>
+              <span className="demo-pill">{dataMode === "real" ? "DB 연결 사업장" : "데모 사업장"}</span>
               <h1>{company.company_name}</h1>
-              <p>{company.address}</p>
+              <p>{company.address ?? "DB에 상세 주소 정보가 없습니다."}</p>
               <div className="detail-tags">
-                <span>{company.region}</span>
-                <span>{company.industry}</span>
-                <span>{company.size_label}</span>
+                <span>{company.region ?? "지역 정보 없음"}</span>
+                <span>{company.industry ?? "업종 정보 없음"}</span>
+                <span>{company.size_label ?? "규모 정보 없음"}</span>
               </div>
             </div>
             <Link href="/companies" className="button button-outline change-company">
@@ -92,6 +90,7 @@ export function CompanyDetail({ company }: { company: Company }) {
               freshness={risk.freshness}
               dataAsOf={risk.data_as_of}
               validUntil={risk.valid_until}
+              targetMonth={risk.target_month}
             />
             <div className="risk-grid">
               <RiskInformationCard
@@ -104,7 +103,7 @@ export function CompanyDetail({ company }: { company: Company }) {
               <RiskInformationCard
                 kind="safety"
                 data={risk.safety_context}
-                dataAsOf={risk.data_as_of}
+                dataAsOf={risk.safety_context.target_end ?? risk.data_as_of}
                 sources={risk.sources.filter((source) => source.name.includes("산업재해"))}
                 onAsk={ask}
               />
@@ -112,36 +111,42 @@ export function CompanyDetail({ company }: { company: Company }) {
             <LimitationNotice>
               <strong>결과를 하나의 점수로 합치지 않습니다.</strong>
               <p>
-                임금 정보는 사업장 단위, 산업재해 정보는 지역·업종 단위입니다. 두 결과 모두 입사나 안전 여부를
-                확정하지 않습니다.
+                임금 공개 판정과 산업재해 공표 우선순위는 서로 다른 모델 결과입니다. 산업재해 신호는 검증된
+                사업장 연결을 거쳤더라도 사고 확률이나 안전 판정이 아니며, 두 결과 모두 입사 여부를 확정하지 않습니다.
               </p>
             </LimitationNotice>
-
-            <section ref={chatRef} className="detail-section scroll-target" aria-labelledby="company-chat-title">
-              <div className="section-heading section-heading-left">
-                <span className="eyebrow">회사 컨텍스트 상담</span>
-                <h2 id="company-chat-title">이 결과, 어떻게 확인하면 좋을까요?</h2>
-                <p>선택한 사업장의 Mock 결과만 사용해 확인할 질문과 행동을 안내합니다.</p>
-              </div>
-              <ChatPanel
-                key={chatPrompt || "company-chat"}
-                companyId={company.company_id}
-                companyName={company.company_name}
-                suggestedPrompt={chatPrompt}
-              />
-            </section>
 
             <div className="detail-section">
               <ActionChecklist />
             </div>
 
-            <section className="detail-section" aria-labelledby="contract-title">
+            <section className="detail-section next-action-section" aria-labelledby="next-action-title">
               <div className="section-heading section-heading-left">
-                <span className="eyebrow">근로계약서 확인</span>
-                <h2 id="contract-title">계약서에서 빠진 기본 항목을 확인하세요</h2>
-                <p>현재 Mock Mode에서는 파일 내용을 서버에 저장하거나 실제로 분석하지 않습니다.</p>
+                <span className="eyebrow">다음 단계</span>
+                <h2 id="next-action-title">상세 기능은 필요한 화면에서 이어가세요</h2>
+                <p>사업장 상세는 신호와 체크리스트에 집중하고, 상담과 계약서 검토는 별도 화면에서 진행합니다.</p>
               </div>
-              <ContractReviewPanel />
+              <div className="next-action-grid">
+                <Link
+                  href={`/chat?${new URLSearchParams({ company_id: company.company_id }).toString()}`}
+                  className="next-action-card"
+                >
+                  <span aria-hidden="true">AI</span>
+                  <div>
+                    <strong>이 사업장을 기준으로 AI 상담</strong>
+                    <p>같은 공식 근거를 사용한 두 모델의 답변과 한계를 비교합니다.</p>
+                  </div>
+                  <b aria-hidden="true">→</b>
+                </Link>
+                <Link href="/contracts" className="next-action-card">
+                  <span aria-hidden="true">✓</span>
+                  <div>
+                    <strong>근로계약서 별도 검토</strong>
+                    <p>파일을 올려 확인·누락·추가 검토 항목을 구조적으로 살펴봅니다.</p>
+                  </div>
+                  <b aria-hidden="true">→</b>
+                </Link>
+              </div>
             </section>
           </>
         ) : null}

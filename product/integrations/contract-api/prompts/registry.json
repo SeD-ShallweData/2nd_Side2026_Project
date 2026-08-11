@@ -1,0 +1,91 @@
+{
+  "general": {
+    "label": "종합 상담",
+    "description": "임금체불·산재를 아우르는 일반 상담 창구",
+    "system": [
+      "system/base/00-계약.md",
+      "system/base/10-형식.md",
+      "system/persona/general.md",
+      "system/base/20-가드레일.md"
+    ],
+    "knowledge": [
+      "common"
+    ],
+    "few_shot": "few_shot/general.jsonl",
+    "suggestions": [
+      "돈을 못 받고 있어요. 어떻게 해야 하나요?",
+      "현장이 너무 위험한데 신고할 수 있나요?",
+      "이직해야 할까요? 이 회사 괜찮은가요?",
+      "산재 신청 방법을 알고 싶어요.",
+      "부당해고를 당한 것 같아요.",
+      "샘플A건설 어때요? 괜찮은 회사인가요?",
+      "샘플J건설 어때요?",
+      "예시C물류는요?",
+      "인천 건설현장 요즘 위험한가요?",
+      "3개월치 월급 250만원씩 못 받았는데 얼마인가요?"
+    ],
+    "workplace_db": true,
+    "safety_db": true
+  },
+  "wage_arrears": {
+    "label": "임금체불 진단",
+    "description": "체불 위험 신호를 해석하고 대응 절차를 안내합니다",
+    "system": [
+      "system/base/00-계약.md",
+      "system/base/10-형식.md",
+      "system/persona/wage_arrears.md",
+      "system/base/20-가드레일.md"
+    ],
+    "knowledge": [
+      "common",
+      "wage"
+    ],
+    "few_shot": "few_shot/wage_arrears.jsonl",
+    "suggestions": [
+      "월급이 두 달째 밀렸는데 어떻게 해야 하나요?",
+      "4대보험 체납이 임금체불과 관계가 있나요?",
+      "샘플A건설 어때요? 괜찮은 회사인가요?",
+      "퇴사했는데 퇴직금을 언제까지 줘야 하나요?"
+    ],
+    "workplace_db": true,
+    "safety_db": true
+  },
+  "safety_risk": {
+    "label": "산재위험 진단",
+    "description": "지역·업종 단위 산재 경보를 해석하고 대응을 안내합니다",
+    "system": [
+      "system/base/00-계약.md",
+      "system/base/10-형식.md",
+      "system/persona/safety_risk.md",
+      "system/base/20-가드레일.md"
+    ],
+    "knowledge": [
+      "common",
+      "safety"
+    ],
+    "few_shot": "few_shot/safety_risk.jsonl",
+    "suggestions": [
+      "인천 건설현장 요즘 위험한가요?",
+      "일하다 다쳤는데 회사가 산재 처리를 안 해줘요",
+      "건설업 20인 사업장인데 어떤 위험이 큰가요?",
+      "현장이 너무 위험한데 신고할 수 있나요?"
+    ],
+    "safety_db": true
+  },
+  "contract_review": {
+    "label": "근로계약서 진단",
+    "description": "업로드한 근로계약서의 조항을 법정 기준과 대조합니다",
+    "system": [
+      "system/base/00-계약.md",
+      "system/base/10-형식.md",
+      "system/persona/contract_review.md",
+      "system/base/20-가드레일.md"
+    ],
+    "knowledge": [
+      "common",
+      "contract"
+    ],
+    "suggestions": [],
+    "chat_visible": false
+  }
+}
