@@ -2,7 +2,7 @@ import type { LlmProviderId, TokenUsage } from "@/domain/chatComparison";
 import type { RagRetrievalStatus } from "@/domain/rag";
 import type { SourceReference } from "@/domain/risk";
 
-export type InspectorQueuePriority = "긴급" | "우선" | "주의" | "관찰";
+export type InspectorQueueGrade = "긴급" | "우선" | "주의" | "관찰";
 
 export interface InspectorBatchMeta {
   batch_id: number;
@@ -18,8 +18,7 @@ export interface InspectorQueueItem {
   region: string | null;
   industry: string | null;
   rank: number;
-  queue_priority: string;
-  risk_tier: string | null;
+  grade: InspectorQueueGrade;
   model_score: number | null;
   reasons: string[];
 }
@@ -31,7 +30,7 @@ export interface InspectorOverview {
     queue: number;
     safe_recommendation: number;
   };
-  queue_counts: Record<InspectorQueuePriority, number>;
+  queue_counts: Record<InspectorQueueGrade, number>;
   top_queue: InspectorQueueItem[];
 }
 
@@ -56,9 +55,8 @@ export interface InspectorCompanyDetail {
     status: "scored" | "insufficient_data";
     model_score: number | null;
     score_interpretation: "relative_model_score_not_probability";
-    risk_tier: string | null;
     rank: number | null;
-    queue_priority: string | null;
+    grade: InspectorQueueGrade | null;
     in_inspector_queue: boolean;
     reasons: string[];
     reasons_status: "available" | "not_in_queue" | "not_provided";

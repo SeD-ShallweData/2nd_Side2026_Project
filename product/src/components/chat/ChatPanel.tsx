@@ -37,6 +37,18 @@ function metric(value: number | null, suffix = ""): string {
   return value === null ? "미제공" : `${value.toLocaleString("ko-KR")}${suffix}`;
 }
 
+function comparisonHistoryContent(
+  comparison: ChatComparisonResponse,
+  selection?: LlmProviderId | "tie",
+): string {
+  const selected = selection && selection !== "tie"
+    ? comparison.results.filter((result) => result.provider === selection)
+    : comparison.results;
+  return selected
+    .map((result) => `${result.provider_label}: ${result.answer.slice(0, 900)}`)
+    .join("\n");
+}
+
 function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
   const statusLabel =
     result.status === "success"
@@ -88,7 +100,7 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
           <div><dt>답변 길이</dt><dd>{metric(result.metrics.answer_chars, "자")}</dd></div>
           <div><dt>실행 상태</dt><dd>{statusLabel}</dd></div>
           <div><dt>컨텍스트</dt><dd>{result.trace.context_mode === "company" ? "선택 사업장 연결" : "일반 상담"}</dd></div>
-          <div><dt>질의 재작성</dt><dd>{result.trace.query_transform === "none" ? "사용 안 함" : result.trace.query_transform}</dd></div>
+          <div><dt>질의 재작성</dt><dd>{result.trace.query_transform === "none" ? "사용 안 함" : "후속 질문 독립형 재작성"}</dd></div>
           <div><dt>최근 대화</dt><dd>{result.trace.recent_message_count}개 전달</dd></div>
           <div><dt>공식 근거 검색</dt><dd>{result.trace.rag_status}</dd></div>
           <div><dt>공유 근거</dt><dd>{result.trace.retrieved_document_count}개</dd></div>
@@ -220,9 +232,14 @@ export function ChatPanel({
     if (!message || loading) return;
 
     const recentMessages: RecentMessage[] = messages
-      .filter((item) => !item.comparison)
+      .filter((item) => item.id !== "welcome")
       .slice(-8)
-      .map((item) => ({ role: item.role, content: item.content }));
+      .map((item) => ({
+        role: item.role,
+        content: item.comparison
+          ? comparisonHistoryContent(item.comparison, feedback[item.comparison.comparison_id])
+          : item.content,
+      }));
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: message }]);
     setDraft("");
     setError(null);

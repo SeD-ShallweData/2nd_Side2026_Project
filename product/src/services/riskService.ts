@@ -1,4 +1,4 @@
-import { getMockDelayMs } from "@/config/dataMode";
+import { getCompanyDataMode, getMockDelayMs } from "@/config/dataMode";
 import type { Company } from "@/domain/company";
 import type { CompanyRiskResult } from "@/domain/risk";
 import { getCompanyById } from "@/services/companyService";
@@ -33,7 +33,7 @@ export function assertRiskIdentity(company: Company, result: CompanyRiskResult):
 
 export async function getCompanyRisk(companyId: string): Promise<CompanyRiskResult> {
   const company = await getCompanyById(companyId);
-  await delay(getMockDelayMs());
+  if (getCompanyDataMode() === "mock") await delay(getMockDelayMs());
   const result = await getRiskProvider().getCompanyRisk(company.company_id);
   if (!result) {
     throw new ServiceError("RISK_RESULT_NOT_FOUND", "사업장 분석 결과를 찾을 수 없습니다.", 404, false);

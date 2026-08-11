@@ -5,7 +5,8 @@
 
 ## 1. 설계 목표
 
-통합 프로토타입은 실제 ML 운영 DB, RAG, LLM, 계약서 분석 시스템의 준비 여부와 무관하게 프론트엔드를 개발하고 본선 시연을 수행할 수 있어야 한다. 이를 위해 UI, API, 어댑터, 외부 시스템을 분리하고 모든 외부 의존성에 Mock 구현을 둔다.
+통합 프로토타입의 실행 기본값은 실제 ML 운영 DB, RAG, LLM, 계약서 분석 시스템이다. UI, API, 어댑터,
+외부 시스템은 분리하며 Mock 구현은 단위 테스트와 별도 정적 시연본 검증 용도로만 보존한다.
 
 핵심 원칙은 다음과 같다.
 
@@ -14,7 +15,7 @@
 - 산업재해 결과는 `region_industry | validated_firm_context` 범위의 `safety_context`로 다루며 사고 확률로 해석하지 않는다.
 - 내부 모델 값과 사용자용 응답 DTO를 분리한다.
 - LLM은 DB 결과를 재계산하거나 추정하지 않고 설명만 한다.
-- Real 공급자 실패는 기본적으로 명시적 오류가 되며, 운영자가 허용한 데모 환경에서만 Mock으로 전환된다.
+- Real 공급자 실패는 명시적 오류가 되며 자동으로 Mock 성공 결과로 전환하지 않는다.
 
 ## 2. 전체 구조
 
@@ -43,7 +44,7 @@ flowchart TB
         RCR[RealCompanyRepository]
         MRP[MockRiskProvider]
         MLP[MlRiskProvider]
-        MCP[MockChatProvider]
+        MCP[PolicyChatProvider]
         RCP[RealChatProvider]
         MCON[MockContractReviewProvider]
         RCON[RealContractReviewProvider]
@@ -169,7 +170,7 @@ Next.js가 그 근거를 두 LLM에 동일하게 전달한다. DB 조회는 읽�
 - 경로: `POST /api/contracts/review`
 - 실제 파일, 테스트 텍스트, Mock 파일 메타데이터 중 하나를 받는다.
 - 파일 추출 결과를 직접 법률 판정으로 변환하지 않는다.
-- 실제 공급자 오류 시 계약 기능 안에서만 Mock 또는 제한 응답으로 전환한다.
+- 실제 공급자 오류는 명시적 계약 분석 오류로 반환하며 Mock 성공 결과로 바꾸지 않는다.
 
 ## 5. Adapter Layer
 
@@ -199,7 +200,7 @@ interface RiskProvider {
 
 ### Chat Provider
 
-현재 프로토타입은 `DualLlmChatProvider`가 Upstage Solar와 SKT A.X의 OpenAI 호환 Chat Completions API를 같은 조건으로 병렬 호출한다. `MockChatProvider`는 최종 사용자 답변 생성기가 아니라, 회사 선택·긴급상황·근거 부족·금지 표현에 대한 정책 기준과 fallback 문구를 제공한다.
+현재 프로토타입은 `DualLlmChatProvider`가 Upstage Solar와 SKT A.X의 OpenAI 호환 Chat Completions API를 같은 조건으로 병렬 호출한다. `PolicyChatProvider`는 최종 사용자 답변 생성기가 아니라, 회사 선택·긴급상황·근거 부족·금지 표현에 대한 정책 기준과 fallback 문구를 제공한다.
 
 - 공유 키 파일은 서버에서만 읽고 클라이언트 번들에 포함하지 않는다.
 - 한 모델이 실패해도 다른 모델 결과는 유지한다.
@@ -213,8 +214,8 @@ interface ChatProvider {
 }
 ```
 
-- `MockChatProvider`: 시나리오별 고정 답변과 출처 제공
-- `RealChatProvider`: 질의 재작성, RAG 검색, LLM 생성, 후처리 가드레일 수행
+- `PolicyChatProvider`: 긴급상황과 정책 위반 시 사용할 결정적 기준 안내 제공
+- `DualLlmChatProvider`: 서버 질의 재작성, RAG 검색 결과를 이용한 병렬 생성과 후처리 가드레일 수행
 - LLM 공급자 선택은 Provider 내부 설정이며 API 계약에는 노출하지 않음
 
 ### Contract Review Provider
@@ -239,11 +240,12 @@ interface ContractReviewProvider {
 - 운영 PostgreSQL의 `firms`, `batches`, `scored_active`, `safe_recommendation`과 허용된
   `industrial_safety.v_llm_firm_safety_context`만 읽는다.
 - 구직자 응답은 `safe_recommendation.판정`을 사용하고, 공개 `/api/companies/*`에는 감독관 전용
-  `risk_tier`·`risk_full`·SHAP를 노출하지 않는다.
+  `grade`·`risk_full`·SHAP를 노출하지 않는다.
 - 팀 시연용 `/api/inspector/*`만 최신 `inspector_queue`와 `scored_active`의 내부 필드를 읽는다.
   `risk_full`은 상대 모델 원점수로 표시하고 확률화하지 않으며, 시연 서버에서는 Basic 인증을 필수로 한다.
 - 감독관 챗봇이 사업장 내부 컨텍스트를 외부 LLM에 전달하려면 화면과 API 양쪽에서 명시적 확인이
-  필요하다. 외부 컨텍스트에서는 `firm_id`와 마스킹 사업자번호를 제거한다.
+  필요하다. 화면은 사업장·배치·ML·관측지표·산업안전·RAG 범위를 접기/펼치기로 안내하고,
+  외부 컨텍스트에서는 `firm_id`와 마스킹 사업자번호를 제거한다.
 - DB에 없는 주소·규모·미확정 기준월은 `null`로 유지한다.
 
 ### 프롬프트·LLM 서버
@@ -251,6 +253,12 @@ interface ContractReviewProvider {
 - 질의 재작성과 최종 답변 생성을 분리할 수 있다.
 - 회사 결과를 재계산하거나 다른 회사 데이터를 섞지 않는다.
 - 공급자별 차이는 어댑터 내부에서 흡수한다.
+- 일반 상담과 감독관 상담은 사용자 입력·대화 이력·검색 문서를 지시가 아닌 데이터로 취급한다.
+- 법령은 이번 RAG 검색에 직접 연결된 조항만 문장 안에 인용한다. 검색 실패 시 조문을 생성하지 않고
+  근거 부족과 공식 확인 경로를 짧게 안내한다.
+- 기간·금액·비율을 근거 없이 만들거나 계산하지 않으며, 결론 → 확인된 근거 → 행동 → 한계 순으로 답한다.
+- 계약서 분석 서비스의 프롬프트·가드레일은 `integrations/contract-api`에 보존된 CSH 규칙 세트를 사용하고,
+  일반·감독관 상담은 별도의 TypeScript 출력 가드레일로 공개 위험값·단정·지침 유출을 차단한다.
 
 ### RAG 서버
 
@@ -321,7 +329,7 @@ sequenceDiagram
         P->>E: 항목 추출 요청
         E-->>P: 추출 결과
         P-->>A: 검토 결과
-    else Real 장애 또는 Mock 모드
+    else 명시적 테스트용 Mock 모드
         A->>M: review(mock input)
         M-->>A: 시나리오 검토 결과
     end
@@ -353,7 +361,7 @@ CONTRACT_PROVIDER=mock | real
 
 외부 장애 시 원칙은 다음과 같다.
 
-- 사업장 검색 실패가 이미 선택된 Mock 시나리오를 지우지 않는다.
+- 사업장 검색 실패는 이전 실제 조회 결과와 구분되는 오류 상태로 표시한다.
 - 임금체불 데이터가 없어도 산업재해 카드를 렌더링하고 그 반대도 동일하다.
 - RAG 실패 시 일반 상식으로 법률 답변을 채우지 않는다.
 - LLM 실패 시 검색·카드·출처 링크는 계속 사용할 수 있다.
