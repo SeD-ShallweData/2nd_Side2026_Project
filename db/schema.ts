@@ -100,8 +100,22 @@ export const batches = pgTable(
      * 써야 사용자가 "지금 상태" 로 오해하지 않는다. 하나만 있으면 반드시 오해가 생긴다.
      */
     targetMonth: date("target_month", { mode: "string" }),
-    /** 재학습·롤백 대비 버전 태그 (예: 260807) */
+    /**
+     * 모델 레시피의 정체를 가리키는 태그 (예: door1-voting-39f-v1).
+     * 날짜를 넣지 않는다 — 그건 as_of_date 가 맡는다.
+     * 월 재추론은 데이터만 갱신하므로 이 값이 바뀌지 않는다.
+     * 실제로 바뀌는 건 새 명단공개 차수로 재학습했을 때뿐이다.
+     */
     modelVersion: text("model_version").notNull(),
+    /**
+     * 이 배치를 만든 모델 pkl 의 sha256 앞 16자.
+     *
+     * model_version 이 같아도 이 값이 다르면 가중치가 실제로 바뀐 것이다.
+     * 월 재추론은 매 실행 재학습을 하지만 학습셋·파라미터·시드가 고정이라
+     * 결정론적으로 같은 모델이 나온다 — 단 동일 환경(lightgbm==4.6.0 등)에서만이다.
+     * 순위가 크게 흔들렸을 때 "모델이 아니라 데이터 때문" 임을 이 값으로 보인다.
+     */
+    modelSha: text("model_sha"),
     ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
     source: text(),
     nScored: integer("n_scored").notNull().default(0),
@@ -140,6 +154,20 @@ export const scoredActive = pgTable(
     riskFull: real("risk_full"),
     /** 캘리브레이션 결과를 넣을 자리. 준비되기 전까지 NULL */
     riskCalibrated: real("risk_calibrated"),
+
+    /**
+     * 전체 분포 기준 위험등급.
+     *   매우높음(상위 0.5%) / 높음(~2%) / 다소높음(~10%) / 일반 + 정보부족 / 이미공개
+     *
+     * 백분위 모집단은 같은 batch 안에서 risk_full IS NOT NULL AND 체불배제 = false 인 행만이다.
+     * 정보부족·이미공개는 순위를 매기지 않고 상태로만 표시한다.
+     *
+     * inspector_queue.queue_priority 와 다른 척도다 — 그쪽은 큐 3,000곳 안의 순위 기준이라
+     * 같은 이름을 쓰면 25배 다른 집합을 가리키게 된다. 그래서 라벨 자체를 다르게 뒀다.
+     *
+     * 감독관 전용. 구직자 화면에는 노출하지 않는다(명예훼손 리스크).
+     */
+    riskTier: text("risk_tier"),
 
     // ── 예측 피처 39개 ──
     turnoverAvg12m: real("turnover_avg_12m"),
@@ -204,8 +232,14 @@ export const inspectorQueue = pgTable(
       .references(() => batches.id, { onDelete: "cascade" }),
     /** risk_full 내림차순 1~3000 */
     rank: integer().notNull(),
-    /** 긴급(<100) / 우선(<500) / 주의(<1500) / 관찰 */
-    grade: text().notNull(),
+    /**
+     * 큐 top3000 안에서의 순위 기반 우선순위. 긴급(rank<100) / 우선(<500) / 주의(<1500) / 관찰.
+     *
+     * scored_active.risk_tier 와 혼동하지 말 것 — 그쪽은 전체 55만 곳의 백분위다.
+     * 큐 3,000곳은 전부 전체 상위 0.6% 안에 들어서, 백분위 컷을 큐에 적용하면
+     * 84%가 한 등급에 몰려 변별이 안 된다. 그래서 큐는 순위 기준을 따로 쓴다.
+     */
+    queuePriority: text("queue_priority").notNull(),
     riskFull: real("risk_full"),
     /** door1_체납이력 */
     door1Arrears: boolean("door1_체납이력"),
@@ -217,9 +251,32 @@ export const inspectorQueue = pgTable(
   (t) => [
     primaryKey({ columns: [t.firmId, t.batchId] }),
     index("queue_batch_rank_idx").on(t.batchId, t.rank),
-    index("queue_batch_grade_idx").on(t.batchId, t.grade),
+    index("queue_batch_priority_idx").on(t.batchId, t.queuePriority),
   ],
 );
+
+/* ── 위험등급 해설표 ──────────────────────────────────────── */
+
+/**
+ * 화면 범례·툴팁용. lift 는 "이 구간이 평균 대비 몇 배 더 자주 실제 명단공개되는가" 다.
+ *
+ * ML팀이 라벨 있는 CV(LORO, firm당 1행)로 실측한 값이며, DB 에는 라벨이 없어
+ * 우리가 재계산할 수 없다. 받은 값을 그대로 보존한다 — 지어내거나 고치지 않는다.
+ */
+export const riskTierMeta = pgTable("risk_tier_meta", {
+  tier: text().primaryKey(),
+  sortOrder: smallint("sort_order").notNull(),
+  percentileFrom: real("percentile_from"),
+  percentileTo: real("percentile_to"),
+  recallCum: real("recall_cum"),
+  /** pooled(전체 회차) = 보수적. 화면에는 lift_low~lift_high 범위로 표기한다 */
+  liftLow: real("lift_low"),
+  /** recent(2023~2026 배포대상) = 낙관적 */
+  liftHigh: real("lift_high"),
+  label: text().notNull(),
+  /** false 면 예측이 아니라 사실·상태다(이미공개·정보부족). 위험 예측과 섞지 말 것 */
+  isPrediction: boolean("is_prediction").notNull().default(true),
+});
 
 /* ── 구직자 안전추천 ─────────────────────────────────────── */
 

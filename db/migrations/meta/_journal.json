@@ -43,6 +43,13 @@
       "when": 1786205195781,
       "tag": "0005_existing_firms_projection",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786706400000,
+      "tag": "0006_risk_tier",
+      "breakpoints": true
     }
   ]
 }
