@@ -11,6 +11,11 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Docker 기본 /dev/shm 은 64MB 다. Postgres 의 병렬 워커(VACUUM·인덱스 빌드·해시 조인)가
+    # 여기에 공유메모리를 잡는데, 수백만 행 규모에서는 64MB 로 부족해 이렇게 실패한다:
+    #   ERROR: could not resize shared memory segment ... No space left on device
+    # 디스크가 아니라 /dev/shm 이 꽉 찬 것이다. 메시지가 헷갈리게 나온다.
+    shm_size: 1gb
     # 127.0.0.1 로 묶는다 — 공용 머신이라 사내망에 DB 를 열지 않는다.
     ports:
       - "127.0.0.1:${DB_PORT:-5433}:5432"
