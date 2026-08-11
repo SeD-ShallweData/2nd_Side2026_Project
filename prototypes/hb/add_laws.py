@@ -46,6 +46,36 @@ def normalize_spaces(text):
     return re.sub(r"[ \t]{2,}", " ", text).strip()
 
 
+# 편(1) > 장(2) > 절(3). 같은 층끼리만 서로를 대체하게 한다.
+CHAPTER_LEVELS = [(re.compile(r"^제\d+편"), 1),
+                  (re.compile(r"^제\d+장"), 2),
+                  (re.compile(r"^제\d+절"), 3)]
+
+
+def chapter_level_of(text):
+    for pattern, level in CHAPTER_LEVELS:
+        if pattern.match(text):
+            return level
+    return 3  # 관(款) 등 더 하위 단위는 절과 같은 층으로 본다
+
+
+# 별표는 <조문> 바깥에 있고 API가 텍스트가 아니라 HWP/PDF/이미지 링크만 준다.
+# 그런데 소정급여일수처럼 사용자가 가장 많이 묻는 수치가 여기 들어 있어서,
+# 없으면 "실업급여 며칠 받나요?"에 답할 근거 자체가 DB에 없게 된다.
+# 고용보험법은 별표가 2개뿐이라 원본 이미지를 확인해 표를 그대로 옮겨 붙였다.
+# (출처: https://www.law.go.kr 별표 이미지, 고용보험법 [별표 1]·[별표 2] 2019.8.27 개정)
+APPENDIX_TABLES = {
+    ("고용보험법", "제50조"): """
+[별표 1] 구직급여의 소정급여일수 (제50조제1항 관련)
+이직일 현재 연령 50세 미만: 피보험기간 1년 미만 120일, 1년 이상 3년 미만 150일, 3년 이상 5년 미만 180일, 5년 이상 10년 미만 210일, 10년 이상 240일
+이직일 현재 연령 50세 이상: 피보험기간 1년 미만 120일, 1년 이상 3년 미만 180일, 3년 이상 5년 미만 210일, 5년 이상 10년 미만 240일, 10년 이상 270일
+비고: 「장애인고용촉진 및 직업재활법」 제2조제1호에 따른 장애인은 50세 이상인 것으로 보아 위 표를 적용한다.""",
+    ("고용보험법", "제69조의6"): """
+[별표 2] 자영업자의 구직급여의 소정급여일수 (제69조의6 관련)
+소정급여일수: 피보험기간 1년 이상 3년 미만 120일, 3년 이상 5년 미만 150일, 5년 이상 10년 미만 180일, 10년 이상 210일""",
+}
+
+
 def parse_law(xml_bytes, law_name):
     root = ET.fromstring(xml_bytes)
     info = root.find("기본정보")
@@ -53,7 +83,10 @@ def parse_law(xml_bytes, law_name):
 
     articles = []
     seen_ids = set()
-    current_chapter = None
+    # 편/장/절을 각각 따로 들고 있다가 합쳐 쓴다. 하나의 변수에 덮어쓰면 하위 단위가
+    # 상위를 지워버린다. 실제로 고용보험법 제40조의 chapter가 '제2절 구직급여'가 되면서
+    # 상위인 '제4장 실업급여'가 사라져, '실업급여' 질문이 해당 조문에 안 걸렸다.
+    chapter_levels = {}
 
     jomun_root = root.find("조문")
     if jomun_root is None:
@@ -65,8 +98,14 @@ def parse_law(xml_bytes, law_name):
         if jo.findtext("조문여부") == "전문":
             chapter = strip_trailing_annotation(raw_content)
             if chapter:
-                current_chapter = chapter
+                level = chapter_level_of(chapter)
+                chapter_levels[level] = chapter
+                # 상위 단위가 바뀌면 그 아래 단위는 무효가 된다.
+                for lower in range(level + 1, 4):
+                    chapter_levels.pop(lower, None)
             continue
+
+        current_chapter = " ".join(chapter_levels[k] for k in sorted(chapter_levels))
 
         title = jo.findtext("조문제목")
         if not title:
@@ -125,6 +164,12 @@ def parse_law(xml_bytes, law_name):
         doc_text = f"{article_id}({title}) " + body_parts[0]
         for part in body_parts[1:]:
             doc_text += "\n" + part
+
+        # 조문이 '별표 N에서 정한 …'이라고만 하고 실제 값은 별표에 있는 경우,
+        # 그 표를 조문 뒤에 붙여 답변 근거가 되게 한다.
+        appendix = APPENDIX_TABLES.get((law_name, article_id))
+        if appendix:
+            doc_text += "\n" + appendix.strip()
 
         articles.append({
             "article_id": article_id,

@@ -13,7 +13,7 @@ import {
 } from "@/adapters/real/OpenAICompatibleChatClient";
 import type { LlmProviderConfig } from "@/server/llmConfig";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-08-11-v3";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-08-11-v4";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -30,7 +30,19 @@ interface OutputGuardrailRule {
 
 const SENTENCE_PATTERN = /[^.!?\n]+[.!?]?/g;
 const NEGATION_PATTERN = /않습니다|않아요|않으며|않고|아닙니다|아니라|없습니다|못합니다|드리지|만들지|말씀드릴 수 없|판단할 수 없|확정할 수 없|보증하지|단정할 수 없/;
-const LAW_CITATION_PATTERN = /(?:근로기준법(?:\s*시행령)?|최저임금법|임금채권보장법)\s*제\s*\d+\s*조/g;
+const LAW_NAMES = [
+  "남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률",
+  "근로자퇴직급여 보장법",
+  "근로기준법 시행령",
+  "임금채권보장법",
+  "고용보험법",
+  "최저임금법",
+  "근로기준법",
+] as const;
+const LAW_CITATION_PATTERN = new RegExp(
+  `(?:「\\s*)?(?:${LAW_NAMES.join("|")})(?:\\s*」)?\\s*제\\s*\\d+\\s*조(?:의\\s*\\d+)?`,
+  "g",
+);
 
 const OUTPUT_GUARDRAILS: OutputGuardrailRule[] = [
   { code: "SAFE_COMPANY_CERTAINTY", pattern: /안전한\s*(회사|사업장|기업|직장)(?:입니다|이다)|문제가\s*없는\s*(회사|사업장)(?:입니다|이다)/i, allowNegated: true },
@@ -44,6 +56,37 @@ const OUTPUT_GUARDRAILS: OutputGuardrailRule[] = [
   { code: "RAW_MODEL_FIELD", pattern: /raw_probability|shap[_ ]?value|\bSHAP\b|model_threshold|internal_score|feature[_ ]?importance/i },
 ];
 
+function citationKeys(text: string): Set<string> {
+  return new Set(
+    (text.match(LAW_CITATION_PATTERN) ?? []).map((citation) =>
+      citation.replace(/[「」\s]/g, ""),
+    ),
+  );
+}
+
+function previousCitations(context: ComparisonContext): string[] {
+  const citations = new Set<string>();
+  for (const message of context.request.recent_messages) {
+    if (message.role !== "assistant") continue;
+    for (const citation of message.content.match(LAW_CITATION_PATTERN) ?? []) {
+      citations.add(citation.replace(/[「」]/g, "").replace(/\s+/g, " ").trim());
+    }
+  }
+  return [...citations];
+}
+
+function digestAssistantMessage(content: string): string {
+  const flat = content.replace(/\s+/g, " ").trim();
+  if (!flat) return "";
+  const sentences = flat.match(SENTENCE_PATTERN) ?? [flat];
+  const core = sentences.find((sentence) => citationKeys(sentence).size > 0) ?? sentences[0];
+  const shortened = core.length > 240 ? `${core.slice(0, 240)}…` : core;
+  const citations = [...citationKeys(flat)].slice(0, 6);
+  return citations.length > 0
+    ? `${shortened} [이전 답변 근거: ${citations.join(", ")}]`
+    : shortened;
+}
+
 function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   const hits = new Set<string>();
   const sentences = answer.match(SENTENCE_PATTERN) ?? [answer];
@@ -56,9 +99,18 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
     }
   }
 
-  const citations = answer.match(LAW_CITATION_PATTERN) ?? [];
-  if (citations.length > 0 && context.ragRetrieval.status !== "matched") {
-    hits.add("UNVERIFIED_LAW_CITATION");
+  const citations = citationKeys(answer);
+  if (citations.size > 0) {
+    if (context.ragRetrieval.status !== "matched") {
+      hits.add("UNVERIFIED_LAW_CITATION");
+    } else {
+      const retrievedCitations = new Set(
+        context.ragRetrieval.documents.flatMap((document) => [...citationKeys(document.citation)]),
+      );
+      if ([...citations].some((citation) => !retrievedCitations.has(citation))) {
+        hits.add("UNVERIFIED_LAW_CITATION");
+      }
+    }
   }
   return [...hits];
 }
@@ -84,6 +136,7 @@ function buildSystemPrompt(context: ComparisonContext): string {
             content: document.content,
           }))
         : [],
+    previously_cited_labor_law: previousCitations(context),
     retrieval_status: context.ragRetrieval.status,
     policy_baseline: context.policyBaseline.answer,
     required_limitations: context.policyBaseline.limitations,
@@ -99,6 +152,7 @@ function buildSystemPrompt(context: ComparisonContext): string {
     "normal은 안전 인증이 아니며 unknown은 자료 부족입니다.",
     "산업재해 정보는 지역·업종 맥락 또는 검증된 사업장 연결의 공표 확인 우선순위이며, 사고 확률이나 안전 판정이 아닙니다.",
     "법령은 retrieved_labor_law에서 질문과 직접 관련된 문서만 사용하고, 인용은 해당 설명·행동 문장 끝에 citation을 그대로 괄호로 붙이세요. 관련 없는 검색 결과는 언급하지 마세요.",
+    "previously_cited_labor_law에 있는 조문은 이미 설명한 근거입니다. 이번 질문에 꼭 필요하지 않으면 되풀이하지 말고 새로 검색된 관련 조문을 우선하세요.",
     "retrieval_status가 matched가 아니면 긴 답변 형식을 억지로 채우지 말고, 확인된 법령 근거가 없다고 짧게 밝힌 뒤 고용노동부 1350 등 공식 확인 경로를 안내하세요. 법률명·조항·출처를 새로 만들지 마세요.",
     "컨텍스트에 없는 기간·금액·비율·예외를 만들거나 계산하지 마세요. 평균임금과 통상임금처럼 서로 다른 개념을 섞지 마세요.",
     "공개 화면에서는 원시 확률, 위험 점수·등급·순위, SHAP·피처 중요도를 말하지 마세요.",
@@ -114,7 +168,9 @@ function buildMessages(context: ComparisonContext) {
     { role: "system" as const, content: buildSystemPrompt(context) },
     ...context.request.recent_messages.slice(-6).map((message) => ({
       role: message.role,
-      content: message.content,
+      content: message.role === "assistant"
+        ? digestAssistantMessage(message.content)
+        : message.content,
     })),
     { role: "user" as const, content: context.request.message },
   ];

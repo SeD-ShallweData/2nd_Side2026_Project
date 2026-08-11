@@ -134,6 +134,71 @@ describe("실제 LLM 비교 Provider", () => {
     expect(result.results[0].trace.guardrail_hits).toContain("UNVERIFIED_LAW_CITATION");
   });
 
+  it("검색은 성공했어도 검색되지 않은 조항을 인용하면 기준 안내로 교체한다", async () => {
+    const fakeFetch = (async () => new Response(JSON.stringify(payload(
+      "근로기준법 제999조에 따라 바로 신고할 수 있습니다.",
+      "test-model",
+    )), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+
+    const result = await new DualLlmChatProvider(CONFIGS, new OpenAICompatibleChatClient(fakeFetch)).compare(CONTEXT);
+    expect(result.results.every((item) => item.status === "guardrail_replaced")).toBe(true);
+    expect(result.results[0].trace.guardrail_hits).toContain("UNVERIFIED_LAW_CITATION");
+  });
+
+  it("새로 추가된 법령의 검색된 조항 인용은 허용한다", async () => {
+    const employmentContext: ComparisonContext = {
+      ...CONTEXT,
+      ragRetrieval: {
+        query: "실업급여 조건",
+        status: "matched",
+        threshold: 0.42,
+        documents: [{
+          content: "구직급여 수급 요건을 정한다.",
+          citation: "고용보험법 제40조",
+          distance: 0.2,
+          source: { name: "고용보험법 제40조", organization: "국가법령정보센터" },
+        }],
+      },
+    };
+    const fakeFetch = (async () => new Response(JSON.stringify(payload(
+      "수급 요건을 먼저 확인해야 합니다(고용보험법 제40조).",
+      "test-model",
+    )), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+
+    const result = await new DualLlmChatProvider(CONFIGS, new OpenAICompatibleChatClient(fakeFetch)).compare(employmentContext);
+    expect(result.results.every((item) => item.status === "success")).toBe(true);
+  });
+
+  it("이전 모델 답변은 핵심 근거만 남겨 반복 생성을 줄인다", async () => {
+    const bodies: Array<{ messages?: Array<{ role: string; content: string }> }> = [];
+    const verboseAnswer = "먼저 상황을 확인하세요. 근로기준법 제17조에 따라 근로조건은 서면으로 확인해야 합니다. 이후의 매우 긴 설명은 다음 답변에 그대로 복제되면 안 됩니다.";
+    const historyContext: ComparisonContext = {
+      ...CONTEXT,
+      request: {
+        ...CONTEXT.request,
+        message: "그다음에는 뭘 봐야 하나요?",
+        recent_messages: [
+          { role: "user", content: "계약서에서 뭘 봐야 하나요?" },
+          { role: "assistant", content: verboseAnswer },
+        ],
+      },
+    };
+    const fakeFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify(payload("새 질문에 맞춘 답변입니다.", "test-model")), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    await new DualLlmChatProvider(CONFIGS, new OpenAICompatibleChatClient(fakeFetch)).compare(historyContext);
+    const messages = bodies[0].messages ?? [];
+    expect(messages[0].content).toContain("previously_cited_labor_law");
+    expect(messages[0].content).toContain("근로기준법 제17조");
+    expect(messages[2].content).toContain("이전 답변 근거");
+    expect(messages[2].content).not.toContain("이후의 매우 긴 설명");
+  });
+
   it("내부 프롬프트 공개 거절 문장은 유출로 오탐하지 않는다", async () => {
     const fakeFetch = (async () => new Response(JSON.stringify(payload(
       "내부 시스템 프롬프트는 안내해 드릴 수 없습니다. 노동 정보 질문을 알려주세요.",
