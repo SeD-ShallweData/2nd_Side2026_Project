@@ -2,538 +2,563 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>돈워리 챗봇</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>돈워리 · Money Worry AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #ffffff;
-    --panel: #f7f7f5;
-    --border: #e5e5e2;
-    --text: #1f1f1e;
-    --muted: #7a7a76;
-    --user-bubble: #2f6f4f;
-    --user-text: #ffffff;
-    --bot-bubble: #f0efec;
-    --bot-text: #1f1f1e;
-    --accent: #2f6f4f;
-    --accent-soft: #4fae7c;
-    --danger: #c0392b;
-    --danger-on: #ffffff;
-    --shadow: 0 12px 30px rgba(0, 0, 0, 0.13);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1b1b1a;
-      --panel: #242422;
-      --border: #35342f;
-      --text: #ececea;
-      --muted: #9a9a94;
-      --user-bubble: #3f8f66;
-      --user-text: #ffffff;
-      --bot-bubble: #2c2c29;
-      --bot-text: #ececea;
-      --accent: #4fae7c;
-      --accent-soft: #6fc79a;
-      --danger: #ff7b6b;
-      --danger-on: #2a1310;
-      --shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-    }
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    height: 100%;
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, Roboto, sans-serif;
-  }
+/* ──────────────────────────────────────────────────────────────
+   디자인 토큰 - design/figma-extract/design-tokens.css 와 동일한 값.
+   Figma 시안(초안, node 4:2)에서 뽑은 팀 공통 토큰이다.
+   ────────────────────────────────────────────────────────────── */
+:root {
+  --mw-font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mw-color-ink: #191f28;
+  --mw-color-muted: #8b95a1;
+  --mw-color-subtle: #6a7282;
+  --mw-color-brand: #ffd600;
+  --mw-color-page: #f7f8fa;
+  --mw-color-surface: #f2f4f6;
+  --mw-color-line: #e5e8eb;
+  --mw-color-safe: #48cfad;
+  --mw-color-danger: #e53935;
+  --mw-color-info: #4e9aff;
+  --mw-color-violet: #a29bfe;
+  --mw-color-white: #ffffff;
 
-  .shell {
-    display: flex;
-    height: 100vh;
-  }
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --sidebar-w: 260px;
+}
 
-  /* --- 사이드바 --- */
+* { box-sizing: border-box; }
+
+/* display를 지정한 요소는 hidden 속성만으로 감춰지지 않는다.
+   작성자 스타일이 브라우저 기본 [hidden]{display:none}을 이기기 때문이다.
+   모달·첨부 미리보기가 처음부터 보이던 문제라 한 줄로 일괄 처리한다. */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: var(--mw-font-family);
+  background: var(--mw-color-page);
+  color: var(--mw-color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; }
+
+/* ── 레이아웃 ───────────────────────────────────────────────── */
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  height: 100dvh;
+  transition: grid-template-columns .18s ease;
+}
+.shell.sidebar-collapsed { grid-template-columns: 0 1fr; }
+.shell.sidebar-collapsed .sidebar { opacity: 0; pointer-events: none; }
+
+/* ── 사이드바 ───────────────────────────────────────────────── */
+.sidebar {
+  background: var(--mw-color-white);
+  border-right: 1px solid var(--mw-color-line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: opacity .18s ease;
+}
+
+/* 로고를 눌러도 '+ 새 대화'와 같게 동작한다. button으로 바꾼 만큼
+   브라우저 기본 스타일(배경·테두리·가운데 정렬)을 지워 원래 모양을 유지한다. */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 18px 14px;
+  width: 100%;
+  background: none;
+  border: 0;
+  text-align: left;
+  color: inherit;
+  border-radius: var(--radius-md, 10px);
+  transition: background .15s ease;
+}
+.sidebar-brand:hover { background: var(--mw-color-surface); }
+.sidebar-brand:focus-visible {
+  outline: 2px solid var(--mw-color-brand);
+  outline-offset: -2px;
+}
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  background: var(--mw-color-brand);
+  flex: none;
+}
+.brand-text b {
+  display: block;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+}
+.brand-text small {
+  display: block;
+  font-size: 11px;
+  color: var(--mw-color-muted);
+  margin-top: 1px;
+}
+
+.sidebar-header { padding: 0 14px 12px; }
+.new-chat-btn {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--mw-color-line);
+  border-radius: var(--radius-md);
+  background: var(--mw-color-white);
+  color: var(--mw-color-ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  transition: background .12s, border-color .12s;
+}
+.new-chat-btn:hover { background: var(--mw-color-surface); border-color: #d8dde3; }
+
+.convo-list { flex: 1; overflow-y: auto; padding: 0 10px 16px; }
+.convo-empty {
+  padding: 18px 8px;
+  font-size: 13px;
+  color: var(--mw-color-muted);
+  text-align: center;
+}
+.convo-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 8px 9px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--mw-color-subtle);
+}
+.convo-item:hover { background: var(--mw-color-surface); }
+.convo-item.active {
+  background: var(--mw-color-surface);
+  color: var(--mw-color-ink);
+  font-weight: 700;
+}
+/* 활성 대화 왼쪽에 브랜드 색 막대 */
+.convo-item.active::before {
+  content: "";
+  position: absolute;
+  left: 3px; top: 8px; bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--mw-color-brand);
+}
+.convo-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.convo-menu-btn {
+  border: 0;
+  background: transparent;
+  color: var(--mw-color-muted);
+  font-size: 15px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 6px;
+  opacity: 0;
+}
+.convo-item:hover .convo-menu-btn,
+.convo-item.menu-open .convo-menu-btn { opacity: 1; }
+.convo-menu-btn:hover { background: #e3e7ec; color: var(--mw-color-ink); }
+
+.convo-rename {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 3px 6px;
+  border: 1px solid var(--mw-color-brand);
+  border-radius: 6px;
+  background: var(--mw-color-white);
+  color: var(--mw-color-ink);
+}
+.convo-rename:focus { outline: none; }
+
+/* ── 메인 ──────────────────────────────────────────────────── */
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* 그리드/플렉스 항목의 min-height 기본값은 auto라서, 내용이 길어지면 칸이
+     100dvh 아래로 줄어들지 못하고 페이지 전체가 늘어난다. 그러면 #messages의
+     overflow-y가 발동하지 않아 scrollTop 대입이 전부 무효가 된다. */
+  min-height: 0;
+  overflow: hidden;
+  background: var(--mw-color-page);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+  background: var(--mw-color-white);
+  border-bottom: 1px solid var(--mw-color-line);
+}
+.toggle-btn {
+  border: 1px solid var(--mw-color-line);
+  background: var(--mw-color-white);
+  color: var(--mw-color-subtle);
+  width: 34px; height: 34px;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  line-height: 1;
+}
+.toggle-btn:hover { background: var(--mw-color-surface); }
+header h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -.01em;
+}
+header .sub {
+  font-size: 12px;
+  color: var(--mw-color-muted);
+  margin-top: 1px;
+}
+.tag {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mw-color-subtle);
+  background: var(--mw-color-surface);
+  border: 1px solid var(--mw-color-line);
+  border-radius: 999px;
+  padding: 5px 11px;
+  white-space: nowrap;
+}
+
+/* ── 메시지 ────────────────────────────────────────────────── */
+#messages {
+  flex: 1;
+  min-height: 0;   /* 없으면 이 칸이 내용만큼 늘어나 스크롤이 생기지 않는다 */
+  overflow-y: auto;
+  padding: 28px 22px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.msg {
+  max-width: min(760px, 82%);
+  padding: 14px 17px;
+  border-radius: var(--radius-lg);
+  font-size: 15px;
+  line-height: 1.72;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg.user {
+  align-self: flex-end;
+  background: var(--mw-color-ink);
+  color: var(--mw-color-white);
+  border-bottom-right-radius: 4px;
+}
+.msg.bot {
+  align-self: flex-start;
+  background: var(--mw-color-white);
+  border: 1px solid var(--mw-color-line);
+  border-bottom-left-radius: 4px;
+}
+.msg.bot strong { font-weight: 700; }
+/* 로딩 표시. "법령을 찾는 중" 같은 문구는 넣지 않는다. 실제로 무슨 단계인지
+   알려주지도 못하면서 답변이 그 자리에 나타날 때 글자가 바뀌어 어수선하다.
+   점 세 개만 깜빡인다. */
+.msg.pending {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 21px;
+}
+.msg.pending i {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--mw-color-brand);
+  animation: dotPulse 1.2s infinite ease-in-out both;
+}
+.msg.pending i:nth-child(2) { animation-delay: .16s; }
+.msg.pending i:nth-child(3) { animation-delay: .32s; }
+@keyframes dotPulse {
+  0%, 70%, 100% { opacity: .25; transform: translateY(0); }
+  35%           { opacity: 1;   transform: translateY(-3px); }
+}
+
+/* ── 빈 상태(첫 화면) ──────────────────────────────────────── */
+.intro {
+  margin: auto 0;
+  padding: 8px 0 20px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.intro-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: #c8a800;      /* 브랜드 노랑은 흰 배경에서 대비가 낮아 어둡게 조정 */
+  text-transform: uppercase;
+}
+.intro h2 {
+  margin: 10px 0 0;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.32;
+  letter-spacing: -.02em;
+}
+.intro p {
+  margin: 12px 0 0;
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--mw-color-subtle);
+}
+.chips {
+  margin-top: 26px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  justify-content: center;
+  max-width: 720px;
+}
+.chip {
+  border: 1px solid var(--mw-color-line);
+  background: var(--mw-color-white);
+  color: var(--mw-color-ink);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 13.5px;
+  transition: border-color .12s, background .12s, transform .12s;
+}
+.chip:hover {
+  border-color: var(--mw-color-brand);
+  background: #fffdf0;
+  transform: translateY(-1px);
+}
+.intro-note {
+  margin-top: 22px;
+  font-size: 12px;
+  color: var(--mw-color-muted);
+  line-height: 1.7;
+}
+
+/* ── 입력창 ────────────────────────────────────────────────── */
+#composerWrap {
+  padding: 12px 22px 20px;
+  background: var(--mw-color-page);
+}
+#attachPreview {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 900px;
+  margin: 0 auto 8px;
+  padding: 8px 12px;
+  background: var(--mw-color-white);
+  border: 1px solid var(--mw-color-line);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--mw-color-subtle);
+}
+#attachThumb { width: 34px; height: 34px; object-fit: cover; border-radius: 6px; }
+#attachPreview span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#attachRemove {
+  border: 0; background: transparent; color: var(--mw-color-muted);
+  font-size: 14px; padding: 3px 5px; border-radius: 5px;
+}
+#attachRemove:hover { background: var(--mw-color-surface); color: var(--mw-color-ink); }
+
+#composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 8px 8px 8px 10px;
+  background: var(--mw-color-white);
+  border: 1px solid var(--mw-color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgba(25,31,40,.04);
+}
+#composer:focus-within { border-color: #d3d8de; }
+#attachBtn {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  line-height: 1;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  color: var(--mw-color-subtle);
+}
+#attachBtn:hover:not(:disabled) { background: var(--mw-color-surface); }
+#input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  resize: none;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  padding: 9px 2px;
+  max-height: 140px;
+  background: transparent;
+  color: var(--mw-color-ink);
+}
+#input::placeholder { color: var(--mw-color-muted); }
+#send {
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--mw-color-brand);
+  color: var(--mw-color-ink);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 18px;
+  transition: filter .12s;
+}
+#send:hover:not(:disabled) { filter: brightness(.95); }
+#send:disabled, #attachBtn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+.composer-help {
+  max-width: 900px;
+  margin: 8px auto 0;
+  font-size: 11.5px;
+  color: var(--mw-color-muted);
+  text-align: center;
+}
+
+/* ── 대화 옵션 메뉴 / 모달 ─────────────────────────────────── */
+.ctx-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 168px;
+  padding: 6px;
+  background: var(--mw-color-white);
+  border: 1px solid var(--mw-color-line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(25,31,40,.12);
+}
+.ctx-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--mw-color-ink);
+  font-size: 13.5px;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+}
+.ctx-menu button:hover { background: var(--mw-color-surface); }
+.ctx-menu button.danger { color: var(--mw-color-danger); }
+.ctx-menu button.danger:hover { background: #fdecec; }
+.ctx-icon { width: 16px; text-align: center; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(25,31,40,.42);
+  padding: 20px;
+}
+.modal {
+  width: min(400px, 100%);
+  background: var(--mw-color-white);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: 0 20px 48px rgba(25,31,40,.2);
+}
+.modal h3 { margin: 0 0 8px; font-size: 17px; font-weight: 900; }
+.modal p { margin: 0; font-size: 13.5px; line-height: 1.7; color: var(--mw-color-subtle); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.btn-ghost, .btn-danger {
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 9px 16px;
+  border: 1px solid var(--mw-color-line);
+}
+.btn-ghost { background: var(--mw-color-white); color: var(--mw-color-subtle); }
+.btn-ghost:hover { background: var(--mw-color-surface); }
+.btn-danger { background: var(--mw-color-danger); border-color: var(--mw-color-danger); color: #fff; }
+.btn-danger:hover { filter: brightness(.94); }
+
+/* ── 좁은 화면 ─────────────────────────────────────────────── */
+@media (max-width: 760px) {
+  /* 사이드바가 position:fixed가 되면 그리드 흐름에서 빠진다. 그러면 .main이
+     첫 칼럼으로 밀려가므로, 칼럼 정의를 한 개로 바꿔야 본문이 폭을 갖는다.
+     (collapsed 규칙까지 같이 덮어써야 특이도가 밀리지 않는다) */
+  .shell,
+  .shell.sidebar-collapsed { grid-template-columns: 1fr; }
   .sidebar {
-    width: 260px;
-    flex-shrink: 0;
-    background: var(--panel);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    transition: width 0.15s ease;
-  }
-  .shell.sidebar-collapsed .sidebar {
-    width: 0;
-    border-right: none;
-  }
-  /* 사이드바가 접힐 때 내용이 찌그러지지 않도록 폭을 고정한다. */
-  .sidebar-brand,
-  .sidebar-header,
-  .convo-list {
-    min-width: 260px;
-  }
-  .sidebar-brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 14px 6px;
-    flex-shrink: 0;
-    user-select: none;
-  }
-  .brand-mark {
-    display: flex;
-    flex-shrink: 0;
-    filter: drop-shadow(0 2px 5px rgba(47, 111, 79, 0.35));
-  }
-  /* stop-color는 프레젠테이션 속성에서 var()가 안 먹는 브라우저가 있어 CSS로 지정한다. */
-  .dw-stop-a { stop-color: var(--accent-soft); }
-  .dw-stop-b { stop-color: var(--accent); }
-  .brand-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.25;
-    min-width: 0;
-  }
-  .brand-text b {
-    font-size: 15px;
-    letter-spacing: -0.2px;
-  }
-  .brand-text small {
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .sidebar-header {
-    padding: 10px 12px 12px;
-    flex-shrink: 0;
-  }
-  .new-chat-btn {
-    width: 100%;
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 9px 10px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .convo-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 4px 8px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .convo-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 8px 6px 8px 10px;
-    border-radius: 8px;
-    font-size: 13px;
-    cursor: pointer;
-    color: var(--text);
-  }
-  .convo-item:hover { background: var(--border); }
-  .convo-item.active { background: var(--border); font-weight: 600; }
-  .convo-item.menu-open { background: var(--border); }
-  .convo-title {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .convo-menu-btn {
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
-    border: none;
-    border-radius: 6px;
-    color: var(--muted);
-    font-size: 15px;
-    line-height: 1;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.12s ease;
-  }
-  .convo-item:hover .convo-menu-btn,
-  .convo-item.active .convo-menu-btn,
-  .convo-item.menu-open .convo-menu-btn,
-  .convo-menu-btn:focus-visible { opacity: 1; }
-  .convo-menu-btn:hover { background: var(--bg); color: var(--text); }
-  .convo-rename {
-    flex: 1;
-    min-width: 0;
-    font: inherit;
-    padding: 2px 6px;
-    border: 1px solid var(--accent);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--text);
-    outline: none;
-  }
-  .convo-empty {
-    padding: 10px;
-    font-size: 12.5px;
-    color: var(--muted);
-  }
-
-  /* --- 대화 우클릭/⋯ 메뉴 --- */
-  .ctx-menu {
     position: fixed;
-    z-index: 50;
-    min-width: 170px;
-    padding: 5px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+    z-index: 30;
+    width: var(--sidebar-w);
+    height: 100dvh;
+    box-shadow: 0 0 40px rgba(25,31,40,.18);
   }
-  .ctx-menu[hidden] { display: none; }
-  .ctx-menu button {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    width: 100%;
-    padding: 8px 10px;
-    background: none;
-    border: none;
-    border-radius: 7px;
-    font-family: inherit;
-    font-size: 13px;
-    text-align: left;
-    color: var(--text);
-    cursor: pointer;
-  }
-  .ctx-menu button:hover { background: var(--panel); }
-  .ctx-menu button.danger { color: var(--danger); }
-  .ctx-menu .ctx-icon {
-    width: 15px;
-    text-align: center;
-    flex-shrink: 0;
-  }
-
-  /* --- 삭제 확인 --- */
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    background: rgba(0, 0, 0, 0.38);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-  .modal-backdrop[hidden] { display: none; }
-  .modal {
-    width: min(340px, 100%);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: var(--shadow);
-  }
-  .modal h3 {
-    margin: 0 0 8px;
-    font-size: 15px;
-  }
-  .modal p {
-    margin: 0 0 18px;
-    font-size: 13px;
-    line-height: 1.55;
-    color: var(--muted);
-    word-break: break-word;
-  }
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-  }
-  .modal-actions button {
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .btn-ghost {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    color: var(--text);
-  }
-  .btn-ghost:hover { border-color: var(--muted); }
-  .btn-danger {
-    background: var(--danger);
-    border: 1px solid var(--danger);
-    color: var(--danger-on);
-  }
-  .btn-danger:hover { filter: brightness(1.08); }
-
-  /* --- 메인 --- */
-  .main {
-    flex: 1;
-    min-width: 0;
-    max-width: 720px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
-  header {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-  }
-  .toggle-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text);
-    font-size: 16px;
-    line-height: 1;
-    padding: 6px 8px;
-    border-radius: 6px;
-  }
-  .toggle-btn:hover { background: var(--border); }
-  .header-mark { margin-left: -2px; }
-  header h1 {
-    font-size: 16px;
-    margin: 0;
-    font-weight: 600;
-  }
-  header .sub {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-  #messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .msg {
-    max-width: 80%;
-    padding: 10px 14px;
-    border-radius: 14px;
-    line-height: 1.5;
-    font-size: 14.5px;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-  .msg.user {
-    align-self: flex-end;
-    background: var(--user-bubble);
-    color: var(--user-text);
-    border-bottom-right-radius: 4px;
-  }
-  .msg.bot {
-    align-self: flex-start;
-    background: var(--bot-bubble);
-    color: var(--bot-text);
-    border-bottom-left-radius: 4px;
-  }
-  .msg.bot.pending {
-    color: var(--muted);
-    font-style: italic;
-  }
-
-  /* --- 페르소나 선택 --- */
-  .persona-picker {
-    margin: auto;
-    text-align: left;
-    padding: 24px;
-    max-width: 380px;
-    width: 100%;
-  }
-  .persona-picker h2 {
-    font-size: 15px;
-    margin: 0 0 14px;
-    text-align: center;
-    color: var(--text);
-  }
-  .persona-btn {
-    display: block;
-    width: 100%;
-    text-align: left;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    color: var(--text);
-    font-size: 14px;
-  }
-  .persona-btn:hover { border-color: var(--accent); }
-  .persona-btn b { display: block; margin-bottom: 2px; }
-  .persona-btn span { font-size: 12px; color: var(--muted); }
-
-  #composerWrap {
-    border-top: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  form#composer {
-    display: flex;
-    gap: 8px;
-    padding: 14px;
-  }
-  #attachPreview {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 12px 14px 0;
-    padding: 8px 10px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 13px;
-  }
-  #attachPreview[hidden] { display: none; }
-  #attachThumb {
-    width: 34px;
-    height: 34px;
-    object-fit: cover;
-    border-radius: 4px;
-    flex-shrink: 0;
-  }
-  #attachName {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  #attachRemove {
-    background: none;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 14px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    flex-shrink: 0;
-  }
-  #attachRemove:hover { background: var(--border); color: var(--text); }
-  textarea#input {
-    flex: 1;
-    resize: none;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 14.5px;
-    font-family: inherit;
-    background: var(--panel);
-    color: var(--text);
-    max-height: 140px;
-  }
-  textarea#input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-  textarea#input:disabled {
-    opacity: 0.5;
-  }
-  button#send {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    padding: 0 18px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  button#send:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-  button#attachBtn {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0 12px;
-    font-size: 16px;
-    cursor: pointer;
-    color: var(--text);
-  }
-  button#attachBtn:hover { border-color: var(--accent); }
-  button#attachBtn:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
+  .shell.sidebar-collapsed .sidebar { opacity: 0; pointer-events: none; }
+  .shell:not(.sidebar-collapsed) .sidebar { opacity: 1; pointer-events: auto; }
+  .msg { max-width: 92%; }
+  .intro h2 { font-size: 23px; }
+  #messages, #composerWrap { padding-left: 14px; padding-right: 14px; }
+}
 </style>
 </head>
 <body>
 <div class="shell" id="shell">
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-brand">
+  <aside class="sidebar" id="sidebar">
+    <button type="button" class="sidebar-brand" id="brandBtn"
+            title="새 대화 시작" aria-label="돈워리 - 새 대화 시작">
       <span class="brand-mark" aria-hidden="true">
-        <svg width="30" height="30" viewBox="0 0 32 32" role="img">
-          <defs>
-            <linearGradient id="dwLogo" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" class="dw-stop-a"/>
-              <stop offset="1" class="dw-stop-b"/>
-            </linearGradient>
-          </defs>
-          <rect width="32" height="32" rx="9" fill="url(#dwLogo)"/>
-          <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 10.2 L12.8 20.4 L16 14.2 L19.2 20.4 L23 10.2" stroke-width="2.1"/>
-            <path d="M8.2 15.4 H23.8" stroke-width="1.4"/>
-            <path d="M8.2 18.4 H23.8" stroke-width="1.4"/>
-          </g>
+        <svg width="19" height="19" viewBox="0 0 32 32" fill="none"
+             stroke="#191f28" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 9.5 L12.6 21 L16 14.4 L19.4 21 L24 9.5"/>
         </svg>
       </span>
       <span class="brand-text">
         <b>돈워리</b>
         <small>근로·노무 AI 상담</small>
       </span>
-    </div>
+    </button>
     <div class="sidebar-header">
-      <button class="new-chat-btn" id="newChatBtn">+ 새 채팅</button>
+      <button class="new-chat-btn" id="newChatBtn">+ 새 대화</button>
     </div>
     <div class="convo-list" id="convoList"></div>
-  </div>
+  </aside>
 
   <div class="main">
     <header>
-      <button class="toggle-btn" id="toggleBtn" title="사이드바 접기/펼치기">☰</button>
-      <span class="brand-mark header-mark" aria-hidden="true">
-        <svg width="24" height="24" viewBox="0 0 32 32">
-          <defs>
-            <linearGradient id="dwLogoSm" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" class="dw-stop-a"/>
-              <stop offset="1" class="dw-stop-b"/>
-            </linearGradient>
-          </defs>
-          <rect width="32" height="32" rx="9" fill="url(#dwLogoSm)"/>
-          <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 10.2 L12.8 20.4 L16 14.2 L19.2 20.4 L23 10.2" stroke-width="2.1"/>
-            <path d="M8.2 15.4 H23.8" stroke-width="1.4"/>
-            <path d="M8.2 18.4 H23.8" stroke-width="1.4"/>
-          </g>
-        </svg>
-      </span>
+      <button class="toggle-btn" id="toggleBtn" title="사이드바 접기/펼치기" aria-label="사이드바 접기/펼치기">☰</button>
       <div>
-        <h1>돈워리 챗봇</h1>
-        <div class="sub">근로/노무 상담 데모</div>
+        <h1>Money Worry AI</h1>
+        <div class="sub">근로·노무 상담</div>
       </div>
+      <span class="tag">RAG 기반 · 법령 연동</span>
     </header>
 
     <div id="messages"></div>
@@ -542,14 +567,21 @@
       <div id="attachPreview" hidden>
         <img id="attachThumb" alt="" hidden>
         <span id="attachName"></span>
-        <button type="button" id="attachRemove" title="첨부 취소">✕</button>
+        <button type="button" id="attachRemove" title="첨부 취소" aria-label="첨부 취소">✕</button>
       </div>
       <form id="composer">
         <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.bmp,.tiff,.heic" hidden>
-        <button type="button" id="attachBtn" title="근로계약서 첨부 (PDF/이미지)">📎</button>
-        <textarea id="input" rows="1" placeholder="메시지를 입력하세요..." autofocus></textarea>
+        <button type="button" id="attachBtn" title="근로계약서 첨부 (PDF/이미지)" aria-label="근로계약서 첨부">
+          <!-- 이모지(📎)는 폰트가 없는 환경에서 두부로 깨져서 선 아이콘(Lucide 계열)으로 대체 -->
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </button>
+        <textarea id="input" rows="1" placeholder="궁금한 것을 질문해 보세요..." autofocus></textarea>
         <button id="send" type="submit">전송</button>
       </form>
+      <p class="composer-help">공식 법령을 근거로 안내합니다. 개별 사안의 최종 판단은 고용노동부(1350)나 전문가 상담을 이용하세요.</p>
     </div>
   </div>
 </div>
@@ -575,14 +607,21 @@ const STORAGE_KEY = 'donworry_conversations_v1';
 const ACTIVE_KEY = 'donworry_active_id_v1';
 const COLLAPSE_KEY = 'donworry_sidebar_collapsed_v1';
 
-const PERSONAS = [
-  { key: '구직자', label: '구직자', desc: '아직 입사하지 않았고, 이 회사에 들어가도 되는지 확인하고 싶어요' },
-  { key: '근로자', label: '근로자', desc: '현재 재직 중이거나 퇴사 직후로, 실제 문제를 겪고 있어요' },
-  { key: '사업주', label: '사업주', desc: '소규모 사업장을 운영 중이고, 법적 의무를 확인하고 싶어요' },
+/* 첫 화면에 띄우는 예시 질문.
+   서버가 답할 수 있는 범위는 현재 노동 5법(근로기준법·시행령·최저임금법·
+   임금채권보장법·근로자퇴직급여 보장법)뿐이다. 그 밖의 주제(산재, 육아휴직,
+   실업급여 등)는 게이트에 막혀 "확인이 어렵다"로 응답되므로 예시에 넣지 않는다.
+   아래 5개는 실제로 게이트를 통과하고 의도한 조문을 찾는지 확인한 것들이다. */
+const SUGGESTIONS = [
+  '월급이 두 달째 밀렸어요. 어떻게 해야 하나요?',
+  '퇴직금은 퇴사하고 며칠 안에 줘야 하나요?',
+  '해고 통보를 문자로만 받았는데 효력이 있나요?',
+  '실업급여는 며칠 동안 받을 수 있나요?',
+  '육아휴직은 얼마나 쓸 수 있나요?',
+  '수습기간에도 최저임금을 다 받아야 하나요?',
 ];
 
 const shellEl = document.getElementById('shell');
-const sidebarEl = document.getElementById('sidebar');
 const convoListEl = document.getElementById('convoList');
 const newChatBtn = document.getElementById('newChatBtn');
 const toggleBtn = document.getElementById('toggleBtn');
@@ -641,7 +680,6 @@ function createConversation() {
   const conv = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     title: null,
-    persona: null,
     messages: [],
     createdAt: Date.now(),
   };
@@ -651,6 +689,7 @@ function createConversation() {
   clearPendingFile();
   renderSidebar();
   renderMain();
+  collapseSidebarOnMobile();
 }
 
 function switchConversation(id) {
@@ -658,6 +697,14 @@ function switchConversation(id) {
   clearPendingFile();
   renderSidebar();
   renderMain();
+  collapseSidebarOnMobile();
+}
+
+// 좁은 화면에서는 사이드바가 본문을 덮으므로, 대화를 고르면 바로 접어준다.
+function collapseSidebarOnMobile() {
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    shellEl.classList.add('sidebar-collapsed');
+  }
 }
 
 function renderSidebar() {
@@ -858,6 +905,7 @@ confirmBackdrop.addEventListener('click', (e) => {
   if (e.target === confirmBackdrop) closeConfirm();
 });
 
+/* --- 메시지 렌더링 --- */
 function escapeHtml(str) {
   return str
     .replace(/&/g, '&amp;')
@@ -888,40 +936,55 @@ function addMessageDom(role, text) {
   return div;
 }
 
-function renderPersonaPicker() {
-  messagesEl.innerHTML = '';
-  const wrap = document.createElement('div');
-  wrap.className = 'persona-picker';
-
-  const h2 = document.createElement('h2');
-  h2.textContent = '이 대화는 어떤 입장에서 시작할까요?';
-  wrap.appendChild(h2);
-
-  PERSONAS.forEach(p => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'persona-btn';
-    btn.innerHTML = '<b>' + p.label + '</b><span>' + p.desc + '</span>';
-    btn.addEventListener('click', () => selectPersona(p.key));
-    wrap.appendChild(btn);
+/* 답변이 도착했을 때 그 답변이 보이도록 스크롤한다.
+   맨 아래로 내려버리면 긴 답변은 끝부분만 보여서 처음부터 다시 올려 읽어야 한다.
+   답변 말풍선의 '시작 지점'을 화면 위쪽에 맞추고, 짧은 답변이면 맨 아래에서 멈춘다. */
+function scrollToAnswer(el) {
+  requestAnimationFrame(() => {
+    const offset = el.getBoundingClientRect().top
+      - messagesEl.getBoundingClientRect().top
+      + messagesEl.scrollTop - 12;
+    const max = messagesEl.scrollHeight - messagesEl.clientHeight;
+    messagesEl.scrollTo({ top: Math.min(offset, max), behavior: 'smooth' });
   });
-
-  messagesEl.appendChild(wrap);
-
-  input.disabled = true;
-  sendBtn.disabled = true;
-  attachBtn.disabled = true;
 }
 
-function selectPersona(personaKey) {
-  const conv = getActive();
-  if (!conv) return;
-  conv.persona = personaKey;
-  saveConversations();
-  renderMain();
-  input.disabled = false;
-  updateSendState();
-  input.focus();
+/* 첫 화면. 예전에는 여기서 페르소나(구직자/근로자/사업주)를 고르게 했지만,
+   지금은 서버가 질문을 보고 자동으로 분류한다(app.py → bot.ask_donworry_auto).
+   사용자는 바로 질문만 하면 된다. */
+function renderIntro() {
+  const wrap = document.createElement('div');
+  wrap.className = 'intro';
+  wrap.innerHTML =
+    '<div class="intro-eyebrow">RAG AI 상담</div>' +
+    '<h2>막막할 때<br>AI가 먼저 답합니다</h2>' +
+    '<p>일터에서 겪고 있는 어려움을 편하게 말씀해 주세요. 임금 체불, 퇴직금, 부당해고 같은 상황에서 ' +
+    '공식 법령을 근거로 지금 무엇을 해야 하는지 안내해 드려요.</p>';
+
+  const chips = document.createElement('div');
+  chips.className = 'chips';
+  SUGGESTIONS.forEach(q => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'chip';
+    btn.textContent = q;
+    btn.addEventListener('click', () => {
+      input.value = q;
+      autoResize();
+      updateSendState();
+      form.requestSubmit();
+    });
+    chips.appendChild(btn);
+  });
+  wrap.appendChild(chips);
+
+  const note = document.createElement('div');
+  note.className = 'intro-note';
+  note.textContent = '현재 근로기준법·같은 법 시행령·최저임금법·임금채권보장법·근로자퇴직급여 보장법·'
+    + '고용보험법·남녀고용평등과 일·가정 양립 지원에 관한 법률을 근거로 답변합니다.';
+  wrap.appendChild(note);
+
+  messagesEl.appendChild(wrap);
 }
 
 function renderMain() {
@@ -933,14 +996,14 @@ function renderMain() {
     return;
   }
 
-  if (!conv.persona) {
-    renderPersonaPicker();
-    return;
-  }
-
   input.disabled = false;
   attachBtn.disabled = false;
   updateSendState();
+
+  if (conv.messages.length === 0) {
+    renderIntro();
+    return;
+  }
   conv.messages.forEach(m => addMessageDom(m.role, m.text));
 }
 
@@ -961,6 +1024,8 @@ input.addEventListener('keydown', (e) => {
 });
 
 newChatBtn.addEventListener('click', () => createConversation());
+document.getElementById('brandBtn')
+  .addEventListener('click', () => createConversation());
 
 toggleBtn.addEventListener('click', () => {
   shellEl.classList.toggle('sidebar-collapsed');
@@ -983,10 +1048,11 @@ form.addEventListener('submit', async (e) => {
   if (!text || busy) return;   // 질문이 비어 있으면 전송하지 않는다(첨부만 있어도 마찬가지)
 
   const conv = getActive();
-  if (!conv || !conv.persona) return;
+  if (!conv) return;
 
   const fileToSend = pendingFile;
   const history = recentHistory(conv);   // 이번 질문을 push하기 전 시점의 히스토리
+  const firstMessage = conv.messages.length === 0;
 
   const shownText = fileToSend ? `📎 ${fileToSend.name}\n${text}` : text;
   conv.messages.push({ role: 'user', text: shownText });
@@ -994,6 +1060,7 @@ form.addEventListener('submit', async (e) => {
   saveConversations();
   renderSidebar();
 
+  if (firstMessage) messagesEl.innerHTML = '';   // 첫 질문이면 인트로를 걷어낸다
   addMessageDom('user', shownText);
   input.value = '';
   autoResize();
@@ -1002,8 +1069,9 @@ form.addEventListener('submit', async (e) => {
   updateSendState();
   attachBtn.disabled = true;
 
-  const pending = addMessageDom(
-    'bot pending', fileToSend ? '계약서 검토 중...' : '생각 중...');
+  const pending = addMessageDom('bot pending', '');
+  pending.innerHTML = '<i></i><i></i><i></i>';
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
     let res;
@@ -1011,16 +1079,15 @@ form.addEventListener('submit', async (e) => {
       const formData = new FormData();
       formData.append('file', fileToSend);
       formData.append('message', text);
-      formData.append('persona', conv.persona);
       formData.append('history', JSON.stringify(history));
       res = await fetch('/check-contract', { method: 'POST', body: formData });
     } else {
+      // persona를 보내지 않으면 서버가 질문을 보고 자동으로 분류한다.
       res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          persona: conv.persona,
           contract_context: conv.contractContext || null,
           history: history,
         })
@@ -1029,7 +1096,9 @@ form.addEventListener('submit', async (e) => {
     const data = await res.json();
     const answerText = res.ok ? data.answer : ('오류: ' + data.error);
     pending.classList.remove('pending');
+    pending.innerHTML = '';
     setMessageText(pending, 'bot', answerText);
+    scrollToAnswer(pending);
     conv.messages.push({ role: 'bot', text: answerText });
     if (res.ok && data.missing_items !== undefined) {
       conv.contractContext = { missing_items: data.missing_items, extracted: data.extracted };
@@ -1037,7 +1106,9 @@ form.addEventListener('submit', async (e) => {
     saveConversations();
   } catch (err) {
     pending.classList.remove('pending');
+    pending.innerHTML = '';
     setMessageText(pending, 'bot', '오류: 서버에 연결할 수 없습니다.');
+    scrollToAnswer(pending);
   } finally {
     busy = false;
     attachBtn.disabled = false;
@@ -1083,7 +1154,7 @@ function clearPendingFile() {
   attachThumb.removeAttribute('src');
   attachThumb.hidden = true;
   attachName.textContent = '';
-  input.placeholder = '메시지를 입력하세요...';
+  input.placeholder = '궁금한 것을 질문해 보세요...';
   updateSendState();
 }
 
@@ -1098,6 +1169,9 @@ function updateSendState() {
 
 // --- 초기화 ---
 if (localStorage.getItem(COLLAPSE_KEY) === '1') {
+  shellEl.classList.add('sidebar-collapsed');
+}
+if (window.matchMedia('(max-width: 760px)').matches) {
   shellEl.classList.add('sidebar-collapsed');
 }
 if (!activeId || !conversations.find(c => c.id === activeId)) {
