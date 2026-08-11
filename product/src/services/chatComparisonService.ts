@@ -24,6 +24,12 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
       ...policyBaseline.limitations,
       "연결된 공식 노동법 검색 범위에서 직접 관련된 근거를 찾지 못했습니다.",
     ];
+  } else if (policyBaseline.answer_type !== "emergency_guidance") {
+    policyBaseline.sources = [];
+    policyBaseline.limitations = [
+      ...policyBaseline.limitations,
+      "공식 노동법 검색 서비스에 연결하지 못해 이 답변에는 확인된 법령 근거가 첨부되지 않았습니다.",
+    ];
   }
 
   if (policyBaseline.answer_type === "emergency_guidance") {

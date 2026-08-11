@@ -5,7 +5,7 @@ import { MockRiskProvider } from "@/adapters/mock/MockRiskProvider";
 import { RealCompanyRepository } from "@/adapters/real/RealCompanyRepository";
 import { RealContractReviewProvider } from "@/adapters/real/RealContractReviewProvider";
 import { MlRiskProvider } from "@/adapters/real/MlRiskProvider";
-import { getDataMode } from "@/config/dataMode";
+import { getCompanyDataMode, getContractDataMode } from "@/config/dataMode";
 import type { CompanyRepository } from "@/domain/company";
 import type { ChatProvider } from "@/domain/chat";
 import type { ContractReviewProvider } from "@/domain/contract";
@@ -17,11 +17,11 @@ const realCompanyRepository = new RealCompanyRepository();
 const realRiskProvider = new MlRiskProvider();
 
 export function getCompanyRepository(): CompanyRepository {
-  return getDataMode() === "real" ? realCompanyRepository : mockCompanyRepository;
+  return getCompanyDataMode() === "real" ? realCompanyRepository : mockCompanyRepository;
 }
 
 export function getRiskProvider(): RiskProvider {
-  return getDataMode() === "real" ? realRiskProvider : mockRiskProvider;
+  return getCompanyDataMode() === "real" ? realRiskProvider : mockRiskProvider;
 }
 
 export function getChatProvider(): ChatProvider {
@@ -31,5 +31,5 @@ export function getChatProvider(): ChatProvider {
 }
 
 export function getContractReviewProvider(): ContractReviewProvider {
-  return getDataMode() === "real" ? new RealContractReviewProvider() : new MockContractReviewProvider();
+  return getContractDataMode() === "real" ? new RealContractReviewProvider() : new MockContractReviewProvider();
 }

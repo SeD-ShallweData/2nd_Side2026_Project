@@ -133,12 +133,24 @@ function ComparisonBlock({
   selected?: LlmProviderId | "tie";
   onSelect: (selection: LlmProviderId | "tie") => void;
 }) {
+  const retrieval = comparison.results[0]?.trace;
+  const ragLabel = !retrieval
+    ? "공식 근거 상태 미확인"
+    : retrieval.rag_status === "matched"
+      ? `공식 근거 ${retrieval.retrieved_document_count}개 연결`
+      : retrieval.rag_status === "no_match"
+        ? "직접 관련 공식 근거 없음"
+        : comparison.execution_mode === "policy_short_circuit"
+          ? "긴급 안내 우선"
+          : "공식 근거 검색 연결 안 됨";
+
   return (
     <div className="comparison-block">
       <div className="comparison-summary">
         <div>
           <span className="comparison-kicker">{comparison.execution_mode === "dual_api" ? "동일 조건 병렬 비교" : "긴급 안전정책 우선"}</span>
-          <strong>{comparison.execution_mode === "dual_api" ? "두 모델이 같은 질문·사업장·공식 검색 근거·생성 설정을 사용했습니다." : "긴급 상황은 모델 응답을 기다리지 않고 공통 안전 안내를 즉시 표시합니다."}</strong>
+          <strong>{comparison.execution_mode === "dual_api" ? "두 모델이 같은 질문·사업장·공식 검색 결과·생성 설정을 사용했습니다." : "긴급 상황은 모델 응답을 기다리지 않고 공통 안전 안내를 즉시 표시합니다."}</strong>
+          <span className={`rag-status rag-status-${retrieval?.rag_status ?? "unavailable"}`}>{ragLabel}</span>
         </div>
         <span>{new Date(comparison.completed_at).toLocaleTimeString("ko-KR")}</span>
       </div>

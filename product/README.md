@@ -19,20 +19,151 @@ AI Rookie 및 창의종합설계 경진대회를 위한 구직자·근로자용 
 
 - Node.js 22
 - Next.js 16 / React 19 / TypeScript
-- 데이터 모드: `mock`(기본값) 또는 `real`
+- 데이터 모드: `mock`(기본값) 또는 `real`, 사업장·계약서 기능별 독립 전환 가능
 - 상담 모드: Upstage Solar + SKT A.X 실제 API 병렬 비교
 
-이 서버에서 프로젝트 전용 Node.js를 사용할 때:
+### 전체 기능 실행 방법
+
+상담 RAG와 계약서 분석까지 사용하려면 실행 중인 터미널이 총 3개 필요합니다. Python 패키지 설치는
+최초 한 번만 하면 되고, 설치에 사용한 터미널은 설치가 끝난 뒤 실행용 터미널로 다시 사용해도 됩니다.
+
+#### 1. 최초 설치 — 한 번만 수행
+
+먼저 저장소 안의 `product`로 이동합니다. 개인 폴더명과 저장소 위치가 다르면 자신의 경로에 맞게
+앞부분만 바꿉니다.
 
 ```bash
-cd product
+cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
+```
+
+현재 AI Rookie 서버에서는 프로젝트용 Node.js 22를 PATH에 추가한 뒤 패키지를 설치합니다.
+
+```bash
 export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+node --version
 npm install
+```
+
+`node --version`이 `v22`로 시작하면 정상입니다. 개인 PC에서 Node.js 22를 이미 설치했다면 `export`
+줄은 필요 없습니다.
+
+환경설정 파일도 최초 한 번만 만듭니다.
+
+```bash
 cp .env.example .env.local
+```
+
+이미 `.env.local`을 수정했다면 위 명령을 다시 실행하지 않습니다. 다시 복사하면 기존 설정이
+`.env.example` 내용으로 초기화됩니다. 기본값은 사업장과 계약서가 Mock이며 RAG와 두 LLM은 실제
+서비스 주소를 사용합니다. 실제 계약서 파일 분석도 켜려면 `.env.local`에서 다음 값만 변경합니다.
+
+```env
+COMPANY_DATA_MODE=mock
+CONTRACT_DATA_MODE=real
+```
+
+그러면 계약서만 실제 분석으로 바뀌고 사업장 DB는 Mock으로 유지됩니다.
+
+이어서 같은 설치 터미널에서 RAG와 계약서 분석용 Python 가상환경을 각각 준비합니다.
+
+```bash
+cd integrations/rag-api
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+
+cd ../contract-api
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+
+cd ../..
+pwd
+```
+
+마지막 `pwd` 결과가 `.../2nd_Side2026_Project/product`인지 확인합니다. `.venv` 폴더는 Git에 올라가지
+않으므로 새 서버나 개인 PC에서는 최초 설치를 다시 해야 합니다.
+
+#### 2. 매번 실행 — 터미널 3개 사용
+
+VS Code에서 터미널을 3개 엽니다. 각 터미널의 PATH와 현재 폴더는 서로 독립적일 수 있으므로,
+세 터미널 모두 `product`로 이동하고 서버에서는 Node.js PATH를 설정합니다.
+
+터미널 1 — 공식 노동법 RAG:
+
+```bash
+cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
+export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+npm run dev:rag
+```
+
+최초 실행은 BGE-M3 모델을 올리느라 시간이 걸립니다. 아래 두 문구가 나온 뒤 다음 단계로 갑니다.
+
+```text
+RAG 모델과 노동법 컬렉션을 불러왔습니다.
+Running on http://127.0.0.1:5051
+```
+
+`unauthenticated requests to the HF Hub` 경고는 모델 다운로드 속도·한도 안내이며, 위 정상 문구가
+나오면 실행에는 문제가 없습니다.
+
+터미널 2 — 계약서 분석:
+
+```bash
+cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
+export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+npm run dev:contract
+```
+
+다음처럼 프로바이더와 `8000` 포트가 표시되면 정상입니다.
+
+```text
+프로바이더: upstage, skt
+Running on http://127.0.0.1:8000
+```
+
+브라우저가 이 포트의 `/`에 접근해 `404`를 남겨도 정상입니다. 계약서 서버는 홈페이지가 아니라
+Next.js가 호출하는 내부 API를 제공합니다.
+
+터미널 3 — 통합 웹 UI와 API:
+
+```bash
+cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
+export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
 npm run dev
 ```
 
-브라우저에서 `http://서버주소:3000`으로 접속합니다. 다른 포트를 사용하려면 `npm run dev -- -p 3001`처럼 실행합니다.
+`Ready`와 `http://localhost:3000`이 표시되면 브라우저에서 `http://서버주소:3000`으로 접속합니다.
+다른 포트를 사용하려면 `npm run dev -- -p 3001`처럼 실행합니다. 세 프로세스는 터미널을 닫거나
+`Ctrl+C`를 누를 때까지 계속 실행되어 있어야 합니다.
+
+#### 3. 연결 상태와 RAG 확인
+
+브라우저에서 `http://서버주소:3000/api/system/status`를 열면 비밀값 없이 연결 상태를 확인할 수
+있습니다. 정상적인 실제 연동 예시는 다음과 같습니다.
+
+```json
+{
+  "integrations": {
+    "rag": "ready",
+    "contract_analysis": "ready",
+    "dual_llm": "ready"
+  }
+}
+```
+
+노동 상담 화면에서는 다음처럼 구체적인 법률 질문을 입력해 RAG를 확인합니다.
+
+```text
+임금이 체불됐을 때 체불임금 확인서는 어떻게 발급받나요? 공식 법령 근거와 함께 알려주세요.
+```
+
+정상이라면 비교 결과에 `공식 근거 N개 연결`, 두 모델의 동일한 국가법령정보센터 출처가 표시되고,
+RAG 터미널에는 `POST /api/retrieve ... 200` 로그가 남습니다. 응답 상세의 `공식 근거 검색`도
+`matched`로 표시됩니다. RAG는 상담 데이터 모드와 무관하게 한 번 검색한 같은 근거를 두 LLM에
+전달합니다.
+
+실행 중 `npm: command not found`가 나오면 그 터미널에서 Node.js PATH의 `export` 명령을 다시
+실행합니다. `가상환경이 없습니다`가 나오면 1단계의 `python3 -m venv`와 `pip install`을 다시
+확인합니다.
 
 ## 팀 시연용 임시 배포
 
@@ -111,15 +242,15 @@ API 키와 숨은 시스템 프롬프트는 브라우저로 전송하지 않습�
 
 ## 실제 데이터 연결 위치
 
-UI와 서비스 계층은 그대로 두고 `src/adapters/real`의 네 어댑터를 구현하면 됩니다.
+실제 데이터는 `src/adapters/real`의 어댑터와 `integrations`의 내부 서비스로 연결합니다.
 
 - `RealCompanyRepository.ts`: DB 사업장 검색
 - `MlRiskProvider.ts`: 임금 모델 및 산업안전 참고정보 변환
 - `DualLlmChatProvider.ts`: Upstage·SKT 실제 병렬 상담 및 가드레일
-- `RealChatProvider.ts`: 향후 RAG 오케스트레이션을 위한 자리표시자
+- `HttpRagRetriever.ts`: 제품 내부 RAG 검색 서비스 연결
 - `RealContractReviewProvider.ts`: 계약서 분석
 
-상담 키는 기본적으로 `/data/shared-SeD/api_key.env`에서 서버 런타임에만 읽습니다. 이 파일을 프로젝트로 복사하지 않으며 API 키나 원본 계약서는 Git에 저장하지 않습니다. 실제 DB/ML 어댑터는 `.env.local`에서 `APP_DATA_MODE=real`로 전환하며 자동 Mock fallback은 기본적으로 꺼져 있습니다.
+상담 키는 기본적으로 `/data/shared-SeD/api_key.env`에서 서버 런타임에만 읽습니다. 이 파일을 프로젝트로 복사하지 않으며 API 키나 원본 계약서는 Git에 저장하지 않습니다. 실제 DB/ML 어댑터는 `.env.local`에서 `COMPANY_DATA_MODE=real`, 계약서 분석은 `CONTRACT_DATA_MODE=real`로 독립 전환하며 자동 Mock fallback은 기본적으로 꺼져 있습니다.
 
 ## 설계 문서
 

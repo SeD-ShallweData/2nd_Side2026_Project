@@ -201,7 +201,9 @@ interface ContractReviewResponse {
 
 ### `GET /api/system/status`
 
-비밀값 없이 계약 버전, `mock | real`, 명시적 Mock fallback 여부, DB/RAG/계약서/LLM 설정 여부만 반환한다.
+비밀값 없이 계약 버전, 전체 및 기능별 `mock | real`, 명시적 Mock fallback 여부와 통합 상태만 반환한다.
+RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`, DB는 접속정보 설정 여부만
+`configured | unavailable`로 표시한다. 이 상태 API는 비밀값이나 원문 데이터를 반환하지 않는다.
 
 ## 8. 아직 공개하지 않는 API
 
