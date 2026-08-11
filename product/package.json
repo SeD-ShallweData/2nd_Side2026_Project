@@ -5,6 +5,8 @@
   "description": "돈워리 구직자·근로자용 통합 프로토타입",
   "scripts": {
     "dev": "next dev",
+    "dev:rag": "bash integrations/rag-api/run.sh",
+    "dev:contract": "bash integrations/contract-api/run.sh",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

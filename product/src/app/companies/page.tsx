@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { CompanySearch } from "@/components/company/CompanySearch";
-import { getDataMode } from "@/config/dataMode";
+import { getCompanyDataMode } from "@/config/dataMode";
 
 export const metadata: Metadata = {
   title: "사업장 확인",
 };
 
 export default function CompaniesPage() {
-  const dataMode = getDataMode();
+  const dataMode = getCompanyDataMode();
   return (
     <div className="page-section search-page">
       <div className="shell narrow-shell">

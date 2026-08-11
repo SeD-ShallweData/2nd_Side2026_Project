@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useId, useRef, useState } from "react";
+import type { DataMode } from "@/config/dataMode";
 import type { ContractItem, ContractReviewResult } from "@/domain/contract";
 import { readApiResponse } from "@/utils/clientApi";
 
@@ -41,7 +42,7 @@ function ReviewSection({
   );
 }
 
-export function ContractReviewPanel() {
+export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -144,13 +145,17 @@ export function ContractReviewPanel() {
           <button type="submit" className="button button-dark" disabled={loading || !file}>
             {loading ? "검토 중" : "선택한 파일 검토"}
           </button>
-          <button type="button" className="button button-ghost" onClick={() => void review(true)} disabled={loading}>
-            파일 없이 데모 결과 보기
-          </button>
+          {dataMode === "mock" ? (
+            <button type="button" className="button button-ghost" onClick={() => void review(true)} disabled={loading}>
+              파일 없이 데모 결과 보기
+            </button>
+          ) : null}
         </div>
         <p className="privacy-note">
           <span aria-hidden="true">🔒</span>
-          업로드된 원문은 제품 서버나 Git에 영구 저장하지 않습니다. 데모 모드에서는 파일 내용도 분석하지 않습니다.
+          {dataMode === "real"
+            ? "업로드된 원문은 내부 문서 분석 API에 전달되며 제품 서버나 Git에 영구 저장하지 않습니다."
+            : "업로드된 원문은 제품 서버나 Git에 영구 저장하지 않습니다. 데모 모드에서는 파일 내용도 분석하지 않습니다."}
         </p>
         {error ? (
           <p className="field-error" role="alert">
@@ -164,7 +169,7 @@ export function ContractReviewPanel() {
           <span className="spinner" aria-hidden="true" />
           <div>
             <strong>계약서 검토 결과를 준비하고 있습니다</strong>
-            <p>문서 연결 상태에 따라 실제 분석 또는 명시된 데모 결과를 반환합니다.</p>
+            <p>{dataMode === "real" ? "문서 인식과 조항별 규칙 검토를 순서대로 진행합니다." : "명시된 데모 시나리오 결과를 준비합니다."}</p>
           </div>
         </div>
       ) : null}
@@ -173,7 +178,9 @@ export function ContractReviewPanel() {
         <div className="contract-results" aria-live="polite">
           <div className="contract-results-head">
             <div>
-              <span className="demo-pill">{result.analysis_status === "mocked" ? "MOCK 결과" : "검토 결과"}</span>
+              <span className="demo-pill">
+                {result.analysis_status === "mocked" ? "MOCK 결과" : result.analysis_status === "partial" ? "부분 분석" : "실제 분석"}
+              </span>
               <h2>기본 항목 확인 결과</h2>
             </div>
             <button type="button" className="text-button" onClick={reset}>

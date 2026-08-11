@@ -20,11 +20,21 @@ interface CshFinding {
 
 interface CshReviewResponse {
   ok?: unknown;
+  error?: unknown;
   reason?: unknown;
   message?: unknown;
   review_id?: unknown;
   filename?: unknown;
   verdict?: { headline?: unknown; findings?: unknown };
+}
+
+function timeoutMs(): number {
+  const value = Number(process.env.CONTRACT_TIMEOUT_MS ?? 90_000);
+  return Number.isFinite(value) && value > 0 ? Math.min(value, 300_000) : 90_000;
+}
+
+function upstreamMessage(payload: CshReviewResponse): string | undefined {
+  return string(payload.message) ?? string(payload.error);
 }
 
 function string(value: unknown): string | undefined {
@@ -55,6 +65,8 @@ function toItem(value: unknown, index: number): ContractItem | null {
 }
 
 export class RealContractReviewProvider implements ContractReviewProvider {
+  constructor(private readonly fetchFn: typeof fetch = fetch) {}
+
   async review(request: ContractReviewRequest): Promise<ContractReviewResult> {
     const baseUrl = process.env.CONTRACT_ANALYSIS_URL?.trim();
     if (!baseUrl) {
@@ -70,10 +82,10 @@ export class RealContractReviewProvider implements ContractReviewProvider {
 
     let response: Response;
     try {
-      response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/contract/review`, {
+      response = await this.fetchFn(`${baseUrl.replace(/\/$/, "")}/api/contract/review`, {
         method: "POST",
         body: form,
-        signal: AbortSignal.timeout(Number(process.env.CONTRACT_TIMEOUT_MS ?? 90_000)),
+        signal: AbortSignal.timeout(timeoutMs()),
         cache: "no-store",
       });
     } catch {
@@ -84,7 +96,7 @@ export class RealContractReviewProvider implements ContractReviewProvider {
     if (!response.ok || payload.ok !== true) {
       throw new ServiceError(
         payload.reason === "not_a_contract" ? "NOT_A_CONTRACT" : "CONTRACT_ANALYSIS_FAILED",
-        string(payload.message) ?? `계약서 분석 서비스가 HTTP ${response.status} 오류를 반환했습니다.`,
+        upstreamMessage(payload) ?? `계약서 분석 서비스가 HTTP ${response.status} 오류를 반환했습니다.`,
         payload.reason === "not_a_contract" ? 422 : 502,
         true,
       );

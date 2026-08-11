@@ -2384,6 +2384,23 @@ summary:focus-visible {
   font-size: 0.72rem;
 }
 
+.comparison-summary .rag-status {
+  border: 1px solid #cdc9ef;
+  border-radius: 999px;
+  color: #4d488b;
+  display: inline-flex;
+  font-size: 0.68rem;
+  justify-self: start;
+  padding: 4px 8px;
+}
+
+.comparison-summary .rag-status-no_match,
+.comparison-summary .rag-status-unavailable {
+  background: #fff8e9;
+  border-color: #e5c97f;
+  color: #725714;
+}
+
 .provider-answer-grid {
   display: grid;
   gap: 14px;
