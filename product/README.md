@@ -168,6 +168,17 @@ DB·ML은 사업장 검색 화면에서 실제 회사명을 검색한 뒤 상세
 않습니다. DB에는 연결되지만 선택한 사업장의 최신 공개 판정이 없으면 값을 추정하지 않고 `정보 부족`으로
 표시합니다.
 
+근로감독관 시연 화면은 `http://서버주소:3000/inspector`에서 엽니다. 최신 배치 요약과 감독관 위험큐가
+표시되고, 큐 행 또는 사업장 검색 결과를 선택하면 모델 원점수·전체 상대 위험등급·큐 내부 점검 순서·
+실제 SHAP 사유·G1~G6 지표를 확인할 수 있습니다. 모델 원점수는 확률이 아니며, 정보 부족으로 채점되지
+않은 값은 0이 아니라 `채점 불가`로 표시됩니다. 산업안전 공표 우선순위는 임금체불 점수와 합치지 않고
+별도 참고 카드에 표시합니다.
+
+상세 화면의 `AI 점검 보조 열기`는 `/inspector/chat`으로 이동합니다. 감독관 챗봇도 Upstage와 SKT에
+같은 질문·내부 컨텍스트·RAG 근거를 병렬 전달하지만, 전송 전 확인란을 직접 선택해야 합니다. 이때
+사업장명·지역·업종·모델 원점수·등급·순위·저장된 SHAP 사유가 외부 모델에 전달되며, 마스킹 사업자번호와
+내부 식별키는 전달하지 않습니다. 시연 서버에서는 위의 팀 전용 Basic 인증을 반드시 설정하세요.
+
 노동 상담 화면에서는 다음처럼 구체적인 법률 질문을 입력해 RAG를 확인합니다.
 
 ```text
@@ -266,6 +277,8 @@ API 키와 숨은 시스템 프롬프트는 브라우저로 전송하지 않습�
 - `GET /api/companies/{company_id}/risk`
 - `POST /api/chat`
 - `POST /api/contracts/review`
+- `GET /api/inspector/overview` · `GET /api/inspector/companies/*` (팀 시연용 내부 조회)
+- `POST /api/inspector/chat` (명시적 외부 컨텍스트 전송 확인 필요)
 
 상세 요청·응답 형식과 정책은 [API 계약](docs/api-contract.md), [서비스 정책](docs/service-policy.md)을 참고하세요.
 
@@ -278,6 +291,7 @@ API 키와 숨은 시스템 프롬프트는 브라우저로 전송하지 않습�
 - `DualLlmChatProvider.ts`: Upstage·SKT 실제 병렬 상담 및 가드레일
 - `HttpRagRetriever.ts`: 제품 내부 RAG 검색 서비스 연결
 - `RealContractReviewProvider.ts`: 계약서 분석
+- `inspectorService.ts`: 감독관 위험큐·사업장 내부 지표 읽기 및 감독관용 듀얼 LLM 경계
 
 상담 키는 기본적으로 `/data/shared-SeD/api_key.env`에서 서버 런타임에만 읽습니다. 이 파일을 프로젝트로 복사하지 않으며 API 키나 원본 계약서는 Git에 저장하지 않습니다. 실제 DB/ML 어댑터는 `.env.local`에서 `COMPANY_DATA_MODE=real`, 계약서 분석은 `CONTRACT_DATA_MODE=real`로 독립 전환하며 자동 Mock fallback은 기본적으로 꺼져 있습니다.
 

@@ -18,6 +18,7 @@ export function SiteFooter() {
           <Link href="/chat">노동 상담</Link>
           <Link href="/contracts">계약서 확인</Link>
           <Link href="/community">커뮤니티</Link>
+          <Link href="/inspector">근로감독관 전용</Link>
         </nav>
         <p className="footer-note">
           본 서비스는 회사의 안전·위법 여부나 입사 결정을 확정하지 않습니다. 현재 사업장 데이터 모드: {dataMode === "real" ? "읽기 전용 DB" : "명시된 데모 데이터"}.
