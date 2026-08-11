@@ -32,8 +32,17 @@ type CardProps =
 
 export function RiskInformationCard(props: CardProps) {
   const isWage = props.kind === "wage";
-  const title = isWage ? "임금 지급 관련 정보" : "지역·업종 산업재해 신호";
-  const kicker = isWage ? "사업장 단위 확인 정보" : "개별 사업장 판정 아님";
+  const validatedFirmSafety = !isWage && props.data.scope === "validated_firm_context";
+  const title = isWage
+    ? "임금 지급 관련 정보"
+    : validatedFirmSafety
+      ? "산업재해 확인 우선순위 신호"
+      : "지역·업종 산업재해 신호";
+  const kicker = isWage
+    ? "사업장 단위 확인 정보"
+    : validatedFirmSafety
+      ? "검증된 사업장 연결 · 사고확률 아님"
+      : "개별 사업장 판정 아님";
   const question = isWage ? "왜 임금 관련 추가 확인이 필요한가요?" : "산업재해 정보는 무엇을 확인해야 하나요?";
   const unknown = props.data.level === "unknown";
 
@@ -53,7 +62,7 @@ export function RiskInformationCard(props: CardProps) {
         <div className="scope-strip">
           <strong>분석 범위</strong>
           <span>
-            {props.data.region ?? "지역 정보 없음"} · {props.data.industry ?? "업종 정보 없음"}
+            {validatedFirmSafety ? "검증된 사업장 연결" : "지역·업종 맥락"} · {props.data.region ?? "지역 정보 없음"} · {props.data.industry ?? "업종 정보 없음"}
           </span>
         </div>
       ) : null}

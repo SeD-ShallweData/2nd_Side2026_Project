@@ -51,7 +51,7 @@ export function LandingHero() {
                 <span>고용 변동을 확인하세요</span>
               </div>
               <div className="demo-signal demo-signal-warn">
-                <small>지역·업종 산재 신호</small>
+                <small>산업안전 확인 신호</small>
                 <strong>우선 확인 필요</strong>
                 <span>현장 안전조치를 물어보세요</span>
               </div>

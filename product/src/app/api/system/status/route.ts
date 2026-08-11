@@ -6,7 +6,7 @@ import {
   isMockFallbackEnabled,
 } from "@/config/dataMode";
 import { getLlmProviderConfigs } from "@/server/llmConfig";
-import { isDatabaseConfigured } from "@/server/postgres";
+import { isDatabaseConfigured, isDatabaseReady } from "@/server/postgres";
 
 type IntegrationStatus = "ready" | "configured_unreachable" | "unavailable";
 
@@ -28,7 +28,8 @@ async function probe(
 }
 
 export async function GET(): Promise<NextResponse> {
-  const [rag, contractAnalysis] = await Promise.all([
+  const [databaseReady, rag, contractAnalysis] = await Promise.all([
+    isDatabaseReady(),
     probe(process.env.RAG_API_URL, (payload) => {
       if (typeof payload !== "object" || payload === null) return false;
       const health = payload as { ok?: unknown; database_exists?: unknown; loaded?: unknown };
@@ -54,7 +55,7 @@ export async function GET(): Promise<NextResponse> {
     },
     mock_fallback_enabled: isMockFallbackEnabled(),
     integrations: {
-      database: isDatabaseConfigured() ? "configured" : "unavailable",
+      database: !isDatabaseConfigured() ? "unavailable" : databaseReady ? "ready" : "configured_unreachable",
       rag,
       contract_analysis: contractAnalysis,
       dual_llm: llmConfigs.every((config) => Boolean(config.apiKey)) ? "ready" : "unavailable",

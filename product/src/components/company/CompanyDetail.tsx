@@ -103,7 +103,7 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
               <RiskInformationCard
                 kind="safety"
                 data={risk.safety_context}
-                dataAsOf={risk.data_as_of}
+                dataAsOf={risk.safety_context.target_end ?? risk.data_as_of}
                 sources={risk.sources.filter((source) => source.name.includes("산업재해"))}
                 onAsk={ask}
               />
@@ -111,8 +111,8 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
             <LimitationNotice>
               <strong>결과를 하나의 점수로 합치지 않습니다.</strong>
               <p>
-                임금 정보는 사업장 단위, 산업재해 정보는 지역·업종 단위입니다. 두 결과 모두 입사나 안전 여부를
-                확정하지 않습니다.
+                임금 공개 판정과 산업재해 공표 우선순위는 서로 다른 모델 결과입니다. 산업재해 신호는 검증된
+                사업장 연결을 거쳤더라도 사고 확률이나 안전 판정이 아니며, 두 결과 모두 입사 여부를 확정하지 않습니다.
               </p>
             </LimitationNotice>
 
