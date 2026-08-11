@@ -238,7 +238,12 @@ interface ContractReviewProvider {
 - `data_as_of`, `generated_at`, `valid_until`, 모델·데이터 버전을 보존한다.
 - 운영 PostgreSQL의 `firms`, `batches`, `scored_active`, `safe_recommendation`과 허용된
   `industrial_safety.v_llm_firm_safety_context`만 읽는다.
-- 구직자 응답은 `safe_recommendation.판정`을 사용하고, 감독관 전용 `risk_tier`·`risk_full`·SHAP는 노출하지 않는다.
+- 구직자 응답은 `safe_recommendation.판정`을 사용하고, 공개 `/api/companies/*`에는 감독관 전용
+  `risk_tier`·`risk_full`·SHAP를 노출하지 않는다.
+- 팀 시연용 `/api/inspector/*`만 최신 `inspector_queue`와 `scored_active`의 내부 필드를 읽는다.
+  `risk_full`은 상대 모델 원점수로 표시하고 확률화하지 않으며, 시연 서버에서는 Basic 인증을 필수로 한다.
+- 감독관 챗봇이 사업장 내부 컨텍스트를 외부 LLM에 전달하려면 화면과 API 양쪽에서 명시적 확인이
+  필요하다. 외부 컨텍스트에서는 `firm_id`와 마스킹 사업자번호를 제거한다.
 - DB에 없는 주소·규모·미확정 기준월은 `null`로 유지한다.
 
 ### 프롬프트·LLM 서버

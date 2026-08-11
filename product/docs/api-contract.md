@@ -205,14 +205,34 @@ interface ContractReviewResponse {
 DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`로 표시한다. DB의 `ready`는
 읽기 전용 연결에서 `SELECT 1`이 성공했다는 뜻이다. 이 상태 API는 비밀값이나 원문 데이터를 반환하지 않는다.
 
-## 8. 아직 공개하지 않는 API
+## 8. 근로감독관 시연용 내부 API
 
-- 근로감독관 queue: 인증·권한 분리가 완성되기 전에는 공개 route를 만들지 않는다. 이후
-  `inspector_queue.rank`, `queue_priority`, 실제 `reasons`만 사용하며 `risk_full`을 확률로 표현하지 않는다.
+근로감독관 화면은 `/inspector`, AI 점검 보조는 `/inspector/chat`이다. 현재는 역할 기반 계정 시스템이
+아닌 팀 시연용 프로토타입이므로 외부 공개 API가 아니다. 시연 서버에서는 `DEMO_BASIC_AUTH_USER`와
+`DEMO_BASIC_AUTH_PASSWORD`를 반드시 설정해 페이지와 `/api/inspector/*` 전체를 Basic 인증으로 보호한다.
+
+- `GET /api/inspector/overview`: 최신 배치 요약, 큐 우선순위별 건수, 최상위 큐를 반환한다.
+- `GET /api/inspector/companies/search?q=...`: 실제 `firms`에서 동명 사업장을 검색한다.
+- `GET /api/inspector/companies/{companyId}`: 최신 `risk_tier`, `risk_full`, 큐 순위·우선순위, 실제
+  `reasons`, G1~G6 지표와 별도 산업안전 공표 구간을 반환한다.
+- `POST /api/inspector/chat`: 선택 사업장 내부 컨텍스트와 노동법 RAG를 두 LLM에 동일하게 전달한다.
+
+감독관 응답에서도 `risk_full`은 **모델 원점수**로만 표시하고 확률이나 백분율로 바꾸지 않는다.
+`risk_full IS NULL`은 `채점 불가`이며 0점이 아니다. `risk_tier`는 전체 채점 사업장 상대 등급,
+`queue_priority`는 상위 3,000곳 내부 점검 순서이므로 서로 대신하지 않는다. `reasons`는 DB에 실제
+저장된 큐 행에만 제공한다. 산업안전 순위는 임금체불 점수와 결합하지 않는다.
+
+내부 챗봇은 외부 모델 전송 전에 화면에서 명시적 확인을 요구한다. 확인 대상은 사업장명·지역·업종,
+모델 원점수·등급·순위·실제 SHAP 사유이며, `firm_id`와 마스킹 사업자번호는 LLM 컨텍스트에서 제외한다.
+API도 `confirm_external_context: true`가 없으면 호출을 거부한다. 응답은 조사·위법 판단·행정처분을
+대신하지 않는다.
+
+## 9. 아직 공개하지 않는 API
+
 - 커뮤니티 쓰기: 팀원 구현과 인증 계약이 합쳐진 뒤 확정한다. 읽기 계층은 신원이 제거된 `v_posts`,
   `v_comments`, `v_reviews`만 사용한다.
 
-## 9. HTTP 상태
+## 10. HTTP 상태
 
 | 상태 | 의미 |
 |---|---|
