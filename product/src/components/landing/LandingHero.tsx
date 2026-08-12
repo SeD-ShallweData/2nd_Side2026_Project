@@ -30,8 +30,8 @@ export function LandingHero() {
               <b>OO</b><div><strong>OO건설</strong><span>인천광역시 · 건설업</span></div>
             </div>
             <div className="refresh-demo-cards">
-              <article className="is-review"><small>사업장 단위</small><strong>임금 지급 관련 정보</strong><em>추가 확인 권장</em><p>공개된 항목과 확인 질문을 살펴보세요.</p></article>
-              <article className="is-watch"><small>지역·업종 맥락</small><strong>산업재해 확인 신호</strong><em>우선 확인 필요</em><p>현장 안전조치와 교육 여부를 물어보세요.</p></article>
+              <article className="is-watch"><small>사업장 단위</small><strong>임금 지급 관련 정보</strong><em>추가 확인 권장</em><p>공개된 항목과 확인 질문을 살펴보세요.</p></article>
+              <article className="is-review"><small>지역·업종 맥락</small><strong>산업재해 확인 신호</strong><em>우선 확인 필요</em><p>현장 안전조치와 교육 여부를 물어보세요.</p></article>
             </div>
           </div>
           <span className="refresh-float-chip refresh-chip-top">공개 데이터 기준일 표시</span>

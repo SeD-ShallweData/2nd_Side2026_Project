@@ -2,9 +2,11 @@ export type SignalLevel = "normal" | "watch" | "review" | "unknown";
 export type Confidence = "sufficient" | "limited" | "unavailable";
 export type Freshness = "current" | "expired" | "unknown";
 export type SignalAvailability = "ready" | "no_data" | "unavailable";
+export type SourceCategory = "wage" | "safety" | "labor_law";
 
 export interface SourceReference {
   name: string;
+  category?: SourceCategory;
   citation?: string;
   organization?: string;
   as_of?: string;

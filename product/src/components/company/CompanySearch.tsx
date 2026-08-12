@@ -7,7 +7,7 @@ import { CompanySearchResultCard } from "@/components/company/CompanySearchResul
 import type { CompanySearchResponse } from "@/domain/company";
 import { readApiResponse } from "@/utils/clientApi";
 
-const DEMO_QUERIES = ["OO건설", "한빛", "없는회사", "오류확인사업장", "error"] as const;
+const RECOMMENDED_QUERIES = ["건설", "한빛", "테크"] as const;
 
 export function CompanySearch() {
   const router = useRouter();
@@ -44,7 +44,7 @@ export function CompanySearch() {
     void search(query);
   }
 
-  function applyDemoQuery(value: string) {
+  function applyRecommendedQuery(value: string) {
     setQuery(value);
     void search(value);
   }
@@ -61,7 +61,7 @@ export function CompanySearch() {
             id={inputId}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="예: OO건설, 한빛테크"
+            placeholder="예: 건설, 한빛테크"
             aria-describedby={validation ? `${inputId}-error` : `${inputId}-help`}
             aria-invalid={Boolean(validation)}
             autoComplete="off"
@@ -81,10 +81,10 @@ export function CompanySearch() {
         )}
       </form>
 
-      <div className="demo-query-row" aria-label="시연용 검색어">
-        <span>시연 검색어</span>
-        {DEMO_QUERIES.map((value) => (
-          <button key={value} type="button" onClick={() => applyDemoQuery(value)} disabled={loading}>
+      <div className="demo-query-row" aria-label="추천 검색어">
+        <span>추천 검색어</span>
+        {RECOMMENDED_QUERIES.map((value) => (
+          <button key={value} type="button" onClick={() => applyRecommendedQuery(value)} disabled={loading}>
             {value}
           </button>
         ))}
