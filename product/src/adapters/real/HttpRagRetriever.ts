@@ -44,6 +44,7 @@ function parseDocument(value: unknown): RagDocument | null {
     distance: typeof item.distance === "number" && Number.isFinite(item.distance) ? item.distance : null,
     source: {
       name,
+      category: "labor_law",
       citation,
       organization: optionalString(item.source?.organization),
       document_id: optionalString(item.source?.document_id),

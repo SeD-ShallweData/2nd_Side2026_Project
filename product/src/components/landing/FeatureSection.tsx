@@ -27,13 +27,13 @@ export function RiskPreviewSection() {
       <div className="shell">
         <div className="refresh-section-row"><div><span className="eyebrow">사업장 확인</span><h2 id="risk-preview-title">두 가지 위험카드로 나눠 확인하세요</h2><p>사업장 단위 임금 정보와 지역·업종 단위 산업안전 정보를 섞지 않습니다.</p></div><Link href="/companies" className="button button-outline">사업장 검색하기 →</Link></div>
         <div className="refresh-risk-preview" aria-label="위험카드 화면 예시">
-          <article className="refresh-risk-card is-review">
+          <article className="refresh-risk-card is-watch">
             <header><div><small>사업장 단위 확인 정보</small><h3>임금 지급 관련 정보</h3></div><strong>추가 확인 권장</strong></header>
             <p className="refresh-status-copy">확인할 공개 항목이 있습니다. 아래 세부 지표와 공식 명단 결과를 함께 확인하세요.</p>
             <dl>{WAGE_ITEMS.map((item) => <div key={item}><dt>{item}</dt><dd>확인할 수 없음</dd></div>)}</dl>
             <small className="refresh-preview-note">화면 예시 · 연결되지 않은 값은 추정하지 않습니다.</small>
           </article>
-          <article className="refresh-risk-card is-watch">
+          <article className="refresh-risk-card is-review">
             <header><div><small>개별 사업장 판정 아님</small><h3>지역·업종 산업재해 신호</h3></div><strong>우선 확인 필요</strong></header>
             <p className="refresh-status-copy">이 신호는 해당 회사의 사고확률이 아닙니다. 현장별 안전조치를 직접 확인하세요.</p>
             <div className="refresh-context-box"><b>분석 범위</b><span>지역·업종 맥락 · 인천광역시 · 건설업</span></div>
