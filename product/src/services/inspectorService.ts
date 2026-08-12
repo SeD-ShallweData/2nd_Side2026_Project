@@ -20,6 +20,7 @@ import {
   scanRules,
 } from "@/server/guardrails";
 import { getLlmProviderConfigs, getLlmTimeoutMs } from "@/server/llmConfig";
+import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
 import { loadPrompt, withRuntimeContext } from "@/server/promptLoader";
 import { queryReadOnly } from "@/server/postgres";
 import { retrieveLaborLawContext } from "@/services/ragService";
@@ -152,8 +153,7 @@ export async function getInspectorOverview(limit = 8): Promise<InspectorOverview
             n_queue,
             n_safe
        FROM public.batches
-      ORDER BY as_of_date DESC NULLS LAST, ingested_at DESC, id DESC
-      LIMIT 1`,
+      ${LATEST_BATCH_ORDER_SQL}`,
   );
   const batch = batches[0];
   if (!batch) {
@@ -279,8 +279,7 @@ export async function getInspectorCompanyDetail(companyId: string): Promise<Insp
     `WITH latest_batch AS (
        SELECT id, as_of_date, target_month, model_version, ingested_at
          FROM public.batches
-        ORDER BY as_of_date DESC NULLS LAST, ingested_at DESC, id DESC
-        LIMIT 1
+        ${LATEST_BATCH_ORDER_SQL}
      )
      SELECT f.firm_id,
             f.name,

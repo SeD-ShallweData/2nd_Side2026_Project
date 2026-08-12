@@ -108,6 +108,33 @@ describe("법령 인용 검증", () => {
     expect(citationKeys("산업안전보건법 제5조").size).toBe(0);
   });
 
+  it("계약 규칙 엔진이 사용하는 기간제법·최저임금법 시행령도 인용으로 검증한다", () => {
+    expect(
+      citationKeys(
+        "기간제 및 단시간근로자 보호 등에 관한 법률 제4조와 최저임금법 시행령 제3조",
+      ).size,
+    ).toBe(2);
+  });
+
+  it("계약 규칙의 축약 법률명은 정식명과 같은 citation key로 정규화한다", () => {
+    expect(citationKeys("근기법 제17조")).toEqual(citationKeys("근로기준법 제17조"));
+    expect(citationKeys("퇴직급여법 제4조")).toEqual(
+      citationKeys("근로자퇴직급여 보장법 제4조"),
+    );
+    expect(citationKeys("기간제법 제4조")).toEqual(
+      citationKeys("기간제 및 단시간근로자 보호 등에 관한 법률 제4조"),
+    );
+    expect(citationKeys("남녀고용평등법 제11조")).toEqual(
+      citationKeys("남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률 제11조"),
+    );
+  });
+
+  it("축약 법률명의 확인되지 않은 조문도 우회하지 못한다", () => {
+    expect(
+      hasUnverifiedCitation("근기법 제999조", "matched", ["근로기준법 제17조"]),
+    ).toBe(true);
+  });
+
   it("검색이 실패했는데 조문을 인용하면 걸린다", () => {
     expect(hasUnverifiedCitation("근로기준법 제36조에 따르면", "no_match")).toBe(true);
     expect(hasUnverifiedCitation("근로기준법 제36조에 따르면", "unavailable")).toBe(true);

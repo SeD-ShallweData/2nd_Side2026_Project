@@ -57,6 +57,13 @@
       "when": 1786752000000,
       "tag": "0007_current_batch_views",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786838400000,
+      "tag": "0008_deterministic_current_batch",
+      "breakpoints": true
     }
   ]
 }

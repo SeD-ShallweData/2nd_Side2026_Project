@@ -132,7 +132,7 @@ interface CompanyRiskResponse {
 `normal`은 안전 인증이 아니다. 산업안전 priority band는 사고 확률이 아니라 현장 확인 순서를 돕는
 공표 구간으로만 설명한다. 공개 API에는 `risk_full`, percentile, rank, SHAP를 포함하지 않는다.
 
-## 5. 공식 노동법 검색과 듀얼 LLM
+## 5. 노동 상담 실행 모드와 도구 계약
 
 ### 공개: `POST /api/chat`
 
@@ -147,8 +147,74 @@ interface ChatRequest {
 ```
 
 Next 서버는 회사 컨텍스트를 `company_id`로 다시 조회한다. 클라이언트가 보낸 위험 설명은 신뢰하지 않는다.
-후속 질문은 서버가 CSH 재작성 규칙으로 독립 질문으로 바꾼 뒤 HB 검색 서비스에서 근거를 **한 번만**
-검색하고 같은 문서 배열을 두 LLM에 전달한다. 클라이언트는 `resolved_query`를 지정할 수 없다.
+클라이언트는 `resolved_query`를 지정할 수 없다. `CHAT_EXECUTION_MODE`에 따라 응답 wrapper는 유지하면서
+내부 실행만 달라진다.
+
+- `dual_api`(기본): 후속 질문을 독립 질문으로 바꾸고 HB 검색 근거를 한 번 조회해 Upstage와 SKT에
+  동일하게 병렬 전달한다. 결과는 2개다.
+- `openai_responses`: OpenAI Responses가 허용된 function tool만 필요에 따라 순차 호출한다. 결과는
+  `provider=openai` 한 개다. Upstage/SKT 장애 우회는 하지 않고 실패 시 정책 baseline으로 대체한다.
+
+Responses 도구 allowlist와 입력은 다음과 같다. 모든 schema는 strict mode, 모든 필드 required,
+`additionalProperties=false`이며 같은 조건을 서버에서 다시 검사한다.
+
+```ts
+search_company({ query: string, limit: number | null })
+get_company_risk({ company_id: string })
+retrieve_labor_law({ query: string })
+review_contract({ document_ref: "current_upload" })
+```
+
+도구 출력은 임의 문자열이 아니라 기존 서비스 DTO를 공통 성공·실패 envelope에 담는다.
+
+```ts
+interface ToolOutputMap {
+  search_company: CompanySearchResponse;
+  get_company_risk: CompanyRiskResult;
+  retrieve_labor_law: RagRetrievalResult;
+  review_contract: ContractReviewResult;
+}
+
+type ToolExecutionResult<K extends keyof ToolOutputMap> =
+  | { ok: true; data: ToolOutputMap[K] }
+  | {
+      ok: false;
+      error: {
+        code: string;
+        message: string;
+        retryable: boolean;
+        details?: Array<{ field?: string; reason: string }>;
+      };
+    };
+```
+
+`get_company_risk`는 같은 요청의 `ChatRequest.company_id`와 정확히 일치할 때만 실행한다. 검색 결과가 여러
+후보일 수 있으므로 `search_company.items[0]`을 자동 선택하지 않으며, 사용자가 주소·업종을 보고 선택한 다음
+요청에서 조회한다.
+
+모델 출력의 `function_call.call_id`와 같은 `function_call_output.call_id`를 다음 Responses 요청에 전달한다.
+reasoning을 포함한 이전 `response.output` 전체도 보존한다. 미등록 도구는 실행하지 않고
+`UNSUPPORTED_TOOL`, 잘못된 인자는 `INVALID_TOOL_ARGUMENTS` JSON 결과로 모델에 되돌린다. 호출·라운드·
+전체 시간 한도를 넘으면 반복을 종료한다.
+도구 결과가 `ok=false`이거나 전달 크기 한도를 넘으면, 이후 모델이 성공했다고 주장해도 해당 문구를 사용자
+응답으로 채택하지 않고 정책 baseline과 구조화된 오류로 대체한다.
+
+계약서 도구 상담은 같은 `/api/chat`의 `multipart/form-data` 입력을 사용한다.
+
+```text
+file=<PDF|PNG|JPEG, 최대 10MiB>  # 필수
+message=<1..2000자>              # 생략 시 계약 검토 기본 질문
+conversation_id=<선택>
+company_id=<선택>
+chat_mode=contract
+recent_messages=<JSON 배열 문자열>
+```
+
+파일은 요청 범위 서버 컨텍스트로만 주입된다. 모델에는 고정 참조값 `current_upload`만 보이며 파일 경로,
+base64, 원문을 function arguments로 받지 않는다. 업로드가 없는 JSON 채팅에는 `review_contract` 정의 자체를
+보내지 않는다. 업로드가 있으면 첫 Responses 라운드는 `review_contract`를 강제하고 이후 라운드만 `auto`로
+돌린다. 성공한 finding의 `legal_basis`는 그 finding 설명에 한해 검증된 인용으로 인정하며 다른 조문으로
+확장하지 않는다. multipart 도구 상담은 `openai_responses` 모드에서만 허용한다.
 
 ### 내부: `POST {RAG_API_URL}/api/retrieve`
 
@@ -168,9 +234,10 @@ interface RagRetrieveResponse {
 }
 ```
 
-`/api/chat` 응답은 Upstage와 SKT 결과를 함께 반환한다. 각 결과에는 답변, 동일한 공식 출처, 다음 행동,
-한계, 지연시간, token 사용량, 종료 사유, 가드레일 상태가 포함된다. 성능 지표는 기능에서 제거하지 않되
-일반 화면에서는 접힌 상세정보로 제공한다.
+`/api/chat` 응답은 두 모드 모두 기존 `ChatComparisonResponse` wrapper를 유지한다. 각 결과에는 답변,
+도구에서 실제 확인한 공식 출처, 다음 행동, 한계, 지연시간, token 사용량, 종료 사유, 가드레일 상태가
+포함된다. Responses 결과 trace에는 비민감한 response ID, 도구명, 호출·라운드 수만 추가하며 도구 인자·
+DB 결과·계약서 원문은 남기지 않는다.
 
 RAG `no_match`는 오류가 아니다. `reason=out_of_scope`이면 `topic`을 함께 표시하고, 그 밖에는 직접 관련 근거가 없음을 표시한다. 검색 근거에는 citation·문서 식별자·확인된 원문 URL을 노출하며, 출처를 만들지 않고 공식 확인 창구를 안내한다. 한 LLM 실패는
 다른 LLM 결과를 취소하지 않는다. 즉각적 사고·부상 표현은 RAG와 LLM을 기다리지 않고 공통 긴급안내를 반환한다.
@@ -208,10 +275,13 @@ interface ContractReviewResponse {
 ### `GET /api/system/status`
 
 비밀값 없이 계약 버전, 전체 및 기능별 `mock | real`과 통합 상태만 반환한다.
-DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`로 표시한다. DB의 `ready`는
+DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`로 표시한다. 응답에는
+`chat_execution_mode`, 기존 `dual_llm`, 구성 기반 `openai_responses`, 현재 선택 경로인 `active_chat_llm`이
+함께 들어간다. DB의 `ready`는
 읽기 전용 연결에서 `SELECT 1`이 성공했다는 뜻이다. LLM의 `ready`는 키 문자열 존재 여부가 아니라 두
-공급자에 대한 최소 실제 요청이 모두 성공했다는 뜻이며 결과는 60초 캐시한다. 이 상태 API는 비밀값이나
-질문·답변 원문을 반환하지 않는다.
+공급자에 대한 최소 실제 요청이 모두 성공했다는 뜻이며 결과는 60초 캐시한다. OpenAI Responses의
+`ready`는 상태 조회 비용 없이 키·모델·URL 구성이 존재한다는 뜻이며 실제 credential 성공은 smoke test에서
+확인한다. 이 상태 API는 비밀값이나 질문·답변 원문을 반환하지 않는다.
 
 ## 8. 근로감독관 시연용 내부 API
 
