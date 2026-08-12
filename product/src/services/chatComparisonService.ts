@@ -14,7 +14,14 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
   const configs = getLlmProviderConfigs();
 
   if (policyBaseline.answer_type === "emergency_guidance") {
-    const ragRetrieval = { query: parsedRequest.message, status: "unavailable" as const, threshold: null, documents: [] };
+    const ragRetrieval = {
+      query: parsedRequest.message,
+      status: "unavailable" as const,
+      reason: "policy_short_circuit",
+      topic: null,
+      threshold: null,
+      documents: [],
+    };
     const now = new Date().toISOString();
     return {
       comparison_id: `cmp_${crypto.randomUUID()}`,
@@ -64,6 +71,8 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
           guardrail_hits: ["EMERGENCY_PRIORITY"],
           upstream_request_id: null,
           rag_status: ragRetrieval.status,
+          rag_reason: ragRetrieval.reason ?? null,
+          rag_topic: ragRetrieval.topic ?? null,
           retrieved_document_count: ragRetrieval.documents.length,
         },
       })),
@@ -82,7 +91,9 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
     policyBaseline.sources = [];
     policyBaseline.limitations = [
       ...policyBaseline.limitations,
-      "연결된 공식 노동법 검색 범위에서 직접 관련된 근거를 찾지 못했습니다.",
+      ragRetrieval.reason === "out_of_scope" && ragRetrieval.topic
+        ? `현재 공식 근거 검색 범위에는 ${ragRetrieval.topic} 자료가 수록되어 있지 않습니다.`
+        : "연결된 공식 노동법 검색 범위에서 직접 관련된 근거를 찾지 못했습니다.",
     ];
   } else {
     policyBaseline.sources = [];

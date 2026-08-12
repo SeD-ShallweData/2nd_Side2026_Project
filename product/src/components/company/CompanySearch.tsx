@@ -18,7 +18,7 @@ export function CompanySearch() {
   const [validation, setValidation] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function search(nextQuery: string) {
+  async function search(nextQuery: string, page = 1) {
     const trimmed = nextQuery.trim();
     if (trimmed.length < 1) {
       setValidation("사업장명을 한 글자 이상 입력해 주세요.");
@@ -29,7 +29,7 @@ export function CompanySearch() {
     setError(null);
     setLoading(true);
     try {
-      const response = await fetch(`/api/companies/search?q=${encodeURIComponent(trimmed)}`);
+      const response = await fetch(`/api/companies/search?q=${encodeURIComponent(trimmed)}&limit=10&page=${page}`);
       setResult(await readApiResponse<CompanySearchResponse>(response));
     } catch (caught) {
       setResult(null);
@@ -76,7 +76,7 @@ export function CompanySearch() {
           </p>
         ) : (
           <p className="field-help" id={`${inputId}-help`}>
-            이름이 같은 사업장이 있을 수 있으니 주소와 업종을 꼭 확인하세요.
+            이름이 같은 사업장이 있을 수 있으니 지역과 업종을 꼭 확인하세요.
           </p>
         )}
       </form>
@@ -96,7 +96,7 @@ export function CompanySearch() {
         {!loading && !error && result?.items.length === 0 ? (
           <EmptyState
             title="검색 결과가 없습니다"
-            description="법인명이나 사업장명의 띄어쓰기를 바꾸거나 주소 단서를 함께 확인해 보세요."
+            description="법인명이나 사업장명의 띄어쓰기를 바꾸고, 검색된 지역·업종 단서를 함께 확인해 보세요."
           />
         ) : null}
         {!loading && !error && result && result.items.length > 0 ? (
@@ -119,6 +119,27 @@ export function CompanySearch() {
                 />
               ))}
             </div>
+            {result.total_pages > 1 ? (
+              <nav className="search-pagination" aria-label="사업장 검색 결과 페이지">
+                <button
+                  type="button"
+                  className="button button-outline"
+                  disabled={loading || result.page <= 1}
+                  onClick={() => void search(result.query, result.page - 1)}
+                >
+                  ← 이전
+                </button>
+                <span><strong>{result.page}</strong> / {result.total_pages} 페이지</span>
+                <button
+                  type="button"
+                  className="button button-outline"
+                  disabled={loading || !result.has_more}
+                  onClick={() => void search(result.query, result.page + 1)}
+                >
+                  다음 →
+                </button>
+              </nav>
+            ) : null}
           </>
         ) : null}
         {!loading && !error && result === null ? (
@@ -127,7 +148,7 @@ export function CompanySearch() {
               ⌕
             </div>
             <h2>확인할 사업장을 검색해 보세요</h2>
-            <p>회사명이 같을 수 있으므로 주소와 업종을 함께 확인해 정확한 사업장을 선택하세요.</p>
+            <p>회사명이 같을 수 있으므로 지역과 업종을 함께 확인해 정확한 사업장을 선택하세요.</p>
           </div>
         ) : null}
       </section>

@@ -13,7 +13,7 @@ import { containsAny, normalizeSearchText } from "@/utils/text";
 const SEARCH_ACTION: SuggestedAction = {
   code: "SEARCH_COMPANY",
   label: "사업장 검색하기",
-  description: "주소와 업종을 확인해 정확한 사업장을 선택하세요.",
+  description: "지역과 업종을 확인해 정확한 사업장을 선택하세요.",
   priority: "now",
 };
 
@@ -26,8 +26,10 @@ const CALL_1350: SuggestedAction = {
 
 const WAGE_GUIDE_SOURCE: SourceReference = {
   name: "임금체불 진정 및 상담 안내",
+  citation: "고용노동부 노동포털 「체불임금 해결 방법」",
   organization: "고용노동부",
-  document_id: "MOEL_WAGE_GUIDE",
+  document_id: "LABOR-PORTAL-WAGE-COMPLAINT",
+  url: "https://labor.moel.go.kr/minwonSysInfo/wagesolway.do",
 };
 
 const SAFETY_GUIDE_SOURCE: SourceReference = {
@@ -104,7 +106,7 @@ export class PolicyChatProvider implements ChatProvider {
       const otherCompany = await findOtherReferencedCompany(message, company.company_id, this.companies);
       if (otherCompany) {
         return {
-          answer: `현재 상담에는 ${company.company_name}만 연결되어 있습니다. ${otherCompany.company_name} 정보를 확인하려면 주소와 업종을 보고 해당 사업장을 다시 선택해 주세요.`,
+          answer: `현재 상담에는 ${company.company_name}만 연결되어 있습니다. ${otherCompany.company_name} 정보를 확인하려면 지역과 업종을 보고 해당 사업장을 다시 선택해 주세요.`,
           answer_type: "clarification",
           sources: [],
           suggested_actions: [SEARCH_ACTION],
@@ -199,12 +201,12 @@ export class PolicyChatProvider implements ChatProvider {
 
     if (containsAny(message, ["체불할 거", "체불할거", "체불할 것", "임금이 밀릴", "월급이 밀릴"])) {
       return {
-        answer: `${company.company_name}에서 향후 임금체불이 발생할지는 현재 정보만으로 확정할 수 없습니다. ${wage.summary} 입사 전에는 근로계약서의 임금 지급일과 지급 방법, 4대보험 가입 시점을 확인하세요.`,
+        answer: `${company.company_name}에서 향후 임금체불이 발생할지는 현재 정보만으로 확정할 수 없습니다. ${wage.summary} 입사 전에는 근로계약서의 임금 지급일·지급 방법·급여 구성과 계약서 교부 여부를 확인하세요.`,
         answer_type: "company_context",
         sources: risk.sources,
         suggested_actions: [
           { code: "CHECK_PAYDAY", label: "임금 지급일 확인", priority: "now" },
-          { code: "CHECK_INSURANCE", label: "4대보험 가입 시점 확인", priority: "next" },
+          { code: "CHECK_PAY_STRUCTURE", label: "급여 구성·계약서 교부 확인", priority: "next" },
         ],
         limitations: baseLimitations,
         guardrail_status: "limited",
@@ -218,7 +220,7 @@ export class PolicyChatProvider implements ChatProvider {
           ? "산업재해 쪽은 분석 가능한 자료가 부족해 판단할 수 없습니다."
           : `산업재해 카드는 ${safety.region}·${safety.industry} 단위의 맥락을 보여주며, 현재 안내는 “${safety.summary}”입니다.`;
       return {
-        answer: `${company.company_name}이 안전한지 또는 입사해도 되는지를 이 정보만으로 확정할 수는 없습니다. ${wage.summary} ${safetyDetail}\n\n근로계약서의 임금 지급일과 4대보험 가입 시점, 실제 현장의 안전교육·보호구·사고 보고 절차를 직접 확인한 뒤 다른 채용 조건과 함께 판단하세요.`,
+        answer: `${company.company_name}이 안전한지 또는 입사해도 되는지를 이 정보만으로 확정할 수는 없습니다. ${wage.summary} ${safetyDetail}\n\n근로계약서의 임금 지급일·급여 구성·소정근로시간과 실제 현장의 안전교육·보호구·사고 보고 절차를 직접 확인한 뒤 다른 채용 조건과 함께 판단하세요.`,
         answer_type: "company_context",
         sources: risk.sources,
         suggested_actions: [
@@ -240,7 +242,7 @@ export class PolicyChatProvider implements ChatProvider {
         sources: risk.sources,
         suggested_actions: [
           { code: "CHECK_PAYDAY", label: "임금 지급일 확인", priority: "now" },
-          { code: "CHECK_INSURANCE", label: "4대보험 가입 시점 확인", priority: "next" },
+          { code: "CHECK_PAY_STRUCTURE", label: "급여 구성·근로시간 확인", priority: "next" },
           { code: "CHECK_SAFETY_PROCESS", label: "안전교육·보고 절차 확인", priority: "next" },
         ],
         limitations: baseLimitations,
@@ -252,7 +254,7 @@ export class PolicyChatProvider implements ChatProvider {
     if (containsAny(message, ["입사 전", "확인해야", "체크리스트", "무엇을 확인"])) {
       return {
         answer:
-          "입사 전에는 근로계약서에 임금 지급일, 기본급·수당 구분, 소정근로시간과 휴게시간이 적혀 있는지 확인하세요. 4대보험 가입 시점과 실제 근무지, 연장·야간·휴일근로 수당 기준도 질문하는 것이 좋습니다. 현장 업무가 있다면 안전교육, 보호구 지급, 사고 보고 절차도 함께 확인하세요.",
+          "입사 전에는 근로계약서에 임금 지급일, 기본급·수당 구분, 소정근로시간·휴게시간·근무 장소가 적혀 있고 서면으로 교부되는지 확인하세요. 연장·야간·휴일근로 수당 기준도 질문하는 것이 좋습니다. 현장 업무가 있다면 안전교육, 보호구 지급, 사고 보고 절차도 함께 확인하세요.",
         answer_type: "company_context",
         sources: risk.sources,
         suggested_actions: [
