@@ -144,13 +144,47 @@ describe("RAG 내부 계약", () => {
     expect(result).toMatchObject({ status: "unavailable", documents: [] });
   });
 
-  it("내용이나 인용이 없는 검색 항목은 버린다", async () => {
+  it("명시적인 no_match와 빈 목록만 근거 없음으로 신뢰한다", async () => {
+    const fakeFetch = (async () => new Response(JSON.stringify({
+      status: "no_match",
+      query: "직접 근거 없는 질문",
+      threshold: 0.42,
+      items: [],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("질문");
+    expect(result).toMatchObject({
+      query: "직접 근거 없는 질문",
+      status: "no_match",
+      threshold: 0.42,
+      documents: [],
+    });
+  });
+
+  it("matched인데 내용이나 인용이 없는 검색 항목은 malformed unavailable로 격리한다", async () => {
     const fakeFetch = (async () => new Response(JSON.stringify({
       status: "matched",
       items: [{ content: "", citation: "" }],
     }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
     const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("질문");
-    expect(result).toMatchObject({ status: "no_match", documents: [] });
+    expect(result).toMatchObject({ query: "질문", status: "unavailable", threshold: null, documents: [] });
+  });
+
+  it.each([
+    ["status 누락", { items: [] }],
+    ["알 수 없는 status", { status: "partial", items: [] }],
+    ["items 누락", { status: "no_match" }],
+    ["상태와 문서 불일치", {
+      status: "no_match",
+      items: [{ content: "조문", citation: "근로기준법 제43조", source: { name: "근로기준법 제43조" } }],
+    }],
+    ["잘못된 threshold", { status: "no_match", threshold: "0.42", items: [] }],
+  ])("HTTP 200이어도 %s payload는 unavailable로 처리한다", async (_label, payload) => {
+    const fakeFetch = (async () => new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+    const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("질문");
+    expect(result).toMatchObject({ query: "질문", status: "unavailable", threshold: null, documents: [] });
   });
 });
 
@@ -202,7 +236,7 @@ describe("계약서 분석 내부 계약", () => {
     expect(requestedBody?.get("file")).toBeInstanceOf(File);
     expect(result.missing_items[0]).toMatchObject({
       code: "missing_required_wage",
-      legal_basis: "근기법 제17조",
+      legal_basis: "근로기준법 제17조",
       extracted_text: "임금: 월 250만원",
     });
     expect(result.missing_items[0].description).toContain("임금 지급일을 서면으로 확인하세요.");
@@ -232,6 +266,76 @@ describe("계약서 분석 내부 계약", () => {
       code: "NOT_A_CONTRACT",
       status: 422,
       retryable: true,
+    });
+  });
+
+  it.each([
+    ["verdict 누락", {
+      ok: true,
+      review_id: "review-1",
+      filename: "contract.pdf",
+    }],
+    ["findings 누락", {
+      ok: true,
+      review_id: "review-1",
+      filename: "contract.pdf",
+      verdict: { headline: "확인 결과" },
+    }],
+    ["알 수 없는 finding level", {
+      ok: true,
+      review_id: "review-1",
+      filename: "contract.pdf",
+      verdict: {
+        headline: "확인 결과",
+        findings: [{ code: "wage", level: "critical", title: "임금", message: "확인" }],
+      },
+    }],
+    ["finding 필수 필드 누락", {
+      ok: true,
+      review_id: "review-1",
+      filename: "contract.pdf",
+      verdict: {
+        headline: "확인 결과",
+        findings: [{ code: "wage", level: "check", title: "임금" }],
+      },
+    }],
+  ])("HTTP 200 성공 응답의 %s을 공급자 schema 오류로 차단한다", async (_label, payload) => {
+    vi.stubEnv("CONTRACT_ANALYSIS_URL", "http://contract.test");
+    const fakeFetch = (async () => new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+    const file = new File(["pdf"], "contract.pdf", { type: "application/pdf" });
+
+    await expect(new RealContractReviewProvider(fakeFetch).review({ file })).rejects.toMatchObject({
+      code: "CONTRACT_ANALYSIS_INVALID_RESPONSE",
+      status: 502,
+      retryable: true,
+    });
+  });
+
+  it("판정 가능한 항목이 없는 정상 계약 분석은 빈 결과로 보존한다", async () => {
+    vi.stubEnv("CONTRACT_ANALYSIS_URL", "http://contract.test");
+    const fakeFetch = (async () => new Response(JSON.stringify({
+      ok: true,
+      review_id: "review-empty",
+      filename: "contract.pdf",
+      verdict: {
+        headline: "계약서에서 판정할 수 있는 항목을 찾지 못했습니다.",
+        findings: [],
+      },
+    }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    const file = new File(["pdf"], "contract.pdf", { type: "application/pdf" });
+
+    const result = await new RealContractReviewProvider(fakeFetch).review({ file });
+
+    expect(result).toMatchObject({
+      analysis_status: "completed",
+      review_id: "review-empty",
+      detected_items: [],
+      missing_items: [],
+      review_items: [],
+      warnings: ["계약서에서 판정할 수 있는 항목을 찾지 못했습니다."],
     });
   });
 });

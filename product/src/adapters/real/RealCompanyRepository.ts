@@ -1,4 +1,5 @@
 import type { Company, CompanyMatchType, CompanyRepository, CompanySearchResult } from "@/domain/company";
+import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
 import { queryReadOnly } from "@/server/postgres";
 
 interface FirmRow {
@@ -71,8 +72,7 @@ export class RealCompanyRepository implements CompanyRepository {
       `WITH latest_batch AS (
          SELECT as_of_date
            FROM public.batches
-          ORDER BY as_of_date DESC NULLS LAST, ingested_at DESC, id DESC
-          LIMIT 1
+          ${LATEST_BATCH_ORDER_SQL}
        )
        SELECT f.firm_id,
               f.name,

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useId, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useId, useRef, useState } from "react";
 import { DataSourceList } from "@/components/common/DataSourceList";
 import type { ChatMode, RecentMessage } from "@/domain/chat";
 import type {
   ChatComparisonResponse,
+  ConfiguredChatExecutionMode,
   LlmProviderId,
   ProviderComparisonResult,
 } from "@/domain/chatComparison";
@@ -44,6 +45,9 @@ const GUIDE_GROUPS = [
   },
 ] as const;
 
+const CONTRACT_FILE_TYPES = ["application/pdf", "image/png", "image/jpeg"];
+const MAX_CONTRACT_FILE_SIZE = 10 * 1024 * 1024;
+
 interface UiMessage {
   id: string;
   role: "user" | "assistant";
@@ -65,6 +69,12 @@ function comparisonHistoryContent(
   return selected
     .map((result) => `${result.provider_label}: ${result.answer.slice(0, 900)}`)
     .join("\n");
+}
+
+function isLegacyProvider(
+  result: ProviderComparisonResult,
+): result is ProviderComparisonResult & { provider: LlmProviderId } {
+  return result.provider === "upstage" || result.provider === "skt";
 }
 
 function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
@@ -124,6 +134,9 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
           <div><dt>검색 판단</dt><dd>{result.trace.rag_reason ?? "근거 연결"}</dd></div>
           <div><dt>범위 밖 주제</dt><dd>{result.trace.rag_topic ?? "해당 없음"}</dd></div>
           <div><dt>공유 근거</dt><dd>{result.trace.retrieved_document_count}개</dd></div>
+          {result.trace.tool_round_count !== undefined ? <div><dt>도구 라운드</dt><dd>{result.trace.tool_round_count}회</dd></div> : null}
+          {result.trace.tool_call_count !== undefined ? <div><dt>도구 호출</dt><dd>{result.trace.tool_call_count}회</dd></div> : null}
+          {result.trace.tool_names ? <div><dt>사용 도구</dt><dd>{result.trace.tool_names.join(", ") || "사용 안 함"}</dd></div> : null}
           <div><dt>정책 버전</dt><dd>{result.trace.prompt_policy_version}</dd></div>
           <div><dt>가드레일</dt><dd>{result.trace.guardrail_action}</dd></div>
           <div><dt>가드레일 규칙</dt><dd>{result.trace.guardrail_hits.join(", ") || "탐지 없음"}</dd></div>
@@ -166,8 +179,11 @@ function ComparisonBlock({
   onSelect: (selection: LlmProviderId | "tie") => void;
 }) {
   const retrieval = comparison.results[0]?.trace;
+  const ragToolCalled = retrieval?.tool_names?.includes("retrieve_labor_law") ?? false;
   const ragLabel = !retrieval
     ? "공식 근거 상태 미확인"
+    : comparison.execution_mode === "openai_responses" && !ragToolCalled
+      ? "이번 답변에서 공식 법령 검색 미사용"
     : retrieval.rag_status === "matched"
       ? `공식 근거 ${retrieval.retrieved_document_count}개 연결`
       : retrieval.rag_status === "no_match"
@@ -177,27 +193,45 @@ function ComparisonBlock({
         : comparison.execution_mode === "policy_short_circuit"
           ? "긴급 안내 우선"
           : "공식 근거 검색 연결 안 됨";
+  const modeCopy = comparison.execution_mode === "dual_api"
+    ? {
+        kicker: "동일 조건 병렬 비교",
+        summary: "두 모델이 같은 질문·사업장·공식 검색 결과·생성 설정을 사용했습니다.",
+      }
+    : comparison.execution_mode === "openai_responses"
+      ? {
+          kicker: "도구 연결형 단일 상담",
+          summary: "OpenAI Responses가 필요한 경우 허용된 검색·위험·법령 도구를 호출해 답변했습니다.",
+        }
+      : {
+          kicker: "긴급 안전정책 우선",
+          summary: "긴급 상황은 모델 응답을 기다리지 않고 공통 안전 안내를 즉시 표시합니다.",
+        };
+  const feedbackResults = comparison.execution_mode === "dual_api"
+    ? comparison.results.filter(isLegacyProvider)
+    : [];
+  const showFeedback = feedbackResults.length >= 2;
 
   return (
     <div className="comparison-block">
       <div className="comparison-summary">
         <div>
-          <span className="comparison-kicker">{comparison.execution_mode === "dual_api" ? "동일 조건 병렬 비교" : "긴급 안전정책 우선"}</span>
-          <strong>{comparison.execution_mode === "dual_api" ? "두 모델이 같은 질문·사업장·공식 검색 결과·생성 설정을 사용했습니다." : "긴급 상황은 모델 응답을 기다리지 않고 공통 안전 안내를 즉시 표시합니다."}</strong>
+          <span className="comparison-kicker">{modeCopy.kicker}</span>
+          <strong>{modeCopy.summary}</strong>
           <span className={`rag-status rag-status-${retrieval?.rag_status ?? "unavailable"}`}>{ragLabel}</span>
         </div>
         <span>{new Date(comparison.completed_at).toLocaleTimeString("ko-KR")}</span>
       </div>
-      <div className="provider-answer-grid">
+      <div className={`provider-answer-grid${comparison.results.length === 1 ? " provider-answer-grid-single" : ""}`}>
         {comparison.results.map((result) => <ProviderAnswerCard key={result.provider} result={result} />)}
       </div>
-      <div className="comparison-feedback">
+      {showFeedback ? <div className="comparison-feedback">
         <div>
           <strong>어느 답변이 더 유용했나요?</strong>
           <span>질문과 답변 원문 없이 선택과 성능 지표만 로컬 평가 로그에 저장됩니다.</span>
         </div>
         <div className="feedback-buttons">
-          {comparison.results.map((result) => (
+          {feedbackResults.map((result) => (
             <button
               type="button"
               key={result.provider}
@@ -212,7 +246,7 @@ function ComparisonBlock({
           </button>
         </div>
         {selected ? <p role="status">평가가 저장되었습니다.</p> : null}
-      </div>
+      </div> : null}
     </div>
   );
 }
@@ -222,13 +256,17 @@ export function ChatPanel({
   companyName,
   suggestedPrompt,
   chatMode = "general",
+  executionMode = "dual_api",
 }: {
   companyId?: string;
   companyName?: string;
   suggestedPrompt?: string;
   chatMode?: ChatMode;
+  executionMode?: ConfiguredChatExecutionMode;
 }) {
   const inputId = useId();
+  const contractFileInputId = useId();
+  const contractFileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(suggestedPrompt ?? "");
   const [messages, setMessages] = useState<UiMessage[]>([
@@ -236,13 +274,18 @@ export function ChatPanel({
       id: "welcome",
       role: "assistant",
       content: companyName
-        ? `${companyName}의 공개 컨텍스트를 두 실제 LLM에 동일하게 전달해 비교합니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
-        : "Upstage Solar와 SKT A.X에 같은 노동 상담 질문을 동시에 보내 답변과 성능 지표를 비교합니다.",
+        ? executionMode === "dual_api"
+          ? `${companyName}의 공개 컨텍스트를 두 실제 LLM에 동일하게 전달해 비교합니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
+          : `${companyName}을 선택했습니다. 필요한 경우 허용된 사업장·위험·법령 조회 도구를 사용해 답변합니다.`
+        : executionMode === "dual_api"
+          ? "Upstage Solar와 SKT A.X에 같은 노동 상담 질문을 동시에 보내 답변과 성능 지표를 비교합니다."
+          : "OpenAI Responses가 질문에 필요한 공식 정보 도구만 선택적으로 호출해 노동 상담 답변을 만듭니다.",
     },
   ]);
   const [conversationId, setConversationId] = useState<string>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contractFile, setContractFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<Record<string, LlmProviderId | "tie">>({});
 
   useEffect(() => {
@@ -252,6 +295,7 @@ export function ChatPanel({
   async function sendMessage(value: string) {
     const message = value.trim();
     if (!message || loading) return;
+    const submittedContractFile = contractFile;
 
     const recentMessages: RecentMessage[] = messages
       .filter((item) => item.id !== "welcome")
@@ -268,25 +312,52 @@ export function ChatPanel({
     setLoading(true);
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const requestInit: RequestInit = { method: "POST" };
+      if (
+        executionMode === "openai_responses" &&
+        chatMode === "contract" &&
+        submittedContractFile
+      ) {
+        const form = new FormData();
+        form.append("file", submittedContractFile, submittedContractFile.name);
+        form.append("message", message);
+        form.append("chat_mode", chatMode);
+        form.append("recent_messages", JSON.stringify(recentMessages));
+        if (conversationId) form.append("conversation_id", conversationId);
+        if (companyId) form.append("company_id", companyId);
+        requestInit.body = form;
+      } else {
+        requestInit.headers = { "Content-Type": "application/json" };
+        requestInit.body = JSON.stringify({
           message,
           conversation_id: conversationId,
           company_id: companyId,
           chat_mode: chatMode,
           recent_messages: recentMessages,
-        }),
-      });
+        });
+      }
+      const response = await fetch("/api/chat", requestInit);
       const data = await readApiResponse<ChatComparisonResponse>(response);
       setConversationId(data.conversation_id);
+      const completedContractReview = data.results.some(
+        (result) =>
+          result.status === "success" &&
+          result.trace.tool_names?.includes("review_contract"),
+      );
+      if (completedContractReview && submittedContractFile) {
+        setContractFile((current) =>
+          current === submittedContractFile ? null : current,
+        );
+        if (contractFileInputRef.current?.files?.[0] === submittedContractFile) {
+          contractFileInputRef.current.value = "";
+        }
+      }
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: "두 모델 비교 결과", comparison: data },
+        { id: crypto.randomUUID(), role: "assistant", content: "상담 결과", comparison: data },
       ]);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "두 모델의 상담 답변을 불러오지 못했습니다.");
+      setError(caught instanceof Error ? caught.message : "상담 답변을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -301,7 +372,7 @@ export function ChatPanel({
         body: JSON.stringify({
           comparison_id: comparison.comparison_id,
           selection,
-          result_metrics: comparison.results.map((result) => ({
+          result_metrics: comparison.results.filter(isLegacyProvider).map((result) => ({
             provider: result.provider,
             model: result.model,
             status: result.status,
@@ -322,13 +393,35 @@ export function ChatPanel({
     void sendMessage(draft);
   }
 
+  function handleContractFile(event: ChangeEvent<HTMLInputElement>) {
+    const next = event.target.files?.[0] ?? null;
+    setError(null);
+    if (!next) {
+      setContractFile(null);
+      return;
+    }
+    if (!CONTRACT_FILE_TYPES.includes(next.type)) {
+      setContractFile(null);
+      setError("계약서는 PDF, PNG, JPG 파일만 선택할 수 있습니다.");
+      event.target.value = "";
+      return;
+    }
+    if (next.size > MAX_CONTRACT_FILE_SIZE) {
+      setContractFile(null);
+      setError("계약서 파일은 10MB 이하여야 합니다.");
+      event.target.value = "";
+      return;
+    }
+    setContractFile(next);
+  }
+
   const questions = companyId ? COMPANY_QUESTIONS : GENERAL_QUESTIONS;
 
   return (
     <div className="chat-experience-layout">
       <div className="chat-panel comparison-chat-panel">
       <div className="chat-topbar">
-        <div><span className="online-dot" aria-hidden="true" /><strong>실제 LLM 동시 비교</strong></div>
+        <div><span className="online-dot" aria-hidden="true" /><strong>{executionMode === "dual_api" ? "실제 LLM 동시 비교" : "OpenAI 도구 연결 상담"}</strong></div>
         <span>{companyName ? `${companyName} 컨텍스트 연결됨` : chatMode === "contract" ? "계약서 후속 상담" : "일반 노동 상담"}</span>
       </div>
 
@@ -348,7 +441,7 @@ export function ChatPanel({
             </div>
           )
         ))}
-        {loading ? (
+        {loading ? executionMode === "dual_api" ? (
           <div className="dual-loading" role="status">
             <strong>두 모델에 같은 요청을 동시에 보냈습니다</strong>
             <div>
@@ -356,6 +449,14 @@ export function ChatPanel({
               <span><i className="provider-dot provider-dot-skt" />SKT A.X 응답 대기</span>
             </div>
             <small>한쪽이 실패해도 다른 모델의 결과는 유지합니다. 최대 45초까지 기다릴 수 있습니다.</small>
+          </div>
+        ) : (
+          <div className="dual-loading" role="status">
+            <strong>질문을 분석하고 필요한 공식 정보 도구를 확인하고 있습니다</strong>
+            <div>
+              <span><i className="provider-dot provider-dot-openai" />OpenAI Responses 응답 대기</span>
+            </div>
+            <small>도구가 필요하면 허용된 검색·위험·법령 조회만 실행합니다. 여러 단계면 응답에 시간이 걸릴 수 있습니다.</small>
           </div>
         ) : null}
         <div ref={bottomRef} />
@@ -370,6 +471,23 @@ export function ChatPanel({
       {error ? <p className="chat-error" role="alert">{error}</p> : null}
 
       <form className="chat-form" onSubmit={handleSubmit}>
+        {executionMode === "openai_responses" && chatMode === "contract" ? (
+          <div className="chat-contract-upload">
+            <label className="button button-outline" htmlFor={contractFileInputId}>
+              상담에 계약서 첨부
+            </label>
+            <input
+              ref={contractFileInputRef}
+              id={contractFileInputId}
+              className="sr-only"
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+              onChange={handleContractFile}
+              disabled={loading}
+            />
+            <span>{contractFile ? `${contractFile.name} · 전송 후 선택 해제` : "선택 사항 · 최대 10MB"}</span>
+          </div>
+        ) : null}
         <label className="sr-only" htmlFor={inputId}>상담 질문</label>
         <textarea
           id={inputId}
@@ -387,8 +505,17 @@ export function ChatPanel({
         />
         <button type="submit" className="chat-send" disabled={loading || !draft.trim()} aria-label="질문 보내기"><span aria-hidden="true">↑</span></button>
       </form>
-      <p className="dual-api-note">동일 질문을 실제 Upstage Solar·SKT A.X API에 병렬 전송합니다. API 키와 숨은 프롬프트는 브라우저로 전송하지 않습니다.</p>
-        {!companyId ? <p className="chat-company-help">특정 회사에 관해 질문하려면 <Link href="/companies">사업장을 먼저 검색해 선택</Link>하세요.</p> : null}
+      <p className="dual-api-note">
+        {executionMode === "dual_api"
+          ? "동일 질문을 실제 Upstage Solar·SKT A.X API에 병렬 전송합니다."
+          : "질문에 따라 허용된 도구만 서버에서 실행하며, 단일 OpenAI Responses 답변을 표시합니다."}{" "}
+        API 키와 숨은 프롬프트는 브라우저로 전송하지 않습니다.
+      </p>
+      {!companyId ? (
+        <p className="chat-company-help">
+          특정 회사에 관해 질문하려면 <Link href="/companies">사업장을 먼저 검색해 선택</Link>하세요.
+        </p>
+      ) : null}
       </div>
       <aside className="question-guide" aria-label="AI 질문 가이드">
         <div className="guide-title">

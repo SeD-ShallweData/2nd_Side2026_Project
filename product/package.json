@@ -12,7 +12,12 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check": "npm test && npm run typecheck && npm run lint && npm run build",
+    "test:e2e:wire": "node scripts/responses-wire-e2e.mjs",
+    "test:e2e:openai-live": "node scripts/openai-responses-live-smoke.mjs",
+    "dev:e2e:responses": "node scripts/fake-responses-e2e-server.mjs",
+    "check:env-permissions": "node scripts/check-env-permissions.mjs"
   },
   "dependencies": {
     "next": "16.3.0",
