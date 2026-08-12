@@ -25,6 +25,19 @@ interface WageRow {
   excluded_wage: boolean | null;
 }
 
+type CompanyBatchRow = Pick<
+  WageRow,
+  | "firm_id"
+  | "name"
+  | "sido"
+  | "industry"
+  | "batch_id"
+  | "model_version"
+  | "as_of_date"
+  | "target_month"
+  | "ingested_at"
+>;
+
 interface SafetyRow {
   target_week_start: string;
   target_week_end: string;
@@ -71,10 +84,10 @@ export function toWageRiskPublic(row: WageRow): WageRiskPublic {
     const wageListing = row.verdict === "배제_임금체불공개";
     evidence.push({
       code: wageListing ? "OFFICIAL_WAGE_LISTING_MATCH" : "INSURANCE_PAYMENT_REVIEW",
-      label: wageListing ? "공식 임금체불 공개 명단 연계" : "4대보험 관련 정보 확인 필요",
+      label: wageListing ? "공식 임금체불 공개 명단 연계" : "임금 지급 관련 추가 확인 신호",
       description: wageListing
         ? "기준일 현재 공개 명단 연계 결과가 있습니다. 동명이 아닌지 공식 원문을 함께 확인하세요."
-        : "공개 판정에서 4대보험 관련 확인 신호가 있어 가입·납부 처리 시점을 직접 확인하는 것이 좋습니다.",
+        : "공개 판정에서 임금 지급 관련 추가 확인 신호가 있어 지급일·급여 구성·계약서 교부 여부를 직접 확인하는 것이 좋습니다.",
     });
   } else if (mapped && mapped.level !== "unknown") {
     evidence.push({
@@ -88,6 +101,7 @@ export function toWageRiskPublic(row: WageRow): WageRiskPublic {
   }
 
   return {
+    availability: row.score_batch_id === null && row.verdict === null ? "no_data" : "ready",
     level,
     summary: excluded
       ? "사용자용 공개 판정에서 우선 확인할 항목이 있습니다. 이를 체불 발생 확정이나 입사 판단으로 해석하지 마세요."
@@ -116,6 +130,7 @@ function safetyLevel(band: string): SignalLevel {
 
 function unknownSafety(row: WageRow): SafetyContextPublic {
   return {
+    availability: "no_data",
     scope: "validated_firm_context",
     level: "unknown",
     summary: "공표된 산업안전 참고자료에서 이 사업장과 연결된 결과를 확인하지 못했습니다.",
@@ -142,6 +157,7 @@ function safetyResult(company: WageRow, row: SafetyRow): SafetyContextPublic {
       ? "아직 대상 기간 전이므로 현재 상태로 해석하지 마세요."
       : "현장 안전조치를 직접 확인하세요.";
   return {
+    availability: "ready",
     scope: "validated_firm_context",
     level,
     summary: `공표된 산업안전 자료에서 우선 확인 범위가 ‘${row.provisional_population_priority_band}’으로 표시됐습니다. ${periodNote}`,
@@ -203,17 +219,67 @@ async function getSafety(company: WageRow): Promise<{ data: SafetyContextPublic;
       },
     };
   } catch {
-    return { data: unknownSafety(company) };
+    return {
+      data: {
+        ...unknownSafety(company),
+        availability: "unavailable",
+        summary: "산업안전 참고정보를 현재 불러오지 못했습니다.",
+        disclaimer: "연결 오류를 자료 없음이나 안전 신호로 해석하지 마세요.",
+      },
+    };
+  }
+}
+
+function unavailableWage(): WageRiskPublic {
+  return {
+    availability: "unavailable",
+    level: "unknown",
+    summary: "임금 지급 관련 정보를 현재 불러오지 못했습니다.",
+    evidence_codes: [],
+    evidence_items: [],
+    confidence: "unavailable",
+    official_listing: { status: "unavailable", as_of: null },
+  };
+}
+
+async function getWage(company: CompanyBatchRow): Promise<WageRiskPublic> {
+  if (company.batch_id === null) return { ...unavailableWage(), availability: "no_data", summary: "분석 가능한 최신 임금 자료가 없습니다." };
+  try {
+    const rows = await queryReadOnly<Pick<WageRow, "score_batch_id" | "n_months" | "n_green" | "verdict" | "excluded_wage">>(
+      `SELECT s.batch_id AS score_batch_id,
+              COALESCE(r.n_months, s.n_months) AS n_months,
+              COALESCE(r.n_green, s.n_green) AS n_green,
+              r."판정" AS verdict,
+              COALESCE(r."체불배제", s."체불배제") AS excluded_wage
+         FROM (SELECT $1::text AS firm_id, $2::integer AS batch_id) AS target
+         LEFT JOIN public.scored_active AS s
+           ON s.firm_id = target.firm_id AND s.batch_id = target.batch_id
+         LEFT JOIN public.safe_recommendation AS r
+           ON r.firm_id = target.firm_id AND r.batch_id = target.batch_id
+        LIMIT 1`,
+      [company.firm_id, company.batch_id],
+    );
+    const signal = rows[0];
+    return toWageRiskPublic({
+      ...company,
+      score_batch_id: signal?.score_batch_id ?? null,
+      n_months: signal?.n_months ?? null,
+      n_green: signal?.n_green ?? null,
+      verdict: signal?.verdict ?? null,
+      excluded_wage: signal?.excluded_wage ?? null,
+    });
+  } catch {
+    return unavailableWage();
   }
 }
 
 export class MlRiskProvider {
   async getCompanyRisk(companyId: string): Promise<CompanyRiskResult | null> {
-    const rows = await queryReadOnly<WageRow>(
+    const rows = await queryReadOnly<CompanyBatchRow>(
       `WITH latest_batch AS (
          SELECT id, as_of_date, target_month, model_version, ingested_at
            FROM public.batches
-          ORDER BY ingested_at DESC, id DESC
+          ORDER BY as_of_date DESC NULLS LAST, ingested_at DESC, id DESC
           LIMIT 1
        )
        SELECT f.firm_id,
@@ -221,21 +287,12 @@ export class MlRiskProvider {
               f.sido,
               f.industry,
               b.id AS batch_id,
-              s.batch_id AS score_batch_id,
               b.model_version,
               b.as_of_date::text,
               b.target_month::text,
-              b.ingested_at::text,
-              COALESCE(r.n_months, s.n_months) AS n_months,
-              COALESCE(r.n_green, s.n_green) AS n_green,
-              r."판정" AS verdict,
-              COALESCE(r."체불배제", s."체불배제") AS excluded_wage
+              b.ingested_at::text
          FROM public.firms AS f
          LEFT JOIN latest_batch AS b ON true
-         LEFT JOIN public.scored_active AS s
-           ON s.firm_id = f.firm_id AND s.batch_id = b.id
-         LEFT JOIN public.safe_recommendation AS r
-           ON r.firm_id = f.firm_id AND r.batch_id = b.id
         WHERE f.firm_id = $1
         LIMIT 1`,
       [companyId],
@@ -243,7 +300,17 @@ export class MlRiskProvider {
     const row = rows[0];
     if (!row) return null;
 
-    const safety = await getSafety(row);
+    const [wage, safety] = await Promise.all([
+      getWage(row),
+      getSafety({
+        ...row,
+        score_batch_id: null,
+        n_months: null,
+        n_green: null,
+        verdict: null,
+        excluded_wage: null,
+      }),
+    ]);
     return {
       company_id: row.firm_id,
       company_name: row.name,
@@ -252,7 +319,7 @@ export class MlRiskProvider {
       generated_at: toIso(row.ingested_at),
       valid_until: null,
       freshness: "unknown",
-      wage_risk: toWageRiskPublic(row),
+      wage_risk: wage,
       safety_context: safety.data,
       sources: [
         {

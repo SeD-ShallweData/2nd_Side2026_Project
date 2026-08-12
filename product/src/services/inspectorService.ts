@@ -152,7 +152,7 @@ export async function getInspectorOverview(limit = 8): Promise<InspectorOverview
             n_queue,
             n_safe
        FROM public.batches
-      ORDER BY ingested_at DESC, id DESC
+      ORDER BY as_of_date DESC NULLS LAST, ingested_at DESC, id DESC
       LIMIT 1`,
   );
   const batch = batches[0];
@@ -279,7 +279,7 @@ export async function getInspectorCompanyDetail(companyId: string): Promise<Insp
     `WITH latest_batch AS (
        SELECT id, as_of_date, target_month, model_version, ingested_at
          FROM public.batches
-        ORDER BY ingested_at DESC, id DESC
+        ORDER BY as_of_date DESC NULLS LAST, ingested_at DESC, id DESC
         LIMIT 1
      )
      SELECT f.firm_id,

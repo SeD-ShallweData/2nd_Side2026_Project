@@ -14,6 +14,17 @@ const LISTING_LABEL = {
   unavailable: "공개 명단 확인 불가",
 } as const;
 
+const WAGE_OBSERVATION_LABELS = [
+  "체불사업주 명단",
+  "건강보험 체납 명단",
+  "국민연금 가입자 (12개월)",
+  "이직률 (12개월)",
+  "1인당 고지금액",
+  "고용 추이",
+  "업종 폐업률",
+  "데이터 충실도",
+] as const;
+
 type CardProps =
   | {
       kind: "wage";
@@ -45,9 +56,10 @@ export function RiskInformationCard(props: CardProps) {
       : "개별 사업장 판정 아님";
   const question = isWage ? "왜 임금 관련 추가 확인이 필요한가요?" : "산업재해 정보는 무엇을 확인해야 하나요?";
   const unknown = props.data.level === "unknown";
+  const unavailable = props.data.availability === "unavailable";
 
   return (
-    <article className={`risk-card risk-card-${props.kind}`}>
+    <article className={`risk-card risk-card-${props.kind} risk-level-${props.data.level}`}>
       <div className="risk-card-head">
         <div>
           <span className="card-kicker">{kicker}</span>
@@ -67,7 +79,12 @@ export function RiskInformationCard(props: CardProps) {
         </div>
       ) : null}
 
-      {!unknown ? (
+      {unavailable ? (
+        <div className="unknown-panel unavailable-panel" role="status">
+          <strong>현재 연결 상태를 확인해 주세요.</strong>
+          <p>이 카드의 데이터 공급자가 응답하지 않았습니다. 자료 부족이나 정상 상태로 해석하지 않습니다.</p>
+        </div>
+      ) : !unknown ? (
         <div className="risk-section">
           <h3>주요 확인 신호</h3>
           {props.data.evidence_items.length > 0 ? (
@@ -92,6 +109,24 @@ export function RiskInformationCard(props: CardProps) {
           <p>자료가 부족하다는 사실만 표시하며, 이를 정상이나 안전으로 바꾸지 않습니다.</p>
         </div>
       )}
+
+      {isWage ? (
+        <section className="risk-section wage-observation-section" aria-labelledby="wage-observation-title">
+          <div className="observation-title-row">
+            <h3 id="wage-observation-title">세부 공개 지표</h3>
+            <span>연결 준비 중</span>
+          </div>
+          <dl className="wage-observation-list">
+            {WAGE_OBSERVATION_LABELS.map((label) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>확인할 수 없음</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="observation-note">값을 추정하거나 내부 ML 피처를 사용자 수치로 바꾸지 않습니다.</p>
+        </section>
+      ) : null}
 
       {isWage ? (
         <div className="listing-panel">

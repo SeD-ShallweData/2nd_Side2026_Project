@@ -1,9 +1,11 @@
 export type SignalLevel = "normal" | "watch" | "review" | "unknown";
 export type Confidence = "sufficient" | "limited" | "unavailable";
 export type Freshness = "current" | "expired" | "unknown";
+export type SignalAvailability = "ready" | "no_data" | "unavailable";
 
 export interface SourceReference {
   name: string;
+  citation?: string;
   organization?: string;
   as_of?: string;
   url?: string;
@@ -23,6 +25,7 @@ export interface OfficialListingStatus {
 }
 
 export interface WageRiskPublic {
+  availability?: SignalAvailability;
   level: SignalLevel;
   summary: string;
   evidence_codes: string[];
@@ -32,6 +35,7 @@ export interface WageRiskPublic {
 }
 
 export interface SafetyContextPublic {
+  availability?: SignalAvailability;
   scope: "region_industry" | "validated_firm_context";
   level: SignalLevel;
   summary: string;

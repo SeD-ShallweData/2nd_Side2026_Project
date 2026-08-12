@@ -8,9 +8,18 @@ export function DataSourceList({ sources }: { sources: SourceReference[] }) {
     <ul className="source-list">
       {sources.map((source, index) => (
         <li key={`${source.name}-${source.as_of ?? index}`}>
-          <span>{source.name}</span>
+          <span>
+            {source.url ? (
+              <a href={source.url} target="_blank" rel="noreferrer">{source.name}</a>
+            ) : source.name}
+            {source.citation && source.citation !== source.name ? <em>{source.citation}</em> : null}
+          </span>
           <small>
-            {[source.organization, source.as_of && `기준 ${source.as_of}`].filter(Boolean).join(" · ")}
+            {[
+              source.organization,
+              source.as_of && `기준 ${source.as_of}`,
+              source.document_id && `문서 ${source.document_id}`,
+            ].filter(Boolean).join(" · ")}
           </small>
         </li>
       ))}
