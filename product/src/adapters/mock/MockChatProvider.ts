@@ -40,6 +40,199 @@ function conversationId(value?: string): string {
   return value || `conv_${crypto.randomUUID()}`;
 }
 
+const EMERGENCY_SIGNS = ["사고 났", "사고났", "다쳤", "화재", "붕괴", "의식이 없", "유해물질 노출"];
+
+/**
+ * 응급으로 보지 않을 표현.
+ *
+ * 응급 분기는 LLM 을 아예 타지 않고 즉시 안전 안내로 끝납니다. 그래서 이미 지나간
+ * 부상의 사후 절차를 묻는 질문까지 여기로 오면, 사용자는 산재 안내 대신 "119에
+ * 신고하세요"만 받게 됩니다. "일하다 다쳤는데 회사가 산재 처리를 안 해줘요"가
+ * 그렇게 걸렸습니다.
+ *
+ * 행정 절차를 묻는 말이 함께 있으면 급성 상황이 아니라고 본다. 놓쳐서 위험한 쪽은
+ * 응급을 못 알아보는 것이므로, 제외 표현은 절차를 명시적으로 가리키는 것만 둡니다.
+ * 산재 주제 답변도 "먼저 치료와 안전을 확보하고"로 시작해 안전 안내가 사라지지는
+ * 않습니다.
+ */
+const EMERGENCY_EXCLUSIONS = [
+  "산재 처리", "산재처리", "산재 신청", "산재신청", "산재 신고", "공상",
+  "처리를 안", "인정받", "보상은", "보상을",
+];
+
+/**
+ * 회사를 선택하지 않은 상태에서 들어오는 노동 주제.
+ *
+ * 예전에는 임금과 산재 두 갈래만 알아봤습니다. 그래서 주휴수당·연차·해고·근로계약서
+ * 같은 흔한 질문이 전부 "조금 더 구체적으로 알려주세요"로 떨어졌고, RAG가 법령을
+ * 제대로 찾아왔더라도 그 근거가 통째로 버려졌습니다. 실사용에 가까운 질문 20건을
+ * 태워보니 11건이 여기에 걸렸습니다.
+ *
+ * 정책 baseline 은 질문에 답하는 층이 아닙니다. 답은 검색된 법령과 모델이 만듭니다.
+ * 이 표는 "무엇을 확인하고 어디에 물어야 하는지"라는 골격만 제공하고, 되묻기로
+ * 빠지지 않게 하는 역할을 합니다.
+ *
+ * 주제를 추가할 때는 위에서부터 먼저 맞는 것이 이깁니다. 좁은 표현을 위에 둡니다.
+ */
+interface LaborTopic {
+  code: string;
+  keywords: string[];
+  answer: string;
+  sources: SourceReference[];
+  actions: SuggestedAction[];
+  limitation: string;
+}
+
+const LABOR_TOPICS: LaborTopic[] = [
+  {
+    code: "WAGE",
+    // "못 받", "안 줘" 같은 일반 표현은 넣지 않는다. "근로계약서를 아직 못 받았어요"
+    // 처럼 다른 주제의 질문까지 임금으로 끌어와 버린다.
+    keywords: [
+      "임금", "월급", "급여", "체불", "퇴직금", "주휴", "야근수당", "연장수당",
+      "초과근무수당", "시간외수당", "가산수당", "최저임금", "임금명세서", "급여명세서",
+      "포괄임금", "상여금", "일당", "알바비", "정산", "돈을 안", "돈 안 줘", "돈 안 줍",
+    ],
+    answer:
+      "임금이 지급되지 않았다면 근로계약서, 급여명세서, 출퇴근 기록, 계좌 내역처럼 근무와 미지급 사실을 확인할 자료를 먼저 정리하세요. 그다음 고용노동부 상담 또는 관할 노동관서의 진정 절차를 확인할 수 있습니다.",
+    sources: [WAGE_GUIDE_SOURCE],
+    actions: [
+      { code: "COLLECT_WAGE_RECORDS", label: "근무·임금 자료 정리", priority: "now" },
+      CALL_1350,
+    ],
+    limitation: "개별 체불 여부와 청구 가능 범위는 공식 상담에서 확인해야 합니다.",
+  },
+  {
+    code: "SAFETY",
+    keywords: ["산재", "산업재해", "업무상 재해", "업무상재해", "다쳐서", "재해보상", "공상"],
+    answer:
+      "업무 중 다치거나 질병이 발생했다면 먼저 치료와 안전을 확보하고, 발생 시각·장소·작업 내용·목격자 등 사실관계를 기록해 두세요. 산재 신청에 필요한 구체적인 자료와 절차는 근로복지공단 또는 고용노동부 공식 창구에서 확인하는 것이 좋습니다.",
+    sources: [SAFETY_GUIDE_SOURCE],
+    actions: [
+      { code: "RECORD_ACCIDENT", label: "발생 경위 기록", priority: "now" },
+      CALL_1350,
+    ],
+    limitation: "이 답변은 산재 승인 여부를 판단하지 않습니다.",
+  },
+  {
+    code: "TERMINATION",
+    keywords: [
+      "해고", "부당해고", "권고사직", "계약해지", "잘렸", "나오지 말라", "나오지말라",
+      "그만두라", "짤렸", "사직서", "재계약", "계약 기간",
+    ],
+    answer:
+      "해고나 계약 종료를 통보받았다면 통보를 받은 날짜와 방법, 회사가 밝힌 사유를 그대로 기록해 두세요. 문자·메일·녹취처럼 통보 사실을 남기는 자료가 이후 절차의 근거가 됩니다. 구제 신청은 기한이 정해져 있으므로 고용노동부 1350이나 관할 노동위원회에서 본인 사안의 기한과 요건을 먼저 확인하세요.",
+    sources: [],
+    actions: [
+      { code: "RECORD_NOTICE", label: "통보 일자·방법·사유 기록", priority: "now" },
+      CALL_1350,
+    ],
+    limitation: "해고의 정당성 여부와 구제 신청 요건은 개별 사안에 따라 달라 공식 창구에서 확인해야 합니다.",
+  },
+  {
+    code: "CONTRACT",
+    keywords: ["근로계약서", "계약서", "근로조건", "수습", "채용 공고", "서면 교부", "교부"],
+    answer:
+      "근로계약 내용이 문제라면 계약서 사본과 실제 근무 조건이 다른 부분을 먼저 정리하세요. 임금 구성, 소정근로시간, 휴게·휴일, 담당 업무처럼 서면에 적혀 있어야 할 항목을 기준으로 비교하면 확인이 쉽습니다. 계약서를 받지 못했다면 회사에 교부를 요청한 사실도 함께 남겨 두세요.",
+    sources: [],
+    actions: [
+      { code: "COMPARE_CONTRACT", label: "계약서와 실제 근무조건 비교", priority: "now" },
+      { code: "REVIEW_CONTRACT", label: "근로계약서 검토", priority: "next" },
+    ],
+    limitation: "계약 조항의 효력은 전체 맥락에 따라 달라져 이 안내만으로 판단할 수 없습니다.",
+  },
+  {
+    code: "LEAVE",
+    keywords: [
+      "연차", "휴가", "휴게시간", "휴일", "반차", "출산휴가", "출산전후휴가",
+      "육아휴직", "병가", "생리휴가", "점심시간", "쉬는 시간", "쉴 시간",
+    ],
+    answer:
+      "휴가나 휴게 문제는 실제로 어떻게 운영됐는지가 기준이 됩니다. 근무 기간, 소정근로시간, 신청했는데 거부된 기록, 실제로 쉰 날을 정리해 두세요. 부여 일수와 수당 지급 기준은 근무 형태와 사업장 규모에 따라 달라지므로 고용노동부 1350에서 본인 조건으로 확인하는 것이 정확합니다.",
+    sources: [],
+    actions: [
+      { code: "COLLECT_LEAVE_RECORDS", label: "근무·휴가 기록 정리", priority: "now" },
+      CALL_1350,
+    ],
+    limitation: "부여 일수와 수당 기준은 근무 형태·사업장 규모에 따라 달라집니다.",
+  },
+  {
+    code: "WORKTIME",
+    keywords: ["52시간", "근로시간", "연장근로", "야간근로", "교대", "장시간", "초과근무", "야근"],
+    answer:
+      "근로시간 문제는 실제 일한 시간을 남기는 것이 먼저입니다. 출퇴근 기록, 업무 지시 메시지, 근무표처럼 시간이 확인되는 자료를 모아 두세요. 연장·야간 근로의 한도와 수당 기준은 근무 형태와 합의 내용에 따라 달라지므로 고용노동부 1350에서 확인하시는 것이 좋습니다.",
+    sources: [],
+    actions: [
+      { code: "COLLECT_WORKTIME_RECORDS", label: "출퇴근·근무시간 기록 정리", priority: "now" },
+      CALL_1350,
+    ],
+    limitation: "연장·야간 근로의 한도와 수당 기준은 근무 형태와 합의 내용에 따라 달라집니다.",
+  },
+  {
+    code: "HARASSMENT",
+    keywords: ["괴롭힘", "갑질", "폭언", "성희롱", "따돌림", "모욕"],
+    answer:
+      "직장 내 괴롭힘은 발생 일시, 장소, 행위 내용, 목격자를 사실 그대로 기록해 두는 것이 중요합니다. 회사에 신고한 경우 신고 시점과 회사의 조치도 함께 남기세요. 회사 내부 절차로 해결되지 않으면 고용노동부 1350이나 관할 노동관서에 상담할 수 있습니다.",
+    sources: [],
+    actions: [
+      { code: "RECORD_HARASSMENT", label: "일시·내용·목격자 기록", priority: "now" },
+      CALL_1350,
+    ],
+    limitation: "괴롭힘 해당 여부와 회사의 조치 의무는 개별 사안에 따라 판단이 달라집니다.",
+  },
+  {
+    code: "INSURANCE",
+    keywords: ["4대보험", "사대보험", "고용보험", "국민연금", "건강보험", "직장가입", "가입을 안"],
+    answer:
+      "사회보험 가입 문제는 실제 근무 사실과 임금을 확인할 수 있는 자료가 근거가 됩니다. 근로계약서, 급여 입금 내역, 출퇴근 기록을 정리해 두세요. 가입 대상 여부와 소급 신고 절차는 보험별로 담당 기관이 다르므로 국민연금공단·국민건강보험공단·근로복지공단 또는 고용노동부 1350에서 확인해야 합니다.",
+    sources: [],
+    actions: [
+      { code: "COLLECT_EMPLOYMENT_PROOF", label: "근무·임금 증빙 정리", priority: "now" },
+      CALL_1350,
+    ],
+    limitation: "보험별로 가입 요건과 담당 기관이 달라 이 안내만으로 결론을 내릴 수 없습니다.",
+  },
+];
+
+function matchLaborTopic(message: string): LaborTopic | undefined {
+  return LABOR_TOPICS.find((topic) => containsAny(message, topic.keywords));
+}
+
+/**
+ * 특정 회사를 가리키는 표현. 노동 주제보다 먼저 본다.
+ *
+ * "이 회사 임금 어때요?"는 임금 안내가 아니라 사업장 선택이 필요한 질문이다.
+ * 예전에는 여기에 맨 `사업장`이 들어 있어 "사업장에서 월급을 못 받았어요" 같은
+ * 일반 임금 질문까지 선점했다. 지시 표현만 남긴다.
+ *
+ * `회사가 안전`·`회사는 안전`도 함께 둔다. 조사 하나 차이로 `회사 안전`에서
+ * 빗나가 일반 안내로 새던 자리다.
+ */
+const COMPANY_REFERENCE = [
+  "이 회사", "그 회사", "저 회사", "이 사업장", "이 업체", "여기",
+  "회사 안전", "회사가 안전", "회사는 안전", "직장이 안전", "왜 추가 확인",
+];
+
+/**
+ * 회사를 가리키는 것일 수도 있는 약한 표현. 노동 주제가 없을 때만 본다.
+ *
+ * "입사하려는데 근로계약서를 못 받았어요"는 계약서 안내가 맞고,
+ * "입사해도 괜찮을까요?"는 사업장 선택 안내가 맞다.
+ */
+const WEAK_COMPANY_REFERENCE = ["입사", "이직"];
+
+function needsCompanySelection(id: string): ChatResponse {
+  return {
+    answer: CHAT_COPY.noCompany,
+    answer_type: "clarification",
+    sources: [],
+    suggested_actions: [SEARCH_ACTION],
+    limitations: ["사업장을 선택하기 전에는 특정 회사의 신호를 설명할 수 없습니다."],
+    guardrail_status: "limited",
+    conversation_id: id,
+  };
+}
+
 function evidenceSummary(labels: string[]): string {
   if (labels.length === 0) return "세부 확인 신호가 제공되지 않았습니다.";
   return labels.join(", ");
@@ -71,7 +264,7 @@ export class PolicyChatProvider implements ChatProvider {
     const message = request.message.trim();
     const id = conversationId(request.conversation_id);
 
-    if (containsAny(message, ["사고 났", "사고났", "다쳤", "화재", "붕괴", "의식이 없", "유해물질 노출"])) {
+    if (containsAny(message, EMERGENCY_SIGNS) && !containsAny(message, EMERGENCY_EXCLUSIONS)) {
       return {
         answer: `${CHAT_COPY.emergency}\n\n안전이 확보된 뒤 사고 기록과 신고·산재 절차를 확인하세요.`,
         answer_type: "emergency_guidance",
@@ -115,16 +308,8 @@ export class PolicyChatProvider implements ChatProvider {
       }
     }
 
-    if (!company && containsAny(message, ["이 회사", "여기", "사업장", "입사", "회사 안전", "왜 추가 확인"])) {
-      return {
-        answer: CHAT_COPY.noCompany,
-        answer_type: "clarification",
-        sources: [],
-        suggested_actions: [SEARCH_ACTION],
-        limitations: ["사업장을 선택하기 전에는 특정 회사의 신호를 설명할 수 없습니다."],
-        guardrail_status: "limited",
-        conversation_id: id,
-      };
+    if (!company && containsAny(message, COMPANY_REFERENCE)) {
+      return needsCompanySelection(id);
     }
 
     if (!company || !risk) {
@@ -141,41 +326,17 @@ export class PolicyChatProvider implements ChatProvider {
         };
       }
 
-      if (containsAny(message, ["임금", "월급", "체불", "퇴직금"])) {
-        return {
-          answer:
-            "임금이 지급되지 않았다면 근로계약서, 급여명세서, 출퇴근 기록, 계좌 내역처럼 근무와 미지급 사실을 확인할 자료를 먼저 정리하세요. 그다음 고용노동부 상담 또는 관할 노동관서의 진정 절차를 확인할 수 있습니다.",
-          answer_type: "general_guidance",
-          sources: [WAGE_GUIDE_SOURCE],
-          suggested_actions: [
-            {
-              code: "COLLECT_WAGE_RECORDS",
-              label: "근무·임금 자료 정리",
-              priority: "now",
-            },
-            CALL_1350,
-          ],
-          limitations: ["개별 체불 여부와 청구 가능 범위는 공식 상담에서 확인해야 합니다."],
-          guardrail_status: "passed",
-          conversation_id: id,
-        };
+      const topic = matchLaborTopic(message);
+      if (!topic && containsAny(message, WEAK_COMPANY_REFERENCE)) {
+        return needsCompanySelection(id);
       }
-
-      if (containsAny(message, ["산재", "산업재해", "업무상 재해"])) {
+      if (topic) {
         return {
-          answer:
-            "업무 중 다치거나 질병이 발생했다면 먼저 치료와 안전을 확보하고, 발생 시각·장소·작업 내용·목격자 등 사실관계를 기록해 두세요. 산재 신청에 필요한 구체적인 자료와 절차는 근로복지공단 또는 고용노동부 공식 창구에서 확인하는 것이 좋습니다.",
+          answer: topic.answer,
           answer_type: "general_guidance",
-          sources: [SAFETY_GUIDE_SOURCE],
-          suggested_actions: [
-            {
-              code: "RECORD_ACCIDENT",
-              label: "발생 경위 기록",
-              priority: "now",
-            },
-            CALL_1350,
-          ],
-          limitations: ["이 답변은 산재 승인 여부를 판단하지 않습니다."],
+          sources: topic.sources,
+          suggested_actions: topic.actions,
+          limitations: [topic.limitation],
           guardrail_status: "passed",
           conversation_id: id,
         };
