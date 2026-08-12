@@ -8,6 +8,7 @@ import type {
 import type { RiskProvider, SourceReference } from "@/domain/risk";
 import { CHAT_COPY } from "@/mocks/chatResponses";
 import { ServiceError } from "@/utils/errors";
+import { stripBandLabel } from "@/utils/riskText";
 import { containsAny, normalizeSearchText } from "@/utils/text";
 
 const SEARCH_ACTION: SuggestedAction = {
@@ -366,8 +367,10 @@ export class PolicyChatProvider implements ChatProvider {
       };
     }
 
-    const wage = risk.wage_risk;
-    const safety = risk.safety_context;
+    // 요약문에는 "상위1%" 같은 순위 표기가 들어 있다. 답변에 그대로 끼워 넣으면
+    // 특정 사업장에 순위를 붙이게 되므로 여기서 한 번 걷어낸 값을 쓴다.
+    const wage = { ...risk.wage_risk, summary: stripBandLabel(risk.wage_risk.summary) };
+    const safety = { ...risk.safety_context, summary: stripBandLabel(risk.safety_context.summary) };
     const baseLimitations = [CHAT_COPY.dataLimitation, CHAT_COPY.safetyScope];
 
     if (containsAny(message, ["체불할 거", "체불할거", "체불할 것", "임금이 밀릴", "월급이 밀릴"])) {

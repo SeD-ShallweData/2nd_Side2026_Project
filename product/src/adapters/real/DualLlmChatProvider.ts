@@ -21,6 +21,7 @@ import {
   scanRules,
 } from "@/server/guardrails";
 import { loadPrompt, withRuntimeContext } from "@/server/promptLoader";
+import { stripBandLabel } from "@/utils/riskText";
 
 export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-08-12-v5";
 const EMPTY_USAGE: TokenUsage = {
@@ -63,14 +64,6 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   );
   if (unverified) hits.add("UNVERIFIED_LAW_CITATION");
   return [...hits];
-}
-
-/** 순위 표기를 지운다. "우선 확인 범위가 ‘상위1%’으로 표시됐습니다" 같은 문장이 대상이다. */
-function stripBandLabel(text: string): string {
-  return text
-    .replace(/[‘'"“]?상위\s*\d+(?:\.\d+)?\s*(?:%|퍼센트)[’'"”]?/g, "상위 구간")
-    .replace(/\s{2,}/g, " ")
-    .trim();
 }
 
 /**

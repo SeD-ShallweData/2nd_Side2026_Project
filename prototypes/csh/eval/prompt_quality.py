@@ -173,6 +173,8 @@ def classify(answer):
 def evaluate(row):
     """저장된 답변에서 항목별 참/거짓을 계산한다."""
     answer = row["answer"]
+    # 사용자가 실제로 보는 것은 답변 + 제한사항이다. 범위·거절 판정은 둘을 합쳐 본다.
+    shown = "\n".join([answer, *row.get("limitations", [])])
     parsed = classify(answer)
     cited = bool(parsed["law_citations"] or parsed["guide_citations"])
     # 검색이 성공하지 않았는데 근거를 적었으면 지어낸 것이다. 가드레일 교체도 같은 신호다.
@@ -190,10 +192,10 @@ def evaluate(row):
         # 가드레일이 잡아 답변을 교체했으면 지어낸 근거가 사용자에게 닿지는 않는다.
         # 배포 기준은 이쪽이다 — 모델이 지어냈는가와 사용자가 봤는가는 다른 문제다.
         "no_leak": not (fabricated and row["status"] == "success"),
-        "action": bool(ACTION_PATH.search(answer)),
+        "action": bool(ACTION_PATH.search(shown)),
         "no_label": not bool(DESIGN_LABEL.search(answer)),
-        "gap_stated": bool(GAP_STATED.search(answer)),
-        "declined": bool(DECLINED.search(answer)) and len(answer) < 700,
+        "gap_stated": bool(GAP_STATED.search(shown)),
+        "declined": bool(DECLINED.search(shown)) and len(answer) < 700,
         "no_field_leak": not bool(FIELD_NAME_LEAK.search(answer)),
     }
 
@@ -208,6 +210,9 @@ def score(case, result):
         "guardrail_hits": result["trace"]["guardrail_hits"],
         "answer_chars": len(result["answer"]),
         "answer": result["answer"],
+        # 화면은 제한사항을 답변 아래에 함께 보여준다(ChatPanel). 정책 단락 응답은
+        # "왜 답을 못 하는지"가 답변 본문이 아니라 여기에 담기므로 같이 채점한다.
+        "limitations": result.get("limitations", []),
     }
 
 
