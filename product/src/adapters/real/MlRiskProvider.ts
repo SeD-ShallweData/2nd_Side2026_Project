@@ -6,6 +6,7 @@ import type {
   SignalLevel,
   WageRiskPublic,
 } from "@/domain/risk";
+import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
 import { queryReadOnly } from "@/server/postgres";
 
 interface WageRow {
@@ -279,8 +280,7 @@ export class MlRiskProvider {
       `WITH latest_batch AS (
          SELECT id, as_of_date, target_month, model_version, ingested_at
            FROM public.batches
-          ORDER BY as_of_date DESC NULLS LAST, ingested_at DESC, id DESC
-          LIMIT 1
+          ${LATEST_BATCH_ORDER_SQL}
        )
        SELECT f.firm_id,
               f.name,

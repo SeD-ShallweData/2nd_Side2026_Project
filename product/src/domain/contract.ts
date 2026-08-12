@@ -11,6 +11,8 @@ export interface ContractReviewRequest {
   file_metadata?: ContractFileMetadata;
   file?: File;
   scenario_id?: string;
+  /** 서버 내부 요청 취소/전체 실행 deadline. 공개 JSON 입력으로 신뢰하지 않는다. */
+  signal?: AbortSignal;
 }
 
 export interface ContractItem {

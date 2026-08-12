@@ -210,6 +210,30 @@ interface RiskProvider {
 - UI에는 지연시간·토큰·종료 사유·가드레일 상태를 표시하되 숨은 프롬프트와 API 키는 표시하지 않는다.
 - 비교 선택 로그에는 질문·답변 원문을 저장하지 않는다.
 
+일반 사용자 `/api/chat`은 `CHAT_EXECUTION_MODE` feature flag로 두 실행기를 선택한다. 기본 `dual_api`는
+위 동작을 그대로 보존한다. `openai_responses`는 기존 PolicyChatProvider의 긴급·fallback 기준을 유지한 채
+다음 서버 경계를 추가한다.
+
+```text
+ResponsesChatService
+  → OpenAIResponsesClient (raw /v1/responses)
+  → OpenAIResponsesRunner (function_call 반복·한도·usage 합산)
+  → allowlist ToolDispatcher
+      ├─ search_company       → companyService
+      ├─ get_company_risk     → riskService
+      ├─ retrieve_labor_law   → ragService
+      └─ review_contract      → contractService + request-scoped File
+```
+
+도구 handler는 Repository나 외부 adapter를 새로 구현하지 않고 기존 service를 주입받는 얇은 경계다.
+모델은 임의 SQL·URL·파일 경로를 실행할 수 없다. strict JSON schema 다음에 런타임 parser와 dispatcher
+allowlist를 다시 거치며, service가 공개한 `ServiceError` 외 내부 오류 원문은 function output에 넣지 않는다.
+
+Responses loop는 stateless 요청에서 reasoning item을 포함한 `response.output` 전체와 동일한 `call_id`의
+`function_call_output`을 다음 입력으로 돌려준다. 동일 call ID 재실행 방지, 다른 인자의 call ID 재사용 차단,
+계약 검토 run당 1회, 전체 도구 호출·라운드·실행시간 제한을 적용한다. 실제 RAG citation/source만 ledger에
+누적해 최종 출력의 법령 인용 가드레일과 사용자 출처에 사용한다.
+
 ```ts
 interface ChatProvider {
   answer(input: ChatProviderInput): Promise<ChatProviderResult>;

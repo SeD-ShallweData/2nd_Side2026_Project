@@ -38,6 +38,7 @@ async function parseRequest(request: Request): Promise<ContractReviewRequest> {
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const input = await parseRequest(request);
+    input.signal = request.signal;
     return NextResponse.json(await reviewContract(input));
   } catch (error) {
     const payload = errorPayload(error);

@@ -23,6 +23,10 @@ interface UpstreamResponse {
   items?: unknown;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
@@ -55,24 +59,53 @@ export class HttpRagRetriever implements RagRetriever {
     private readonly fetchFn: typeof fetch = fetch,
   ) {}
 
-  async retrieve(query: string, limit = 5): Promise<RagRetrievalResult> {
+  async retrieve(
+    query: string,
+    limit = 5,
+    signal?: AbortSignal,
+  ): Promise<RagRetrievalResult> {
     try {
       const response = await this.fetchFn(`${this.baseUrl.replace(/\/$/, "")}/api/retrieve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query, limit }),
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(this.timeoutMs)])
+          : AbortSignal.timeout(this.timeoutMs),
         cache: "no-store",
       });
       if (!response.ok) throw new Error(`RAG HTTP ${response.status}`);
-      const payload = (await response.json()) as UpstreamResponse;
-      const documents = Array.isArray(payload.items)
-        ? payload.items.map(parseDocument).filter((item): item is RagDocument => item !== null)
-        : [];
+      const rawPayload: unknown = await response.json();
+      if (!isRecord(rawPayload)) throw new Error("RAG payload must be an object");
+      const payload = rawPayload as UpstreamResponse;
+      if (payload.status !== "matched" && payload.status !== "no_match") {
+        throw new Error("RAG payload has an unsupported status");
+      }
+      if (!Array.isArray(payload.items)) throw new Error("RAG payload items must be an array");
+      if (
+        payload.threshold !== undefined &&
+        payload.threshold !== null &&
+        (typeof payload.threshold !== "number" || !Number.isFinite(payload.threshold))
+      ) {
+        throw new Error("RAG payload threshold must be a finite number or null");
+      }
+
+      const parsedDocuments = payload.items.map(parseDocument);
+      if (parsedDocuments.some((item) => item === null)) {
+        throw new Error("RAG payload contains an invalid document");
+      }
+      const documents = parsedDocuments as RagDocument[];
+      if (
+        (payload.status === "matched" && documents.length === 0) ||
+        (payload.status === "no_match" && documents.length > 0)
+      ) {
+        throw new Error("RAG payload status and documents disagree");
+      }
+
       return {
         query: optionalString(payload.query) ?? query,
         retrieval_query: optionalString(payload.retrieval_query),
-        status: payload.status === "matched" && documents.length > 0 ? "matched" : "no_match",
+        status: payload.status,
         reason: optionalString(payload.reason) ?? null,
         topic: optionalString(payload.topic) ?? null,
         threshold: typeof payload.threshold === "number" ? payload.threshold : null,

@@ -9,6 +9,9 @@ import type { SourceReference } from "@/domain/risk";
 import type { RagRetrievalResult } from "@/domain/rag";
 
 export type LlmProviderId = "upstage" | "skt";
+export type ChatResultProviderId = LlmProviderId | "openai";
+export type ConfiguredChatExecutionMode = "dual_api" | "openai_responses";
+export type ChatExecutionMode = ConfiguredChatExecutionMode | "policy_short_circuit";
 export type ProviderRunStatus = "success" | "guardrail_replaced" | "fallback" | "policy_short_circuit";
 
 export interface TokenUsage {
@@ -41,10 +44,14 @@ export interface SafeExecutionTrace {
   rag_reason: string | null;
   rag_topic: string | null;
   retrieved_document_count: number;
+  tool_round_count?: number;
+  tool_call_count?: number;
+  tool_names?: string[];
+  response_id?: string | null;
 }
 
 export interface ProviderComparisonResult {
-  provider: LlmProviderId;
+  provider: ChatResultProviderId;
   provider_label: string;
   model: string;
   status: ProviderRunStatus;
@@ -66,7 +73,7 @@ export interface ProviderComparisonResult {
 export interface ChatComparisonResponse {
   comparison_id: string;
   conversation_id: string;
-  execution_mode: "dual_api" | "policy_short_circuit";
+  execution_mode: ChatExecutionMode;
   started_at: string;
   completed_at: string;
   fair_comparison: {
