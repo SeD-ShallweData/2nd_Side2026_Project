@@ -7,12 +7,12 @@ export const metadata: Metadata = { title: "근로계약서 확인" };
 export default function ContractsPage() {
   const dataMode = getContractDataMode();
   return (
-    <div className="page-section contract-page">
+    <div className="page-section contract-page refresh-contract-page">
       <div className="shell narrow-shell">
         <div className="page-heading">
-          <span className="eyebrow">근로계약 기본 항목</span>
-          <h1>계약서에서 무엇을 확인해야 할까요?</h1>
-          <p>확인된 항목, 누락 가능 항목과 회사에 추가로 물어볼 질문을 구분해 확인합니다.</p>
+          <span className="eyebrow">근로계약서 확인</span>
+          <h1>계약서에서 놓친 항목이 있나요?</h1>
+          <p>파일을 올리면 확인된 항목, 누락 가능 항목과 회사에 다시 물어볼 질문을 구분합니다.</p>
         </div>
         <div className={`mode-banner mode-banner-${dataMode}`} role="status">
           <span>{dataMode === "real" ? "DOCUMENT ANALYSIS" : "DEMO"}</span>

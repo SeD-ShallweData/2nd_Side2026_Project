@@ -20,11 +20,11 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
   const prompt = params.prompt?.slice(0, 2_000);
   return (
     <div className="page-section conversation-page">
-      <div className="shell chat-page-shell">
+      <div className="shell chat-page-shell refresh-chat-shell">
         <div className="page-heading page-heading-left">
-          <span className="eyebrow">공식 정보 기반 행동 안내</span>
-          <h1>노동 관련 상황을 물어보세요</h1>
-          <p>공식 노동법 검색 결과를 두 모델에 동일하게 전달하며, 법률 판단이나 전문가 상담을 대신하지 않습니다.</p>
+          <span className="eyebrow">AI 노동 상담</span>
+          <h1>같은 질문, 두 관점으로 확인하세요</h1>
+          <p>답변보다 공식 근거와 다음 행동을 먼저 볼 수 있게 구성했습니다.</p>
         </div>
         <ChatPanel
           companyId={company?.company_id}

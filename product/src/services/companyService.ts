@@ -4,7 +4,7 @@ import { delay } from "@/utils/delay";
 import { ServiceError } from "@/utils/errors";
 import { getCompanyRepository } from "@/services/providers";
 
-export async function searchCompanies(query: string, limit = 10): Promise<CompanySearchResponse> {
+export async function searchCompanies(query: string, limit = 10, page = 1): Promise<CompanySearchResponse> {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 1 || normalizedQuery.length > 100) {
     throw new ServiceError(
@@ -24,14 +24,31 @@ export async function searchCompanies(query: string, limit = 10): Promise<Compan
       [{ field: "limit", reason: "limit은 1 이상 20 이하의 정수여야 합니다." }],
     );
   }
+  if (!Number.isInteger(page) || page < 1 || page > 100_000) {
+    throw new ServiceError(
+      "VALIDATION_ERROR",
+      "검색 페이지를 확인해 주세요.",
+      400,
+      false,
+      [{ field: "page", reason: "page는 1 이상의 정수여야 합니다." }],
+    );
+  }
 
   if (getCompanyDataMode() === "mock") await delay(getMockDelayMs());
-  const items = await getCompanyRepository().search(normalizedQuery, limit);
+  const repository = getCompanyRepository();
+  const [items, total] = await Promise.all([
+    repository.search(normalizedQuery, limit, (page - 1) * limit),
+    repository.count(normalizedQuery),
+  ]);
+  const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
   return {
     query: normalizedQuery,
     items,
-    total: items.length,
-    has_more: false,
+    total,
+    has_more: page < totalPages,
+    page,
+    page_size: limit,
+    total_pages: totalPages,
   };
 }
 

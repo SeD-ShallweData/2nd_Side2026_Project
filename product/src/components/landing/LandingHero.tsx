@@ -2,63 +2,40 @@ import Link from "next/link";
 
 export function LandingHero() {
   return (
-    <section className="hero-section">
-      <div className="shell hero-grid">
-        <div className="hero-copy">
+    <section className="refresh-hero" aria-labelledby="home-title">
+      <div className="shell refresh-hero-grid">
+        <div className="refresh-hero-copy">
           <span className="eyebrow">구직자와 근로자를 위한 AI 노동 정보</span>
-          <h1>
-            일하기 전에도,
-            <br />
-            일하는 중에도 <mark>돈워리</mark>
+          <h1 id="home-title">
+            <span>일하기 전에도, 일하는 중에도</span>
+            <mark>미리 대비하는 돈워리</mark>
           </h1>
-          <p>
-            공공데이터 기반 고용 신호와 공식 노동 정보를 연결해, 입사 전과 재직 중 확인해야 할 정보를
-            안내합니다.
-          </p>
-          <div className="hero-actions">
-            <Link href="/companies" className="button button-dark button-large">
-              사업장 확인하기
-              <span aria-hidden="true">→</span>
-            </Link>
-            <Link href="/chat" className="button button-ghost button-large">
-              일반 노동 상담
-            </Link>
+          <p>사업장의 공개 정보부터 계약서, 노동 상담까지. 막막했던 확인을 한곳에서 시작하세요.</p>
+          <div className="refresh-button-row">
+            <Link href="/companies" className="button button-dark button-large">무료로 위험카드 보기 <span aria-hidden="true">→</span></Link>
+            <Link href="/chat" className="button button-light button-large">AI 상담 먼저 해보기</Link>
           </div>
-          <p className="hero-disclaimer">
-            회사의 안전·위법 여부나 입사 결정을 확정하지 않고, 확인할 정보와 행동을 안내합니다.
-          </p>
+          <dl className="refresh-hero-facts">
+            <div><dt>위험 정보</dt><dd>두 카드로 분리</dd></div>
+            <div><dt>공식 근거</dt><dd>출처와 기준일 표시</dd></div>
+            <div><dt>결론 대신</dt><dd>확인할 행동 안내</dd></div>
+          </dl>
         </div>
-        <div className="hero-visual" aria-label="돈워리 서비스 화면 예시">
-          <div className="floating-chip chip-top">확률 대신 확인할 정보</div>
-          <div className="demo-window">
-            <div className="demo-window-top">
-              <span />
-              <span />
-              <span />
-              <small>돈워리 사업장 확인</small>
+
+        <div className="refresh-hero-visual" aria-label="돈워리 위험카드 화면 예시">
+          <span className="refresh-demo-label">화면 예시</span>
+          <div className="refresh-demo-window">
+            <div className="refresh-demo-bar"><i /><i /><i /><span>돈워리 · 사업장 확인</span></div>
+            <div className="refresh-demo-company">
+              <b>OO</b><div><strong>OO건설</strong><span>인천광역시 · 건설업</span></div>
             </div>
-            <div className="demo-company">
-              <div className="demo-logo">OO</div>
-              <div>
-                <strong>OO건설</strong>
-                <span>인천광역시 · 건설업</span>
-              </div>
+            <div className="refresh-demo-cards">
+              <article className="is-review"><small>사업장 단위</small><strong>임금 지급 관련 정보</strong><em>추가 확인 권장</em><p>공개된 항목과 확인 질문을 살펴보세요.</p></article>
+              <article className="is-watch"><small>지역·업종 맥락</small><strong>산업재해 확인 신호</strong><em>우선 확인 필요</em><p>현장 안전조치와 교육 여부를 물어보세요.</p></article>
             </div>
-            <div className="demo-signal-grid">
-              <div className="demo-signal">
-                <small>임금 지급 관련</small>
-                <strong>추가 확인 권장</strong>
-                <span>고용 변동을 확인하세요</span>
-              </div>
-              <div className="demo-signal demo-signal-warn">
-                <small>산업안전 확인 신호</small>
-                <strong>우선 확인 필요</strong>
-                <span>현장 안전조치를 물어보세요</span>
-              </div>
-            </div>
-            <div className="demo-chat-bubble">입사 전에 무엇을 확인해야 하나요?</div>
           </div>
-          <div className="floating-chip chip-bottom">공식 자료 기반 행동 가이드</div>
+          <span className="refresh-float-chip refresh-chip-top">공개 데이터 기준일 표시</span>
+          <span className="refresh-float-chip refresh-chip-bottom">공식 근거 기반 다음 행동</span>
         </div>
       </div>
     </section>

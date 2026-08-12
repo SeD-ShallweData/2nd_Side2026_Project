@@ -31,7 +31,7 @@ function toCompany(row: FirmRow): Company {
 }
 
 export class RealCompanyRepository implements CompanyRepository {
-  async search(query: string, limit = 10): Promise<CompanySearchResult[]> {
+  async search(query: string, limit = 10, offset = 0): Promise<CompanySearchResult[]> {
     const rows = await queryReadOnly<FirmRow>(
       `SELECT f.firm_id, f.name, f.sido, f.industry
          FROM public.firms AS f
@@ -39,8 +39,9 @@ export class RealCompanyRepository implements CompanyRepository {
         ORDER BY CASE WHEN lower(f.name) = lower($2) THEN 0 ELSE 1 END,
                  f.name,
                  f.firm_id
-        LIMIT $3`,
-      [`%${escapeLike(query)}%`, query, limit],
+        LIMIT $3
+       OFFSET $4`,
+      [`%${escapeLike(query)}%`, query, limit, offset],
     );
 
     return rows.map((row) => ({
@@ -55,12 +56,22 @@ export class RealCompanyRepository implements CompanyRepository {
     }));
   }
 
+  async count(query: string): Promise<number> {
+    const rows = await queryReadOnly<{ total: string }>(
+      `SELECT count(*)::text AS total
+         FROM public.firms AS f
+        WHERE f.name ILIKE $1 ESCAPE '\\'`,
+      [`%${escapeLike(query)}%`],
+    );
+    return Number(rows[0]?.total ?? 0);
+  }
+
   async getById(companyId: string): Promise<Company | null> {
     const rows = await queryReadOnly<FirmRow>(
       `WITH latest_batch AS (
          SELECT as_of_date
            FROM public.batches
-          ORDER BY ingested_at DESC, id DESC
+          ORDER BY as_of_date DESC NULLS LAST, ingested_at DESC, id DESC
           LIMIT 1
        )
        SELECT f.firm_id,

@@ -9,7 +9,7 @@ export default function NotFoundPage() {
             ?
           </span>
           <h1>요청한 사업장을 찾을 수 없습니다</h1>
-          <p>사업장 검색에서 이름, 주소, 업종을 다시 확인해 주세요.</p>
+          <p>사업장 검색에서 이름, 지역, 업종을 다시 확인해 주세요.</p>
           <Link href="/companies" className="button button-dark">
             사업장 다시 검색
           </Link>

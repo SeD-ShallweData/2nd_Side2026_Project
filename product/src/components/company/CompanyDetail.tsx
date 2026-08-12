@@ -67,11 +67,9 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
             <div className="detail-company-copy">
               <span className="demo-pill">{dataMode === "real" ? "DB 연결 사업장" : "데모 사업장"}</span>
               <h1>{company.company_name}</h1>
-              <p>{company.address ?? "DB에 상세 주소 정보가 없습니다."}</p>
               <div className="detail-tags">
                 <span>{company.region ?? "지역 정보 없음"}</span>
                 <span>{company.industry ?? "업종 정보 없음"}</span>
-                <span>{company.size_label ?? "규모 정보 없음"}</span>
               </div>
             </div>
             <Link href="/companies" className="button button-outline change-company">

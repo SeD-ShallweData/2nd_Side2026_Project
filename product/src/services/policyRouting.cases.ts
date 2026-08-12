@@ -236,7 +236,7 @@ export const POLICY_ROUTING_CASES: PolicyRoutingCase[] = [
     expect_answer_type: "company_context",
     expect_guardrail: "limited",
     expect_sources: "some",
-    expect_actions: ["CHECK_PAYDAY", "CHECK_INSURANCE"],
+    expect_actions: ["CHECK_PAYDAY", "CHECK_PAY_STRUCTURE"],
     expect_contains: ["확정할 수 없습니다"],
   },
   {
