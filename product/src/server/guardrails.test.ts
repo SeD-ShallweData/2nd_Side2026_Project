@@ -128,6 +128,46 @@ describe("법령 인용 검증", () => {
   it("조문을 인용하지 않으면 검색이 실패해도 걸리지 않는다", () => {
     expect(hasUnverifiedCitation("고용노동부 1350에 문의하세요.", "no_match")).toBe(false);
   });
+
+  /*
+   * 아래 두 경우는 조문 정규식이 적재된 7개 법령만 알던 동안 검증을 그대로
+   * 통과했습니다. 검색이 out_of_scope 로 막힌 질문에 모델이 근거를 지어내
+   * 붙였는데 가드레일이 걸리지 않고 사용자에게 나갔습니다.
+   */
+  it("적재 목록에 없는 법령의 조문을 인용하면 걸린다", () => {
+    expect(
+      hasUnverifiedCitation("노동조합 및 노동관계조정법 제2조에 근거합니다.", "no_match"),
+    ).toBe(true);
+    expect(
+      hasUnverifiedCitation("산업안전보건법 제38조에 따라", "matched", ["근로기준법 제36조"]),
+    ).toBe(true);
+  });
+
+  it("공식 안내 문서명을 지어내면 걸린다", () => {
+    expect(
+      hasUnverifiedCitation("고용노동부 노동포털 「노동조합 설립 절차」", "no_match"),
+    ).toBe(true);
+    expect(
+      hasUnverifiedCitation("국세청 「종합소득세 신고 안내」를 참고하세요.", "no_match"),
+    ).toBe(true);
+    expect(
+      hasUnverifiedCitation(
+        "자료를 정리하세요(고용노동부 노동포털 「체불임금 해결 방법」).",
+        "matched",
+        ["고용노동부 노동포털 「체불임금 해결 방법」"],
+      ),
+    ).toBe(false);
+  });
+
+  it("검색된 공식 안내와 다른 문서명을 인용하면 걸린다", () => {
+    expect(
+      hasUnverifiedCitation(
+        "가입 의무가 있습니다(고용노동부 노동포털 「4대보험 가입 의무」).",
+        "matched",
+        ["고용노동부 노동포털 「체불임금 해결 방법」"],
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("두 화면의 판정 기준 일치", () => {

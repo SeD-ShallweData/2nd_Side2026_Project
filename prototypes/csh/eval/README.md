@@ -16,6 +16,8 @@
 | `rag_hitrate.py` | rag-api (5051) | 없음 |
 | `threshold_band.py` | rag-api (5051) | 없음 |
 | `relevance_eval.py` | product (3001) + rag-api | **있음** |
+| `prompt_quality.py` | product (3001) + rag-api | **있음** |
+| `citation_attach.py` | product (3001) + rag-api | **있음** |
 
 ```bash
 RAG_API_URL=http://127.0.0.1:5051      # 기본값
@@ -61,6 +63,37 @@ python3 eval/relevance_eval.py compare
 답변이 그것을 끌어다 쓰는지 셉니다.
 
 결과는 `results/` 에 JSON으로 남고 git에 올라가지 않습니다.
+
+## prompt_quality.py — 상담 프롬프트 종합 회귀
+
+**LLM을 호출합니다.** 16케이스 × 2모델 = 32회입니다.
+
+프롬프트를 크게 고칠 때 쓰는 넓은 게이트입니다. RAG가 돌려주는 검색 경로
+네 가지(조문 matched / 공식 안내만 matched / 수록 범위 밖 / 서비스 범위 밖)를
+나눠서, 경로마다 다른 합격 조건으로 봅니다. 한쪽을 고치다 다른 쪽을 무너뜨리는
+것을 잡으려는 것입니다.
+
+```bash
+python3 eval/prompt_quality.py paths    # LLM 없이 검색 경로만 확인
+python3 eval/prompt_quality.py before
+python3 eval/prompt_quality.py after
+python3 eval/prompt_quality.py compare
+```
+
+## citation_attach.py — 법령 인용 부착
+
+**LLM을 호출합니다.** 20케이스 × 2모델 = 40회입니다.
+
+인용 하나를 깊게 봅니다. 검색 거리 0.35 미만 안정 구간만 써서, 인용을 안 붙인
+것과 붙일 근거가 없었던 것을 구분합니다.
+
+```bash
+python3 eval/citation_attach.py before
+python3 eval/citation_attach.py after
+python3 eval/citation_attach.py compare
+```
+
+두 스크립트로 무엇을 찾아 어떻게 고쳤는지는 [PROMPT.md](PROMPT.md) 에 있습니다.
 
 ## 주의
 
