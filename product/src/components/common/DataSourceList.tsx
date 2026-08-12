@@ -8,10 +8,10 @@ export function DataSourceList({ sources }: { sources: SourceReference[] }) {
     <ul className="source-list">
       {sources.map((source, index) => (
         <li key={`${source.name}-${source.as_of ?? index}`}>
-          <span>
+          <span className="source-primary">
             {source.url ? (
-              <a href={source.url} target="_blank" rel="noreferrer">{source.name}</a>
-            ) : source.name}
+              <a className="source-name" href={source.url} target="_blank" rel="noreferrer" title={source.name}>{source.name}</a>
+            ) : <span className="source-name" title={source.name}>{source.name}</span>}
             {source.citation && source.citation !== source.name ? <em>{source.citation}</em> : null}
           </span>
           <small>

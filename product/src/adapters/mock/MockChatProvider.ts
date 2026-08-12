@@ -26,6 +26,7 @@ const CALL_1350: SuggestedAction = {
 
 const WAGE_GUIDE_SOURCE: SourceReference = {
   name: "임금체불 진정 및 상담 안내",
+  category: "labor_law",
   citation: "고용노동부 노동포털 「체불임금 해결 방법」",
   organization: "고용노동부",
   document_id: "LABOR-PORTAL-WAGE-COMPLAINT",
@@ -34,6 +35,7 @@ const WAGE_GUIDE_SOURCE: SourceReference = {
 
 const SAFETY_GUIDE_SOURCE: SourceReference = {
   name: "산업재해보상보험 안내",
+  category: "labor_law",
   organization: "근로복지공단",
   document_id: "COMWEL_ACCIDENT_GUIDE",
 };

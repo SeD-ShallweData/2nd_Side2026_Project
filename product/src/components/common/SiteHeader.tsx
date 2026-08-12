@@ -54,9 +54,11 @@ export function SiteHeader() {
         </nav>
       </div>
       </header>
-      <Link href="/chat" className="consumer-floating-chat" aria-label="AI 노동 상담 바로가기">
-        <span>AI</span> 바로 상담
-      </Link>
+      {pathname !== "/chat" ? (
+        <Link href="/chat" className="consumer-floating-chat" aria-label="AI 노동 상담 바로가기">
+          <span>AI</span> 바로 상담
+        </Link>
+      ) : null}
       <nav className="consumer-mobile-nav" aria-label="모바일 주요 메뉴">
         <Link href="/">소개</Link><Link href="/companies">사업장</Link>
         <Link href="/contracts">계약서</Link><Link href="/community">커뮤니티</Link>
