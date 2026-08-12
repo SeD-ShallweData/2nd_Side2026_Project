@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// 시스템 프롬프트를 파일에서 읽게 되면서 server-only 모듈을 거친다.
+vi.mock("server-only", () => ({}));
+
 import { DualLlmChatProvider } from "@/adapters/real/DualLlmChatProvider";
 import { OpenAICompatibleChatClient } from "@/adapters/real/OpenAICompatibleChatClient";
 import type { ChatResponse } from "@/domain/chat";
