@@ -22,6 +22,11 @@
        [정제된 비교 응답만 브라우저로 반환]
 ```
 
+기본 `CHAT_EXECUTION_MODE=dual_api`는 위 Upstage/SKT 비교를 유지한다. 새
+`CHAT_EXECUTION_MODE=openai_responses`에서는 Next 백엔드가 OpenAI Responses를 호출하고 모델이 요청한
+도구명을 allowlist dispatcher로 검증한 뒤 기존 DB/RAG/계약 서비스를 실행한다. 두 경로는 같은 공개 응답
+wrapper를 사용하므로 환경변수 한 개로 rollback할 수 있다.
+
 API 키는 브라우저의 HTML이나 JavaScript에 넣지 않는다. 배포 서비스의 서버 환경변수 또는 서버 전용 비밀 저장소에 보관하고, `/api/chat` 같은 백엔드 경로에서만 읽는다.
 
 또한 공개 배포에는 다음 보호가 필요하다.
@@ -63,3 +68,13 @@ DB·ML·RAG가 GPU 서버에 남는다면 프론트엔드만 별도 배포해서
 - 본선 이후 안정적인 서비스: 공개 프론트엔드 + 인증된 백엔드 API + 환경변수 기반 비밀 관리
 
 정적 HTML에 API 키를 넣어 직접 Upstage나 SKT를 호출하는 방식은 사용하지 않는다. 브라우저 개발자 도구와 다운로드된 소스에서 키가 그대로 노출되기 때문이다.
+
+## 5. 종료 전 데이터 보존
+
+GitHub는 소스·문서·migration·작은 RAG 산출물을 보존하지만 PostgreSQL의 실행 데이터와 비밀값, 실행 중인
+서비스를 대신하지 않는다. 서버 종료 전에 PostgreSQL custom dump와 RAG DB archive를 만들고 checksum과
+restore 리허설까지 마쳐야 한다. 구체적인 순서와 rollback은 [`infra/OPERATIONS.md`](../../infra/OPERATIONS.md)를
+따른다.
+
+환경 파일은 Git에 넣지 않는다. VM에서는 `0600`, 같은 팀 그룹 읽기가 필요한 경우 `0640`을 사용하고,
+관리형 배포에서는 secret store에 `DATABASE_URL`, 공급자 키, 모델명, 내부 서비스 URL을 직접 등록한다.

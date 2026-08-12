@@ -2422,6 +2422,10 @@ summary:focus-visible {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.provider-answer-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .provider-answer {
   background: #fff;
   border: 1px solid var(--line);
@@ -2462,6 +2466,10 @@ summary:focus-visible {
 
 .provider-dot-skt {
   background: #159f86;
+}
+
+.provider-dot-openai {
+  background: #2f7a63;
 }
 
 .provider-run-status {
@@ -2855,6 +2863,28 @@ summary:focus-visible {
 .dual-api-note {
   margin: 0;
   padding: 0 18px 12px;
+}
+
+.chat-contract-upload {
+  align-items: center;
+  display: flex;
+  flex: 1 0 100%;
+  gap: 10px;
+  padding: 0 2px;
+}
+
+.chat-contract-upload .button {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+}
+
+.chat-contract-upload span {
+  color: var(--muted);
+  font-size: 0.69rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Responsive */

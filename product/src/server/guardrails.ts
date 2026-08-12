@@ -1,3 +1,8 @@
+import {
+  CONTRACT_LAW_ALIASES,
+  normalizeContractLegalBasis,
+} from "@/domain/contractLaw";
+
 /**
  * 출력 가드레일 공용 엔진.
  *
@@ -26,12 +31,14 @@ const NEGATION_PATTERN =
   /않습니다|않아요|않으며|않고|아닙니다|아니라|없습니다|못합니다|드리지|만들지|말씀드릴 수 없|판단할 수 없|확정할 수 없|보증하지|단정할 수 없/;
 
 /**
- * 벡터DB에 적재된 법령. 새 법령을 적재하면 여기에도 추가해야 인용 검증이 동작한다.
+ * RAG 또는 계약 규칙 엔진이 검증할 수 있는 법령. 새 근거원을 연결하면 함께 갱신한다.
  * 긴 이름을 먼저 두어 "근로기준법 시행령"이 "근로기준법"으로 잘리지 않게 한다.
  */
 export const LAW_NAMES = [
+  "기간제 및 단시간근로자 보호 등에 관한 법률",
   "남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률",
   "근로자퇴직급여 보장법",
+  "최저임금법 시행령",
   "근로기준법 시행령",
   "임금채권보장법",
   "고용보험법",
@@ -39,7 +46,11 @@ export const LAW_NAMES = [
   "근로기준법",
 ] as const;
 
-const LAW_CITATION_SOURCE = `(?:「\\s*)?(?:${LAW_NAMES.join("|")})(?:\\s*」)?\\s*제\\s*\\d+\\s*조(?:의\\s*\\d+)?`;
+const LAW_CITATION_NAMES = [
+  ...LAW_NAMES,
+  ...Object.keys(CONTRACT_LAW_ALIASES),
+];
+const LAW_CITATION_SOURCE = `(?:「\\s*)?(?:${LAW_CITATION_NAMES.join("|")})(?:\\s*」)?\\s*제\\s*\\d+\\s*조(?:의\\s*\\d+)?`;
 
 /** `g` 플래그가 있는 정규식은 lastIndex 상태를 가지므로 호출마다 새로 만든다. */
 function lawCitationPattern(): RegExp {
@@ -49,7 +60,11 @@ function lawCitationPattern(): RegExp {
 /** 답변에서 법령 인용을 뽑아 공백·괄호를 지운 비교용 키로 만든다. */
 export function citationKeys(text: string): Set<string> {
   return new Set(
-    (text.match(lawCitationPattern()) ?? []).map((citation) => citation.replace(/[「」\s]/g, "")),
+    (text.match(lawCitationPattern()) ?? []).map((citation) =>
+      normalizeContractLegalBasis(
+        citation.replace(/[「」]/g, "").replace(/\s+/g, " ").trim(),
+      )!.replace(/\s/g, ""),
+    ),
   );
 }
 
@@ -57,8 +72,11 @@ export function citationKeys(text: string): Set<string> {
 export function citationLabels(text: string): string[] {
   return [
     ...new Set(
-      (text.match(lawCitationPattern()) ?? []).map((citation) =>
-        citation.replace(/[「」]/g, "").replace(/\s+/g, " ").trim(),
+      (text.match(lawCitationPattern()) ?? []).map(
+        (citation) =>
+          normalizeContractLegalBasis(
+            citation.replace(/[「」]/g, "").replace(/\s+/g, " ").trim(),
+          )!,
       ),
     ),
   ];

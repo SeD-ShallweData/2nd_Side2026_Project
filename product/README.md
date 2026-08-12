@@ -2,7 +2,7 @@
 
 AI Rookie 및 창의종합설계 경진대회를 위한 구직자·근로자용 노동 정보 서비스입니다. 기본 실행은 명시된 데모 데이터이며, Real 모드에서는 읽기 전용 PostgreSQL·공식 노동법 RAG·계약서 분석 서비스를 Next.js 통합 API 뒤에 연결합니다. 상담 답변은 Upstage Solar와 SKT A.X API를 동시에 호출해 비교합니다.
 
-이 디렉터리는 `jcu_branch`의 통합 프로토타입을 초기 기준으로 만든 팀 공용 제품 작업 공간입니다. 기준 정보와 이후 개발 원칙은 [PRODUCT.md](PRODUCT.md)를 참고하세요.
+이 디렉터리는 `jcu_branch`의 통합 프로토타입을 초기 기준으로 만든 팀 공용 제품 작업 공간입니다. 상담은 기본적으로 기존 Upstage·SKT 비교를 유지하고, feature flag로 OpenAI Responses의 허용 도구 실행 흐름을 선택할 수 있습니다. 기준 정보와 이후 개발 원칙은 [PRODUCT.md](PRODUCT.md)를 참고하세요.
 
 ## 지금 시연할 수 있는 흐름
 
@@ -20,7 +20,7 @@ AI Rookie 및 창의종합설계 경진대회를 위한 구직자·근로자용 
 - Node.js 22
 - Next.js 16 / React 19 / TypeScript
 - 데이터 모드: `mock`(기본값) 또는 `real`, 사업장·계약서 기능별 독립 전환 가능
-- 상담 모드: Upstage Solar + SKT A.X 실제 API 병렬 비교
+- 상담 실행 모드: `dual_api`(기본 Upstage+SKT 병렬 비교) 또는 `openai_responses`(허용 도구 연결형 단일 답변)
 
 ### 전체 기능 실행 방법
 
@@ -66,6 +66,20 @@ CONTRACT_DATA_MODE=real
 `DATABASE_ENV_FILE`에서는 관리자 계정이 아니라 `BOT_NAME`·`BOT_PASSWORD`만 읽습니다. 비밀번호를
 `product`나 Git에 복사하지 않습니다. `mock` 모드는 단위 테스트와 별도 정적 HTML 시연본을 보존하기 위한
 명시적 개발 옵션일 뿐이며, 실제 연동 실패를 성공 결과로 바꾸는 자동 Mock 전환은 사용하지 않습니다.
+
+Responses 도구 흐름을 사용할 때만 다음 값을 추가합니다. 모델명은 배포 시점에 팀이 승인한 값을
+명시하며, 코드가 임의의 `latest` 모델을 선택하지 않습니다.
+
+```env
+CHAT_EXECUTION_MODE=openai_responses
+OPENAI_RESPONSES_MODEL=<승인한 모델 ID>
+OPENAI_API_KEY=<배포 secret에 등록>
+```
+
+사용 가능한 도구는 `search_company`, `get_company_risk`, `retrieve_labor_law`, `review_contract` 네 개뿐입니다.
+도구명과 JSON 인자는 strict schema와 서버 런타임 검증을 모두 통과해야 합니다. `review_contract`는
+`multipart/form-data`로 파일이 함께 온 요청에서만 모델에 노출되며 경로·base64·원문을 모델 인자로 받지
+않습니다. 기본 `CHAT_EXECUTION_MODE=dual_api`에서는 기존 Upstage/SKT 코드와 비교 UI가 그대로 동작합니다.
 
 이어서 같은 설치 터미널에서 RAG와 계약서 분석용 Python 가상환경을 각각 준비합니다.
 
@@ -149,11 +163,14 @@ npm run dev
 
 ```json
 {
+  "chat_execution_mode": "dual_api",
   "integrations": {
     "database": "ready",
     "rag": "ready",
     "contract_analysis": "ready",
-    "dual_llm": "ready"
+    "dual_llm": "ready",
+    "openai_responses": "unavailable",
+    "active_chat_llm": "ready"
   }
 }
 ```
@@ -162,6 +179,8 @@ npm run dev
 `configured_unreachable`, 설정 자체가 없으면 `unavailable`로 표시됩니다. `dual_llm`은 키 문자열만
 확인하지 않고 Upstage와 SKT에 최소 실제 요청을 보내므로, 키가 만료·차단됐거나 공급자가 요청을 거절하면
 `ready`가 아닌 `configured_unreachable`로 표시됩니다. 이 확인 결과는 60초 동안 재사용합니다.
+`openai_responses`는 상태 조회 비용을 만들지 않기 위해 키·모델·URL 구성 준비 여부만 검사합니다. 실제 키와
+네트워크 성공은 배포 smoke test로 확인하며, `active_chat_llm`은 현재 feature flag가 선택한 경로의 상태입니다.
 
 DB·ML은 사업장 검색 화면에서 실제 회사명을 검색한 뒤 상세 페이지를 열어 확인합니다. 정상이라면
 상단에 `READ ONLY DB`, 상세 화면에 `DB 연결 사업장`이 표시되고, 임금 공개 판정과 산업안전 공표
@@ -245,11 +264,26 @@ npm run start -- -H 127.0.0.1 -p 3111
 ## 검증 명령
 
 ```bash
-npm test
-npm run lint
-npm run typecheck
-npm run build
+npm run check
+npm run check:env-permissions
+npm run test:e2e:openai-live
 ```
+
+두 번째 명령은 env 값은 읽거나 출력하지 않고 파일 권한만 검사합니다. 팀 공용 파일은 임의로 변경하지 말고
+소유자와 합의해 `0600` 또는 같은 팀 그룹 읽기용 `0640`으로 조정합니다.
+
+`test:e2e:openai-live`는 기본적으로 `[SKIP]`을 출력하고 성공 종료하므로 비용이 발생하지 않습니다. 실제
+Responses·DB 도구 연결을 한 번 검증할 때만 실행 중인 `openai_responses` 서버 주소와 opt-in을 명시합니다.
+
+```bash
+RUN_OPENAI_LIVE_E2E=1 \
+E2E_BASE_URL=http://127.0.0.1:3000 \
+npm run test:e2e:openai-live
+```
+
+시연용 Basic 인증이 켜져 있으면 `E2E_BASIC_AUTH_USER`와 `E2E_BASIC_AUTH_PASSWORD`도 함께 설정합니다.
+스크립트는 OpenAI API 키를 인자로 받거나 출력하지 않으며, `/api/system/status`의 활성 상태를 확인한 뒤
+감독관 overview에서 한 사업장을 골라 실제 `/api/chat`의 `get_company_risk` 호출·성공·출처 전달을 검사합니다.
 
 ## Mock 시연 데이터
 
@@ -278,7 +312,7 @@ API 키와 숨은 시스템 프롬프트는 브라우저로 전송하지 않습�
 
 - `GET /api/companies/search?q=사업장명`
 - `GET /api/companies/{company_id}/risk`
-- `POST /api/chat`
+- `POST /api/chat` (JSON 상담 또는 `multipart/form-data` + `file`인 Responses 계약 검토 도구 요청)
 - `POST /api/contracts/review`
 - `GET /api/inspector/overview` · `GET /api/inspector/companies/*` (팀 시연용 내부 조회)
 - `POST /api/inspector/chat` (명시적 외부 컨텍스트 전송 확인 필요)
