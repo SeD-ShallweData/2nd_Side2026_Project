@@ -109,6 +109,25 @@ const companies = [
   }
 ];
 
+const companyMetrics = {
+  "demo-oo-incheon": {
+    defaulter: "미등재", arrears: "미등재", subscribers: "51 → 38명 (-25.5%)", turnover: "42%", notice: "월 345만원 · 4개월 연속 하락", trend: "감소", closure: "11.8% · KOSIS", completeness: "보통 · 최근 3개월 결측 1개월",
+    predicted: "128건", baseline: "90건", ratio: "1.42배", drivers: ["2주 전 산업안전 관련 민원이 늘었습니다", "지난주 건설 관련 민원이 평소보다 많이 접수됐습니다"]
+  },
+  "demo-oo-hwaseong": {
+    defaulter: "미등재", arrears: "미등재", subscribers: "19 → 12명 (-36.8%)", turnover: "51%", notice: "월 345만원 · 3개월 연속 하락", trend: "감소", closure: "11.8% · KOSIS", completeness: "낮음 · 최근 3개월 결측 2개월",
+    predicted: "141건", baseline: "94건", ratio: "1.51배", drivers: ["건설 관련 민원이 평시보다 많이 접수됐습니다", "최근 산업안전 관련 민원이 늘었습니다"]
+  },
+  "demo-daon": {
+    defaulter: "미등재", arrears: "미등재", subscribers: "146 → 151명 (+3.4%)", turnover: "12%", notice: "월 482만원", trend: "보합", closure: "7.1% · KOSIS", completeness: "높음 · 최근 결측 없음",
+    predicted: "41건", baseline: "39건", ratio: "1.05배", drivers: ["최근 재해 집계가 평시 수준입니다", "공정별 실제 안전조치는 직접 확인해야 합니다"]
+  },
+  "demo-future": {
+    defaulter: "확인 불가", arrears: "확인 불가", subscribers: "자료 부족", turnover: "자료 부족", notice: "자료 부족", trend: "판단 불가", closure: "연결 자료 없음", completeness: "낮음 · 분석 자료 부족",
+    predicted: "-", baseline: "-", ratio: "산정 불가", drivers: ["연결 가능한 지역·업종 집계가 부족합니다", "자료 부족을 정상 또는 위험으로 추정하지 않습니다"]
+  }
+};
+
 let selectedCompanyId = companies[0].id;
 let companyContextActive = false;
 let pendingPrompt = "";
@@ -194,47 +213,62 @@ function performSearch(query) {
     </div>`;
 }
 
-function workplaceRiskCard(company) {
-  const observedStatus = company.wage.level === "unknown" ? "자료 부족" : "명단 미등재";
-  const badgeClass = company.wage.level === "unknown" ? "badge-muted" : "badge-safe";
+function workplaceRiskCards(company) {
+  const metrics = companyMetrics[company.id];
   const contextLevel = company.safety.level === "normal" ? "정상" : company.safety.level === "unknown" ? "자료 부족" : "주의";
   const contextDot = company.safety.level === "normal" ? "normal" : company.safety.level === "unknown" ? "unknown" : "warning";
-  const contextNumbers = company.safety.level === "unknown"
-    ? "연결 가능한 집계가 없어 수치를 표시하지 않습니다."
-    : company.safety.level === "normal" ? "예측 4건 / 평시 4건 (1.0배)" : "예측 9건 / 평시 5건 (1.8배)";
   const contextWidth = company.safety.level === "unknown" ? 18 : company.safety.level === "normal" ? 44 : 78;
   return `
-    <article class="wcard">
-      <div class="wcard-head">
-        <div><h3>${escapeHtml(company.name)}</h3><p>⌖ ${escapeHtml(company.region)} · ${escapeHtml(company.industry)} · ${escapeHtml(company.size)}</p></div>
-        <span class="wcard-badge ${badgeClass}">${observedStatus}</span>
+    <div class="split-risk-grid">
+    <article class="split-risk-card split-risk-wage">
+      <div class="split-risk-head">
+        <div><span>사업장 단위 공개 정보</span><h3>임금 지급 관련 정보</h3></div>
+        <b class="status status-${company.wage.level}">${escapeHtml(company.wage.status)}</b>
       </div>
-      <section class="wcard-layer layer-observed">
-        <span class="wcard-layer-title">관측 사실 · 공개 데이터</span>
-        <div class="wcard-facts">
-          <div><span>체불사업주 명단</span><strong class="fact-safe">미등재</strong></div>
-          <div><span>건강보험 체납 명단</span><strong class="fact-safe">미등재</strong></div>
-          ${company.wage.facts.filter(([key]) => !key.includes("명단")).map(([key, value]) => `<div><span>${escapeHtml(key)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}
-          <div><span>데이터 충실도</span><strong>${company.wage.level === "unknown" ? "낮음 · 결측 있음" : "보통 · 최근 자료 확인"}</strong></div>
+      <p class="split-risk-summary">${escapeHtml(company.wage.summary)}</p>
+      <section class="split-risk-layer observed-layer">
+        <span class="split-layer-title">관측 사실 · 공개 데이터</span>
+        <div class="metric-list">
+          <div><span>체불사업주 명단</span><strong class="${metrics.defaulter === "미등재" ? "metric-safe" : ""}">${metrics.defaulter}</strong></div>
+          <div><span>건강보험 체납 명단</span><strong class="${metrics.arrears === "미등재" ? "metric-safe" : ""}">${metrics.arrears}</strong></div>
+          <div><span>국민연금 가입자 (12개월)</span><strong>${metrics.subscribers}</strong></div>
+          <div><span>이직률 (12개월)</span><strong>${metrics.turnover}</strong></div>
+          <div><span>1인당 고지금액</span><strong>${metrics.notice}</strong></div>
+          <div><span>고용 추이</span><strong>${metrics.trend}</strong></div>
+          <div><span>업종 폐업률</span><strong>${metrics.closure}</strong></div>
+          <div><span>데이터 충실도</span><strong>${metrics.completeness}</strong></div>
         </div>
-        <div class="wcard-flags"><span>공개 출처 확인</span><span>기준일 표시</span></div>
+      </section>
+      <section class="split-risk-layer checklist-layer">
+        <span class="split-layer-title">확인 체크리스트</span>
+        <div class="compact-check"><i>!</i><p><strong>면접·입사 전에 이렇게 물어보세요</strong><span>${escapeHtml(company.wage.prompt)}</span></p></div>
+      </section>
+      <details class="split-risk-details"><summary>출처·기준일·해석 한계</summary><p><b>출처</b> · ${escapeHtml(company.wage.source)}<br><b>기준</b> · 2026-07 · 매칭 신뢰도 ${company.wage.level === "unknown" ? "확인 필요" : "92%"}<br><b>한계</b> · ${escapeHtml(company.wage.limitation)}</p></details>
+      <button class="split-risk-action" type="button" data-ask="${escapeHtml(company.wage.prompt)}" data-company-context>임금 정보로 AI 상담하기 →</button>
+    </article>
+
+    <article class="split-risk-card split-risk-safety">
+      <div class="split-risk-head">
+        <div><span>지역·업종 단위 참고정보</span><h3>산업안전 관련 정보</h3></div>
+        <b class="status status-${company.safety.level}">${escapeHtml(company.safety.status)}</b>
       </div>
-      <section class="wcard-layer layer-check">
-        <span class="wcard-layer-title">확인 체크리스트 · 예측을 질문으로</span>
-        <div class="wcard-check"><i>!</i><p><strong>임금 조건을 서면으로 확인하세요</strong><span>${escapeHtml(company.wage.prompt)}</span></p></div>
-        <div class="wcard-check info"><i>i</i><p><strong>실제 현장 조건을 함께 확인하세요</strong><span>${escapeHtml(company.safety.prompt)}</span></p></div>
-      </section>
-      <section class="wcard-layer layer-context">
-        <span class="wcard-layer-title">지역·업종 맥락 · 집계</span>
+      <p class="split-risk-summary">${escapeHtml(company.safety.summary)}</p>
+      <div class="scope-strip"><strong>분석 범위</strong><span>${escapeHtml(company.region)} · ${escapeHtml(company.industry)} · 개별 사업장 판정 아님</span></div>
+      <section class="split-risk-layer safety-layer">
+        <span class="split-layer-title">지역·업종 맥락 · 집계</span>
         <div class="context-head"><i class="context-dot ${contextDot}"></i><strong>${escapeHtml(company.region)} · ${escapeHtml(company.industry)} — ${contextLevel}</strong></div>
-        <p class="context-numbers">${contextNumbers}</p>
+        <div class="safety-number-grid"><span><small>예측 집계</small><strong>${metrics.predicted}</strong></span><span><small>평시 집계</small><strong>${metrics.baseline}</strong></span><span><small>비교</small><strong>${metrics.ratio}</strong></span></div>
         <div class="context-scale" aria-label="지역·업종 집계 신호 시각화"><span style="width:${contextWidth}%"></span></div>
-        <ul><li>최근 지역·업종 공개 참고자료 기준</li><li>현장 안전교육과 보호구 지급 여부 직접 확인</li></ul>
-        <p class="wcard-note">지역·업종 집계이며 이 사업장의 사고 위험이나 안전 판정이 아닙니다.</p>
+        <ul class="driver-list">${metrics.drivers.map((driver) => `<li>${escapeHtml(driver)}</li>`).join("")}</ul>
       </section>
-      <details class="wcard-more"><summary>출처·기준일·해석 한계 보기</summary><p class="wcard-disclaimer">이 카드는 공개 데이터에서 관측된 사실과 확인할 질문을 정리한 참고자료입니다. 입사 결정이나 법률 판단을 대신하지 않습니다.</p><div class="wcard-foot"><span>출처 · 국민연금 가입 사업장 자료 · 공개 명단 · 산업재해 지역·업종 참고자료</span><span>기준 · 고용 2026-07 · 산재 2026-07-31 · 매칭 ${company.wage.level === "unknown" ? "확인 필요" : "92%"}</span></div></details>
-      <button class="wcard-action" type="button" data-ask="${escapeHtml(company.wage.prompt)}" data-company-context>이 카드로 AI 상담 이어가기 →</button>
-    </article>`;
+      <section class="split-risk-layer checklist-layer safety-checklist">
+        <span class="split-layer-title">현장에서 직접 확인할 것</span>
+        <div class="compact-check info"><i>i</i><p><strong>안전교육·보호구·사고 보고 절차</strong><span>${escapeHtml(company.safety.prompt)}</span></p></div>
+      </section>
+      <details class="split-risk-details"><summary>출처·기준일·해석 한계</summary><p><b>출처</b> · ${escapeHtml(company.safety.source)}<br><b>기준</b> · 2026-07-31<br><b>한계</b> · ${escapeHtml(company.safety.limitation)}</p></details>
+      <button class="split-risk-action" type="button" data-ask="${escapeHtml(company.safety.prompt)}" data-company-context>산업안전 정보로 AI 상담하기 →</button>
+    </article>
+    </div>`;
 }
 
 function renderHomeRisk() {
@@ -242,7 +276,7 @@ function renderHomeRisk() {
   const card = document.getElementById("home-risk-card");
   if (!picker || !card) return;
   picker.innerHTML = companies.map((company) => `<button type="button" class="chip ${company.id === selectedCompanyId ? "is-active" : ""}" data-home-company="${company.id}">${escapeHtml(company.name)}${company.id === "demo-oo-hwaseong" ? " (화성)" : ""}</button>`).join("");
-  card.innerHTML = workplaceRiskCard(currentCompany());
+  card.innerHTML = workplaceRiskCards(currentCompany());
 }
 
 function renderCompany() {
@@ -251,7 +285,7 @@ function renderCompany() {
   document.getElementById("company-title").textContent = company.name;
   document.getElementById("company-address").textContent = company.address;
   document.getElementById("detail-tags").innerHTML = `<span>${escapeHtml(company.region)}</span><span>${escapeHtml(company.industry)}</span><span>${escapeHtml(company.size)}</span>`;
-  document.getElementById("risk-grid").innerHTML = workplaceRiskCard(company);
+  document.getElementById("risk-grid").innerHTML = workplaceRiskCards(company);
   const questions = [
     ["임금 조건", company.wage.prompt, "임금 카드에서 이어짐"],
     ["현장 안전", company.safety.prompt, "산업안전 카드에서 이어짐"],
@@ -313,8 +347,8 @@ function dummyAnswers(question) {
     sources = ["사업장 공개 확인정보", "공식 노동 상담 안내"];
   }
   return [
-    { name: "Upstage Solar", dot: "", answer: core, actions, sources },
-    { name: "SKT A.X", dot: "model-dot-skt", answer: `${core}\n\n확인한 답변은 입사 결정의 한 자료로만 사용하고, 실제 계약 조건과 최신 현장 상황을 함께 비교하세요.`, actions: [...actions].reverse(), sources }
+    { name: "Upstage Solar", dot: "", answer: core, actions, sources, limit: "공개 자료와 질문 내용만으로 구성한 안내이며 회사의 위법·안전 여부를 확정하지 않습니다." },
+    { name: "SKT A.X", dot: "model-dot-skt", answer: `${core}\n\n확인한 답변은 입사 결정의 한 자료로만 사용하고, 실제 계약 조건과 최신 현장 상황을 함께 비교하세요.`, actions: [...actions].reverse(), sources, limit: "일반적인 노동 정보 안내이며 개별 사건의 법률 자문이나 전문가 판단을 대신하지 않습니다." }
   ];
 }
 
@@ -330,17 +364,20 @@ function sendChat(question) {
     const answers = dummyAnswers(trimmed);
     messages.insertAdjacentHTML("beforeend", `
       <div class="comparison-block">
-        <div class="comparison-summary"><strong>같은 질문과 공개 컨텍스트로 비교</strong><span>UI 더미 응답</span></div>
+        <div class="comparison-summary"><div><span>동일 조건 병렬 비교</span><strong>두 모델이 같은 질문·사업장·공식 검색 결과를 사용했습니다.</strong><em>공식 근거 ${answers[0].sources.length}개 연결</em></div><span>UI 더미 응답</span></div>
         <div class="answer-grid">
           ${answers.map((item) => `<article class="answer-card">
-            <div class="answer-head"><i class="model-dot ${item.dot}"></i><strong>${item.name}</strong><span>더미 답변</span></div>
+            <header class="answer-head"><div><i class="model-dot ${item.dot}"></i><strong>${item.name}</strong><small>${item.name === "Upstage Solar" ? "solar-pro3" : "A.X-K1"}</small></div><span>더미 응답</span></header>
             <div class="answer-copy">${escapeHtml(item.answer)}</div>
-            <div class="answer-section"><strong>공식 근거 예시</strong><ul>${item.sources.map((source) => `<li>${escapeHtml(source)}</li>`).join("")}</ul></div>
-            <div class="answer-section"><strong>지금 할 일</strong><ul>${item.actions.map((action) => `<li>${escapeHtml(action)}</li>`).join("")}</ul></div>
-            <details class="answer-details"><summary>응답 상세 · 기술 정보</summary><dl><div><dt>응답 시간</dt><dd>더미·미측정</dd></div><div><dt>토큰</dt><dd>더미·미측정</dd></div><div><dt>공식 검색</dt><dd>예시 자료</dd></div><div><dt>외부 전송</dt><dd>없음</dd></div></dl></details>
+            <section class="answer-evidence" aria-label="${item.name} 답변 근거와 한계">
+              <div><strong>공식 근거</strong><ul class="answer-source-list">${item.sources.map((source) => `<li><span>공식</span>${escapeHtml(source)}</li>`).join("")}</ul></div>
+              <div><strong>답변 한계</strong><ul><li>${escapeHtml(item.limit)}</li></ul></div>
+            </section>
+            <details class="answer-details"><summary>응답 상세 · 속도, 토큰, 생성 과정</summary><dl><div><dt>전체 응답시간</dt><dd>더미·미측정</dd></div><div><dt>전체 토큰</dt><dd>더미·미측정</dd></div><div><dt>답변 길이</dt><dd>${item.answer.length.toLocaleString("ko-KR")}자</dd></div><div><dt>실행 상태</dt><dd>사전 생성 응답</dd></div><div><dt>컨텍스트</dt><dd>${companyContextActive ? "선택 사업장 연결" : "일반 상담"}</dd></div><div><dt>질의 재작성</dt><dd>사용 안 함</dd></div><div><dt>최근 대화</dt><dd>더미·미전달</dd></div><div><dt>공식 근거 검색</dt><dd>예시 자료</dd></div><div><dt>공유 근거</dt><dd>${item.sources.length}개</dd></div><div><dt>정책 버전</dt><dd>UI-DEMO</dd></div><div><dt>가드레일</dt><dd>단정 차단</dd></div><div><dt>종료 사유</dt><dd>stop</dd></div><div><dt>입력 토큰</dt><dd>미측정</dd></div><div><dt>출력 토큰</dt><dd>미측정</dd></div></dl><p>API 키와 숨은 시스템 프롬프트는 보안을 위해 표시하지 않습니다.</p></details>
+            <div class="answer-actions"><strong>다음 행동</strong><ul>${item.actions.map((action, index) => `<li><span>${index === 0 ? "지금" : index === 1 ? "다음" : "선택"}</span><div><strong>${escapeHtml(action)}</strong></div></li>`).join("")}</ul></div>
           </article>`).join("")}
         </div>
-        <div class="comparison-vote"><button type="button" data-vote>Solar가 더 유용</button><button type="button" data-vote>A.X가 더 유용</button><button type="button" data-vote>비슷함</button></div>
+        <div class="comparison-vote"><div><strong>어느 답변이 더 유용했나요?</strong><span>선택 결과만 이 화면의 더미 평가에 반영됩니다.</span></div><div><button type="button" data-vote>Solar가 더 유용</button><button type="button" data-vote>A.X가 더 유용</button><button type="button" data-vote>비슷함</button></div></div>
       </div>`);
     messages.scrollTop = messages.scrollHeight;
   }, 650);
