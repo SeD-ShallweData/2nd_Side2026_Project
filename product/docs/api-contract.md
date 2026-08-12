@@ -48,7 +48,22 @@ interface ErrorResponse {
     request_id: string;
   };
 }
+
+type SourceCategory = "wage" | "safety" | "labor_law";
+
+interface SourceReference {
+  name: string;
+  category?: SourceCategory;
+  citation?: string;
+  organization?: string;
+  as_of?: string;
+  url?: string;
+  document_id?: string;
+}
 ```
+
+사업장 위험카드 출처는 표시 이름이 아니라 `category`로 임금(`wage`)과 산업안전(`safety`)을 분리한다.
+RAG에서 정규화한 공식 법령·안내 출처는 `labor_law`로 표시한다.
 
 ## 3. 사업장 검색
 

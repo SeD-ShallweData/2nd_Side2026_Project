@@ -1,12 +1,95 @@
 import { CHAT_POLICY_VERSION, DualLlmChatProvider } from "@/adapters/real/DualLlmChatProvider";
 import { OpenAICompatibleChatClient } from "@/adapters/real/OpenAICompatibleChatClient";
+import type { ChatRequest, ChatResponse, GuardrailStatus } from "@/domain/chat";
 import type { ChatComparisonResponse } from "@/domain/chatComparison";
+import type { RagRetrievalResult } from "@/domain/rag";
 import { getCompanyById } from "@/services/companyService";
 import { parseChatRequest, sendChatMessage } from "@/services/chatService";
 import { getCompanyRisk } from "@/services/riskService";
 import { retrieveLaborLawContext } from "@/services/ragService";
 import { rewriteFollowupQuery } from "@/services/queryRewriteService";
-import { getLlmProviderConfigs, getLlmTimeoutMs } from "@/server/llmConfig";
+import {
+  getLlmProviderConfigs,
+  getLlmTimeoutMs,
+  type LlmProviderConfig,
+} from "@/server/llmConfig";
+
+const EMPTY_USAGE = {
+  prompt_tokens: null,
+  completion_tokens: null,
+  total_tokens: null,
+  cached_tokens: null,
+  reasoning_tokens: null,
+};
+
+function policyShortCircuitResponse({
+  request,
+  policyBaseline,
+  configs,
+  ragRetrieval,
+  guardrailStatus,
+  guardrailHits,
+}: {
+  request: ChatRequest;
+  policyBaseline: ChatResponse;
+  configs: LlmProviderConfig[];
+  ragRetrieval: RagRetrievalResult;
+  guardrailStatus: GuardrailStatus;
+  guardrailHits: string[];
+}): ChatComparisonResponse {
+  const now = new Date().toISOString();
+  const rewritten = Boolean(
+    request.resolved_query && request.resolved_query !== request.message,
+  );
+  return {
+    comparison_id: `cmp_${crypto.randomUUID()}`,
+    conversation_id: policyBaseline.conversation_id,
+    execution_mode: "policy_short_circuit",
+    started_at: now,
+    completed_at: now,
+    fair_comparison: {
+      concurrent: false,
+      same_context: true,
+      same_temperature: false,
+      same_max_tokens: false,
+      same_retrieval: true,
+    },
+    results: configs.map((config) => ({
+      provider: config.id,
+      provider_label: config.label,
+      model: config.model,
+      status: "policy_short_circuit",
+      answer: policyBaseline.answer,
+      answer_type: policyBaseline.answer_type,
+      sources: policyBaseline.sources,
+      suggested_actions: policyBaseline.suggested_actions,
+      limitations: policyBaseline.limitations,
+      guardrail_status: guardrailStatus,
+      metrics: {
+        latency_ms: 0,
+        time_to_first_token_ms: null,
+        streaming: false,
+        finish_reason: null,
+        answer_chars: policyBaseline.answer.length,
+        usage: EMPTY_USAGE,
+      },
+      trace: {
+        prompt_policy_version: CHAT_POLICY_VERSION,
+        query_transform: rewritten ? "llm_rewrite" : "none",
+        context_mode: request.company_id ? "company" : "general",
+        company_context_attached: Boolean(request.company_id),
+        recent_message_count: request.recent_messages.slice(-6).length,
+        guardrail_action: "short_circuit",
+        guardrail_hits: guardrailHits,
+        upstream_request_id: null,
+        rag_status: ragRetrieval.status,
+        rag_reason: ragRetrieval.reason ?? null,
+        rag_topic: ragRetrieval.topic ?? null,
+        retrieved_document_count: ragRetrieval.documents.length,
+      },
+    })),
+  };
+}
 
 export async function sendComparedChatMessage(value: unknown): Promise<ChatComparisonResponse> {
   const parsedRequest = parseChatRequest(value);
@@ -22,61 +105,14 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
       threshold: null,
       documents: [],
     };
-    const now = new Date().toISOString();
-    return {
-      comparison_id: `cmp_${crypto.randomUUID()}`,
-      conversation_id: policyBaseline.conversation_id,
-      execution_mode: "policy_short_circuit",
-      started_at: now,
-      completed_at: now,
-      fair_comparison: {
-        concurrent: false,
-        same_context: true,
-        same_temperature: false,
-        same_max_tokens: false,
-        same_retrieval: true,
-      },
-      results: configs.map((config) => ({
-        provider: config.id,
-        provider_label: config.label,
-        model: config.model,
-        status: "policy_short_circuit",
-        answer: policyBaseline.answer,
-        answer_type: policyBaseline.answer_type,
-        sources: policyBaseline.sources,
-        suggested_actions: policyBaseline.suggested_actions,
-        limitations: policyBaseline.limitations,
-        guardrail_status: "escalated",
-        metrics: {
-          latency_ms: 0,
-          time_to_first_token_ms: null,
-          streaming: false,
-          finish_reason: null,
-          answer_chars: policyBaseline.answer.length,
-          usage: {
-            prompt_tokens: null,
-            completion_tokens: null,
-            total_tokens: null,
-            cached_tokens: null,
-            reasoning_tokens: null,
-          },
-        },
-        trace: {
-          prompt_policy_version: CHAT_POLICY_VERSION,
-          query_transform: "none",
-          context_mode: parsedRequest.company_id ? "company" : "general",
-          company_context_attached: Boolean(parsedRequest.company_id),
-          recent_message_count: parsedRequest.recent_messages.slice(-6).length,
-          guardrail_action: "short_circuit",
-          guardrail_hits: ["EMERGENCY_PRIORITY"],
-          upstream_request_id: null,
-          rag_status: ragRetrieval.status,
-          rag_reason: ragRetrieval.reason ?? null,
-          rag_topic: ragRetrieval.topic ?? null,
-          retrieved_document_count: ragRetrieval.documents.length,
-        },
-      })),
-    };
+    return policyShortCircuitResponse({
+      request: parsedRequest,
+      policyBaseline,
+      configs,
+      ragRetrieval,
+      guardrailStatus: "escalated",
+      guardrailHits: ["EMERGENCY_PRIORITY"],
+    });
   }
 
   const rewrite = await rewriteFollowupQuery(parsedRequest, configs);
@@ -88,13 +124,25 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
   if (ragRetrieval.status === "matched") {
     policyBaseline.sources = ragRetrieval.documents.map((document) => document.source);
   } else if (ragRetrieval.status === "no_match") {
-    policyBaseline.sources = [];
+    // 사업장 답변은 법령 RAG가 아니라 사업장 DB 결과를 근거로 하므로 출처를 보존한다.
+    if (policyBaseline.answer_type !== "company_context") policyBaseline.sources = [];
     policyBaseline.limitations = [
       ...policyBaseline.limitations,
       ragRetrieval.reason === "out_of_scope" && ragRetrieval.topic
         ? `현재 공식 근거 검색 범위에는 ${ragRetrieval.topic} 자료가 수록되어 있지 않습니다.`
         : "연결된 공식 노동법 검색 범위에서 직접 관련된 근거를 찾지 못했습니다.",
     ];
+    return policyShortCircuitResponse({
+      request,
+      policyBaseline,
+      configs,
+      ragRetrieval,
+      guardrailStatus: "limited",
+      guardrailHits: [
+        "RAG_NO_MATCH",
+        ...(ragRetrieval.reason === "out_of_scope" ? ["RAG_OUT_OF_SCOPE"] : []),
+      ],
+    });
   } else {
     policyBaseline.sources = [];
     policyBaseline.limitations = [

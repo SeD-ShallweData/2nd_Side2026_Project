@@ -7,18 +7,21 @@ import type {
 
 const WAGE_SOURCE: SourceReference = {
   name: "국민연금 가입 사업장 내역",
+  category: "wage",
   organization: "국민연금공단",
   as_of: "2026-07",
 };
 
 const LISTING_SOURCE: SourceReference = {
   name: "체불사업주 명단공개",
+  category: "wage",
   organization: "고용노동부",
   as_of: "2026-07-31",
 };
 
 const SAFETY_SOURCE: SourceReference = {
   name: "산업재해 집계 자료",
+  category: "safety",
   organization: "공식 공개자료 기반 데모",
   as_of: "2026-07-31",
 };
