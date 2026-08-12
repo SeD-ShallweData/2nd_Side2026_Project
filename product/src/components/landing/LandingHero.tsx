@@ -8,7 +8,7 @@ export function LandingHero() {
           <span className="eyebrow">구직자와 근로자를 위한 AI 노동 정보</span>
           <h1 id="home-title">
             <span>일하기 전에도, 일하는 중에도</span>
-            <mark>미리 대비하는 돈워리</mark>
+            <mark>미리 대비하는 <span className="refresh-brand-word">돈워리</span></mark>
           </h1>
           <p>사업장의 공개 정보부터 계약서, 노동 상담까지. 막막했던 확인을 한곳에서 시작하세요.</p>
           <div className="refresh-button-row">
