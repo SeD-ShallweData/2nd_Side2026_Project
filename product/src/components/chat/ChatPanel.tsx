@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { DataSourceList } from "@/components/common/DataSourceList";
+import { SafeMarkdown } from "@/components/common/SafeMarkdown";
 import type { ChatMode, RecentMessage } from "@/domain/chat";
 import type {
   ChatComparisonResponse,
@@ -95,7 +96,7 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
         </div>
       ) : null}
 
-      <div className="provider-answer-copy">{result.answer}</div>
+      <div className="provider-answer-copy"><SafeMarkdown>{result.answer}</SafeMarkdown></div>
 
       <section className="provider-evidence" aria-label={`${result.provider_label} 답변 근거와 한계`}>
         <div>
@@ -344,7 +345,14 @@ export function ChatPanel({
           ) : (
             <div className={`chat-row chat-row-${message.role}`} key={message.id}>
               {message.role === "assistant" ? <div className="chat-avatar" aria-hidden="true">돈</div> : null}
-              <div className={`chat-message chat-message-${message.role}`}><p>{message.content}</p></div>
+              {message.role === "user" ? (
+                <div className="user-message-wrap">
+                  <button type="button" className="message-retry" onClick={() => void sendMessage(message.content)} disabled={loading} aria-label={`질문 다시 보내기: ${message.content}`}>
+                    <span aria-hidden="true">↻</span> 재전송
+                  </button>
+                  <div className="chat-message chat-message-user"><p>{message.content}</p></div>
+                </div>
+              ) : <div className="chat-message chat-message-assistant"><p>{message.content}</p></div>}
             </div>
           )
         ))}

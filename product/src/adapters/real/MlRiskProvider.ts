@@ -213,6 +213,7 @@ async function getSafety(company: WageRow): Promise<{ data: SafetyContextPublic;
       data: safetyResult(company, rows[0]),
       source: {
         name: "산업재해 공표 우선순위 안전 뷰",
+        category: "safety",
         organization: "돈워리 산업안전 데이터 파이프라인",
         as_of: toIso(rows[0].published_at) ?? rows[0].prediction_as_of,
         document_id: [rows[0].model_name, rows[0].model_version].filter(Boolean).join(":"),
@@ -324,6 +325,7 @@ export class MlRiskProvider {
       sources: [
         {
           name: "국민연금 사업장 자료 및 ML 공개 판정",
+          category: "wage",
           organization: "돈워리 임금체불 데이터 파이프라인",
           as_of: row.as_of_date ?? undefined,
           document_id:

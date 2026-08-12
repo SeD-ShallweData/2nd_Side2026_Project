@@ -95,14 +95,14 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
                 kind="wage"
                 data={risk.wage_risk}
                 dataAsOf={risk.data_as_of}
-                sources={risk.sources.filter((source) => !source.name.includes("산업재해"))}
+                sources={risk.sources.filter((source) => source.category === "wage")}
                 onAsk={ask}
               />
               <RiskInformationCard
                 kind="safety"
                 data={risk.safety_context}
                 dataAsOf={risk.safety_context.target_end ?? risk.data_as_of}
-                sources={risk.sources.filter((source) => source.name.includes("산업재해"))}
+                sources={risk.sources.filter((source) => source.category === "safety")}
                 onAsk={ask}
               />
             </div>
