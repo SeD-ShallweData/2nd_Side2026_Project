@@ -38,6 +38,8 @@ export interface SafeExecutionTrace {
   guardrail_hits: string[];
   upstream_request_id: string | null;
   rag_status: RagRetrievalResult["status"];
+  rag_reason: string | null;
+  rag_topic: string | null;
   retrieved_document_count: number;
 }
 

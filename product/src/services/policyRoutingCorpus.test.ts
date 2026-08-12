@@ -21,18 +21,78 @@ import {
   type Persona,
 } from "@/services/policyRouting.corpus";
 
-/** 분기가 내놓아야 하는 결과. 분기마다 답변 문구는 달라도 형태는 같다. */
-const EXPECTED: Record<string, { answer_type: AnswerType; guardrail: GuardrailStatus }> = {
-  emergency: { answer_type: "emergency_guidance", guardrail: "escalated" },
-  no_company_context_keyword: { answer_type: "clarification", guardrail: "limited" },
-  no_company_out_of_scope: { answer_type: "insufficient_evidence", guardrail: "limited" },
-  no_company_fallback: { answer_type: "clarification", guardrail: "passed" },
+/**
+ * answer_type/guardrail만 비교하면 서로 다른 노동 주제가 전부 같은 결과로 보여
+ * 오분류를 놓친다. 주제마다 고유한 다음 행동 코드도 함께 확인한다.
+ */
+const EXPECTED: Record<
+  string,
+  { answer_type: AnswerType; guardrail: GuardrailStatus; action: string }
+> = {
+  emergency: {
+    answer_type: "emergency_guidance",
+    guardrail: "escalated",
+    action: "MOVE_TO_SAFETY",
+  },
+  no_company_context_keyword: {
+    answer_type: "clarification",
+    guardrail: "limited",
+    action: "SEARCH_COMPANY",
+  },
+  no_company_out_of_scope: {
+    answer_type: "insufficient_evidence",
+    guardrail: "limited",
+    action: "CALL_1350",
+  },
+  no_company_fallback: {
+    answer_type: "clarification",
+    guardrail: "passed",
+    action: "SEARCH_COMPANY",
+  },
+  no_company_wage: {
+    answer_type: "general_guidance",
+    guardrail: "passed",
+    action: "COLLECT_WAGE_RECORDS",
+  },
+  no_company_safety: {
+    answer_type: "general_guidance",
+    guardrail: "passed",
+    action: "RECORD_ACCIDENT",
+  },
+  no_company_termination: {
+    answer_type: "general_guidance",
+    guardrail: "passed",
+    action: "RECORD_NOTICE",
+  },
+  no_company_contract: {
+    answer_type: "general_guidance",
+    guardrail: "passed",
+    action: "COMPARE_CONTRACT",
+  },
+  no_company_leave: {
+    answer_type: "general_guidance",
+    guardrail: "passed",
+    action: "COLLECT_LEAVE_RECORDS",
+  },
+  no_company_worktime: {
+    answer_type: "general_guidance",
+    guardrail: "passed",
+    action: "COLLECT_WORKTIME_RECORDS",
+  },
+  no_company_harassment: {
+    answer_type: "general_guidance",
+    guardrail: "passed",
+    action: "RECORD_HARASSMENT",
+  },
+  no_company_insurance: {
+    answer_type: "general_guidance",
+    guardrail: "passed",
+    action: "COLLECT_EMPLOYMENT_PROOF",
+  },
 };
 
-const TOPIC_RESULT = { answer_type: "general_guidance" as const, guardrail: "passed" as const };
-
 function expectedFor(branch: PolicyBranch) {
-  return EXPECTED[branch] ?? TOPIC_RESULT;
+  return EXPECTED[branch];
 }
 
 interface Mismatch {
@@ -56,12 +116,19 @@ describe("정책 분기 표현 커버리지", () => {
         parseChatRequest({ message: entry.question, chat_mode: "general", recent_messages: [] }),
       );
       const want = expectedFor(entry.branch);
-      const actual = `${response.answer_type}/${response.guardrail_status}`;
-      const expected = `${want.answer_type}/${want.guardrail}`;
+      const actionCodes = response.suggested_actions.map((action) => action.code);
+      const matched =
+        response.answer_type === want.answer_type &&
+        response.guardrail_status === want.guardrail &&
+        actionCodes.includes(want.action);
+      const actual =
+        `${response.answer_type}/${response.guardrail_status}` +
+        ` actions=[${actionCodes.join(", ")}]`;
+      const expected = `${want.answer_type}/${want.guardrail} action=${want.action}`;
 
       const stat = byPersona.get(entry.persona) ?? { total: 0, miss: 0 };
       stat.total += 1;
-      if (actual !== expected) {
+      if (!matched) {
         stat.miss += 1;
         if (!(entry.question in CORPUS_KNOWN_MISMATCH)) {
           mismatches.push({ entry, actual, expected });

@@ -184,12 +184,12 @@ export const MOCK_RISKS: Record<string, CompanyRiskResult> = {
         {
           code: "LISTED_HISTORY",
           label: "공식 공개명단 일치 결과",
-          description: "기준일의 공식 원문과 사업장 주소를 함께 확인하세요.",
+          description: "기준일의 공식 원문과 사업장 식별정보를 함께 확인하세요.",
         },
         {
           code: "EMPLOYMENT_CHANGE",
           label: "고용 인원 변동",
-          description: "급여 지급일과 4대보험 처리 시점을 우선 확인하세요.",
+          description: "급여 지급일과 급여 구성, 계약서 교부 여부를 우선 확인하세요.",
         },
       ],
       confidence: "sufficient",
@@ -228,7 +228,7 @@ export const MOCK_RISKS: Record<string, CompanyRiskResult> = {
         {
           code: "SHORT_OBSERVATION",
           label: "관측 기간이 비교적 짧음",
-          description: "입사 전 최근 급여 지급과 4대보험 가입 일정을 확인해 보세요.",
+          description: "입사 전 최근 급여 지급과 계약서상 지급 조건을 확인해 보세요.",
         },
       ],
       confidence: "limited",

@@ -21,7 +21,7 @@ import {
 } from "@/server/guardrails";
 import { loadPrompt, withRuntimeContext } from "@/server/promptLoader";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-08-11-v4";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-08-12-v5";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -87,6 +87,8 @@ function buildSystemPrompt(context: ComparisonContext): string {
         : [],
     previously_cited_labor_law: previousCitations(context),
     retrieval_status: context.ragRetrieval.status,
+    retrieval_reason: context.ragRetrieval.reason ?? null,
+    retrieval_topic: context.ragRetrieval.topic ?? null,
     policy_baseline: context.policyBaseline.answer,
     required_limitations: context.policyBaseline.limitations,
     suggested_actions: context.policyBaseline.suggested_actions,
@@ -123,6 +125,8 @@ function baseTrace(context: ComparisonContext): Omit<SafeExecutionTrace, "guardr
     company_context_attached: Boolean(context.companyContext),
     recent_message_count: context.request.recent_messages.slice(-6).length,
     rag_status: context.ragRetrieval.status,
+    rag_reason: context.ragRetrieval.reason ?? null,
+    rag_topic: context.ragRetrieval.topic ?? null,
     retrieved_document_count: context.ragRetrieval.documents.length,
   };
 }

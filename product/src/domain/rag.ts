@@ -11,8 +11,12 @@ export interface RagDocument {
 
 export interface RagRetrievalResult {
   query: string;
+  retrieval_query?: string;
   status: RagRetrievalStatus;
+  reason?: string | null;
+  topic?: string | null;
   threshold: number | null;
+  top1_distance?: number | null;
   documents: RagDocument[];
 }
 

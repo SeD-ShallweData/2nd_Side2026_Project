@@ -26,6 +26,24 @@ const GENERAL_QUESTIONS = [
   "이 회사는 안전한가요?",
 ] as const;
 
+const GUIDE_GROUPS = [
+  {
+    title: "입사 전 확인",
+    items: [
+      ["임금 지급 조건", "입사 전에 임금 지급일과 급여 구성에서 무엇을 확인해야 하나요?"],
+      ["계약서 필수 항목", "근로계약서에서 꼭 확인해야 하는 항목을 알려주세요."],
+    ],
+  },
+  {
+    title: "문제가 생겼을 때",
+    items: [
+      ["임금이 밀렸을 때", "임금이 밀렸을 때 어떤 자료부터 준비해야 하나요?"],
+      ["해고 통보 확인", "갑자기 나오지 말라는 말을 들었을 때 무엇을 확인해야 하나요?"],
+      ["연차 확인", "연차 유급휴가를 사용하지 못했을 때 무엇을 확인해야 하나요?"],
+    ],
+  },
+] as const;
+
 interface UiMessage {
   id: string;
   role: "user" | "assistant";
@@ -103,6 +121,8 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
           <div><dt>질의 재작성</dt><dd>{result.trace.query_transform === "none" ? "사용 안 함" : "후속 질문 독립형 재작성"}</dd></div>
           <div><dt>최근 대화</dt><dd>{result.trace.recent_message_count}개 전달</dd></div>
           <div><dt>공식 근거 검색</dt><dd>{result.trace.rag_status}</dd></div>
+          <div><dt>검색 판단</dt><dd>{result.trace.rag_reason ?? "근거 연결"}</dd></div>
+          <div><dt>범위 밖 주제</dt><dd>{result.trace.rag_topic ?? "해당 없음"}</dd></div>
           <div><dt>공유 근거</dt><dd>{result.trace.retrieved_document_count}개</dd></div>
           <div><dt>정책 버전</dt><dd>{result.trace.prompt_policy_version}</dd></div>
           <div><dt>가드레일</dt><dd>{result.trace.guardrail_action}</dd></div>
@@ -151,7 +171,9 @@ function ComparisonBlock({
     : retrieval.rag_status === "matched"
       ? `공식 근거 ${retrieval.retrieved_document_count}개 연결`
       : retrieval.rag_status === "no_match"
-        ? "직접 관련 공식 근거 없음"
+        ? retrieval.rag_reason === "out_of_scope" && retrieval.rag_topic
+          ? `현재 수록 범위 밖 · ${retrieval.rag_topic}`
+          : "직접 관련 공식 근거 없음"
         : comparison.execution_mode === "policy_short_circuit"
           ? "긴급 안내 우선"
           : "공식 근거 검색 연결 안 됨";
@@ -303,7 +325,8 @@ export function ChatPanel({
   const questions = companyId ? COMPANY_QUESTIONS : GENERAL_QUESTIONS;
 
   return (
-    <div className="chat-panel comparison-chat-panel">
+    <div className="chat-experience-layout">
+      <div className="chat-panel comparison-chat-panel">
       <div className="chat-topbar">
         <div><span className="online-dot" aria-hidden="true" /><strong>실제 LLM 동시 비교</strong></div>
         <span>{companyName ? `${companyName} 컨텍스트 연결됨` : chatMode === "contract" ? "계약서 후속 상담" : "일반 노동 상담"}</span>
@@ -365,7 +388,26 @@ export function ChatPanel({
         <button type="submit" className="chat-send" disabled={loading || !draft.trim()} aria-label="질문 보내기"><span aria-hidden="true">↑</span></button>
       </form>
       <p className="dual-api-note">동일 질문을 실제 Upstage Solar·SKT A.X API에 병렬 전송합니다. API 키와 숨은 프롬프트는 브라우저로 전송하지 않습니다.</p>
-      {!companyId ? <p className="chat-company-help">특정 회사에 관해 질문하려면 <Link href="/companies">사업장을 먼저 검색해 선택</Link>하세요.</p> : null}
+        {!companyId ? <p className="chat-company-help">특정 회사에 관해 질문하려면 <Link href="/companies">사업장을 먼저 검색해 선택</Link>하세요.</p> : null}
+      </div>
+      <aside className="question-guide" aria-label="AI 질문 가이드">
+        <div className="guide-title">
+          <span aria-hidden="true">AI</span>
+          <div><strong>질문 가이드</strong><small>무엇부터 물을지 막막하다면</small></div>
+        </div>
+        {companyName ? (
+          <div className="guide-context"><strong>{companyName}</strong><span>사업장 공개 컨텍스트 연결</span></div>
+        ) : null}
+        {GUIDE_GROUPS.map((group) => (
+          <div className="guide-group" key={group.title}>
+            <strong>{group.title}</strong>
+            {group.items.map(([label, prompt]) => (
+              <button type="button" key={label} disabled={loading} onClick={() => void sendMessage(prompt)}>{label}</button>
+            ))}
+          </div>
+        ))}
+        <p className="guide-scope-note">현재 공식 근거 검색 범위에 맞춘 질문입니다. 수록 범위 밖 주제는 해당 이유와 공식 확인 창구를 안내합니다.</p>
+      </aside>
     </div>
   );
 }

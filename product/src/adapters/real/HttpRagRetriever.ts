@@ -15,7 +15,11 @@ interface UpstreamItem {
 interface UpstreamResponse {
   status?: unknown;
   query?: unknown;
+  retrieval_query?: unknown;
+  reason?: unknown;
+  topic?: unknown;
   threshold?: unknown;
+  top1_distance?: unknown;
   items?: unknown;
 }
 
@@ -36,6 +40,7 @@ function parseDocument(value: unknown): RagDocument | null {
     distance: typeof item.distance === "number" && Number.isFinite(item.distance) ? item.distance : null,
     source: {
       name,
+      citation,
       organization: optionalString(item.source?.organization),
       document_id: optionalString(item.source?.document_id),
       url: optionalString(item.source?.url),
@@ -66,12 +71,27 @@ export class HttpRagRetriever implements RagRetriever {
         : [];
       return {
         query: optionalString(payload.query) ?? query,
+        retrieval_query: optionalString(payload.retrieval_query),
         status: payload.status === "matched" && documents.length > 0 ? "matched" : "no_match",
+        reason: optionalString(payload.reason) ?? null,
+        topic: optionalString(payload.topic) ?? null,
         threshold: typeof payload.threshold === "number" ? payload.threshold : null,
+        top1_distance:
+          typeof payload.top1_distance === "number" && Number.isFinite(payload.top1_distance)
+            ? payload.top1_distance
+            : null,
         documents,
       };
     } catch {
-      return { query, status: "unavailable", threshold: null, documents: [] };
+      return {
+        query,
+        status: "unavailable",
+        reason: "service_unavailable",
+        topic: null,
+        threshold: null,
+        top1_distance: null,
+        documents: [],
+      };
     }
   }
 }

@@ -21,6 +21,15 @@ describe("사업장 검색", () => {
     expect(new Set(result.items.map((item) => item.company_id)).size).toBe(2);
   });
 
+  it("전체 개수는 유지하면서 요청한 페이지를 나눠 반환한다", async () => {
+    const first = await searchCompanies("OO 건설", 1, 1);
+    const second = await searchCompanies("OO 건설", 1, 2);
+    expect(first).toMatchObject({ total: 2, page: 1, page_size: 1, total_pages: 2, has_more: true });
+    expect(second).toMatchObject({ total: 2, page: 2, page_size: 1, total_pages: 2, has_more: false });
+    expect(second.items).toHaveLength(1);
+    expect(second.items[0]?.company_id).not.toBe(first.items[0]?.company_id);
+  });
+
   it("영문 대소문자와 별칭을 구분하지 않는다", async () => {
     const result = await searchCompanies("hanbit tech");
     expect(result.items[0]?.company_id).toBe("COMPANY_DEMO_008");

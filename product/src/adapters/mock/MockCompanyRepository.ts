@@ -44,7 +44,7 @@ function findMatch(company: Company, query: string): Match | null {
 }
 
 export class MockCompanyRepository implements CompanyRepository {
-  async search(query: string, limit = 10): Promise<CompanySearchResult[]> {
+  private matches(query: string) {
     if (normalizeSearchText(query) === "error") {
       throw new ServiceError(
         "COMPANY_SOURCE_UNAVAILABLE",
@@ -56,8 +56,12 @@ export class MockCompanyRepository implements CompanyRepository {
 
     return MOCK_COMPANIES.map((company) => ({ company, match: findMatch(company, query) }))
       .filter((entry): entry is { company: Company; match: Match } => entry.match !== null)
-      .sort((a, b) => a.match.rank - b.match.rank || a.company.company_name.localeCompare(b.company.company_name, "ko"))
-      .slice(0, limit)
+      .sort((a, b) => a.match.rank - b.match.rank || a.company.company_name.localeCompare(b.company.company_name, "ko"));
+  }
+
+  async search(query: string, limit = 10, offset = 0): Promise<CompanySearchResult[]> {
+    return this.matches(query)
+      .slice(offset, offset + limit)
       .map(({ company, match }) => ({
         company_id: company.company_id,
         company_name: company.company_name,
@@ -68,6 +72,10 @@ export class MockCompanyRepository implements CompanyRepository {
         matched_name: match.matchedName,
         match_type: match.matchType,
       }));
+  }
+
+  async count(query: string): Promise<number> {
+    return this.matches(query).length;
   }
 
   async getById(companyId: string): Promise<Company | null> {

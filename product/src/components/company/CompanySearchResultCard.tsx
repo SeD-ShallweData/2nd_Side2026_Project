@@ -25,7 +25,6 @@ export function CompanySearchResultCard({
             <h3>{company.company_name}</h3>
             <span className="match-label">{MATCH_LABEL[company.match_type]}</span>
           </div>
-          <p className="company-address">{company.address ?? "상세 주소 정보 없음"}</p>
           <dl className="company-meta-list">
             <div>
               <dt>지역</dt>
@@ -35,10 +34,6 @@ export function CompanySearchResultCard({
               <dt>업종</dt>
               <dd>{company.industry ?? "정보 없음"}</dd>
             </div>
-            <div>
-              <dt>규모</dt>
-              <dd>{company.size_label ?? "정보 없음"}</dd>
-            </div>
           </dl>
         </div>
       </div>
@@ -46,7 +41,7 @@ export function CompanySearchResultCard({
         type="button"
         className="button button-dark"
         onClick={() => onSelect(company.company_id)}
-        aria-label={`${company.company_name}, ${company.address ?? company.region ?? "주소 정보 없음"} 선택`}
+        aria-label={`${company.company_name}, ${company.region ?? "지역 정보 없음"}, ${company.industry ?? "업종 정보 없음"} 선택`}
       >
         이 사업장 선택
       </button>

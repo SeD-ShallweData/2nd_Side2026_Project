@@ -87,7 +87,11 @@ describe("RAG 내부 계약", () => {
     const fakeFetch = (async () => new Response(JSON.stringify({
       status: "matched",
       query: "임금 지급일",
+      retrieval_query: "임금 지급일 임금 지급 원칙",
+      reason: null,
+      topic: null,
       threshold: 0.42,
+      top1_distance: 0.18,
       items: [{
         content: "임금 지급 관련 공식 조문",
         citation: "근로기준법 제43조",
@@ -102,9 +106,33 @@ describe("RAG 내부 계약", () => {
 
     const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("임금 지급일");
     expect(result.status).toBe("matched");
+    expect(result).toMatchObject({
+      retrieval_query: "임금 지급일 임금 지급 원칙",
+      reason: null,
+      top1_distance: 0.18,
+    });
     expect(result.documents[0]).toMatchObject({
       citation: "근로기준법 제43조",
       source: { organization: "국가법령정보센터" },
+    });
+  });
+
+  it("범위 밖 이유와 주제를 보존한다", async () => {
+    const fakeFetch = (async () => new Response(JSON.stringify({
+      status: "no_match",
+      query: "산재 신청은 어떻게 하나요?",
+      reason: "out_of_scope",
+      topic: "산업재해·산업안전",
+      threshold: 0.42,
+      top1_distance: 0.5,
+      items: [],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+
+    const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("산재 신청은 어떻게 하나요?");
+    expect(result).toMatchObject({
+      status: "no_match",
+      reason: "out_of_scope",
+      topic: "산업재해·산업안전",
     });
   });
 

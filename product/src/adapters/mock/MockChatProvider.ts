@@ -13,7 +13,7 @@ import { containsAny, normalizeSearchText } from "@/utils/text";
 const SEARCH_ACTION: SuggestedAction = {
   code: "SEARCH_COMPANY",
   label: "사업장 검색하기",
-  description: "주소와 업종을 확인해 정확한 사업장을 선택하세요.",
+  description: "지역과 업종을 확인해 정확한 사업장을 선택하세요.",
   priority: "now",
 };
 
@@ -26,8 +26,10 @@ const CALL_1350: SuggestedAction = {
 
 const WAGE_GUIDE_SOURCE: SourceReference = {
   name: "임금체불 진정 및 상담 안내",
+  citation: "고용노동부 노동포털 「체불임금 해결 방법」",
   organization: "고용노동부",
-  document_id: "MOEL_WAGE_GUIDE",
+  document_id: "LABOR-PORTAL-WAGE-COMPLAINT",
+  url: "https://labor.moel.go.kr/minwonSysInfo/wagesolway.do",
 };
 
 const SAFETY_GUIDE_SOURCE: SourceReference = {
@@ -77,6 +79,8 @@ const EMERGENCY_EXCLUSIONS = [
 interface LaborTopic {
   code: string;
   keywords: string[];
+  /** 다른 주제어와 함께 등장해도 이 주제를 우선해야 하는 구체 표현. */
+  priorityKeywords?: string[];
   answer: string;
   sources: SourceReference[];
   actions: SuggestedAction[];
@@ -105,6 +109,7 @@ const LABOR_TOPICS: LaborTopic[] = [
   {
     code: "SAFETY",
     keywords: ["산재", "산업재해", "업무상 재해", "업무상재해", "다쳐서", "재해보상", "공상"],
+    priorityKeywords: ["산재", "산업재해", "업무상 재해", "업무상재해", "재해보상", "공상"],
     answer:
       "업무 중 다치거나 질병이 발생했다면 먼저 치료와 안전을 확보하고, 발생 시각·장소·작업 내용·목격자 등 사실관계를 기록해 두세요. 산재 신청에 필요한 구체적인 자료와 절차는 근로복지공단 또는 고용노동부 공식 창구에서 확인하는 것이 좋습니다.",
     sources: [SAFETY_GUIDE_SOURCE],
@@ -159,6 +164,7 @@ const LABOR_TOPICS: LaborTopic[] = [
   {
     code: "WORKTIME",
     keywords: ["52시간", "근로시간", "연장근로", "야간근로", "교대", "장시간", "초과근무", "야근"],
+    priorityKeywords: ["계약서보다", "실제 근로시간", "근로시간이"],
     answer:
       "근로시간 문제는 실제 일한 시간을 남기는 것이 먼저입니다. 출퇴근 기록, 업무 지시 메시지, 근무표처럼 시간이 확인되는 자료를 모아 두세요. 연장·야간 근로의 한도와 수당 기준은 근무 형태와 합의 내용에 따라 달라지므로 고용노동부 1350에서 확인하시는 것이 좋습니다.",
     sources: [],
@@ -195,6 +201,10 @@ const LABOR_TOPICS: LaborTopic[] = [
 ];
 
 function matchLaborTopic(message: string): LaborTopic | undefined {
+  const priorityMatch = LABOR_TOPICS.find(
+    (topic) => topic.priorityKeywords && containsAny(message, topic.priorityKeywords),
+  );
+  if (priorityMatch) return priorityMatch;
   return LABOR_TOPICS.find((topic) => containsAny(message, topic.keywords));
 }
 
@@ -297,7 +307,7 @@ export class PolicyChatProvider implements ChatProvider {
       const otherCompany = await findOtherReferencedCompany(message, company.company_id, this.companies);
       if (otherCompany) {
         return {
-          answer: `현재 상담에는 ${company.company_name}만 연결되어 있습니다. ${otherCompany.company_name} 정보를 확인하려면 주소와 업종을 보고 해당 사업장을 다시 선택해 주세요.`,
+          answer: `현재 상담에는 ${company.company_name}만 연결되어 있습니다. ${otherCompany.company_name} 정보를 확인하려면 지역과 업종을 보고 해당 사업장을 다시 선택해 주세요.`,
           answer_type: "clarification",
           sources: [],
           suggested_actions: [SEARCH_ACTION],
@@ -360,12 +370,12 @@ export class PolicyChatProvider implements ChatProvider {
 
     if (containsAny(message, ["체불할 거", "체불할거", "체불할 것", "임금이 밀릴", "월급이 밀릴"])) {
       return {
-        answer: `${company.company_name}에서 향후 임금체불이 발생할지는 현재 정보만으로 확정할 수 없습니다. ${wage.summary} 입사 전에는 근로계약서의 임금 지급일과 지급 방법, 4대보험 가입 시점을 확인하세요.`,
+        answer: `${company.company_name}에서 향후 임금체불이 발생할지는 현재 정보만으로 확정할 수 없습니다. ${wage.summary} 입사 전에는 근로계약서의 임금 지급일·지급 방법·급여 구성과 계약서 교부 여부를 확인하세요.`,
         answer_type: "company_context",
         sources: risk.sources,
         suggested_actions: [
           { code: "CHECK_PAYDAY", label: "임금 지급일 확인", priority: "now" },
-          { code: "CHECK_INSURANCE", label: "4대보험 가입 시점 확인", priority: "next" },
+          { code: "CHECK_PAY_STRUCTURE", label: "급여 구성·계약서 교부 확인", priority: "next" },
         ],
         limitations: baseLimitations,
         guardrail_status: "limited",
@@ -379,7 +389,7 @@ export class PolicyChatProvider implements ChatProvider {
           ? "산업재해 쪽은 분석 가능한 자료가 부족해 판단할 수 없습니다."
           : `산업재해 카드는 ${safety.region}·${safety.industry} 단위의 맥락을 보여주며, 현재 안내는 “${safety.summary}”입니다.`;
       return {
-        answer: `${company.company_name}이 안전한지 또는 입사해도 되는지를 이 정보만으로 확정할 수는 없습니다. ${wage.summary} ${safetyDetail}\n\n근로계약서의 임금 지급일과 4대보험 가입 시점, 실제 현장의 안전교육·보호구·사고 보고 절차를 직접 확인한 뒤 다른 채용 조건과 함께 판단하세요.`,
+        answer: `${company.company_name}이 안전한지 또는 입사해도 되는지를 이 정보만으로 확정할 수는 없습니다. ${wage.summary} ${safetyDetail}\n\n근로계약서의 임금 지급일·급여 구성·소정근로시간과 실제 현장의 안전교육·보호구·사고 보고 절차를 직접 확인한 뒤 다른 채용 조건과 함께 판단하세요.`,
         answer_type: "company_context",
         sources: risk.sources,
         suggested_actions: [
@@ -401,7 +411,7 @@ export class PolicyChatProvider implements ChatProvider {
         sources: risk.sources,
         suggested_actions: [
           { code: "CHECK_PAYDAY", label: "임금 지급일 확인", priority: "now" },
-          { code: "CHECK_INSURANCE", label: "4대보험 가입 시점 확인", priority: "next" },
+          { code: "CHECK_PAY_STRUCTURE", label: "급여 구성·근로시간 확인", priority: "next" },
           { code: "CHECK_SAFETY_PROCESS", label: "안전교육·보고 절차 확인", priority: "next" },
         ],
         limitations: baseLimitations,
@@ -413,7 +423,7 @@ export class PolicyChatProvider implements ChatProvider {
     if (containsAny(message, ["입사 전", "확인해야", "체크리스트", "무엇을 확인"])) {
       return {
         answer:
-          "입사 전에는 근로계약서에 임금 지급일, 기본급·수당 구분, 소정근로시간과 휴게시간이 적혀 있는지 확인하세요. 4대보험 가입 시점과 실제 근무지, 연장·야간·휴일근로 수당 기준도 질문하는 것이 좋습니다. 현장 업무가 있다면 안전교육, 보호구 지급, 사고 보고 절차도 함께 확인하세요.",
+          "입사 전에는 근로계약서에 임금 지급일, 기본급·수당 구분, 소정근로시간·휴게시간·근무 장소가 적혀 있고 서면으로 교부되는지 확인하세요. 연장·야간·휴일근로 수당 기준도 질문하는 것이 좋습니다. 현장 업무가 있다면 안전교육, 보호구 지급, 사고 보고 절차도 함께 확인하세요.",
         answer_type: "company_context",
         sources: risk.sources,
         suggested_actions: [

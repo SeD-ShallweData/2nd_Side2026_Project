@@ -52,7 +52,7 @@ interface ErrorResponse {
 
 ## 3. 사업장 검색
 
-### `GET /api/companies/search?q={query}&limit={1..20}`
+### `GET /api/companies/search?q={query}&limit={1..20}&page={1..}`
 
 ```ts
 interface CompanySearchItem {
@@ -71,10 +71,13 @@ interface CompanySearchResponse {
   items: CompanySearchItem[];
   total: number;
   has_more: boolean;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }
 ```
 
-동명 사업장은 합치거나 첫 결과를 자동 선택하지 않는다. 검색 SQL은 parameter binding을 사용한다.
+동명 사업장은 합치거나 첫 결과를 자동 선택하지 않는다. `total`은 현재 페이지가 아니라 전체 일치 건수이며, 기본값은 페이지당 10개다. 검색 SQL은 parameter binding을 사용한다. `address`, `size_label`은 하위 호환을 위해 nullable 필드로 유지하지만 현재 소비자 UI에서는 기능으로 제공하지 않는다.
 
 ## 4. 사업장 공개 신호
 
@@ -85,6 +88,7 @@ interface CompanySearchResponse {
 ```ts
 type SignalLevel = "normal" | "watch" | "review" | "unknown";
 type Confidence = "sufficient" | "limited" | "unavailable";
+type SignalAvailability = "ready" | "no_data" | "unavailable";
 
 interface CompanyRiskResponse {
   company_id: string;
@@ -95,6 +99,7 @@ interface CompanyRiskResponse {
   valid_until: string | null;
   freshness: "current" | "expired" | "unknown";
   wage_risk: {
+    availability?: SignalAvailability;
     level: SignalLevel;
     summary: string;
     evidence_codes: string[];
@@ -107,6 +112,7 @@ interface CompanyRiskResponse {
     };
   };
   safety_context: {
+    availability?: SignalAvailability;
     scope: "region_industry" | "validated_firm_context";
     level: SignalLevel;
     summary: string;
@@ -166,7 +172,7 @@ interface RagRetrieveResponse {
 한계, 지연시간, token 사용량, 종료 사유, 가드레일 상태가 포함된다. 성능 지표는 기능에서 제거하지 않되
 일반 화면에서는 접힌 상세정보로 제공한다.
 
-RAG `no_match`는 오류가 아니다. 이 경우 출처를 만들지 않고 공식 확인 창구를 안내한다. 한 LLM 실패는
+RAG `no_match`는 오류가 아니다. `reason=out_of_scope`이면 `topic`을 함께 표시하고, 그 밖에는 직접 관련 근거가 없음을 표시한다. 검색 근거에는 citation·문서 식별자·확인된 원문 URL을 노출하며, 출처를 만들지 않고 공식 확인 창구를 안내한다. 한 LLM 실패는
 다른 LLM 결과를 취소하지 않는다. 즉각적 사고·부상 표현은 RAG와 LLM을 기다리지 않고 공통 긴급안내를 반환한다.
 
 ## 6. 근로계약서 검토
