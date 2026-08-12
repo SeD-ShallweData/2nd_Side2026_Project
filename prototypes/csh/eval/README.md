@@ -17,6 +17,7 @@
 | `threshold_band.py` | rag-api (5051) | 없음 |
 | `relevance_eval.py` | product (3001) + rag-api | **있음** |
 | `prompt_quality.py` | product (3001) + rag-api | **있음** |
+| `company_context.py` | product (3001) + DB | **있음** |
 | `citation_attach.py` | product (3001) + rag-api | **있음** |
 
 ```bash
@@ -78,6 +79,24 @@ python3 eval/prompt_quality.py paths    # LLM 없이 검색 경로만 확인
 python3 eval/prompt_quality.py before
 python3 eval/prompt_quality.py after
 python3 eval/prompt_quality.py compare
+```
+
+## company_context.py — 사업장 컨텍스트 상담
+
+**LLM을 호출합니다.** 6케이스 × 2모델 = 12회입니다.
+
+`company_id` 를 붙인 상담을 봅니다. 서비스의 제1원칙(사업장에 위험 판정을 붙이지
+않는다)이 걸린 경로라 안전·위험 단정, 내부 등급·순위 노출, 명단 등재 오진술,
+지역·업종 경보를 개별 사업장에 옮기는 것을 셉니다.
+
+위험 조합이 서로 다른 실제 사업장 4곳을 고정해 두고, 매 실행마다 조합이 그대로인지
+먼저 확인합니다.
+
+```bash
+python3 eval/company_context.py profiles   # LLM 없이 사업장 조합만 확인
+python3 eval/company_context.py before
+python3 eval/company_context.py after
+python3 eval/company_context.py compare
 ```
 
 ## citation_attach.py — 법령 인용 부착
