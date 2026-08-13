@@ -154,9 +154,13 @@ export function InspectorDashboard() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<InspectorSearchResponse | null>(null);
   const [loadingOverview, setLoadingOverview] = useState(true);
+  const [loadingQueue, setLoadingQueue] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingQueuePage, setEditingQueuePage] = useState(false);
+  const [queuePageDraft, setQueuePageDraft] = useState("");
+  const [queuePageValidation, setQueuePageValidation] = useState<string | null>(null);
 
   async function selectCompany(companyId: string) {
     setLoadingDetail(true);
@@ -171,11 +175,43 @@ export function InspectorDashboard() {
     }
   }
 
+  async function changeQueuePage(page: number) {
+    setLoadingQueue(true);
+    setQueuePageValidation(null);
+    setError(null);
+    try {
+      const response = await fetch(`/api/inspector/overview?limit=10&page=${page}`, { cache: "no-store" });
+      setOverview(await readApiResponse<InspectorOverview>(response));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "위험큐 페이지를 불러오지 못했습니다.");
+    } finally {
+      setLoadingQueue(false);
+    }
+  }
+
+  function startEditingQueuePage() {
+    if (!overview) return;
+    setQueuePageDraft(String(overview.queue_pagination.page));
+    setQueuePageValidation(null);
+    setEditingQueuePage(true);
+  }
+
+  function goToQueuePage() {
+    if (!overview) return;
+    const nextPage = Number(queuePageDraft);
+    if (!Number.isInteger(nextPage) || nextPage < 1 || nextPage > overview.queue_pagination.total_pages) {
+      setQueuePageValidation(`1부터 ${overview.queue_pagination.total_pages} 사이의 페이지를 입력해 주세요.`);
+      return;
+    }
+    setEditingQueuePage(false);
+    if (nextPage !== overview.queue_pagination.page) void changeQueuePage(nextPage);
+  }
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const response = await fetch("/api/inspector/overview?limit=8", { cache: "no-store" });
+        const response = await fetch("/api/inspector/overview?limit=10&page=1", { cache: "no-store" });
         const data = await readApiResponse<InspectorOverview>(response);
         if (cancelled) return;
         setOverview(data);
@@ -267,9 +303,69 @@ export function InspectorDashboard() {
           <section className="inspector-queue-card">
             <div className="inspector-card-head">
               <div><span className="eyebrow">Priority queue</span><h2>위험큐 최상위</h2></div>
-              <span>최신 배치</span>
+              <span>{loadingQueue ? "페이지 이동 중" : "1~100위 · 최신 배치"}</span>
             </div>
-            {overview ? <QueueTable items={overview.top_queue} onSelect={(id) => void selectCompany(id)} /> : <div className="inspector-loading">위험큐를 불러오는 중입니다.</div>}
+            {overview ? (
+              <>
+                <div className={loadingQueue ? "inspector-queue-loading" : undefined} aria-busy={loadingQueue}>
+                  <QueueTable items={overview.top_queue} onSelect={(id) => void selectCompany(id)} />
+                </div>
+                {overview.queue_pagination.total_pages > 1 ? (
+                  <nav className="inspector-queue-pagination" aria-label="위험큐 페이지">
+                    <button
+                      type="button"
+                      disabled={loadingQueue || !overview.queue_pagination.has_previous}
+                      onClick={() => void changeQueuePage(overview.queue_pagination.page - 1)}
+                    >
+                      <span aria-hidden="true">←</span> 이전
+                    </button>
+                    <span className="inspector-queue-page">
+                      {editingQueuePage ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          min="1"
+                          max={overview.queue_pagination.total_pages}
+                          step="1"
+                          value={queuePageDraft}
+                          aria-label={`이동할 위험큐 페이지, 전체 ${overview.queue_pagination.total_pages}페이지`}
+                          onChange={(event) => setQueuePageDraft(event.target.value)}
+                          onBlur={goToQueuePage}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              goToQueuePage();
+                            }
+                            if (event.key === "Escape") {
+                              setEditingQueuePage(false);
+                              setQueuePageValidation(null);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className="inspector-queue-current-page"
+                          aria-label={`현재 ${overview.queue_pagination.page}페이지. 클릭하여 이동할 페이지 입력`}
+                          onClick={startEditingQueuePage}
+                        >
+                          {overview.queue_pagination.page}
+                        </button>
+                      )}
+                      <span>/ {overview.queue_pagination.total_pages} 페이지</span>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={loadingQueue || !overview.queue_pagination.has_more}
+                      onClick={() => void changeQueuePage(overview.queue_pagination.page + 1)}
+                    >
+                      다음 <span aria-hidden="true">→</span>
+                    </button>
+                  </nav>
+                ) : null}
+                {queuePageValidation ? <p className="inspector-queue-page-error" role="alert">{queuePageValidation}</p> : null}
+              </>
+            ) : <div className="inspector-loading">위험큐를 불러오는 중입니다.</div>}
           </section>
 
           <div className="inspector-detail-column" aria-busy={loadingDetail}>

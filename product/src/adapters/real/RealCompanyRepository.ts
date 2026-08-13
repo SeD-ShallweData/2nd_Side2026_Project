@@ -1,4 +1,11 @@
-import type { Company, CompanyMatchType, CompanyRepository, CompanySearchResult } from "@/domain/company";
+import type {
+  Company,
+  CompanyFilterOptions,
+  CompanyMatchType,
+  CompanyRepository,
+  CompanySearchFilters,
+  CompanySearchResult,
+} from "@/domain/company";
 import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
 import { queryReadOnly } from "@/server/postgres";
 
@@ -8,6 +15,11 @@ interface FirmRow {
   sido: string | null;
   industry: string | null;
   as_of_date?: string | null;
+}
+
+interface FilterOptionRow {
+  value: string;
+  count: string;
 }
 
 function escapeLike(value: string): string {
@@ -32,17 +44,24 @@ function toCompany(row: FirmRow): Company {
 }
 
 export class RealCompanyRepository implements CompanyRepository {
-  async search(query: string, limit = 10, offset = 0): Promise<CompanySearchResult[]> {
+  async search(
+    query: string,
+    limit = 10,
+    offset = 0,
+    filters: CompanySearchFilters = {},
+  ): Promise<CompanySearchResult[]> {
     const rows = await queryReadOnly<FirmRow>(
       `SELECT f.firm_id, f.name, f.sido, f.industry
          FROM public.firms AS f
         WHERE f.name ILIKE $1 ESCAPE '\\'
+          AND ($5::text IS NULL OR f.sido = $5)
+          AND ($6::text IS NULL OR f.industry = $6)
         ORDER BY CASE WHEN lower(f.name) = lower($2) THEN 0 ELSE 1 END,
                  f.name,
                  f.firm_id
         LIMIT $3
        OFFSET $4`,
-      [`%${escapeLike(query)}%`, query, limit, offset],
+      [`%${escapeLike(query)}%`, query, limit, offset, filters.region ?? null, filters.industry ?? null],
     );
 
     return rows.map((row) => ({
@@ -57,14 +76,42 @@ export class RealCompanyRepository implements CompanyRepository {
     }));
   }
 
-  async count(query: string): Promise<number> {
+  async count(query: string, filters: CompanySearchFilters = {}): Promise<number> {
     const rows = await queryReadOnly<{ total: string }>(
       `SELECT count(*)::text AS total
          FROM public.firms AS f
-        WHERE f.name ILIKE $1 ESCAPE '\\'`,
-      [`%${escapeLike(query)}%`],
+        WHERE f.name ILIKE $1 ESCAPE '\\'
+          AND ($2::text IS NULL OR f.sido = $2)
+          AND ($3::text IS NULL OR f.industry = $3)`,
+      [`%${escapeLike(query)}%`, filters.region ?? null, filters.industry ?? null],
     );
     return Number(rows[0]?.total ?? 0);
+  }
+
+  async listFilterOptions(): Promise<CompanyFilterOptions> {
+    const [regionRows, industryRows] = await Promise.all([
+      queryReadOnly<FilterOptionRow>(
+        `SELECT f.sido AS value, count(*)::text AS count
+           FROM public.firms AS f
+          WHERE f.sido IS NOT NULL AND btrim(f.sido) <> ''
+          GROUP BY f.sido
+          ORDER BY f.sido`,
+      ),
+      queryReadOnly<FilterOptionRow>(
+        `SELECT f.industry AS value, count(*)::text AS count
+           FROM public.firms AS f
+          WHERE f.industry IS NOT NULL AND btrim(f.industry) <> ''
+            AND f.industry NOT IN ('BIZ_NO미존재사업장', '해당없음')
+          GROUP BY f.industry
+          ORDER BY count(*) DESC, f.industry`,
+      ),
+    ]);
+
+    const toOptions = (rows: FilterOptionRow[]) => rows.map((row) => ({
+      value: row.value,
+      count: Number(row.count),
+    }));
+    return { regions: toOptions(regionRows), industries: toOptions(industryRows) };
   }
 
   async getById(companyId: string): Promise<Company | null> {

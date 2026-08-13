@@ -67,7 +67,7 @@ RAG에서 정규화한 공식 법령·안내 출처는 `labor_law`로 표시한�
 
 ## 3. 사업장 검색
 
-### `GET /api/companies/search?q={query}&limit={1..20}&page={1..}`
+### `GET /api/companies/search?q={query}&limit={1..20}&page={1..}&region={region}&industry={industry}`
 
 ```ts
 interface CompanySearchItem {
@@ -92,7 +92,18 @@ interface CompanySearchResponse {
 }
 ```
 
-동명 사업장은 합치거나 첫 결과를 자동 선택하지 않는다. `total`은 현재 페이지가 아니라 전체 일치 건수이며, 기본값은 페이지당 10개다. 검색 SQL은 parameter binding을 사용한다. `address`, `size_label`은 하위 호환을 위해 nullable 필드로 유지하지만 현재 소비자 UI에서는 기능으로 제공하지 않는다.
+동명 사업장은 합치거나 첫 결과를 자동 선택하지 않는다. `region`, `industry`는 선택 입력이며 DB 값과 정확히 일치하는 결과만 남긴다. `total`은 현재 페이지가 아니라 필터까지 적용된 전체 일치 건수이며, 기본값은 페이지당 10개다. 검색 SQL은 parameter binding을 사용한다. `address`, `size_label`은 하위 호환을 위해 nullable 필드로 유지하지만 현재 소비자 UI에서는 기능으로 제공하지 않는다.
+
+### `GET /api/companies/filters`
+
+```ts
+interface CompanyFilterOptions {
+  regions: Array<{ value: string; count: number }>;
+  industries: Array<{ value: string; count: number }>;
+}
+```
+
+현재 데이터 모드의 전체 사업장 명부에서 비어 있지 않은 지역·업종 고유값과 사업장 수를 반환한다. 실제 업종이 아닌 DB 구분값(`BIZ_NO미존재사업장`, `해당없음`)은 업종 선택지에서 제외한다. 지역은 이름순, 업종은 사업장 수가 많은 순으로 정렬한다.
 
 ## 4. 사업장 공개 신호
 
@@ -122,6 +133,7 @@ interface CompanyRiskResponse {
     confidence: Confidence;
     official_listing: {
       status: "listed" | "not_listed" | "unavailable";
+      // 명단 자체의 공표일 또는 검증된 스냅샷 기준일. 모델 배치일로 대신하지 않는다.
       as_of: string | null;
       source_name?: string;
     };
@@ -143,6 +155,10 @@ interface CompanyRiskResponse {
   sources: SourceReference[];
 }
 ```
+
+`wage_risk.official_listing.as_of`는 공식 명단 자체의 공표일 또는 검증된 수집 스냅샷
+기준일만 담는다. 현재 DB가 날짜 계보를 보존하지 않은 연계 결과는 상태를 유지하되 `null`을
+반환한다. 상위 `data_as_of`는 국민연금 관측월이므로 이 필드의 대체값으로 사용하지 않는다.
 
 `normal`은 안전 인증이 아니다. 산업안전 priority band는 사고 확률이 아니라 현장 확인 순서를 돕는
 공표 구간으로만 설명한다. 공개 API에는 `risk_full`, percentile, rank, SHAP를 포함하지 않는다.
@@ -304,7 +320,7 @@ DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`
 아닌 팀 시연용 프로토타입이므로 외부 공개 API가 아니다. 시연 서버에서는 `DEMO_BASIC_AUTH_USER`와
 `DEMO_BASIC_AUTH_PASSWORD`를 반드시 설정해 페이지와 `/api/inspector/*` 전체를 Basic 인증으로 보호한다.
 
-- `GET /api/inspector/overview`: 최신 배치 요약, 큐 우선순위별 건수, 최상위 큐를 반환한다.
+- `GET /api/inspector/overview?limit=10&page=1`: 최신 배치 요약, 큐 우선순위별 건수와 최상위 100위 안의 위험큐 페이지를 반환한다. 기본값은 페이지당 10개이며 응답의 `queue_pagination`에 현재 페이지, 전체 페이지, 이전·다음 여부가 포함된다.
 - `GET /api/inspector/companies/search?q=...`: 실제 `firms`에서 동명 사업장을 검색한다.
 - `GET /api/inspector/companies/{companyId}`: 최신 `risk_full`, 큐 순위·`grade`, 실제
   `reasons`, G1~G6 지표와 별도 산업안전 공표 구간을 반환한다.

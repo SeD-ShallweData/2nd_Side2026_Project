@@ -1,12 +1,21 @@
 import Link from "next/link";
+import {
+  CONNECTED_WAGE_LISTING_LABEL,
+  UNCONNECTED_WAGE_OBSERVATION_LABELS,
+} from "@/domain/riskPresentation";
+
+const WAGE_PREVIEW_ITEMS = [
+  [CONNECTED_WAGE_LISTING_LABEL, "연계 데이터 내 일치 결과 없음"],
+  [UNCONNECTED_WAGE_OBSERVATION_LABELS[0], "18%"],
+  [UNCONNECTED_WAGE_OBSERVATION_LABELS[1], "완만한 증가"],
+  [UNCONNECTED_WAGE_OBSERVATION_LABELS[2], "높음 · 12/12개월"],
+] as const;
 
 const STEPS = [
   { number: "01", icon: "⌕", title: "사업장 확인", body: "회사명과 지역·업종으로 정확한 사업장을 선택합니다.", tag: "공개 데이터" },
   { number: "02", icon: "?", title: "확인 질문 정리", body: "임금과 산업안전 신호를 섞지 않고 확인할 질문을 봅니다.", tag: "두 가지 위험카드" },
   { number: "03", icon: "✓", title: "계약서 진단", body: "계약서에서 확인된 항목과 다시 물어볼 내용을 정리합니다.", tag: "원문 대조" },
 ] as const;
-
-const WAGE_ITEMS = ["체불사업주 명단", "건강보험 체납 명단", "국민연금 가입자 (12개월)", "이직률 (12개월)", "1인당 고지금액", "고용 추이", "업종 폐업률", "데이터 충실도"] as const;
 
 export function FeatureSection() {
   return (
@@ -29,9 +38,9 @@ export function RiskPreviewSection() {
         <div className="refresh-risk-preview" aria-label="위험카드 화면 예시">
           <article className="refresh-risk-card is-watch">
             <header><div><small>사업장 단위 확인 정보</small><h3>임금 지급 관련 정보</h3></div><strong>추가 확인 권장</strong></header>
-            <p className="refresh-status-copy">확인할 공개 항목이 있습니다. 아래 세부 지표와 공식 명단 결과를 함께 확인하세요.</p>
-            <dl>{WAGE_ITEMS.map((item) => <div key={item}><dt>{item}</dt><dd>확인할 수 없음</dd></div>)}</dl>
-            <small className="refresh-preview-note">화면 예시 · 연결되지 않은 값은 추정하지 않습니다.</small>
+            <p className="refresh-status-copy"><strong>공식 명단 1개 확인 예시</strong><span>추가 공개 지표 3개 분석 예시</span></p>
+            <dl>{WAGE_PREVIEW_ITEMS.map(([item, value]) => <div key={item}><dt>{item}</dt><dd>{value}</dd></div>)}</dl>
+            <small className="refresh-preview-note">DEMO 예시 · 실제 결과는 선택한 사업장 데이터로 표시됩니다.</small>
           </article>
           <article className="refresh-risk-card is-review">
             <header><div><small>개별 사업장 판정 아님</small><h3>지역·업종 산업재해 신호</h3></div><strong>우선 확인 필요</strong></header>

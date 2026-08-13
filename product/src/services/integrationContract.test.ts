@@ -42,18 +42,22 @@ describe("실제 ML DB 공개 경계", () => {
     ["유보", "watch"],
     ["유보_정보부족", "unknown"],
     ["배제_4대보험체납(door1)", "review"],
+    ["배제_공개체납", "review"],
+    ["배제_임금체불공개", "review"],
   ] as const)("실제 판정 %s를 사용자 상태 %s로 변환한다", (verdict, level) => {
     expect(toWageRiskPublic({ ...baseRow, verdict }).level).toBe(level);
   });
 
-  it("원시 점수 없이 공식 명단 상태와 확인 근거만 반환한다", () => {
+  it("원시 점수나 모델 배치일 없이 공식 명단 상태와 확인 근거만 반환한다", () => {
     const result = toWageRiskPublic({
       ...baseRow,
       verdict: "배제_임금체불공개",
       excluded_wage: true,
     });
     expect(result.official_listing.status).toBe("listed");
+    expect(result.official_listing.as_of).toBeNull();
     expect(result.evidence_codes).toContain("OFFICIAL_WAGE_LISTING_MATCH");
+    expect(result.evidence_items[0]?.description).not.toContain("기준일 현재");
     expect(JSON.stringify(result)).not.toMatch(/risk_full|probability|percentile|shap/i);
   });
 
