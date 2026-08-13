@@ -1,6 +1,10 @@
 import { DataSourceList } from "@/components/common/DataSourceList";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { SafetyContextPublic, SourceReference, WageRiskPublic } from "@/domain/risk";
+import {
+  CONNECTED_WAGE_LISTING_LABEL,
+  UNCONNECTED_WAGE_OBSERVATION_LABELS,
+} from "@/domain/riskPresentation";
 
 const CONFIDENCE_LABEL = {
   sufficient: "자료 충분",
@@ -10,20 +14,9 @@ const CONFIDENCE_LABEL = {
 
 const LISTING_LABEL = {
   listed: "공개 명단 일치 결과 있음",
-  not_listed: "공개 명단 일치 결과 없음",
+  not_listed: "연계 데이터 내 일치 결과 없음",
   unavailable: "공개 명단 확인 불가",
 } as const;
-
-const WAGE_OBSERVATION_LABELS = [
-  "체불사업주 명단",
-  "건강보험 체납 명단",
-  "국민연금 가입자 (12개월)",
-  "이직률 (12개월)",
-  "1인당 고지금액",
-  "고용 추이",
-  "업종 폐업률",
-  "데이터 충실도",
-] as const;
 
 type CardProps =
   | {
@@ -111,13 +104,35 @@ export function RiskInformationCard(props: CardProps) {
       )}
 
       {isWage ? (
+        <div className="wage-indicator-coverage" role="status">
+          <strong>공식 명단 1개 확인</strong>
+          <span>추가 공개 지표 3개 연동 준비 중</span>
+        </div>
+      ) : null}
+
+      {isWage ? (
+        <div className="listing-panel">
+          <div>
+            <span>{CONNECTED_WAGE_LISTING_LABEL}</span>
+            <strong>{LISTING_LABEL[props.data.official_listing.status]}</strong>
+          </div>
+          <small>
+            {props.data.official_listing.as_of
+              ? `명단 공표 기준 ${props.data.official_listing.as_of}`
+              : "명단 공표 기준일 미수록"}
+          </small>
+          <p>일치 결과가 없다는 표시는 연계 데이터 범위의 결과이며, 체불 이력이 전혀 없거나 미래 체불이 없다는 뜻이 아닙니다.</p>
+        </div>
+      ) : null}
+
+      {isWage ? (
         <section className="risk-section wage-observation-section" aria-labelledby="wage-observation-title">
           <div className="observation-title-row">
-            <h3 id="wage-observation-title">세부 공개 지표</h3>
-            <span>연결 준비 중</span>
+            <h3 id="wage-observation-title">추가 공개 지표</h3>
+            <span>3개 연동 준비 중</span>
           </div>
           <dl className="wage-observation-list">
-            {WAGE_OBSERVATION_LABELS.map((label) => (
+            {UNCONNECTED_WAGE_OBSERVATION_LABELS.map((label) => (
               <div key={label}>
                 <dt>{label}</dt>
                 <dd>확인할 수 없음</dd>
@@ -128,22 +143,9 @@ export function RiskInformationCard(props: CardProps) {
         </section>
       ) : null}
 
-      {isWage ? (
-        <div className="listing-panel">
-          <div>
-            <span>공식 명단 확인</span>
-            <strong>{LISTING_LABEL[props.data.official_listing.status]}</strong>
-          </div>
-          <small>
-            {props.data.official_listing.as_of
-              ? `기준 ${props.data.official_listing.as_of}`
-              : "확인 가능한 기준일 없음"}
-          </small>
-          <p>명단에 없다는 사실은 체불 이력이 전혀 없거나 미래 체불이 없다는 뜻이 아닙니다.</p>
-        </div>
-      ) : (
+      {!isWage ? (
         <p className="scope-disclaimer">{props.data.disclaimer}</p>
-      )}
+      ) : null}
 
       <dl className="risk-meta">
         <div>
