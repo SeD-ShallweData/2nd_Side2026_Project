@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { parseChatRequest, sendChatMessage } from "@/services/chatService";
-import { searchCompanies } from "@/services/companyService";
+import { getCompanyFilterOptions, searchCompanies } from "@/services/companyService";
 import { reviewContract, validateContractRequest } from "@/services/contractService";
 import { getCompanyRisk } from "@/services/riskService";
 
@@ -28,6 +28,22 @@ describe("사업장 검색", () => {
     expect(second).toMatchObject({ total: 2, page: 2, page_size: 1, total_pages: 2, has_more: false });
     expect(second.items).toHaveLength(1);
     expect(second.items[0]?.company_id).not.toBe(first.items[0]?.company_id);
+  });
+
+  it("지역과 업종 필터를 검색 결과와 전체 개수에 함께 적용한다", async () => {
+    const byRegion = await searchCompanies("OO 건설", 10, 1, { region: "인천광역시" });
+    const byIndustry = await searchCompanies("OO 건설", 10, 1, { industry: "전문직별 공사업" });
+
+    expect(byRegion.total).toBe(1);
+    expect(byRegion.items[0]?.region).toBe("인천광역시");
+    expect(byIndustry.total).toBe(1);
+    expect(byIndustry.items[0]?.industry).toBe("전문직별 공사업");
+  });
+
+  it("DB 모드에 맞는 지역·업종 필터 옵션과 건수를 제공한다", async () => {
+    const options = await getCompanyFilterOptions();
+    expect(options.regions).toContainEqual({ value: "경기도", count: 2 });
+    expect(options.industries).toContainEqual({ value: "건설업", count: 2 });
   });
 
   it("영문 대소문자와 별칭을 구분하지 않는다", async () => {

@@ -87,7 +87,7 @@ export function toWageRiskPublic(row: WageRow): WageRiskPublic {
       code: wageListing ? "OFFICIAL_WAGE_LISTING_MATCH" : "INSURANCE_PAYMENT_REVIEW",
       label: wageListing ? "공식 임금체불 공개 명단 연계" : "임금 지급 관련 추가 확인 신호",
       description: wageListing
-        ? "기준일 현재 공개 명단 연계 결과가 있습니다. 동명이 아닌지 공식 원문을 함께 확인하세요."
+        ? "연계된 공개 명단에서 일치 결과가 있습니다. 동명이 아닌지 공식 원문을 함께 확인하세요."
         : "공개 판정에서 임금 지급 관련 추가 확인 신호가 있어 지급일·급여 구성·계약서 교부 여부를 직접 확인하는 것이 좋습니다.",
     });
   } else if (mapped && mapped.level !== "unknown") {
@@ -117,7 +117,9 @@ export function toWageRiskPublic(row: WageRow): WageRiskPublic {
           : row.excluded_wage
             ? "listed"
             : "not_listed",
-      as_of: row.as_of_date,
+      // batches.as_of_date는 국민연금 관측월이며 명단의 공표일이 아니다.
+      // 명단 원본의 공표·스냅샷 날짜를 적재하기 전에는 날짜를 추정하지 않는다.
+      as_of: null,
       source_name: "고용노동부 체불사업주 명단공개 연계 결과",
     },
   };
