@@ -22,6 +22,7 @@ export interface EvidenceItem {
 
 export interface OfficialListingStatus {
   status: "listed" | "not_listed" | "unavailable";
+  /** 명단 자체의 공표일 또는 검증된 스냅샷 기준일. 모델 배치일로 대신하지 않는다. */
   as_of: string | null;
   source_name?: string;
 }

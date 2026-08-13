@@ -122,6 +122,7 @@ interface CompanyRiskResponse {
     confidence: Confidence;
     official_listing: {
       status: "listed" | "not_listed" | "unavailable";
+      // 명단 자체의 공표일 또는 검증된 스냅샷 기준일. 모델 배치일로 대신하지 않는다.
       as_of: string | null;
       source_name?: string;
     };
@@ -143,6 +144,10 @@ interface CompanyRiskResponse {
   sources: SourceReference[];
 }
 ```
+
+`wage_risk.official_listing.as_of`는 공식 명단 자체의 공표일 또는 검증된 수집 스냅샷
+기준일만 담는다. 현재 DB가 날짜 계보를 보존하지 않은 연계 결과는 상태를 유지하되 `null`을
+반환한다. 상위 `data_as_of`는 국민연금 관측월이므로 이 필드의 대체값으로 사용하지 않는다.
 
 `normal`은 안전 인증이 아니다. 산업안전 priority band는 사고 확률이 아니라 현장 확인 순서를 돕는
 공표 구간으로만 설명한다. 공개 API에는 `risk_full`, percentile, rank, SHAP를 포함하지 않는다.
