@@ -138,9 +138,14 @@ function asQueueItem(row: QueueRow): InspectorQueueItem {
   };
 }
 
-export async function getInspectorOverview(limit = 8): Promise<InspectorOverview> {
+const INSPECTOR_QUEUE_PREVIEW_SIZE = 100;
+
+export async function getInspectorOverview(limit = 10, page = 1): Promise<InspectorOverview> {
   if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
     throw new ServiceError("VALIDATION_ERROR", "조회 개수를 확인해 주세요.", 400, false);
+  }
+  if (!Number.isInteger(page) || page < 1 || page > Math.ceil(INSPECTOR_QUEUE_PREVIEW_SIZE / limit)) {
+    throw new ServiceError("VALIDATION_ERROR", "위험큐 페이지를 확인해 주세요.", 400, false);
   }
 
   const batches = await queryReadOnly<BatchRow>(
@@ -159,6 +164,13 @@ export async function getInspectorOverview(limit = 8): Promise<InspectorOverview
   if (!batch) {
     throw new ServiceError("INSPECTOR_DATA_NOT_FOUND", "적재된 ML 배치를 찾을 수 없습니다.", 503, true);
   }
+
+  const previewTotal = Math.min(batch.n_queue, INSPECTOR_QUEUE_PREVIEW_SIZE);
+  const totalPages = previewTotal === 0 ? 0 : Math.ceil(previewTotal / limit);
+  if ((totalPages === 0 && page !== 1) || (totalPages > 0 && page > totalPages)) {
+    throw new ServiceError("VALIDATION_ERROR", "위험큐 페이지 범위를 벗어났습니다.", 400, false);
+  }
+  const offset = (page - 1) * limit;
 
   const [counts, topRows] = await Promise.all([
     queryReadOnly<CountRow>(
@@ -181,9 +193,11 @@ export async function getInspectorOverview(limit = 8): Promise<InspectorOverview
          FROM public.inspector_queue AS q
          JOIN public.firms AS f ON f.firm_id = q.firm_id
         WHERE q.batch_id = $1
+          AND q.rank <= $4
         ORDER BY q.rank
-        LIMIT $2`,
-      [batch.batch_id, limit],
+        LIMIT $2
+       OFFSET $3`,
+      [batch.batch_id, limit, offset, INSPECTOR_QUEUE_PREVIEW_SIZE],
     ),
   ]);
 
@@ -205,6 +219,14 @@ export async function getInspectorOverview(limit = 8): Promise<InspectorOverview
       safe_recommendation: batch.n_safe,
     },
     queue_counts: queueCounts,
+    queue_pagination: {
+      page,
+      page_size: limit,
+      total_items: previewTotal,
+      total_pages: totalPages,
+      has_previous: page > 1,
+      has_more: page < totalPages,
+    },
     top_queue: topRows.map(asQueueItem),
   };
 }

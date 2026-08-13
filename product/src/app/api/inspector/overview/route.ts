@@ -8,8 +8,10 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const url = new URL(request.url);
     const limitValue = url.searchParams.get("limit");
-    const limit = limitValue === null ? 8 : Number(limitValue);
-    return NextResponse.json(await getInspectorOverview(limit), {
+    const limit = limitValue === null ? 10 : Number(limitValue);
+    const pageValue = url.searchParams.get("page");
+    const page = pageValue === null ? 1 : Number(pageValue);
+    return NextResponse.json(await getInspectorOverview(limit, page), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

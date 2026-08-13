@@ -31,6 +31,14 @@ export interface InspectorOverview {
     safe_recommendation: number;
   };
   queue_counts: Record<InspectorQueueGrade, number>;
+  queue_pagination: {
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+    has_previous: boolean;
+    has_more: boolean;
+  };
   top_queue: InspectorQueueItem[];
 }
 

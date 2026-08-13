@@ -10,7 +10,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     const limit = limitValue === null ? 10 : Number(limitValue);
     const pageValue = url.searchParams.get("page");
     const page = pageValue === null ? 1 : Number(pageValue);
-    return NextResponse.json(await searchCompanies(query, limit, page));
+    const region = url.searchParams.get("region") ?? undefined;
+    const industry = url.searchParams.get("industry") ?? undefined;
+    return NextResponse.json(await searchCompanies(query, limit, page, { region, industry }));
   } catch (error) {
     const payload = errorPayload(error);
     return NextResponse.json(payload.body, { status: payload.status });

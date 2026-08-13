@@ -1,7 +1,9 @@
 import type {
   Company,
+  CompanyFilterOptions,
   CompanyMatchType,
   CompanyRepository,
+  CompanySearchFilters,
   CompanySearchResult,
 } from "@/domain/company";
 import { MOCK_COMPANIES } from "@/mocks/companies";
@@ -44,7 +46,7 @@ function findMatch(company: Company, query: string): Match | null {
 }
 
 export class MockCompanyRepository implements CompanyRepository {
-  private matches(query: string) {
+  private matches(query: string, filters: CompanySearchFilters = {}) {
     if (normalizeSearchText(query) === "error") {
       throw new ServiceError(
         "COMPANY_SOURCE_UNAVAILABLE",
@@ -56,11 +58,18 @@ export class MockCompanyRepository implements CompanyRepository {
 
     return MOCK_COMPANIES.map((company) => ({ company, match: findMatch(company, query) }))
       .filter((entry): entry is { company: Company; match: Match } => entry.match !== null)
+      .filter(({ company }) => !filters.region || company.region === filters.region)
+      .filter(({ company }) => !filters.industry || company.industry === filters.industry)
       .sort((a, b) => a.match.rank - b.match.rank || a.company.company_name.localeCompare(b.company.company_name, "ko"));
   }
 
-  async search(query: string, limit = 10, offset = 0): Promise<CompanySearchResult[]> {
-    return this.matches(query)
+  async search(
+    query: string,
+    limit = 10,
+    offset = 0,
+    filters: CompanySearchFilters = {},
+  ): Promise<CompanySearchResult[]> {
+    return this.matches(query, filters)
       .slice(offset, offset + limit)
       .map(({ company, match }) => ({
         company_id: company.company_id,
@@ -74,8 +83,25 @@ export class MockCompanyRepository implements CompanyRepository {
       }));
   }
 
-  async count(query: string): Promise<number> {
-    return this.matches(query).length;
+  async count(query: string, filters: CompanySearchFilters = {}): Promise<number> {
+    return this.matches(query, filters).length;
+  }
+
+  async listFilterOptions(): Promise<CompanyFilterOptions> {
+    function summarize(values: Array<string | null>) {
+      const counts = new Map<string, number>();
+      for (const value of values) {
+        if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+      }
+      return [...counts.entries()].map(([value, count]) => ({ value, count }));
+    }
+
+    return {
+      regions: summarize(MOCK_COMPANIES.map((company) => company.region))
+        .sort((a, b) => a.value.localeCompare(b.value, "ko")),
+      industries: summarize(MOCK_COMPANIES.map((company) => company.industry))
+        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value, "ko")),
+    };
   }
 
   async getById(companyId: string): Promise<Company | null> {
