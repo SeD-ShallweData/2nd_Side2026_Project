@@ -1,10 +1,37 @@
 import { getCompanyDataMode, getMockDelayMs } from "@/config/dataMode";
-import type { Company, CompanySearchResponse } from "@/domain/company";
+import type {
+  Company,
+  CompanyFilterOptions,
+  CompanySearchFilters,
+  CompanySearchResponse,
+} from "@/domain/company";
 import { delay } from "@/utils/delay";
 import { ServiceError } from "@/utils/errors";
 import { getCompanyRepository } from "@/services/providers";
 
-export async function searchCompanies(query: string, limit = 10, page = 1): Promise<CompanySearchResponse> {
+function normalizeFilters(filters: CompanySearchFilters): CompanySearchFilters {
+  const normalized = {
+    region: filters.region?.trim() || undefined,
+    industry: filters.industry?.trim() || undefined,
+  };
+  if ((normalized.region?.length ?? 0) > 100 || (normalized.industry?.length ?? 0) > 200) {
+    throw new ServiceError(
+      "VALIDATION_ERROR",
+      "검색 필터를 확인해 주세요.",
+      400,
+      false,
+      [{ field: "filters", reason: "지역은 100자, 업종은 200자 이하여야 합니다." }],
+    );
+  }
+  return normalized;
+}
+
+export async function searchCompanies(
+  query: string,
+  limit = 10,
+  page = 1,
+  filters: CompanySearchFilters = {},
+): Promise<CompanySearchResponse> {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 1 || normalizedQuery.length > 100) {
     throw new ServiceError(
@@ -34,11 +61,12 @@ export async function searchCompanies(query: string, limit = 10, page = 1): Prom
     );
   }
 
+  const normalizedFilters = normalizeFilters(filters);
   if (getCompanyDataMode() === "mock") await delay(getMockDelayMs());
   const repository = getCompanyRepository();
   const [items, total] = await Promise.all([
-    repository.search(normalizedQuery, limit, (page - 1) * limit),
-    repository.count(normalizedQuery),
+    repository.search(normalizedQuery, limit, (page - 1) * limit, normalizedFilters),
+    repository.count(normalizedQuery, normalizedFilters),
   ]);
   const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
   return {
@@ -50,6 +78,11 @@ export async function searchCompanies(query: string, limit = 10, page = 1): Prom
     page_size: limit,
     total_pages: totalPages,
   };
+}
+
+export async function getCompanyFilterOptions(): Promise<CompanyFilterOptions> {
+  if (getCompanyDataMode() === "mock") await delay(getMockDelayMs());
+  return getCompanyRepository().listFilterOptions();
 }
 
 export async function getCompanyById(companyId: string): Promise<Company> {
