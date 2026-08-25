@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
+import os
+import stat
 import sys
 import tempfile
 import unittest
 from collections import Counter
 from pathlib import Path
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "industrial_safety_loader.py"
@@ -18,6 +22,53 @@ SPEC.loader.exec_module(loader)
 
 
 class IndustrialSafetyLoaderUnitTests(unittest.TestCase):
+    def _create_source_registry(
+        self, root: Path, *, symlink_code: str | None = None
+    ) -> tuple[Path, Path, Path, dict[str, bytes]]:
+        v2_root = root / "v2-source"
+        extension_root = root / "extension-source"
+        paths = {
+            "v2_cell": ("v2", Path("data/cell.parquet")),
+            "api_occurrence_bounded": ("extension", Path("data/api.parquet")),
+            "nps_workplace": ("v2", Path("outputs/workplace.parquet")),
+            "nps_display": ("v2", Path("outputs/display.csv.gz")),
+            "nps_quality": ("v2", Path("reports/quality.json")),
+        }
+        payloads = {
+            code: (f"approved-{code}\n".encode("utf-8") * (index + 1))
+            for index, code in enumerate(paths)
+        }
+        artifacts: dict[str, dict[str, object]] = {}
+        for index, (code, (root_code, relative)) in enumerate(paths.items()):
+            source_root = v2_root if root_code == "v2" else extension_root
+            source = source_root / relative
+            source.parent.mkdir(parents=True, exist_ok=True)
+            if code == symlink_code:
+                real_source = source.with_name(source.name + ".real")
+                real_source.write_bytes(payloads[code])
+                source.symlink_to(real_source)
+            else:
+                source.write_bytes(payloads[code])
+            artifacts[code] = {
+                "root": root_code,
+                "path": relative.as_posix(),
+                "bytes": len(payloads[code]),
+                "sha256": hashlib.sha256(payloads[code]).hexdigest(),
+            }
+            if code != "nps_quality":
+                artifacts[code]["rows"] = index + 1
+        config = {
+            "contract_version": loader.CONTRACT_VERSION,
+            "roots": {
+                "v2": str(v2_root),
+                "extension": str(extension_root),
+            },
+            "artifacts": artifacts,
+        }
+        config_path = root / "industrial_safety_sources.v1.json"
+        config_path.write_text(loader.canonical_json(config) + "\n", encoding="utf-8")
+        return config_path, v2_root, extension_root, payloads
+
     def test_fingerprint_is_canonical_and_order_independent(self) -> None:
         left = loader.fingerprint({"b": [2, 1], "a": {"z": False, "x": None}})
         right = loader.fingerprint({"a": {"x": None, "z": False}, "b": [2, 1]})
@@ -297,6 +348,96 @@ class IndustrialSafetyLoaderUnitTests(unittest.TestCase):
             self.assertEqual(count, 1)
             self.assertEqual(path.read_text(encoding="utf-8"), "a,b\nx,\n")
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_existing_firms_sources_are_copied_into_an_exact_sealed_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path, v2_root, extension_root, payloads = self._create_source_registry(root)
+            private_stage = root / "private-stage"
+            private_stage.mkdir(mode=0o700)
+            private_stage.chmod(0o700)
+            bundle = private_stage / "source-bundle"
+            try:
+                manifest = loader.stage_existing_firms_source_bundle(
+                    config_path, v2_root, extension_root, bundle
+                )
+
+                self.assertEqual(
+                    set(manifest["source_artifacts"]),
+                    loader.EXISTING_FIRMS_SOURCE_CODES,
+                )
+                self.assertEqual(stat.S_IMODE(private_stage.stat().st_mode), 0o700)
+                self.assertEqual(stat.S_IMODE(bundle.stat().st_mode), 0o500)
+                for code, record in manifest["source_artifacts"].items():
+                    staged = bundle / record["stage_path"]
+                    self.assertEqual(staged.read_bytes(), payloads[code])
+                    self.assertEqual(stat.S_IMODE(staged.stat().st_mode), 0o400)
+                    self.assertEqual(staged.stat().st_nlink, 1)
+
+                verified = loader.verify_staged_source_bundle(
+                    bundle / loader.SOURCE_BUNDLE_MANIFEST_NAME,
+                    bundle / loader.SOURCE_BUNDLE_CONFIG_PATH,
+                    bundle / "v2",
+                    bundle / "extension",
+                )
+                self.assertEqual(verified["artifacts"], 5)
+            finally:
+                loader._remove_private_bundle(bundle)
+
+    def test_source_bundle_rejects_a_symlink_artifact_without_leaving_a_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path, v2_root, extension_root, _ = self._create_source_registry(
+                root, symlink_code="nps_display"
+            )
+            private_stage = root / "private-stage"
+            private_stage.mkdir(mode=0o700)
+            private_stage.chmod(0o700)
+            bundle = private_stage / "source-bundle"
+
+            with self.assertRaises(loader.ContractError):
+                loader.stage_existing_firms_source_bundle(
+                    config_path, v2_root, extension_root, bundle
+                )
+            self.assertFalse(bundle.exists())
+
+    def test_descriptor_copy_rejects_a_path_swap_and_restore_attack(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.bin"
+            backup = root / "source.approved"
+            destination = root / "staged.bin"
+            approved = b"approved-source-content" * 64
+            source.write_bytes(approved)
+            expected_sha256 = hashlib.sha256(approved).hexdigest()
+            real_read = os.read
+            swapped = False
+
+            def swap_after_first_read(descriptor: int, size: int) -> bytes:
+                nonlocal swapped
+                block = real_read(descriptor, size)
+                if block and not swapped:
+                    source.rename(backup)
+                    source.write_bytes(b"attacker-controlled-replacement")
+                    swapped = True
+                return block
+
+            try:
+                with mock.patch.object(loader.os, "read", side_effect=swap_after_first_read):
+                    with self.assertRaises(loader.ContractError):
+                        loader.copy_regular_file_nofollow(
+                            source,
+                            destination,
+                            expected_bytes=len(approved),
+                            expected_sha256=expected_sha256,
+                            chunk_size=31,
+                        )
+                self.assertFalse(destination.exists())
+            finally:
+                if swapped:
+                    source.unlink(missing_ok=True)
+                    backup.rename(source)
+            self.assertEqual(source.read_bytes(), approved)
 
 
 if __name__ == "__main__":

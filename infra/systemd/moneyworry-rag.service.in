@@ -1,0 +1,61 @@
+[Unit]
+Description=MoneyWorry labor-law RAG API
+Documentation=file://@PROJECT_ROOT@/product/integrations/rag-api/README.md
+Wants=network-online.target moneyworry-db.service
+After=network-online.target moneyworry-db.service
+RequiresMountsFor=/srv/moneyworry
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=@RAG_SERVICE_USER@
+Group=@RAG_SERVICE_GROUP@
+WorkingDirectory=@PROJECT_ROOT@/product/integrations/rag-api
+EnvironmentFile=@RAG_ENV_FILE@
+Environment=PYTHONUNBUFFERED=1
+Environment=HF_HOME=/srv/moneyworry/hf
+Environment=HF_HUB_CACHE=/srv/moneyworry/hf/hub
+Environment=HF_HUB_OFFLINE=1
+Environment=TRANSFORMERS_OFFLINE=1
+Environment=RAG_DB_PATH=/run/moneyworry-rag/chroma
+Environment=RAG_ASSET_MANIFEST=@PROJECT_ROOT@/product/integrations/rag-api/config/rag_assets.v1.json
+Environment=RAG_EMBEDDING_MODEL=BAAI/bge-m3
+Environment=RAG_MODEL_REVISION=5617a9f61b028005a4858fdac845db406aefb181
+Environment=RAG_MODEL_LOCAL_ONLY=1
+Environment=RAG_REQUIRE_ASSET_SEAL=1
+Environment=RAG_COLLECTION=labor_law
+Environment=RAG_EXPECTED_DOCUMENT_COUNT=583
+Environment=RAG_EXPECTED_EMBEDDING_DIMENSION=1024
+Environment=RAG_DISTANCE_THRESHOLD=0.42
+Environment=RAG_STRONG_MATCH_DISTANCE=0.30
+Environment=RAG_PRELOAD=1
+RuntimeDirectory=moneyworry-rag
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=no
+ExecStartPre=/usr/bin/test -x @PROJECT_ROOT@/product/integrations/rag-api/.venv/bin/gunicorn
+ExecStartPre=@PROJECT_ROOT@/product/integrations/rag-api/.venv/bin/python @PROJECT_ROOT@/product/integrations/rag-api/prepare_rag_assets.py stage-runtime --manifest @PROJECT_ROOT@/product/integrations/rag-api/config/rag_assets.v1.json --hf-home /srv/moneyworry/hf --hub-cache /srv/moneyworry/hf/hub --rag-db /srv/moneyworry/rag-db --runtime-rag-db /run/moneyworry-rag/chroma --require-read-only
+ExecStart=@PROJECT_ROOT@/product/integrations/rag-api/run-gunicorn.sh
+Restart=always
+RestartSec=5s
+TimeoutStartSec=15min
+TimeoutStopSec=90s
+KillSignal=SIGTERM
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadOnlyPaths=@PROJECT_ROOT@ /srv/moneyworry/hf /srv/moneyworry/rag-db
+ReadWritePaths=/run/moneyworry-rag
+RestrictSUIDSGID=yes
+UMask=0027
+LimitNOFILE=65536
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moneyworry-rag
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=500
+
+[Install]
+WantedBy=multi-user.target

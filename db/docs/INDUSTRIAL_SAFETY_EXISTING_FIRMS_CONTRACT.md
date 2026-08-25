@@ -149,11 +149,21 @@ industrial_safety.firm_risk.existing_firms.nps
 
 `existing-firms`는 다음 순서를 지켜야 한다.
 
-1. 대상 DB의 `public.firms`를 `firm_id` 순으로 mode-0600 CSV에 export한다.
-2. snapshot의 rows, bytes, SHA-256을 prepared manifest에 기록한다.
-3. snapshot과 strict 결과 파일 참조를 firm-risk run의 `artifact_bundle`과 fingerprint에 포함한다.
-4. DB 적재 transaction에서 `public.firms`를 잠근 뒤 snapshot과 live table을 양방향 비교한다.
-5. 한 행이라도 추가·삭제·변경됐으면 적재를 중단하고 새 snapshot으로 처음부터 다시 준비한다.
+1. registry와 승인된 다섯 source artifact를 각각 `O_NOFOLLOW` regular-file descriptor로 연다.
+2. 같은 descriptor에서 SHA-256을 계산하면서 mode-0700 private stage로 복사하고, source의
+   `fstat` identity/size/mtime/ctime을 복사 전후 비교한다.
+3. source bundle의 directory는 mode-0500, 파일은 mode-0400으로 봉인한다. prepare와
+   verify에는 원본 경로를 넘기지 않고 이 bundle의 config, `v2`, `extension` root만 넘긴다.
+4. 대상 DB의 `public.firms`를 `firm_id` 순으로 별도 mode-0600 prepared directory에 export한다.
+5. snapshot의 rows, bytes, SHA-256을 prepared manifest에 기록한다.
+6. snapshot과 strict 결과 파일 참조를 firm-risk run의 `artifact_bundle`과 fingerprint에 포함한다.
+7. DB 적재 transaction에서 `public.firms`를 잠근 뒤 snapshot과 live table을 양방향 비교한다.
+8. 한 행이라도 추가·삭제·변경됐으면 적재를 중단하고 새 snapshot으로 처음부터 다시 준비한다.
+
+봉인 대상은 `v2_cell`, `api_occurrence_bounded`, `nps_workplace`, `nps_display`,
+`nps_quality`와 이들을 지정하는 registry config다. source pathname을 해시한 뒤 다시 여는
+방식은 허용하지 않는다. `validate-only`는 DB나 credential을 사용하지 않는 원천 사전검사이고,
+실제 rollback/apply의 prepare·verify는 반드시 private source bundle을 새로 만든다.
 
 동일 fingerprint 재실행은 metadata와 실제 DB 행수·키셋을 다시 확인한 뒤 UPDATE 0건으로
 종료한다. current run을 다시 supersede/publish하거나 timestamp를 갱신하지 않는다.
@@ -163,8 +173,8 @@ industrial_safety.firm_risk.existing_firms.nps
 - `public.firms` snapshot 또는 prepared result SHA 변경: 새 fingerprint/run
 - loader/config SHA 변경인데 계약 버전이 그대로임: 재사용 거부
 
-stage는 기본적으로 종료 시 삭제한다. `--keep-stage`에는 canonical firm snapshot과 내부 source
-ID가 남으므로 접근 통제된 진단 상황 외에는 사용하지 않는다.
+stage는 기본적으로 종료 시 삭제한다. `--keep-stage`에는 canonical firm snapshot, 승인 source
+artifact 사본과 내부 source ID가 남으므로 접근 통제된 진단 상황 외에는 사용하지 않는다.
 
 ## 8. LLM 안전 view 계약
 

@@ -61,8 +61,28 @@ export function isDatabaseConfigured(): boolean {
 export async function isDatabaseReady(): Promise<boolean> {
   if (!isDatabaseConfigured()) return false;
   try {
-    await queryReadOnly<{ ready: number }>("SELECT 1 AS ready");
-    return true;
+    const rows = await queryReadOnly<{ ready: boolean }>(`
+      WITH latest AS (
+        SELECT id, as_of_date, target_month, n_scored, n_queue, n_safe
+        FROM batches
+        WHERE as_of_date IS NOT NULL
+        ORDER BY as_of_date DESC, ingested_at DESC, id DESC
+        LIMIT 1
+      )
+      SELECT
+        latest.as_of_date = DATE '2026-06-01'
+        AND latest.target_month = DATE '2026-12-01'
+        AND latest.n_scored = 553598
+        AND latest.n_queue = 3000
+        AND latest.n_safe = 503887
+        AND (SELECT count(*) FROM scored_active WHERE batch_id = latest.id) = latest.n_scored
+        AND (SELECT count(*) FROM inspector_queue WHERE batch_id = latest.id) = latest.n_queue
+        AND (SELECT count(*) FROM safe_recommendation WHERE batch_id = latest.id) = latest.n_safe
+        AND (SELECT count(*) FROM industrial_safety.v_llm_firm_safety_context) = 518806
+        AS ready
+      FROM latest
+    `);
+    return rows.length === 1 && rows[0]?.ready === true;
   } catch {
     return false;
   }

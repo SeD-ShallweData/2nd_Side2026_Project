@@ -1,0 +1,42 @@
+[Unit]
+Description=MoneyWorry contract analysis API
+Documentation=file://@PROJECT_ROOT@/product/integrations/contract-api/README.md
+Wants=network-online.target moneyworry-db.service
+After=network-online.target moneyworry-db.service
+RequiresMountsFor=/srv/moneyworry
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=@CONTRACT_SERVICE_USER@
+Group=@CONTRACT_SERVICE_GROUP@
+WorkingDirectory=@PROJECT_ROOT@/product/integrations/contract-api
+EnvironmentFile=@CONTRACT_ENV_FILE@
+Environment=PYTHONUNBUFFERED=1
+Environment=API_KEY_ENV_FILE=/dev/null
+Environment=LOCAL_CONFIG_ENV_FILE=/dev/null
+ExecStartPre=/usr/bin/test -x @PROJECT_ROOT@/product/integrations/contract-api/.venv/bin/gunicorn
+ExecStartPre=@PROJECT_ROOT@/product/integrations/contract-api/.venv/bin/python @PROJECT_ROOT@/product/integrations/contract-api/verify_contract_assets.py
+ExecStart=@PROJECT_ROOT@/product/integrations/contract-api/run-gunicorn.sh
+Restart=always
+RestartSec=5s
+TimeoutStopSec=90s
+KillSignal=SIGTERM
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadOnlyPaths=@PROJECT_ROOT@
+RestrictSUIDSGID=yes
+UMask=0027
+LimitNOFILE=65536
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moneyworry-contract
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=500
+
+[Install]
+WantedBy=multi-user.target
