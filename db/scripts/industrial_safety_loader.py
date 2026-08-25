@@ -15,6 +15,7 @@ import json
 import math
 import os
 import re
+import stat
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -74,6 +75,11 @@ STATIC_ARTIFACT_CODES = {
         "nps_quality",
     },
 }
+
+SOURCE_BUNDLE_CONTRACT_VERSION = "industrial_safety.source_bundle.v1"
+SOURCE_BUNDLE_CONFIG_PATH = Path("config/industrial_safety_sources.v1.json")
+SOURCE_BUNDLE_MANIFEST_NAME = "source_bundle_manifest.json"
+EXISTING_FIRMS_SOURCE_CODES = frozenset(STATIC_ARTIFACT_CODES["existing-firms"])
 
 FIRM_SNAPSHOT_COLUMNS = ["firm_id", "name", "biz_no", "sido", "industry"]
 FIRM_RESULT_OUTPUT_COLUMNS = [
@@ -427,6 +433,186 @@ def sha256_file(path: Path, chunk_size: int = 8 * 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
+def _stable_file_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    """Return metadata that must not change while a source descriptor is read."""
+
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+        metadata.st_gid,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _open_regular_nofollow(path: Path) -> tuple[int, os.stat_result]:
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if nofollow is None:
+        fail("O_NOFOLLOW is required for source artifact staging")
+    flags = os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        fail(f"cannot open regular source without following symlinks: {path}: {exc}")
+    try:
+        metadata = os.fstat(descriptor)
+    except OSError as exc:
+        os.close(descriptor)
+        raise ContractError(f"cannot inspect opened source descriptor: {path}: {exc}") from exc
+    if not stat.S_ISREG(metadata.st_mode):
+        os.close(descriptor)
+        fail(f"source is not a regular file: {path}")
+    return descriptor, metadata
+
+
+def _require_descriptor_stable(
+    path: Path,
+    descriptor: int,
+    before: os.stat_result,
+) -> os.stat_result:
+    after = os.fstat(descriptor)
+    if _stable_file_identity(after) != _stable_file_identity(before):
+        fail(f"source changed while its descriptor was being read: {path}")
+
+    # Re-open only to prove that the pathname still identifies the descriptor
+    # we consumed.  Data is never read from this second descriptor.
+    current_descriptor, current = _open_regular_nofollow(path)
+    try:
+        if (current.st_dev, current.st_ino) != (before.st_dev, before.st_ino):
+            fail(f"source pathname was replaced while being read: {path}")
+        if _stable_file_identity(current) != _stable_file_identity(after):
+            fail(f"source pathname metadata changed while being read: {path}")
+    finally:
+        os.close(current_descriptor)
+    return after
+
+
+def hash_regular_file_nofollow(
+    path: Path,
+    *,
+    expected_bytes: int | None = None,
+    expected_sha256: str | None = None,
+    maximum_bytes: int | None = None,
+    chunk_size: int = 8 * 1024 * 1024,
+) -> dict[str, Any]:
+    """Hash one regular file through a stable O_NOFOLLOW descriptor."""
+
+    descriptor, before = _open_regular_nofollow(path)
+    digest = hashlib.sha256()
+    total = 0
+    try:
+        if expected_bytes is not None and before.st_size != expected_bytes:
+            fail(f"{path}: bytes {before.st_size} != {expected_bytes}")
+        if maximum_bytes is not None and before.st_size > maximum_bytes:
+            fail(f"{path}: file exceeds the {maximum_bytes}-byte safety limit")
+        while True:
+            block = os.read(descriptor, chunk_size)
+            if not block:
+                break
+            total += len(block)
+            if maximum_bytes is not None and total > maximum_bytes:
+                fail(f"{path}: file exceeds the {maximum_bytes}-byte safety limit")
+            digest.update(block)
+        _require_descriptor_stable(path, descriptor, before)
+    finally:
+        os.close(descriptor)
+
+    actual_sha256 = digest.hexdigest()
+    if total != before.st_size:
+        fail(f"{path}: descriptor byte count changed while hashing")
+    if expected_sha256 is not None and actual_sha256 != expected_sha256:
+        fail(f"{path}: SHA-256 mismatch")
+    return {"bytes": total, "sha256": actual_sha256}
+
+
+def copy_regular_file_nofollow(
+    source: Path,
+    destination: Path,
+    *,
+    expected_bytes: int | None = None,
+    expected_sha256: str | None = None,
+    maximum_bytes: int | None = None,
+    chunk_size: int = 8 * 1024 * 1024,
+) -> dict[str, Any]:
+    """Copy a pinned source from one stable descriptor into a private file."""
+
+    source_descriptor, before = _open_regular_nofollow(source)
+    destination_descriptor = -1
+    created = False
+    digest = hashlib.sha256()
+    total = 0
+    try:
+        if expected_bytes is not None and before.st_size != expected_bytes:
+            fail(f"{source}: bytes {before.st_size} != {expected_bytes}")
+        if maximum_bytes is not None and before.st_size > maximum_bytes:
+            fail(f"{source}: file exceeds the {maximum_bytes}-byte safety limit")
+
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if nofollow is None:
+            fail("O_NOFOLLOW is required for source artifact staging")
+        destination_flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | nofollow
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        destination_descriptor = os.open(destination, destination_flags, 0o600)
+        created = True
+        if not stat.S_ISREG(os.fstat(destination_descriptor).st_mode):
+            fail(f"staged destination is not a regular file: {destination}")
+
+        while True:
+            block = os.read(source_descriptor, chunk_size)
+            if not block:
+                break
+            total += len(block)
+            if maximum_bytes is not None and total > maximum_bytes:
+                fail(f"{source}: file exceeds the {maximum_bytes}-byte safety limit")
+            digest.update(block)
+            offset = 0
+            while offset < len(block):
+                written = os.write(destination_descriptor, block[offset:])
+                if written <= 0:
+                    fail(f"short write while staging source artifact: {destination}")
+                offset += written
+
+        _require_descriptor_stable(source, source_descriptor, before)
+        destination_metadata = os.fstat(destination_descriptor)
+        if not stat.S_ISREG(destination_metadata.st_mode) or destination_metadata.st_size != total:
+            fail(f"staged destination changed while being written: {destination}")
+        os.fsync(destination_descriptor)
+        os.fchmod(destination_descriptor, 0o400)
+    except ContractError:
+        if created:
+            destination.unlink(missing_ok=True)
+        raise
+    except OSError as exc:
+        if created:
+            destination.unlink(missing_ok=True)
+        raise ContractError(f"source artifact staging failed for {source}: {exc}") from exc
+    finally:
+        os.close(source_descriptor)
+        if destination_descriptor >= 0:
+            os.close(destination_descriptor)
+
+    actual_sha256 = digest.hexdigest()
+    try:
+        if total != before.st_size:
+            fail(f"{source}: descriptor byte count changed while staging")
+        if expected_sha256 is not None and actual_sha256 != expected_sha256:
+            fail(f"{source}: SHA-256 mismatch")
+    except ContractError:
+        if created:
+            destination.unlink(missing_ok=True)
+        raise
+    return {"bytes": total, "sha256": actual_sha256}
+
+
 def canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -613,6 +799,413 @@ def load_registry(config_path: Path, v2_root: Path | None, extension_root: Path 
         )
         artifacts[code] = artifact
     return config, artifacts
+
+
+def _read_regular_bytes_nofollow(path: Path, maximum_bytes: int) -> bytes:
+    descriptor, before = _open_regular_nofollow(path)
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        if before.st_size > maximum_bytes:
+            fail(f"{path}: file exceeds the {maximum_bytes}-byte safety limit")
+        while True:
+            block = os.read(descriptor, min(1024 * 1024, maximum_bytes + 1 - total))
+            if not block:
+                break
+            chunks.append(block)
+            total += len(block)
+            if total > maximum_bytes:
+                fail(f"{path}: file exceeds the {maximum_bytes}-byte safety limit")
+        _require_descriptor_stable(path, descriptor, before)
+    finally:
+        os.close(descriptor)
+    if total != before.st_size:
+        fail(f"{path}: descriptor byte count changed while reading")
+    return b"".join(chunks)
+
+
+def _safe_bundle_relative_path(raw: Any, label: str) -> Path:
+    if not isinstance(raw, str) or not raw or "\\" in raw:
+        fail(f"{label}: staged relative path is invalid")
+    relative = Path(raw)
+    if relative.is_absolute() or relative == Path(".") or any(
+        part in {"", ".", ".."} for part in relative.parts
+    ):
+        fail(f"{label}: staged relative path is invalid")
+    return relative
+
+
+def _require_private_directory(path: Path, expected_mode: int) -> None:
+    try:
+        metadata = path.lstat()
+    except OSError as exc:
+        fail(f"private source stage is unavailable: {path}: {exc}")
+    if path.is_symlink() or not stat.S_ISDIR(metadata.st_mode):
+        fail(f"private source stage is not a real directory: {path}")
+    if metadata.st_uid != os.geteuid():
+        fail(f"private source stage has an unexpected owner: {path}")
+    if stat.S_IMODE(metadata.st_mode) != expected_mode:
+        fail(
+            f"private source stage mode is {stat.S_IMODE(metadata.st_mode):04o}, "
+            f"expected {expected_mode:04o}: {path}"
+        )
+
+
+def _mkdir_private_parents(bundle_root: Path, relative_file: Path) -> None:
+    current = bundle_root
+    for part in relative_file.parent.parts:
+        current = current / part
+        if current.exists() or current.is_symlink():
+            metadata = current.lstat()
+            if current.is_symlink() or not stat.S_ISDIR(metadata.st_mode):
+                fail(f"staged source parent is not a real directory: {current}")
+        else:
+            current.mkdir(mode=0o700)
+        current.chmod(0o700)
+
+
+def _write_private_file_exclusive(path: Path, payload: bytes) -> None:
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if nofollow is None:
+        fail("O_NOFOLLOW is required for source artifact staging")
+    flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | nofollow
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    try:
+        descriptor = os.open(path, flags, 0o600)
+        try:
+            offset = 0
+            while offset < len(payload):
+                written = os.write(descriptor, payload[offset:])
+                if written <= 0:
+                    fail(f"short write while creating private source manifest: {path}")
+                offset += written
+            os.fsync(descriptor)
+            os.fchmod(descriptor, 0o400)
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        raise ContractError(f"cannot create private source manifest {path}: {exc}") from exc
+
+
+def _remove_private_bundle(bundle_root: Path) -> None:
+    """Best-effort cleanup for an incomplete bundle created by this process."""
+
+    if not bundle_root.exists() or bundle_root.is_symlink():
+        return
+    for current_raw, directories, files in os.walk(
+        bundle_root, topdown=False, followlinks=False
+    ):
+        current = Path(current_raw)
+        try:
+            current.chmod(0o700)
+        except OSError:
+            pass
+        for name in files:
+            try:
+                (current / name).unlink()
+            except OSError:
+                pass
+        for name in directories:
+            child = current / name
+            try:
+                if child.is_symlink():
+                    child.unlink()
+            except OSError:
+                pass
+        if current != bundle_root:
+            try:
+                current.rmdir()
+            except OSError:
+                pass
+    try:
+        bundle_root.rmdir()
+    except OSError:
+        pass
+
+
+def _registry_artifact_spec(
+    config: Mapping[str, Any], code: str
+) -> tuple[str, Path, int, int | None, str]:
+    artifacts = config.get("artifacts")
+    if not isinstance(artifacts, dict) or code not in artifacts:
+        fail(f"source registry is missing approved artifact: {code}")
+    spec = artifacts[code]
+    if not isinstance(spec, dict):
+        fail(f"{code}: source registry record is invalid")
+    root_code = spec.get("root")
+    if root_code not in {"v2", "extension"}:
+        fail(f"{code}: source registry root is invalid")
+    relative = _safe_bundle_relative_path(spec.get("path"), code)
+    expected_bytes = spec.get("bytes")
+    expected_rows = spec.get("rows")
+    expected_sha256 = spec.get("sha256")
+    if not isinstance(expected_bytes, int) or isinstance(expected_bytes, bool) or expected_bytes <= 0:
+        fail(f"{code}: source registry byte count is invalid")
+    if expected_rows is not None and (
+        not isinstance(expected_rows, int)
+        or isinstance(expected_rows, bool)
+        or expected_rows <= 0
+    ):
+        fail(f"{code}: source registry row count is invalid")
+    if not isinstance(expected_sha256, str) or not HEX64_RE.fullmatch(expected_sha256):
+        fail(f"{code}: source registry SHA-256 is invalid")
+    return root_code, relative, expected_bytes, expected_rows, expected_sha256
+
+
+def stage_existing_firms_source_bundle(
+    config_path: Path,
+    v2_root: Path | None,
+    extension_root: Path | None,
+    bundle_root: Path,
+) -> dict[str, Any]:
+    """Copy the five approved existing-firms inputs into one sealed stage."""
+
+    config_path = config_path.absolute()
+    bundle_root = bundle_root.absolute()
+    _require_private_directory(bundle_root.parent, 0o700)
+    if bundle_root.exists() or bundle_root.is_symlink():
+        fail(f"private source bundle already exists: {bundle_root}")
+    bundle_root.mkdir(mode=0o700)
+    bundle_root.chmod(0o700)
+
+    try:
+        _mkdir_private_parents(bundle_root, SOURCE_BUNDLE_CONFIG_PATH)
+        staged_config = bundle_root / SOURCE_BUNDLE_CONFIG_PATH
+        config_record = copy_regular_file_nofollow(
+            config_path,
+            staged_config,
+            maximum_bytes=4 * 1024 * 1024,
+        )
+        try:
+            config = json.loads(
+                _read_regular_bytes_nofollow(staged_config, 4 * 1024 * 1024).decode(
+                    "utf-8"
+                )
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ContractError(f"source registry is not canonical UTF-8 JSON: {exc}") from exc
+        if not isinstance(config, dict) or config.get("contract_version") != CONTRACT_VERSION:
+            fail("source registry contract_version is invalid")
+
+        roots = config.get("roots")
+        if not isinstance(roots, dict) or set(roots) != {"v2", "extension"}:
+            fail("source registry root set is invalid")
+        source_roots = {
+            "v2": v2_root.absolute() if v2_root else Path(str(roots["v2"])),
+            "extension": (
+                extension_root.absolute()
+                if extension_root
+                else Path(str(roots["extension"]))
+            ),
+        }
+        if any(not root.is_absolute() for root in source_roots.values()):
+            fail("source registry roots must be absolute")
+
+        source_artifacts: dict[str, dict[str, Any]] = {}
+        for code in sorted(EXISTING_FIRMS_SOURCE_CODES):
+            root_code, relative, expected_bytes, expected_rows, expected_sha256 = (
+                _registry_artifact_spec(config, code)
+            )
+            destination_relative = Path(root_code) / relative
+            _mkdir_private_parents(bundle_root, destination_relative)
+            copied = copy_regular_file_nofollow(
+                source_roots[root_code] / relative,
+                bundle_root / destination_relative,
+                expected_bytes=expected_bytes,
+                expected_sha256=expected_sha256,
+            )
+            source_artifacts[code] = {
+                "logical_path": f"{root_code}://{relative.as_posix()}",
+                "stage_path": destination_relative.as_posix(),
+                "bytes": copied["bytes"],
+                "rows": expected_rows,
+                "sha256": copied["sha256"],
+            }
+
+        manifest = {
+            "contract_version": SOURCE_BUNDLE_CONTRACT_VERSION,
+            "scope": "existing-firms",
+            "config": {
+                "stage_path": SOURCE_BUNDLE_CONFIG_PATH.as_posix(),
+                **config_record,
+            },
+            "source_artifacts": source_artifacts,
+        }
+        manifest_path = bundle_root / SOURCE_BUNDLE_MANIFEST_NAME
+        _write_private_file_exclusive(
+            manifest_path,
+            (canonical_json(manifest) + "\n").encode("utf-8"),
+        )
+
+        for current_raw, _, _ in os.walk(bundle_root, topdown=False, followlinks=False):
+            Path(current_raw).chmod(0o500)
+
+        verify_staged_source_bundle(
+            manifest_path,
+            staged_config,
+            bundle_root / "v2",
+            bundle_root / "extension",
+        )
+        return manifest
+    except ContractError:
+        _remove_private_bundle(bundle_root)
+        raise
+    except OSError as exc:
+        _remove_private_bundle(bundle_root)
+        raise ContractError(f"cannot create sealed existing-firms source bundle: {exc}") from exc
+
+
+def verify_staged_source_bundle(
+    manifest_path: Path,
+    config_path: Path,
+    v2_root: Path,
+    extension_root: Path,
+) -> dict[str, Any]:
+    """Verify an exact, read-only existing-firms bundle before every reopen."""
+
+    manifest_path = manifest_path.absolute()
+    bundle_root = manifest_path.parent
+    config_path = config_path.absolute()
+    v2_root = v2_root.absolute()
+    extension_root = extension_root.absolute()
+    if manifest_path.name != SOURCE_BUNDLE_MANIFEST_NAME:
+        fail("source bundle manifest has an unexpected name")
+    _require_private_directory(bundle_root.parent, 0o700)
+    _require_private_directory(bundle_root, 0o500)
+    if config_path != bundle_root / SOURCE_BUNDLE_CONFIG_PATH:
+        fail("loader config is outside the staged source bundle")
+    if v2_root != bundle_root / "v2" or extension_root != bundle_root / "extension":
+        fail("loader artifact roots are outside the staged source bundle")
+
+    try:
+        manifest = json.loads(
+            _read_regular_bytes_nofollow(manifest_path, 4 * 1024 * 1024).decode(
+                "utf-8"
+            )
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ContractError(f"source bundle manifest is not canonical UTF-8 JSON: {exc}") from exc
+    if not isinstance(manifest, dict) or set(manifest) != {
+        "contract_version",
+        "scope",
+        "config",
+        "source_artifacts",
+    }:
+        fail("source bundle manifest shape is invalid")
+    if manifest.get("contract_version") != SOURCE_BUNDLE_CONTRACT_VERSION:
+        fail("source bundle contract_version mismatch")
+    if manifest.get("scope") != "existing-firms":
+        fail("source bundle scope mismatch")
+
+    config_record = manifest.get("config")
+    if not isinstance(config_record, dict) or set(config_record) != {
+        "stage_path",
+        "bytes",
+        "sha256",
+    }:
+        fail("source bundle config record is invalid")
+    if config_record.get("stage_path") != SOURCE_BUNDLE_CONFIG_PATH.as_posix():
+        fail("source bundle config path is invalid")
+    actual_config = hash_regular_file_nofollow(
+        config_path,
+        expected_bytes=config_record.get("bytes"),
+        expected_sha256=config_record.get("sha256"),
+        maximum_bytes=4 * 1024 * 1024,
+    )
+    try:
+        config = json.loads(
+            _read_regular_bytes_nofollow(config_path, 4 * 1024 * 1024).decode(
+                "utf-8"
+            )
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ContractError(f"staged source registry is not canonical UTF-8 JSON: {exc}") from exc
+    if not isinstance(config, dict) or config.get("contract_version") != CONTRACT_VERSION:
+        fail("staged source registry contract_version mismatch")
+    if actual_config != {
+        "bytes": config_record["bytes"],
+        "sha256": config_record["sha256"],
+    }:
+        fail("staged source registry differs from its manifest")
+
+    artifact_records = manifest.get("source_artifacts")
+    if not isinstance(artifact_records, dict) or set(artifact_records) != set(
+        EXISTING_FIRMS_SOURCE_CODES
+    ):
+        fail("source bundle artifact set mismatch")
+    expected_files = {
+        SOURCE_BUNDLE_CONFIG_PATH.as_posix(),
+        SOURCE_BUNDLE_MANIFEST_NAME,
+    }
+    expected_directories = {"."}
+    for code in sorted(EXISTING_FIRMS_SOURCE_CODES):
+        root_code, relative, expected_bytes, expected_rows, expected_sha256 = (
+            _registry_artifact_spec(config, code)
+        )
+        stage_relative = Path(root_code) / relative
+        record = artifact_records[code]
+        expected_record = {
+            "logical_path": f"{root_code}://{relative.as_posix()}",
+            "stage_path": stage_relative.as_posix(),
+            "bytes": expected_bytes,
+            "rows": expected_rows,
+            "sha256": expected_sha256,
+        }
+        if record != expected_record:
+            fail(f"{code}: staged source manifest differs from the registry")
+        hash_regular_file_nofollow(
+            bundle_root / stage_relative,
+            expected_bytes=expected_bytes,
+            expected_sha256=expected_sha256,
+        )
+        expected_files.add(stage_relative.as_posix())
+        for parent in stage_relative.parents:
+            if parent == Path("."):
+                expected_directories.add(".")
+                break
+            expected_directories.add(parent.as_posix())
+    for parent in SOURCE_BUNDLE_CONFIG_PATH.parents:
+        if parent == Path("."):
+            break
+        expected_directories.add(parent.as_posix())
+
+    actual_files: set[str] = set()
+    actual_directories: set[str] = set()
+    for current_raw, directories, files in os.walk(
+        bundle_root, topdown=True, followlinks=False
+    ):
+        current = Path(current_raw)
+        relative_current = current.relative_to(bundle_root)
+        current_name = "." if relative_current == Path(".") else relative_current.as_posix()
+        actual_directories.add(current_name)
+        _require_private_directory(current, 0o500)
+        for name in directories:
+            child = current / name
+            metadata = child.lstat()
+            if child.is_symlink() or not stat.S_ISDIR(metadata.st_mode):
+                fail(f"unexpected non-directory in staged source tree: {child}")
+        for name in files:
+            child = current / name
+            metadata = child.lstat()
+            if child.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+                fail(f"unexpected non-regular file in staged source tree: {child}")
+            if metadata.st_uid != os.geteuid() or stat.S_IMODE(metadata.st_mode) != 0o400:
+                fail(f"staged source file is not owner-read-only: {child}")
+            if metadata.st_nlink != 1:
+                fail(f"staged source file has an unexpected hard link: {child}")
+            actual_files.add(child.relative_to(bundle_root).as_posix())
+    if actual_files != expected_files or actual_directories != expected_directories:
+        fail("staged source bundle tree differs from the exact contract")
+    return {
+        "result": "PASS staged existing-firms source bundle",
+        "contract_version": SOURCE_BUNDLE_CONTRACT_VERSION,
+        "artifacts": len(EXISTING_FIRMS_SOURCE_CODES),
+    }
 
 
 def validate_registry(
@@ -2063,6 +2656,7 @@ def verify_prepared(
     expect_mode: str | None,
     expect_scope: str | None,
     firms_snapshot: Path | None,
+    source_bundle_manifest: Path | None,
 ) -> dict[str, Any]:
     prepared_dir = prepared_dir.resolve()
     manifest_path = prepared_dir / "prepared_manifest.json"
@@ -2080,6 +2674,20 @@ def verify_prepared(
         fail("prepared manifest scope is invalid")
     if expect_scope is not None and scope != expect_scope:
         fail(f"prepared manifest scope {scope!r} != {expect_scope!r}")
+    if scope == "existing-firms":
+        if source_bundle_manifest is None or v2_root is None or extension_root is None:
+            fail(
+                "existing-firms verification requires the staged source bundle "
+                "manifest and both staged roots"
+            )
+        verify_staged_source_bundle(
+            source_bundle_manifest,
+            config_path,
+            v2_root,
+            extension_root,
+        )
+    elif source_bundle_manifest is not None:
+        fail("a staged source bundle is valid only for existing-firms")
 
     expected_names = (
         {
@@ -2442,6 +3050,22 @@ def run_reduced(args: argparse.Namespace) -> dict[str, Any]:
     if scope not in REDUCED_RUN_CODES:
         fail(f"unsupported reduced scope: {scope}")
     config_path = args.config.resolve()
+    if scope == "existing-firms" and args.prepare:
+        if (
+            args.source_bundle_manifest is None
+            or args.v2_root is None
+            or args.extension_root is None
+        ):
+            fail(
+                "existing-firms preparation requires the staged source bundle "
+                "manifest and both staged roots"
+            )
+        verify_staged_source_bundle(
+            args.source_bundle_manifest,
+            config_path,
+            args.v2_root,
+            args.extension_root,
+        )
     config, artifacts = load_registry(
         config_path,
         args.v2_root.resolve() if args.v2_root else None,
@@ -2660,6 +3284,16 @@ def run_reduced(args: argparse.Namespace) -> dict[str, Any]:
     secure_file(manifest_path)
 
     validate_registry(artifacts, static_codes)
+    if scope == "existing-firms" and args.prepare:
+        assert args.source_bundle_manifest is not None
+        assert args.v2_root is not None
+        assert args.extension_root is not None
+        verify_staged_source_bundle(
+            args.source_bundle_manifest,
+            config_path,
+            args.v2_root,
+            args.extension_root,
+        )
     if firms_snapshot_ref is not None:
         current_snapshot = _prepared_file_manifest(
             output_dir / "firms_snapshot.csv", file_rows["firms_snapshot.csv"]
@@ -2698,7 +3332,13 @@ def build_parser() -> argparse.ArgumentParser:
     action.add_argument("--validate-only", action="store_true")
     action.add_argument("--prepare", action="store_true")
     action.add_argument("--verify-prepared", type=Path)
+    action.add_argument("--stage-source-bundle", type=Path)
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument(
+        "--source-bundle-manifest",
+        type=Path,
+        help="Sealed existing-firms source bundle manifest used by prepare/verify.",
+    )
     parser.add_argument(
         "--sample-per-source",
         type=int,
@@ -2712,6 +3352,30 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    if args.stage_source_bundle is not None:
+        if args.scope != "existing-firms":
+            parser.error("--stage-source-bundle requires --scope existing-firms")
+        if (
+            args.output_dir is not None
+            or args.sample_per_source is not None
+            or args.expect_mode is not None
+            or args.expect_scope is not None
+            or args.firms_snapshot is not None
+            or args.source_bundle_manifest is not None
+        ):
+            parser.error("--stage-source-bundle cannot be combined with loader output options")
+        try:
+            result = stage_existing_firms_source_bundle(
+                args.config.absolute(),
+                args.v2_root.absolute() if args.v2_root else None,
+                args.extension_root.absolute() if args.extension_root else None,
+                args.stage_source_bundle.absolute(),
+            )
+        except ContractError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        print(canonical_json(result))
+        return 0
     if args.verify_prepared is not None:
         try:
             result = verify_prepared(
@@ -2722,6 +3386,7 @@ def main() -> int:
                 args.expect_mode,
                 args.expect_scope,
                 args.firms_snapshot,
+                args.source_bundle_manifest,
             )
         except ContractError as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
@@ -2738,6 +3403,10 @@ def main() -> int:
         parser.error("--expect-scope requires --verify-prepared")
     if args.scope != "existing-firms" and args.firms_snapshot is not None:
         parser.error("--firms-snapshot requires --scope existing-firms")
+    if args.source_bundle_manifest is not None and not args.prepare:
+        parser.error("--source-bundle-manifest requires --prepare or --verify-prepared")
+    if args.scope != "existing-firms" and args.source_bundle_manifest is not None:
+        parser.error("--source-bundle-manifest requires --scope existing-firms")
     try:
         result = run(args)
     except ContractError as exc:

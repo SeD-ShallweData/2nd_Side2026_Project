@@ -75,7 +75,7 @@ pg_restore --exit-on-error --no-owner --no-acl \
 
 ## 4. 필수 환경변수
 
-공통:
+논리적으로 필요한 값:
 
 - `DATABASE_URL` 또는 `BOT_DATABASE_URL` — 앱은 읽기 전용 계정 사용
 - `RAG_API_URL`, `CONTRACT_ANALYSIS_URL`
@@ -85,9 +85,11 @@ pg_restore --exit-on-error --no-owner --no-acl \
 - 외부 시연: `DEMO_BASIC_AUTH_USER`, `DEMO_BASIC_AUTH_PASSWORD`
 - serverless: `SAVE_COMPARISON_FEEDBACK=false`
 
-클라우드에는 `/data/shared-SeD/*.env`가 없으므로 각 값을 배포 secret store에 직접 등록한다. 파일을 사용하는
-VM에서는 env 파일을 `0600`, 같은 팀 그룹 읽기가 필요하면 `0640`으로 둔다. 앱 값은 읽지 않고 권한만
-검사하려면 `cd product && npm run check:env-permissions`를 사용한다.
+클라우드에는 `/data/shared-SeD/*.env`가 없으므로 각 값을 배포 secret store에 직접 등록한다. 단일 VM
+systemd 배포에서는 이 목록을 하나의 공용 파일로 합치지 않는다. DB 관리자/Compose 값, read-only bot과
+웹 값, RAG 비-secret 값, 계약 분석 API 값을 각각 `/etc/moneyworry/{db,web,rag,contract}.env`로
+분리하고 서비스별 UID/GID도 분리한다. 상세 권한과 installer gate는 [`README.md`](README.md)를 따른다.
+앱 값은 읽지 않고 권한만 검사하려면 `cd product && npm run check:env-permissions`를 사용한다.
 
 ## 5. 배포·rollback 순서
 

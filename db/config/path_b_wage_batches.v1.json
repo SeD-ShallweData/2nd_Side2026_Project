@@ -1,0 +1,62 @@
+{
+  "contract_version": "path_b_wage_batches.v1.0",
+  "model_version": "door1-voting-39f-v1",
+  "model_sha256": "cbe5d951f170527c662239af3ee3c636d092c2cfa9080b0d0a42b19d845682c6",
+  "expected_firms": 639137,
+  "expected_totals": {
+    "scored": 3855848,
+    "queue": 21000,
+    "safe": 3524726
+  },
+  "batches": [
+    {
+      "sequence": 1,
+      "as_of_date": "2025-12",
+      "target_month": "2026-06",
+      "outputs": "backfill/outputs_202512",
+      "expected_rows": { "scored": 553466, "queue": 3000, "safe": 508505 }
+    },
+    {
+      "sequence": 2,
+      "as_of_date": "2026-01",
+      "target_month": "2026-07",
+      "outputs": "backfill/outputs_202601",
+      "expected_rows": { "scored": 546370, "queue": 3000, "safe": 503029 }
+    },
+    {
+      "sequence": 3,
+      "as_of_date": "2026-02",
+      "target_month": "2026-08",
+      "outputs": "backfill/outputs_202602",
+      "expected_rows": { "scored": 549377, "queue": 3000, "safe": 503770 }
+    },
+    {
+      "sequence": 4,
+      "as_of_date": "2026-03",
+      "target_month": "2026-09",
+      "outputs": "backfill/outputs_202603",
+      "expected_rows": { "scored": 547944, "queue": 3000, "safe": 501577 }
+    },
+    {
+      "sequence": 5,
+      "as_of_date": "2026-04",
+      "target_month": "2026-10",
+      "outputs": "backfill/outputs_202604",
+      "expected_rows": { "scored": 552500, "queue": 3000, "safe": 501843 }
+    },
+    {
+      "sequence": 6,
+      "as_of_date": "2026-05",
+      "target_month": "2026-11",
+      "outputs": "backfill/outputs_202605",
+      "expected_rows": { "scored": 552593, "queue": 3000, "safe": 502115 }
+    },
+    {
+      "sequence": 7,
+      "as_of_date": "2026-06",
+      "target_month": "2026-12",
+      "outputs": "backfill/outputs_202606",
+      "expected_rows": { "scored": 553598, "queue": 3000, "safe": 503887 }
+    }
+  ]
+}

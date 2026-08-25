@@ -3,6 +3,12 @@
 사업장 데이터(ML export)와 사용자 데이터(계정·커뮤니티·리뷰)를 담는 PostgreSQL.
 이 디렉터리 하나로 자립한다 — 스키마·마이그레이션·적재 스크립트가 모두 여기 있다.
 
+> 기존 운영 dump 없이 검증된 7개월 산출물로 새 DB를 만드는 GCP Path B 절차는
+> [Path B 새 DB 재구축](docs/PATH_B_REBUILD.md)을 따른다. 일반 빠른 시작 명령을 여러 번
+> 조합하지 말고, 빈 PostgreSQL 16 검증과 exact-count gate가 포함된 전용 bootstrap을 쓴다.
+> 재구축 뒤 배포 정본 dump와 독립 복원 증명은
+> [Path B 릴리스 게이트](docs/PATH_B_RELEASE_GATE.md)를 따른다.
+
 ## 빠른 시작
 
 ```bash
@@ -11,10 +17,14 @@ cp .env.example .env.local     # 값을 채운다 (아래 참고)
 npm install
 npm run up                     # Postgres 컨테이너 기동
 npm run migrate                # 스키마 적용
-./scripts/ingest.sh --bundle ../_service_bundle \
+npm run ingest -- --bundle ../_service_bundle \
     --model-version door1-voting-39f-v1 --as-of 2026-06 \
     --expect-rows 553598,3000,503887
 ```
+
+Compose의 PostgreSQL 16 이미지는 multi-architecture OCI digest로 고정한다. 보안 patch를
+갱신할 때는 moving tag만 바꾸지 않고 새 digest로 빈 PG16 복원 리허설과 Path B release gate를
+다시 통과시킨다.
 
 ### `.env.local` 값
 
@@ -134,6 +144,7 @@ strict 매칭 funnel, 금지 키, SHA snapshot/no-op 및 운영 절차는
 
 ```bash
 ./scripts/ingest.sh --bundle ../_service_bundle \
+  --expected-database wageguard \
                     --model-version door1-voting-39f-v1 \
                     --as-of 2026-06 \
                     --expect-rows 553598,3000,503887
@@ -145,6 +156,7 @@ strict 매칭 funnel, 금지 키, SHA snapshot/no-op 및 운영 절차는
 | `--model-version` | 모델 **레시피**의 이름. 날짜를 넣지 않는다 — 그건 `as_of_date` 가 맡는다 |
 | `--model-sha` | 생략하면 번들의 `door1_final_model.pkl` 에서 자동 계산 |
 | `--expect-rows` | ML팀이 알려준 기대 행수. 다르면 롤백한다 (엉뚱한 번들을 읽은 것) |
+| `--env-file` | DB 접속 key만 읽을 env 파일. shell code로 실행하지 않는다 |
 
 - CSV 를 **전부 TEXT 인 staging 테이블**에 `\copy` 로 벌크 적재 후 SQL 로 변환. 55만행에 약 2분.
 - **멱등하다.** 같은 `(as_of_date, model_version)` 을 다시 적재하면 그 batch 만 갈아끼운다.
@@ -263,6 +275,17 @@ canonical 모델 상수, NULL/확률/보존식 계약을 확인한다. 기본 sc
 ./scripts/ingest-industrial-safety.sh --validate-only --scope existing-firms
 ```
 
+새 서버에서 artifact 루트가 registry의 기존 `/data/shared-SeD` 경로와 다르면
+registry의 행수·byte·SHA 계약은 바꾸지 않고 루트만 명시적으로 override한다.
+
+```bash
+./scripts/ingest-industrial-safety.sh \
+  --validate-only \
+  --scope existing-firms \
+  --v2-root /srv/moneyworry/artifacts/weekly_workplace_risk_v2_201512_202604 \
+  --extension-root /srv/moneyworry/artifacts/weekly_workplace_risk_api_extension_v3_201512_202604
+```
+
 두 번째 명령은 고정된 NPS 원천까지 검증하지만 DB에 접속하지 않으므로 `public.firms`와의
 strict funnel은 실행하지 않는다. 실제 매칭은 아래 rollback/apply 경로에서 대상 DB의
 `public.firms`를 private snapshot으로 export한 뒤 수행한다.
@@ -352,7 +375,7 @@ psql ... -v assert_scope=existing-firms \
 
 ```bash
 echo "BOT_PASSWORD=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 24)" >> .env.local
-./scripts/create-bot-role.sh
+./scripts/create-bot-role.sh --env-file .env.local
 ```
 
 `wg_bot` 롤이 만들어진다. 접속: `psql -h 127.0.0.1 -p 5433 -U wg_bot -d wageguard`
