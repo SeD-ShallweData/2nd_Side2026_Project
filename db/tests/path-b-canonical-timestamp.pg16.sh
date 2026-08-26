@@ -298,6 +298,13 @@ for database in "$DATABASE_A" "$DATABASE_B"; do
     --set expected_system_identifier="$SYSTEM_IDENTIFIER" \
     --set expected_database_oid="$oid" \
     --file - <"$TEST_TMP/migrations.sql" >/dev/null
+
+  ledger_created_at_type="$(
+    docker exec "$CONTAINER" psql -X -qAt --username "$OWNER" --dbname "$database" \
+      --command "SELECT pg_catalog.format_type(a.atttypid, a.atttypmod) FROM pg_catalog.pg_attribute AS a JOIN pg_catalog.pg_class AS c ON c.oid = a.attrelid JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace WHERE n.nspname = 'drizzle' AND c.relname = '__drizzle_migrations' AND a.attname = 'created_at' AND a.attnum > 0 AND NOT a.attisdropped"
+  )"
+  [[ "$ledger_created_at_type" == "bigint" ]] \
+    || { echo "$database migration ledger created_at type differs: $ledger_created_at_type" >&2; exit 1; }
 done
 
 docker exec "$CONTAINER" mkdir -p /tmp/pathb-sql /tmp/fixture-a /tmp/fixture-b

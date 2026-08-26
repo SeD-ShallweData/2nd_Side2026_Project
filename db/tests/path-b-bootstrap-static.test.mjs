@@ -381,6 +381,8 @@ test("migrations run as one private identity-guarded PostgreSQL transaction", ()
   assert.match(migrationStager, /expected_system_identifier/);
   assert.match(migrationStager, /expected_database_oid/);
   assert.match(migrationStager, /SELECT 1 \/ 0 AS path_b_identity_mismatch/);
+  assert.match(migrationStager, /created_at bigint/);
+  assert.doesNotMatch(migrationStager, /created_at numeric/);
   assert.equal((migrationStager.match(/INSERT INTO drizzle\.__drizzle_migrations/g) ?? []).length, 1);
   assert.ok(migrationStager.indexOf("BEGIN;") < migrationStager.indexOf("COMMIT;"));
   assert.match(bootstrap, /path_b_sha256_file "\$STAGED_MIGRATION_BUNDLE"/);
