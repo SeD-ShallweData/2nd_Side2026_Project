@@ -731,13 +731,14 @@ print("\t".join([
     archive["sha256"],
     gates["content_fingerprint"]["sha256"],
     session_guard_record["sha256"],
+    canonical_clock["timestamp"],
 ]))
 PY
 )" || path_b_die "release metadata validation failed"
 chmod 600 "$REPORT_DIR/release-input-validation.json"
 IFS=$'\t' read -r SOURCE_DATABASE SOURCE_CLUSTER_IDENTITY_SHA256 \
   SOURCE_DATABASE_IDENTITY_SHA256 EXPECTED_DUMP_BYTES EXPECTED_DUMP_SHA256 \
-  EXPECTED_CONTENT_SHA256 EXPECTED_SESSION_GUARD_SHA256 \
+  EXPECTED_CONTENT_SHA256 EXPECTED_SESSION_GUARD_SHA256 SOURCE_CANONICAL_TIMESTAMP \
   <<<"$METADATA_FIELDS"
 
 CURRENT_PHASE="bootstrap-bound private restore-code materialization"
@@ -1130,6 +1131,7 @@ PGPASSWORD="$DB_PASSWORD" PGSSLMODE="$PGSSLMODE" \
     -v "expected_database=$EXPECTED_TARGET_DATABASE" \
     -v "expected_owner=$DB_USER" \
     -v "bot_user=$BOT_USER" \
+    -v "canonical_timestamp=$SOURCE_CANONICAL_TIMESTAMP" \
     -f "$SCRIPT_DIR/sql/assert-path-b-rebuild.sql" \
     >"$REPORT_DIR/restored-path-b-assertion.json"
 chmod 600 "$REPORT_DIR/restored-path-b-assertion.json"

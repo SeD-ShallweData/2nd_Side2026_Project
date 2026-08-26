@@ -391,6 +391,10 @@ elif [[ "$args" == *"assert-empty-path-b-restore-target.sql"* ]]; then
 elif [[ "$args" == *"configure-path-b-release-bot.sql"* ]]; then
   printf 'psql-role-%s\n' "$database" >> "$CALL_LOG"
 elif [[ "$args" == *"assert-path-b-rebuild.sql"* ]]; then
+  if [[ "$args" != *"canonical_timestamp=2026-08-14T15:02:34.715Z"* ]]; then
+    printf 'psql-exact-missing-canonical-timestamp-%s\n' "$database" >> "$CALL_LOG"
+    exit 64
+  fi
   printf 'psql-exact-%s\n' "$database" >> "$CALL_LOG"
   printf '{"status":"validated","contract":"path_b_rebuild.v1.0","database":"%s","postgres_major":16}\n' "$database"
 elif [[ "$args" == *"current_setting('default_transaction_read_only')"* ]]; then
@@ -520,6 +524,14 @@ describe("Path B release gate static contract", () => {
     assert.match(exportScript, /--expected-bootstrap-provenance-sha256/);
     assert.match(exportScript, /--expected-git-commit/);
     assert.match(exportScript, /--approved-content-fingerprint/);
+    assert.match(
+      exportScript,
+      /-v "canonical_timestamp=\$BOOTSTRAP_CANONICAL_TIMESTAMP"/,
+    );
+    assert.match(
+      restoreScript,
+      /-v "canonical_timestamp=\$SOURCE_CANONICAL_TIMESTAMP"/,
+    );
     assert.match(exportScript, /pg_export_snapshot/);
     assert.match(exportScript, /--snapshot="\$SNAPSHOT_ID"/);
     assert.doesNotMatch(exportScript, /--serializable-deferrable/);

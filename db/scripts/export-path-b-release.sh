@@ -718,6 +718,7 @@ PGPASSWORD="$DB_PASSWORD" PGSSLMODE="$PGSSLMODE" \
     -v "expected_database=$EXPECTED_SOURCE_DATABASE" \
     -v "expected_owner=$DB_USER" \
     -v "bot_user=$BOT_USER" \
+    -v "canonical_timestamp=$BOOTSTRAP_CANONICAL_TIMESTAMP" \
     -f "$SCRIPT_DIR/sql/assert-path-b-rebuild.sql" \
     >"$OUTPUT_DIR/source-path-b-assertion.json"
 chmod 600 "$OUTPUT_DIR/source-path-b-assertion.json"
