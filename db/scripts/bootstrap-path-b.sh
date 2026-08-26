@@ -103,7 +103,10 @@ cleanup() {
   status=$?
   if [[ -n "$TMP_DIR" && -d "$TMP_DIR" ]]; then
     case "$TMP_DIR" in
-      "${TMPDIR:-/tmp}"/path-b-bootstrap.*) rm -rf -- "$TMP_DIR" ;;
+      "${TMPDIR:-/tmp}"/path-b-bootstrap.*)
+        chmod -R u+rwX -- "$TMP_DIR" 2>/dev/null || true
+        rm -rf -- "$TMP_DIR"
+        ;;
       *) printf 'Refusing to clean unexpected temporary path: %s\n' "$TMP_DIR" >&2 ;;
     esac
   fi
@@ -1076,7 +1079,12 @@ CURRENT_PHASE="canonical timestamp PostgreSQL round trip"
 CANONICAL_TIMESTAMP_ROUND_TRIP="$(
   "${PSQL[@]}" -qAt \
     -f "$SCRIPT_DIR/sql/assert-path-b-session-identity.sql" \
-    -c "SELECT to_char(:'canonical_timestamp'::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')"
+    -f - <<'SQL'
+SELECT to_char(
+  :'canonical_timestamp'::timestamptz AT TIME ZONE 'UTC',
+  'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+);
+SQL
 )" || die "canonical timestamp is not accepted by the approved PostgreSQL target"
 [[ "$CANONICAL_TIMESTAMP_ROUND_TRIP" == "$CANONICAL_TIMESTAMP" ]] \
   || die "canonical timestamp PostgreSQL UTC round trip mismatch"
@@ -1121,7 +1129,11 @@ CURRENT_PHASE="fresh cluster bot-role assertion"
 require_bootstrap_identity
 BOT_ROLE_EXISTS="$(
   "${PSQL[@]}" -qAt -v "bot_user=$BOT_USER" \
-    -c "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'bot_user')"
+    -f - <<'SQL'
+SELECT EXISTS (
+  SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'bot_user'
+);
+SQL
 )"
 [[ "$BOT_ROLE_EXISTS" == "f" ]] \
   || die "fresh Path B cluster already contains BOT_USER=$BOT_USER; refusing cluster-global mutation"

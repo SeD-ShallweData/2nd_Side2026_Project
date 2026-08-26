@@ -1038,7 +1038,11 @@ CURRENT_PHASE="fresh restore-cluster bot-role assertion"
 BOT_ROLE_EXISTS="$(
   PGPASSWORD="$DB_PASSWORD" PGSSLMODE="$PGSSLMODE" \
     "${PSQL[@]}" -v "bot_user=$BOT_USER" \
-      -c "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'bot_user')"
+      -qAt -f - <<'SQL'
+SELECT EXISTS (
+  SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'bot_user'
+);
+SQL
 )"
 [[ "$BOT_ROLE_EXISTS" == "f" ]] \
   || path_b_die "restore cluster already contains BOT_USER=$BOT_USER; refusing cluster-global role mutation"

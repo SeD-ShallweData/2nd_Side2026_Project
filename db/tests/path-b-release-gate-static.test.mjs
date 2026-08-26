@@ -342,15 +342,22 @@ args="$*"
 database="unknown"
 user="unknown"
 snapshot_output=""
+stdin_sql=""
+read_sql_stdin=0
 previous=""
 for argument in "$@"; do
   if [[ "$previous" == "-d" || "$previous" == "--dbname" ]]; then database="$argument"; fi
   if [[ "$previous" == "-U" || "$previous" == "--username" ]]; then user="$argument"; fi
+  if [[ "$previous" == "-f" && "$argument" == "-" ]]; then read_sql_stdin=1; fi
   if [[ "$argument" == snapshot_output=* ]]; then
     snapshot_output="\${argument#snapshot_output=}"
   fi
   previous="$argument"
 done
+if [[ "$read_sql_stdin" == "1" ]]; then
+  stdin_sql="$(cat)"
+  args="$args $stdin_sql"
+fi
 if [[ -n "$snapshot_output" ]]; then
   printf 'psql-snapshot-keeper-%s\n' "$database" >> "$CALL_LOG"
   printf '00000003-0000001B-1\n' > "$snapshot_output"
@@ -498,6 +505,10 @@ describe("Path B release gate static contract", () => {
     assert.match(exportScript, /source-content-fingerprint\.json/);
     assert.match(restoreScript, /restored-content-fingerprint\.json/);
     assert.match(restoreScript, /fresh restore-cluster bot-role assertion/);
+    assert.doesNotMatch(
+      restoreScript,
+      /-c "SELECT EXISTS \(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'bot_user'\)/,
+    );
     assert.match(restoreScript, /DUMP_PATH="\$RELEASE_DIR\/\$DUMP_BASENAME"/);
     assert.match(restoreScript, /O_NOFOLLOW/);
     assert.match(fingerprintSql, /to_jsonb\(row_value\)::text/);

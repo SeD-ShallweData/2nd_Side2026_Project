@@ -57,6 +57,15 @@ test("Path B bootstrap is valid Bash and confirmation fails closed", () => {
   assert.match(bootstrap, /219a805c513ec05f42f7feedb9991d81a0211757dff206d6607643e8d85ab95a/);
   assert.match(bootstrap, /9cde4ccd109e9ca33b26941e32b53c02918455521ddc1a1e1d136a3597621e51/);
   assert.match(bootstrap, /npm ls --all --json/);
+  assert.match(bootstrap, /chmod -R u\+rwX -- "\$TMP_DIR"/);
+  assert.doesNotMatch(
+    bootstrap,
+    /-c "SELECT to_char\(:'canonical_timestamp'/,
+  );
+  assert.doesNotMatch(
+    bootstrap,
+    /-c "SELECT EXISTS \(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'bot_user'\)/,
+  );
   const packageManifest = JSON.parse(readFileSync(resolve(DB_ROOT, "package.json"), "utf8"));
   assert.equal(
     packageManifest.scripts["bootstrap:path-b"],
