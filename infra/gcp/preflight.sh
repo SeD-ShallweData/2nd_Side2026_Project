@@ -11,6 +11,7 @@ EXPECTED_MONTHLY_USD=""
 EXPECTED_90DAY_USD=""
 JSON_OUTPUT=0
 REQUIRE_COMPLETE=0
+REQUIRE_RUNNING=0
 GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
 
 usage() {
@@ -21,7 +22,7 @@ Usage:
     --zone a|b|c \
     --expected-monthly-usd USD \
     --expected-90day-usd USD \
-    [--json] [--require-complete]
+    [--json] [--require-complete [--require-running]]
 
 Runs read-only gcloud inventory calls and fails closed on authentication,
 billing, budget, API, firewall, or same-name resource drift. It never enables
@@ -29,6 +30,8 @@ an API, creates a budget, changes IAM, or creates/updates a Compute resource.
 
 --require-complete additionally requires every fixed resource to exist exactly;
 it is used by provision.sh for post-apply verification.
+--require-running also requires the scheduled VM to be RUNNING. Normal
+preflight accepts TERMINATED only during the exact daily schedule's off-hours.
 EOF
 }
 
@@ -62,6 +65,10 @@ while (( $# > 0 )); do
       REQUIRE_COMPLETE=1
       shift
       ;;
+    --require-running)
+      REQUIRE_RUNNING=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -77,6 +84,8 @@ done
 [[ -n "$EXPECTED_MONTHLY_USD" ]] || mw_die "--expected-monthly-usd is required"
 [[ -n "$EXPECTED_90DAY_USD" ]] || mw_die "--expected-90day-usd is required"
 mw_validate_project_and_zone "$PROJECT_ID" "$ZONE_SUFFIX"
+(( REQUIRE_RUNNING == 0 || REQUIRE_COMPLETE == 1 )) \
+  || mw_die "--require-running is only valid together with --require-complete"
 mw_require_local_tools "$GCLOUD_BIN"
 
 # Reject malformed or over-ceiling cost inputs before contacting Google Cloud.
@@ -148,6 +157,14 @@ readonly_query "$inventory_dir/image.json" "immutable Ubuntu boot image" \
   compute images describe "$MW_IMAGE_NAME" \
   --account="$ACTIVE_ACCOUNT" \
   --project="$MW_IMAGE_PROJECT" \
+  --format=json
+
+# Inventory all regional policies so a same-name policy outside the target
+# region cannot be mistaken for the fixed Seoul instance schedule.
+readonly_query "$inventory_dir/resource-policies.json" "regional resource policies" \
+  compute resource-policies list \
+  --account="$ACTIVE_ACCOUNT" \
+  --project="$PROJECT_ID" \
   --format=json
 
 readonly_query "$inventory_dir/networks.json" "VPC networks" \
@@ -247,6 +264,7 @@ validator_args=(
   --expected-90day-usd "$EXPECTED_90DAY_USD"
 )
 (( REQUIRE_COMPLETE == 0 )) || validator_args+=(--require-complete)
+(( REQUIRE_RUNNING == 0 )) || validator_args+=(--require-running)
 
 report_path="$inventory_dir/report.json"
 python3 "$SCRIPT_DIR/validate-preflight.py" "${validator_args[@]}" >"$report_path"
@@ -264,7 +282,11 @@ print("MoneyWorry GCP preflight: READY (read-only)")
 print(f"  active account : {report['active_account']}")
 print(f"  project        : {report['project_id']} ({report['project_number']})")
 print(f"  region / zone  : {report['region']} / {report['zone']}")
-print(f"  billing budget : USD {report['budget']['limit_usd']} (project-scoped)")
+print(
+    "  billing budget : "
+    f"{report['budget']['currency_code']} {report['budget']['amount']} "
+    "(project-scoped, gross cost)"
+)
 print(
     "  estimated cost: "
     f"USD {report['cost']['monthly_usd']}/month, "

@@ -26,7 +26,7 @@ Mutation requires both flags and an exact project/zone-specific token:
   --apply \
   --confirm PROVISION:PROJECT_ID:asia-northeast3-ZONE:moneyworry-demo
 
-The machine, disks, image, network, firewall, and metadata are fixed constants;
+The machine, disks, image, network, firewall, schedule, and metadata are fixed constants;
 there are no CLI or environment overrides for deployment size. Apply mode only
 creates absent resources after preflight. Exact existing resources are skipped,
 while same-name drift fails closed.
@@ -168,6 +168,18 @@ firewall_cmd=(
   --enable-logging
   --quiet
 )
+schedule_cmd=(
+  "$GCLOUD_BIN" compute resource-policies create instance-schedule "$MW_SCHEDULE_NAME"
+  --account="$ACTIVE_ACCOUNT"
+  --project="$PROJECT_ID"
+  --region="$MW_REGION"
+  --vm-start-schedule="$MW_SCHEDULE_START_CRON"
+  --vm-stop-schedule="$MW_SCHEDULE_STOP_CRON"
+  --timezone="$MW_SCHEDULE_TIMEZONE"
+  --initiation-date="$MW_SCHEDULE_INITIATION"
+  --end-date="$MW_SCHEDULE_EXPIRATION"
+  --quiet
+)
 data_disk_cmd=(
   "$GCLOUD_BIN" compute disks create "$MW_DATA_DISK_NAME"
   --account="$ACTIVE_ACCOUNT"
@@ -201,6 +213,7 @@ instance_cmd=(
   --shielded-secure-boot
   --shielded-vtpm
   --shielded-integrity-monitoring
+  --resource-policies="$MW_SCHEDULE_NAME"
   --deletion-protection
   --quiet
 )
@@ -221,6 +234,7 @@ add_plan_if_absent() {
 add_plan_if_absent network "$MW_NETWORK_NAME" network_cmd
 add_plan_if_absent subnet "$MW_SUBNET_NAME" subnet_cmd
 add_plan_if_absent firewall "$MW_FIREWALL_NAME" firewall_cmd
+add_plan_if_absent schedule "$MW_SCHEDULE_NAME" schedule_cmd
 add_plan_if_absent data_disk "$MW_DATA_DISK_NAME" data_disk_cmd
 add_plan_if_absent instance "$MW_VM_NAME" instance_cmd
 
@@ -229,6 +243,7 @@ print_planned_command() {
     network_cmd) mw_print_command "${network_cmd[@]}" ;;
     subnet_cmd) mw_print_command "${subnet_cmd[@]}" ;;
     firewall_cmd) mw_print_command "${firewall_cmd[@]}" ;;
+    schedule_cmd) mw_print_command "${schedule_cmd[@]}" ;;
     data_disk_cmd) mw_print_command "${data_disk_cmd[@]}" ;;
     instance_cmd) mw_print_command "${instance_cmd[@]}" ;;
     *) mw_die "internal error: unknown plan command $1" ;;
@@ -240,6 +255,7 @@ run_planned_command() {
     network_cmd) "${network_cmd[@]}" ;;
     subnet_cmd) "${subnet_cmd[@]}" ;;
     firewall_cmd) "${firewall_cmd[@]}" ;;
+    schedule_cmd) "${schedule_cmd[@]}" ;;
     data_disk_cmd) "${data_disk_cmd[@]}" ;;
     instance_cmd) "${instance_cmd[@]}" ;;
     *) mw_die "internal error: unknown plan command $1" ;;
@@ -255,6 +271,7 @@ if (( APPLY == 0 )); then
     "$MW_DATA_DISK_SIZE_GB" "$MW_DATA_DISK_TYPE"
   printf '  workload root  : %s on the data disk (post-provision step)\n' "$MW_MOUNT_ROOT"
   printf '  service ports  : no public ingress rules\n'
+  printf '  VM schedule    : daily 07:00-01:00 %s (18 hours)\n' "$MW_SCHEDULE_TIMEZONE"
   if (( ${#plan_names[@]} == 0 )); then
     printf '  plan           : no changes; all resources already match\n'
   else
@@ -269,6 +286,7 @@ if (( APPLY == 0 )); then
   exit 0
 fi
 
+created_instance=0
 if (( ${#plan_names[@]} == 0 )); then
   printf 'MoneyWorry GCP provisioning: no changes; exact resources already exist.\n'
 else
@@ -289,18 +307,22 @@ else
     fi
     printf 'Creating %s\n' "${plan_names[$index]}"
     run_planned_command "$command_name"
+    [[ "$command_name" != "instance_cmd" ]] || created_instance=1
   done
 fi
 
 # A second, independent read-only inventory must see every fixed resource in
 # the exact state. A create command returning zero without the postcondition is
 # never considered successful.
-GCLOUD_BIN="$GCLOUD_BIN" "$SCRIPT_DIR/preflight.sh" \
-  --project "$PROJECT_ID" \
-  --zone "$ZONE_SUFFIX" \
-  --expected-monthly-usd "$EXPECTED_MONTHLY_USD" \
-  --expected-90day-usd "$EXPECTED_90DAY_USD" \
-  --require-complete >/dev/null
+postflight_args=(
+  --project "$PROJECT_ID"
+  --zone "$ZONE_SUFFIX"
+  --expected-monthly-usd "$EXPECTED_MONTHLY_USD"
+  --expected-90day-usd "$EXPECTED_90DAY_USD"
+  --require-complete
+)
+(( created_instance == 0 )) || postflight_args+=(--require-running)
+GCLOUD_BIN="$GCLOUD_BIN" "$SCRIPT_DIR/preflight.sh" "${postflight_args[@]}" >/dev/null
 
 printf 'MoneyWorry GCP provisioning: COMPLETE and postflight-verified\n'
 printf 'No service port, public URL, IAM role, billing account, or free-trial state was changed.\n'

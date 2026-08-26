@@ -57,14 +57,14 @@ run_provision() {
 }
 
 base_args=(
-  --project safe-demo-123
+  --project sed-coamong
   --zone a
   --expected-monthly-usd 70.00
   --expected-90day-usd 210.00
 )
 confirm_args=(
   --apply
-  --confirm PROVISION:safe-demo-123:asia-northeast3-a:moneyworry-demo
+  --confirm PROVISION:sed-coamong:asia-northeast3-a:moneyworry-demo
 )
 
 reset_case preflight-clean
@@ -79,12 +79,21 @@ assert report["status"] == "ready"
 assert report["mode"] == "read-only-preflight"
 assert report["region"] == "asia-northeast3"
 assert report["zone"] == "asia-northeast3-a"
-assert report["budget"]["limit_usd"] == "250.00"
+assert report["project_id"] == "sed-coamong"
+assert report["budget"]["currency_code"] == "KRW"
+assert report["budget"]["amount"] == "350000"
 assert report["budget"]["display_name"] == "moneyworry-90day"
-assert report["budget"]["period"] == {"start": "2026-08-25", "end": "2026-11-23"}
+assert report["budget"]["credit_types_treatment"] == "EXCLUDE_ALL_CREDITS"
+assert report["budget"]["period"] == {
+    "start": "2026-08-26",
+    "api_end_date": "2026-11-24",
+}
 assert report["budget"]["threshold_percentages"] == [25, 50, 70, 85, 95]
 assert report["budget"]["email_recipients"] == ["billing-iam", "project-owners"]
 assert report["cost"]["gated_90day_usd"] == "210.00"
+assert report["cost"]["ceiling_usd"] == "250.00"
+assert report["operating_schedule"]["daily_window"] == "07:00-01:00"
+assert report["operating_schedule"]["timezone"] == "Asia/Seoul"
 assert report["resources"]["image"] == "exact"
 assert set(report["resources"].values()) == {"absent", "exact"}
 PY
@@ -106,7 +115,7 @@ while IFS= read -r invocation; do
         || fail "immutable public image query must pin the validated account"
       ;;
     *)
-      [[ "$invocation" == *"--project=safe-demo-123"* ]] \
+      [[ "$invocation" == *"--project=sed-coamong"* ]] \
         || fail "every project-scoped read uses the explicit project"
       [[ "$invocation" == *"--account=operator@example.test"* ]] \
         || fail "every cloud read after auth must pin the validated account"
@@ -120,7 +129,7 @@ if grep -Eq '(^| )compute .* create( |$)|(^| )services enable( |$)' "$log_path";
 fi
 note_pass "preflight gcloud inventory contains no mutation command"
 
-grep -Eq '^compute routes list .*--project=safe-demo-123' "$log_path" \
+grep -Eq '^compute routes list .*--project=sed-coamong' "$log_path" \
   || fail "preflight must inventory all routes with the explicit project"
 note_pass "preflight inventories the complete project route table"
 
@@ -128,7 +137,7 @@ reset_case dry-run
 run_provision clean "${base_args[@]}" || fail "default provision mode succeeds"
 grep -Eq 'DRY RUN \(no mutations\)' "$test_root/stdout" \
   || fail "dry-run is visibly labelled"
-grep -Eq 'PROVISION:safe-demo-123:asia-northeast3-a:moneyworry-demo' "$test_root/stdout" \
+grep -Eq 'PROVISION:sed-coamong:asia-northeast3-a:moneyworry-demo' "$test_root/stdout" \
   || fail "dry-run prints the exact confirmation token"
 if grep -Eq '^compute .* create ' "$log_path"; then
   fail "dry-run must not call create"
@@ -144,7 +153,7 @@ note_pass "apply requires an exact project/zone/VM confirmation token"
 
 reset_case over-cost-monthly
 if run_provision clean \
-  --project safe-demo-123 --zone a \
+  --project sed-coamong --zone a \
   --expected-monthly-usd 84.00 --expected-90day-usd 200.00 \
   "${confirm_args[@]}"; then
   fail "monthly times three above USD 250 must fail"
@@ -155,7 +164,7 @@ note_pass "monthly-times-three cost gate cannot be bypassed by a lower 90-day in
 
 reset_case over-cost-90day
 if run_provision clean \
-  --project safe-demo-123 --zone a \
+  --project sed-coamong --zone a \
   --expected-monthly-usd 70.00 --expected-90day-usd 250.01 \
   "${confirm_args[@]}"; then
   fail "explicit 90-day estimate above USD 250 must fail"
@@ -174,7 +183,7 @@ reset_case apply-clean
 run_provision clean "${base_args[@]}" "${confirm_args[@]}" \
   || fail "confirmed clean apply succeeds"
 create_count="$(grep -Ec '^compute .* create ' "$log_path")"
-[[ "$create_count" == "5" ]] || fail "apply must create exactly five fixed resources"
+[[ "$create_count" == "6" ]] || fail "apply must create exactly six fixed resources"
 for fixed_argument in \
   '--machine-type=e2-custom-2-12288' \
   '--image=ubuntu-2404-noble-amd64-v20260820' \
@@ -188,17 +197,23 @@ for fixed_argument in \
   'enable-oslogin=TRUE' \
   'enable-oslogin-2fa=TRUE' \
   '--no-service-account' \
+  '--vm-start-schedule=0\ 7\ \*\ \*\ \*' \
+  '--vm-stop-schedule=0\ 1\ \*\ \*\ \*' \
+  '--timezone=Asia/Seoul' \
+  '--initiation-date=2026-08-27T00:00:00+09:00' \
+  '--end-date=2026-11-24T02:00:00+09:00' \
+  '--resource-policies=moneyworry-18h-daily' \
   '--deletion-protection'; do
   grep -Fq -- "$fixed_argument" "$log_path" \
     || fail "apply command is missing fixed argument $fixed_argument"
 done
 create_count_with_account="$(grep -Ec '^compute .* create .*--account=operator@example.test' "$log_path")"
-[[ "$create_count_with_account" == "5" ]] \
+[[ "$create_count_with_account" == "6" ]] \
   || fail "every mutation must pin the account validated by preflight"
 if grep -Eq -- '0\.0\.0\.0/0|::/0|tcp:(5433|5051|8000|3111)' "$log_path"; then
   fail "apply must not create public service ingress"
 fi
-note_pass "confirmed apply creates only the fixed VM, disks, network, subnet, and IAP firewall"
+note_pass "confirmed apply creates only the fixed VM, disks, network, schedule, and IAP firewall"
 
 : >"$log_path"
 run_provision clean "${base_args[@]}" "${confirm_args[@]}" \
@@ -228,14 +243,43 @@ if grep -Eq '^compute .* create ' "$log_path"; then
 fi
 note_pass "independently existing exact resources are reused without mutation"
 
+reset_case legacy-effective-firewalls
+run_preflight legacy-effective-firewalls "${base_args[@]}" --require-complete \
+  || fail "legacy flattened effective firewall inventory must remain supported"
+note_pass "legacy flattened effective firewall inventory remains supported"
+
+python3 - "$GCP_DIR/validate-preflight.py" <<'PY' \
+  || fail "scheduled off-hours predicate must be exact"
+import importlib.util
+import sys
+from datetime import datetime
+
+spec = importlib.util.spec_from_file_location("moneyworry_validate", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+assert not module.scheduled_termination_expected(datetime.fromisoformat("2026-08-26T01:00:00+09:00"))
+assert module.scheduled_termination_expected(datetime.fromisoformat("2026-08-27T01:00:00+09:00"))
+assert module.scheduled_termination_expected(datetime.fromisoformat("2026-08-27T06:59:59+09:00"))
+assert not module.scheduled_termination_expected(datetime.fromisoformat("2026-08-27T07:00:00+09:00"))
+assert not module.scheduled_termination_expected(datetime.fromisoformat("2026-08-27T00:59:59+09:00"))
+assert module.scheduled_termination_expected(datetime.fromisoformat("2026-11-24T02:00:00+09:00"))
+PY
+note_pass "TERMINATED is eligible only during 01:00-07:00 or after schedule expiration"
+
 for scenario in \
   unauthenticated bad-budget unscoped-budget filtered-budget monthly-budget \
   wrong-budget-dates wrong-budget-thresholds forecast-budget-threshold no-budget-recipients \
+  wrong-credit-treatment \
   missing-api broad-firewall \
   split-public-ingress drift \
-  extra-boot-user extra-data-user stopped-vm readonly-boot readonly-data missing-nat-ip \
+  extra-boot-user extra-data-user readonly-boot readonly-data missing-nat-ip \
+  wrong-instance-schedule stopped-no-schedule schedule-drift schedule-not-ready \
+  schedule-expiration-drift \
   wrong-source-image project-startup-metadata inherited-firewall-policy \
-  missing-default-route custom-next-hop-route egress-deny effective-egress-deny \
+  raw-firewall-policy malformed-effective-wrapper unknown-effective-wrapper \
+  missing-default-route custom-next-hop-route wrong-default-route-type \
+  wrong-subnet-route-type egress-deny effective-egress-deny \
   missing-image bad-image-status deprecated-image arm-image wrong-image-license \
   target-cloud-router target-policy-based-route target-ncc-spoke; do
   reset_case "reject-$scenario"
@@ -247,7 +291,7 @@ done
 
 reset_case invalid-zone
 if run_preflight clean \
-  --project safe-demo-123 --zone d \
+  --project sed-coamong --zone d \
   --expected-monthly-usd 70 --expected-90day-usd 210; then
   fail "unsupported zone suffix must fail"
 fi

@@ -5,7 +5,7 @@ set -euo pipefail
 : "${FAKE_GCLOUD_STATE_DIR:?FAKE_GCLOUD_STATE_DIR is required}"
 
 scenario="${FAKE_GCLOUD_SCENARIO:-clean}"
-project_id="safe-demo-123"
+project_id="sed-coamong"
 zone="asia-northeast3-a"
 for argument in "$@"; do
   case "$argument" in
@@ -26,11 +26,19 @@ exists() {
     || "$scenario" == "readonly-boot" \
     || "$scenario" == "readonly-data" \
     || "$scenario" == "missing-nat-ip" \
+    || "$scenario" == "wrong-instance-schedule" \
+    || "$scenario" == "stopped-no-schedule" \
     || "$scenario" == "wrong-source-image" \
     || "$scenario" == "project-startup-metadata" \
     || "$scenario" == "inherited-firewall-policy" \
+    || "$scenario" == "raw-firewall-policy" \
+    || "$scenario" == "malformed-effective-wrapper" \
+    || "$scenario" == "unknown-effective-wrapper" \
+    || "$scenario" == "legacy-effective-firewalls" \
     || "$scenario" == "missing-default-route" \
     || "$scenario" == "custom-next-hop-route" \
+    || "$scenario" == "wrong-default-route-type" \
+    || "$scenario" == "wrong-subnet-route-type" \
     || "$scenario" == "egress-deny" \
     || "$scenario" == "effective-egress-deny" \
     || -f "$FAKE_GCLOUD_STATE_DIR/$1" ]]
@@ -66,50 +74,54 @@ fi
 if [[ "$1 $2 $3" == "billing budgets list" ]]; then
   if [[ "$scenario" == "bad-budget" ]]; then
     cat <<'EOF'
-[{"name":"billingAccounts/000000-111111-222222/budgets/bad","amount":{"specifiedAmount":{"currencyCode":"USD","units":"300"}},"budgetFilter":{"projects":["projects/123456789012"]}}]
+[{"name":"billingAccounts/000000-111111-222222/budgets/bad","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"KRW","units":"350001"}},"budgetFilter":{"projects":["projects/123456789012"],"creditTypesTreatment":"EXCLUDE_ALL_CREDITS","customPeriod":{"startDate":{"year":2026,"month":8,"day":26},"endDate":{"year":2026,"month":11,"day":24}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
 EOF
   elif [[ "$scenario" == "unscoped-budget" ]]; then
     cat <<'EOF'
-[{"name":"billingAccounts/000000-111111-222222/budgets/unscoped","amount":{"specifiedAmount":{"currencyCode":"USD","units":"250"}},"budgetFilter":{}}]
+[{"name":"billingAccounts/000000-111111-222222/budgets/unscoped","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"KRW","units":"350000"}},"budgetFilter":{"creditTypesTreatment":"EXCLUDE_ALL_CREDITS","customPeriod":{"startDate":{"year":2026,"month":8,"day":26},"endDate":{"year":2026,"month":11,"day":24}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
 EOF
   elif [[ "$scenario" == "filtered-budget" ]]; then
     cat <<'EOF'
 [{
   "name":"billingAccounts/000000-111111-222222/budgets/filtered",
   "displayName":"moneyworry-90day",
-  "amount":{"specifiedAmount":{"currencyCode":"USD","units":"250"}},
-  "budgetFilter":{"projects":["projects/123456789012"],"services":["services/6F81-5844-456A"],"customPeriod":{"startDate":{"year":2026,"month":8,"day":25},"endDate":{"year":2026,"month":11,"day":23}}},
+  "amount":{"specifiedAmount":{"currencyCode":"KRW","units":"350000"}},
+  "budgetFilter":{"projects":["projects/123456789012"],"services":["services/6F81-5844-456A"],"creditTypesTreatment":"EXCLUDE_ALL_CREDITS","customPeriod":{"startDate":{"year":2026,"month":8,"day":26},"endDate":{"year":2026,"month":11,"day":24}}},
   "thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],
   "notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}
 }]
 EOF
   elif [[ "$scenario" == "monthly-budget" ]]; then
     cat <<'EOF'
-[{"name":"billingAccounts/000000-111111-222222/budgets/monthly","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"USD","units":"250"}},"budgetFilter":{"projects":["projects/123456789012"],"calendarPeriod":"MONTH"},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
+[{"name":"billingAccounts/000000-111111-222222/budgets/monthly","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"KRW","units":"350000"}},"budgetFilter":{"projects":["projects/123456789012"],"creditTypesTreatment":"EXCLUDE_ALL_CREDITS","calendarPeriod":"MONTH"},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
 EOF
   elif [[ "$scenario" == "wrong-budget-dates" ]]; then
     cat <<'EOF'
-[{"name":"billingAccounts/000000-111111-222222/budgets/dates","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"USD","units":"250"}},"budgetFilter":{"projects":["projects/123456789012"],"customPeriod":{"startDate":{"year":2026,"month":8,"day":26},"endDate":{"year":2026,"month":11,"day":23}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
+[{"name":"billingAccounts/000000-111111-222222/budgets/dates","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"KRW","units":"350000"}},"budgetFilter":{"projects":["projects/123456789012"],"creditTypesTreatment":"EXCLUDE_ALL_CREDITS","customPeriod":{"startDate":{"year":2026,"month":8,"day":25},"endDate":{"year":2026,"month":11,"day":24}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
 EOF
   elif [[ "$scenario" == "wrong-budget-thresholds" ]]; then
     cat <<'EOF'
-[{"name":"billingAccounts/000000-111111-222222/budgets/thresholds","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"USD","units":"250"}},"budgetFilter":{"projects":["projects/123456789012"],"customPeriod":{"startDate":{"year":2026,"month":8,"day":25},"endDate":{"year":2026,"month":11,"day":23}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
+[{"name":"billingAccounts/000000-111111-222222/budgets/thresholds","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"KRW","units":"350000"}},"budgetFilter":{"projects":["projects/123456789012"],"creditTypesTreatment":"EXCLUDE_ALL_CREDITS","customPeriod":{"startDate":{"year":2026,"month":8,"day":26},"endDate":{"year":2026,"month":11,"day":24}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
 EOF
   elif [[ "$scenario" == "forecast-budget-threshold" ]]; then
     cat <<'EOF'
-[{"name":"billingAccounts/000000-111111-222222/budgets/forecast","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"USD","units":"250"}},"budgetFilter":{"projects":["projects/123456789012"],"customPeriod":{"startDate":{"year":2026,"month":8,"day":25},"endDate":{"year":2026,"month":11,"day":23}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95,"spendBasis":"FORECASTED_SPEND"}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
+[{"name":"billingAccounts/000000-111111-222222/budgets/forecast","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"KRW","units":"350000"}},"budgetFilter":{"projects":["projects/123456789012"],"creditTypesTreatment":"EXCLUDE_ALL_CREDITS","customPeriod":{"startDate":{"year":2026,"month":8,"day":26},"endDate":{"year":2026,"month":11,"day":24}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95,"spendBasis":"FORECASTED_SPEND"}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
 EOF
   elif [[ "$scenario" == "no-budget-recipients" ]]; then
     cat <<'EOF'
-[{"name":"billingAccounts/000000-111111-222222/budgets/recipients","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"USD","units":"250"}},"budgetFilter":{"projects":["projects/123456789012"],"customPeriod":{"startDate":{"year":2026,"month":8,"day":25},"endDate":{"year":2026,"month":11,"day":23}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],"notificationsRule":{"disableDefaultIamRecipients":true,"enableProjectLevelRecipients":false}}]
+[{"name":"billingAccounts/000000-111111-222222/budgets/recipients","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"KRW","units":"350000"}},"budgetFilter":{"projects":["projects/123456789012"],"creditTypesTreatment":"EXCLUDE_ALL_CREDITS","customPeriod":{"startDate":{"year":2026,"month":8,"day":26},"endDate":{"year":2026,"month":11,"day":24}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],"notificationsRule":{"disableDefaultIamRecipients":true,"enableProjectLevelRecipients":false}}]
+EOF
+  elif [[ "$scenario" == "wrong-credit-treatment" ]]; then
+    cat <<'EOF'
+[{"name":"billingAccounts/000000-111111-222222/budgets/credits","displayName":"moneyworry-90day","amount":{"specifiedAmount":{"currencyCode":"KRW","units":"350000"}},"budgetFilter":{"projects":["projects/123456789012"],"creditTypesTreatment":"INCLUDE_ALL_CREDITS","customPeriod":{"startDate":{"year":2026,"month":8,"day":26},"endDate":{"year":2026,"month":11,"day":24}}},"thresholdRules":[{"thresholdPercent":0.25},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],"notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}}]
 EOF
   else
     cat <<'EOF'
 [{
   "name":"billingAccounts/000000-111111-222222/budgets/moneyworry-90day",
   "displayName":"moneyworry-90day",
-  "amount":{"specifiedAmount":{"currencyCode":"USD","units":"250","nanos":0}},
-  "budgetFilter":{"projects":["projects/123456789012"],"customPeriod":{"startDate":{"year":2026,"month":8,"day":25},"endDate":{"year":2026,"month":11,"day":23}}},
+  "amount":{"specifiedAmount":{"currencyCode":"KRW","units":"350000","nanos":0}},
+  "budgetFilter":{"projects":["projects/123456789012"],"creditTypesTreatment":"EXCLUDE_ALL_CREDITS","customPeriod":{"startDate":{"year":2026,"month":8,"day":26},"endDate":{"year":2026,"month":11,"day":24}}},
   "thresholdRules":[{"thresholdPercent":0.25,"spendBasis":"CURRENT_SPEND"},{"thresholdPercent":0.5},{"thresholdPercent":0.7},{"thresholdPercent":0.85},{"thresholdPercent":0.95}],
   "notificationsRule":{"disableDefaultIamRecipients":false,"enableProjectLevelRecipients":true}
 }]
@@ -173,18 +185,63 @@ EOF
   exit 0
 fi
 
-if [[ "$1 $2 $3" == "compute network-firewall-policies get-effective-firewalls" ]]; then
-  iap_effective='{"type":"network-firewall","name":"moneyworry-iap-ssh","direction":"INGRESS","action":"ALLOW","disabled":false,"ip_ranges":["35.235.240.0/20"],"target_tags":["moneyworry-iap"]}'
-  inherited='{"type":"org-firewall","firewall_policy_name":"organizations/123/firewallPolicies/456","direction":"INGRESS","action":"ALLOW","disabled":false,"ip_ranges":["0.0.0.0/0"]}'
-  effective_egress='{"type":"network-firewall","name":"deny-https-effective","direction":"EGRESS","action":"DENY","disabled":false,"ip_ranges":["0.0.0.0/0"],"target_tags":["moneyworry-iap"]}'
-  if [[ "$scenario" == "inherited-firewall-policy" ]]; then
-    printf '[%s,%s]\n' "$iap_effective" "$inherited"
-  elif [[ "$scenario" == "effective-egress-deny" ]]; then
-    printf '[%s,%s]\n' "$iap_effective" "$effective_egress"
-  elif exists firewall; then
-    printf '[%s]\n' "$iap_effective"
+if [[ "$1 $2 $3" == "compute resource-policies list" ]]; then
+  schedule_status='READY'
+  start_cron='0 7 * * *'
+  stop_cron='0 1 * * *'
+  timezone='Asia/Seoul'
+  initiation='2026-08-26T15:00:00.000Z'
+  expiration='2026-11-23T17:00:00.000Z'
+  [[ "$scenario" != "schedule-drift" ]] || start_cron='0 8 * * *'
+  [[ "$scenario" != "schedule-not-ready" ]] || schedule_status='CREATING'
+  [[ "$scenario" != "schedule-expiration-drift" ]] \
+    || expiration='2026-11-24T17:00:00.000Z'
+  if [[ "$scenario" == "schedule-drift" \
+    || "$scenario" == "schedule-not-ready" \
+    || "$scenario" == "schedule-expiration-drift" ]] \
+    || { exists schedule && [[ "$scenario" != "stopped-no-schedule" ]]; }; then
+    cat <<EOF
+[{
+  "name":"moneyworry-18h-daily",
+  "region":"https://www.googleapis.com/compute/v1/projects/$project_id/regions/asia-northeast3",
+  "status":"$schedule_status",
+  "instanceSchedulePolicy":{
+    "vmStartSchedule":{"schedule":"$start_cron"},
+    "vmStopSchedule":{"schedule":"$stop_cron"},
+    "timeZone":"$timezone",
+    "startTime":"$initiation",
+    "expirationTime":"$expiration"
+  }
+}]
+EOF
   else
     printf '[]\n'
+  fi
+  exit 0
+fi
+
+if [[ "$1 $2 $3" == "compute network-firewall-policies get-effective-firewalls" ]]; then
+  iap_legacy='{"type":"network-firewall","name":"moneyworry-iap-ssh","direction":"INGRESS","action":"ALLOW","disabled":false,"ip_ranges":["35.235.240.0/20"],"target_tags":["moneyworry-iap"]}'
+  inherited_legacy='{"type":"org-firewall","firewall_policy_name":"organizations/123/firewallPolicies/456","direction":"INGRESS","action":"ALLOW","disabled":false,"ip_ranges":["0.0.0.0/0"]}'
+  iap_raw='{"allowed":[{"IPProtocol":"tcp","ports":["22"]}],"creationTimestamp":"2026-08-26T04:00:00.000+09:00","description":"","direction":"INGRESS","disabled":false,"id":"123456789","kind":"compute#firewall","logConfig":{"enable":true},"name":"moneyworry-iap-ssh","network":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","priority":1000,"selfLink":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/firewalls/moneyworry-iap-ssh","sourceRanges":["35.235.240.0/20"],"targetTags":["moneyworry-iap"]}'
+  egress_raw='{"denied":[{"IPProtocol":"tcp","ports":["443"]}],"direction":"EGRESS","disabled":false,"destinationRanges":["0.0.0.0/0"],"logConfig":{"enable":true},"name":"deny-https-effective","network":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","priority":900,"targetTags":["moneyworry-iap"]}'
+  policy_raw='{"displayName":"organization-policy","name":"organizations/123456789/firewallPolicies/456789012","priority":0,"rules":[{"action":"allow","direction":"INGRESS","priority":1000}],"type":"HIERARCHY"}'
+  if [[ "$scenario" == "inherited-firewall-policy" ]]; then
+    printf '[%s,%s]\n' "$iap_legacy" "$inherited_legacy"
+  elif [[ "$scenario" == "legacy-effective-firewalls" ]]; then
+    printf '[%s]\n' "$iap_legacy"
+  elif [[ "$scenario" == "raw-firewall-policy" ]]; then
+    printf '{"firewallPolicys":[%s],"firewalls":[%s]}\n' "$policy_raw" "$iap_raw"
+  elif [[ "$scenario" == "malformed-effective-wrapper" ]]; then
+    printf '{"firewallPolicys":[],"firewalls":{}}\n'
+  elif [[ "$scenario" == "unknown-effective-wrapper" ]]; then
+    printf '{"firewallPolicys":[],"firewalls":[%s],"organizationFirewalls":[]}\n' "$iap_raw"
+  elif [[ "$scenario" == "effective-egress-deny" ]]; then
+    printf '{"firewallPolicys":[],"firewalls":[%s,%s]}\n' "$iap_raw" "$egress_raw"
+  elif exists firewall; then
+    printf '{"firewallPolicys":[],"firewalls":[%s]}\n' "$iap_raw"
+  else
+    printf '{"firewallPolicys":[],"firewalls":[]}\n'
   fi
   exit 0
 fi
@@ -216,14 +273,20 @@ EOF
 fi
 
 if [[ "$1 $2 $3" == "compute routes list" ]]; then
-  default_route='{"name":"default-route-internet","network":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","destRange":"0.0.0.0/0","priority":1000,"nextHopGateway":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/gateways/default-internet-gateway","routeType":"STATIC","routeStatus":"ACTIVE"}'
-  subnet_route='{"name":"default-route-subnet","network":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","destRange":"10.20.0.0/24","priority":0,"nextHopNetwork":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","routeType":"SUBNET","routeStatus":"ACTIVE"}'
+  default_route='{"name":"default-route-internet","network":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","destRange":"0.0.0.0/0","priority":1000,"nextHopGateway":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/gateways/default-internet-gateway"}'
+  subnet_route='{"name":"default-route-subnet","network":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","destRange":"10.20.0.0/24","priority":0,"nextHopNetwork":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc"}'
+  wrong_default_type='{"name":"default-route-internet","network":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","destRange":"0.0.0.0/0","priority":1000,"nextHopGateway":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/gateways/default-internet-gateway","routeType":"DYNAMIC"}'
+  wrong_subnet_type='{"name":"default-route-subnet","network":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","destRange":"10.20.0.0/24","priority":0,"nextHopNetwork":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","routeType":"STATIC"}'
   custom_route='{"name":"unexpected-next-hop","network":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/global/networks/moneyworry-vpc","destRange":"0.0.0.0/1","priority":900,"nextHopInstance":"https://www.googleapis.com/compute/v1/projects/'"$project_id"'/zones/'"$zone"'/instances/router-vm","routeType":"STATIC","routeStatus":"ACTIVE"}'
   if exists network; then
     if [[ "$scenario" == "missing-default-route" ]]; then
       printf '[%s]\n' "$subnet_route"
     elif [[ "$scenario" == "custom-next-hop-route" ]]; then
       printf '[%s,%s,%s]\n' "$default_route" "$subnet_route" "$custom_route"
+    elif [[ "$scenario" == "wrong-default-route-type" ]]; then
+      printf '[%s,%s]\n' "$wrong_default_type" "$subnet_route"
+    elif [[ "$scenario" == "wrong-subnet-route-type" ]]; then
+      printf '[%s,%s]\n' "$default_route" "$wrong_subnet_type"
     elif exists subnet; then
       printf '[%s,%s]\n' "$default_route" "$subnet_route"
     else
@@ -326,7 +389,12 @@ if [[ "$1 $2 $3" == "compute instances list" ]]; then
     boot_mode='READ_WRITE'
     data_mode='READ_WRITE'
     nat_ip='34.64.0.10'
-    [[ "$scenario" != "stopped-vm" ]] || vm_status='TERMINATED'
+    instance_schedule='moneyworry-18h-daily'
+    if [[ "$scenario" == "stopped-vm" || "$scenario" == "stopped-no-schedule" ]]; then
+      vm_status='TERMINATED'
+      nat_ip=''
+    fi
+    [[ "$scenario" != "wrong-instance-schedule" ]] || instance_schedule='unexpected-schedule'
     [[ "$scenario" != "readonly-boot" ]] || boot_mode='READ_ONLY'
     [[ "$scenario" != "readonly-data" ]] || data_mode='READ_ONLY'
     [[ "$scenario" != "missing-nat-ip" ]] || nat_ip=''
@@ -339,6 +407,7 @@ if [[ "$1 $2 $3" == "compute instances list" ]]; then
   "machineType":"https://www.googleapis.com/compute/v1/projects/$project_id/zones/$zone/machineTypes/e2-custom-2-12288",
   "deletionProtection":true,
   "canIpForward":false,
+  "resourcePolicies":["https://www.googleapis.com/compute/v1/projects/$project_id/regions/asia-northeast3/resourcePolicies/$instance_schedule"],
   "tags":{"items":["moneyworry-iap"]},
   "metadata":{"items":[
     {"key":"block-project-ssh-keys","value":"TRUE"},
@@ -380,6 +449,12 @@ fi
 
 if [[ "$1 $2 $3" == "compute firewall-rules create" ]]; then
   write_marker firewall
+  printf '{}\n'
+  exit 0
+fi
+
+if [[ "$1 $2 $3 $4" == "compute resource-policies create instance-schedule" ]]; then
+  write_marker schedule
   printf '{}\n'
   exit 0
 fi

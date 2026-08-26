@@ -13,9 +13,11 @@ import ipaddress
 import json
 import re
 import sys
+from datetime import datetime, time, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, NoReturn
+from zoneinfo import ZoneInfo
 
 
 REGION = "asia-northeast3"
@@ -39,10 +41,22 @@ SUBNET_CIDR = "10.20.0.0/24"
 FIREWALL_NAME = "moneyworry-iap-ssh"
 IAP_SOURCE_CIDR = "35.235.240.0/20"
 IAP_TARGET_TAG = "moneyworry-iap"
-BUDGET_LIMIT = Decimal("250.00")
+SCHEDULE_NAME = "moneyworry-18h-daily"
+SCHEDULE_START_CRON = "0 7 * * *"
+SCHEDULE_STOP_CRON = "0 1 * * *"
+SCHEDULE_TIMEZONE = "Asia/Seoul"
+SCHEDULE_ZONE = ZoneInfo(SCHEDULE_TIMEZONE)
+SCHEDULE_DAILY_START = time(7, 0)
+SCHEDULE_DAILY_STOP = time(1, 0)
+SCHEDULE_INITIATION = datetime(2026, 8, 26, 15, 0, tzinfo=timezone.utc)
+SCHEDULE_EXPIRATION = datetime(2026, 11, 23, 17, 0, tzinfo=timezone.utc)
+COST_CEILING_USD = Decimal("250.00")
+BUDGET_AMOUNT = Decimal("350000")
+BUDGET_CURRENCY = "KRW"
 BUDGET_DISPLAY_NAME = "moneyworry-90day"
-BUDGET_START_DATE = {"year": 2026, "month": 8, "day": 25}
-BUDGET_END_DATE = {"year": 2026, "month": 11, "day": 23}
+BUDGET_START_DATE = {"year": 2026, "month": 8, "day": 26}
+BUDGET_END_DATE = {"year": 2026, "month": 11, "day": 24}
+BUDGET_CREDIT_TREATMENT = "EXCLUDE_ALL_CREDITS"
 BUDGET_THRESHOLDS = {
     Decimal("0.25"),
     Decimal("0.50"),
@@ -70,13 +84,15 @@ def fail(message: str) -> NoReturn:
     raise ValueError(message)
 
 
-def load_json(path: Path, expected: type) -> Any:
+def load_json(path: Path, expected: type | tuple[type, ...]) -> Any:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         fail(f"invalid gcloud JSON in {path.name}: {exc}")
     if not isinstance(value, expected):
-        fail(f"unexpected JSON type in {path.name}; expected {expected.__name__}")
+        expected_types = expected if isinstance(expected, tuple) else (expected,)
+        expected_names = "/".join(item.__name__ for item in expected_types)
+        fail(f"unexpected JSON type in {path.name}; expected {expected_names}")
     return value
 
 
@@ -102,9 +118,9 @@ def validate_cost(monthly_raw: str, ninety_day_raw: str) -> dict[str, str]:
     monthly = parse_usd(monthly_raw, "--expected-monthly-usd")
     ninety_day = parse_usd(ninety_day_raw, "--expected-90day-usd")
     conservative_ninety_day = max(ninety_day, monthly * 3)
-    if monthly > BUDGET_LIMIT:
+    if monthly > COST_CEILING_USD:
         fail(f"monthly estimate {monthly} USD exceeds the 250 USD ceiling")
-    if conservative_ninety_day > BUDGET_LIMIT:
+    if conservative_ninety_day > COST_CEILING_USD:
         fail(
             "90-day cost gate exceeds 250 USD: "
             f"max(explicit={ninety_day}, monthly*3={monthly * 3})"
@@ -113,7 +129,7 @@ def validate_cost(monthly_raw: str, ninety_day_raw: str) -> dict[str, str]:
         "monthly_usd": f"{monthly:.2f}",
         "explicit_90day_usd": f"{ninety_day:.2f}",
         "gated_90day_usd": f"{conservative_ninety_day:.2f}",
-        "ceiling_usd": f"{BUDGET_LIMIT:.2f}",
+        "ceiling_usd": f"{COST_CEILING_USD:.2f}",
     }
 
 
@@ -220,7 +236,8 @@ def validate_routes(
         if destination == "0.0.0.0/0":
             internet_routes.append(route)
             require_equal(route.get("priority"), 1000, "default internet route priority drift")
-            require_equal(route.get("routeType"), "STATIC", "default internet route type drift")
+            if "routeType" in route:
+                require_equal(route.get("routeType"), "STATIC", "default internet route type drift")
             require_only_next_hop(route, "nextHopGateway")
             expected_gateway = f"projects/{project}/global/gateways/default-internet-gateway"
             if not resource_url_matches(route.get("nextHopGateway"), expected_gateway):
@@ -228,7 +245,8 @@ def validate_routes(
         elif destination == SUBNET_CIDR and subnet_exists:
             subnet_routes.append(route)
             require_equal(route.get("priority"), 0, "local subnet route priority drift")
-            require_equal(route.get("routeType"), "SUBNET", "local subnet route type drift")
+            if "routeType" in route:
+                require_equal(route.get("routeType"), "SUBNET", "local subnet route type drift")
             require_only_next_hop(route, "nextHopNetwork")
             expected_network = f"projects/{project}/global/networks/{NETWORK_NAME}"
             if not resource_url_matches(route.get("nextHopNetwork"), expected_network):
@@ -515,7 +533,7 @@ def effective_target_values(item: dict[str, Any], field: str) -> list[str]:
     fail(f"effective firewall has malformed {field}")
 
 
-def validate_effective_firewalls(
+def validate_legacy_effective_firewalls(
     items: list[Any], *, network_exists: bool, firewall_exists: bool
 ) -> None:
     if not network_exists:
@@ -568,6 +586,90 @@ def validate_effective_firewalls(
         fail("effective IAP firewall inventory is incomplete or duplicated")
 
 
+def validate_raw_classic_effective_firewall(
+    item: Any, *, project: str
+) -> None:
+    if not isinstance(item, dict):
+        fail("raw effective firewall inventory contains a malformed classic rule")
+    require_equal(item.get("name"), FIREWALL_NAME, "raw effective IAP firewall name drift")
+    require_equal(item.get("disabled"), False, "raw effective IAP disabled state drift")
+    require_equal(item.get("direction"), "INGRESS", "raw effective IAP direction drift")
+    require_equal(item.get("priority"), 1000, "raw effective IAP priority drift")
+    expected_network = f"projects/{project}/global/networks/{NETWORK_NAME}"
+    if not resource_url_matches(item.get("network"), expected_network):
+        fail("raw effective IAP firewall belongs to an unexpected project/VPC")
+    for field in (
+        "sourceTags",
+        "sourceServiceAccounts",
+        "targetServiceAccounts",
+        "destinationRanges",
+        "denied",
+    ):
+        if item.get(field) not in (None, []):
+            fail(f"raw effective IAP firewall has unexpected {field}")
+    validate_firewall(item)
+
+
+def validate_raw_effective_firewalls(
+    wrapper: dict[str, Any],
+    *,
+    project: str,
+    network_exists: bool,
+    firewall_exists: bool,
+) -> None:
+    allowed_keys = {"firewalls", "firewallPolicys"}
+    unknown_keys = sorted(set(wrapper) - allowed_keys)
+    if unknown_keys:
+        fail(
+            "raw effective firewall wrapper has unknown fields: "
+            + ", ".join(unknown_keys)
+        )
+    if "firewalls" not in wrapper:
+        fail("raw effective firewall wrapper is missing firewalls")
+    firewalls = wrapper.get("firewalls")
+    policies = wrapper.get("firewallPolicys", [])
+    if not isinstance(firewalls, list):
+        fail("raw effective firewall wrapper firewalls must be a list")
+    if not isinstance(policies, list):
+        fail("raw effective firewall wrapper firewallPolicys must be a list")
+    if policies:
+        fail("hierarchical, global, regional, or system firewall policy applies to the target VPC")
+    if not network_exists:
+        if firewalls:
+            fail("effective firewall inventory exists while the target network is absent")
+        return
+    expected_count = 1 if firewall_exists else 0
+    if len(firewalls) != expected_count:
+        fail("raw effective IAP firewall inventory is incomplete or duplicated")
+    for item in firewalls:
+        validate_raw_classic_effective_firewall(item, project=project)
+
+
+def validate_effective_firewalls(
+    inventory: list[Any] | dict[str, Any],
+    *,
+    project: str,
+    network_exists: bool,
+    firewall_exists: bool,
+) -> None:
+    if isinstance(inventory, list):
+        validate_legacy_effective_firewalls(
+            inventory,
+            network_exists=network_exists,
+            firewall_exists=firewall_exists,
+        )
+        return
+    if isinstance(inventory, dict):
+        validate_raw_effective_firewalls(
+            inventory,
+            project=project,
+            network_exists=network_exists,
+            firewall_exists=firewall_exists,
+        )
+        return
+    fail("effective firewall inventory must be a raw wrapper or legacy flattened list")
+
+
 def validate_disk(item: dict[str, Any], zone: str, *, boot: bool) -> None:
     expected_name = BOOT_DISK_NAME if boot else DATA_DISK_NAME
     expected_size = BOOT_DISK_SIZE_GB if boot else DATA_DISK_SIZE_GB
@@ -616,12 +718,89 @@ def metadata_map(item: dict[str, Any]) -> dict[str, str]:
     return result
 
 
-def validate_instance(item: dict[str, Any], zone: str) -> None:
+def exact_rfc3339_timestamp(value: Any, expected: datetime) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        return False
+    return parsed.astimezone(timezone.utc) == expected
+
+
+def validate_schedule(item: dict[str, Any]) -> None:
+    require_equal(item.get("name"), SCHEDULE_NAME, "instance schedule name drift")
+    require_equal(basename(item.get("region")), REGION, "instance schedule region drift")
+    require_equal(item.get("status"), "READY", "instance schedule readiness drift")
+    for alternate_policy in (
+        "snapshotSchedulePolicy",
+        "groupPlacementPolicy",
+        "diskConsistencyGroupPolicy",
+        "workloadPolicy",
+    ):
+        if item.get(alternate_policy) not in (None, {}):
+            fail(f"instance schedule has unexpected {alternate_policy}")
+    policy = item.get("instanceSchedulePolicy")
+    if not isinstance(policy, dict):
+        fail("instance schedule policy is missing")
+    start = policy.get("vmStartSchedule")
+    stop = policy.get("vmStopSchedule")
+    if not isinstance(start, dict) or not isinstance(stop, dict):
+        fail("instance schedule start/stop policy is missing")
+    require_equal(start.get("schedule"), SCHEDULE_START_CRON, "instance start cron drift")
+    require_equal(stop.get("schedule"), SCHEDULE_STOP_CRON, "instance stop cron drift")
+    require_equal(policy.get("timeZone"), SCHEDULE_TIMEZONE, "instance schedule timezone drift")
+    if not exact_rfc3339_timestamp(policy.get("startTime"), SCHEDULE_INITIATION):
+        fail("instance schedule initiation time drift")
+    if not exact_rfc3339_timestamp(policy.get("expirationTime"), SCHEDULE_EXPIRATION):
+        fail("instance schedule expiration time drift")
+
+
+def scheduled_termination_expected(now: datetime) -> bool:
+    if now.tzinfo is None:
+        fail("runtime validation clock must include a timezone")
+    utc_now = now.astimezone(timezone.utc)
+    if utc_now < SCHEDULE_INITIATION:
+        return False
+    if utc_now >= SCHEDULE_EXPIRATION:
+        return True
+    local_time = utc_now.astimezone(SCHEDULE_ZONE).time().replace(tzinfo=None)
+    return SCHEDULE_DAILY_STOP <= local_time < SCHEDULE_DAILY_START
+
+
+def validate_instance(
+    item: dict[str, Any],
+    zone: str,
+    *,
+    require_running: bool,
+    allow_terminated: bool,
+) -> None:
     require_equal(basename(item.get("zone")), zone, "instance zone drift")
     require_equal(basename(item.get("machineType")), MACHINE_TYPE, "machine type drift")
-    require_equal(item.get("status"), "RUNNING", "instance runtime status drift")
+    runtime_status = item.get("status")
+    if require_running:
+        require_equal(runtime_status, "RUNNING", "instance runtime status drift")
+    elif runtime_status == "TERMINATED":
+        if not allow_terminated:
+            fail("instance is TERMINATED during its scheduled operating window")
+    elif runtime_status != "RUNNING":
+        fail(
+            "instance runtime status drift: expected scheduled RUNNING/TERMINATED, "
+            f"found {runtime_status!r}"
+        )
     require_equal(item.get("deletionProtection"), True, "instance deletion protection drift")
     require_equal(item.get("canIpForward", False), False, "instance IP forwarding drift")
+    resource_policies = item.get("resourcePolicies")
+    if not isinstance(resource_policies, list):
+        fail("instance resource policy attachments are missing")
+    require_equal(
+        [basename(policy) for policy in resource_policies],
+        [SCHEDULE_NAME],
+        "instance schedule attachment drift",
+    )
 
     tags = item.get("tags")
     if not isinstance(tags, dict):
@@ -683,19 +862,25 @@ def validate_instance(item: dict[str, Any], zone: str) -> None:
         fail("instance access configuration is malformed")
     require_equal(access_config.get("type"), "ONE_TO_ONE_NAT", "instance access type drift")
     require_equal(access_config.get("networkTier", "PREMIUM"), "PREMIUM", "network tier drift")
-    try:
-        nat_ip = ipaddress.ip_address(access_config.get("natIP", ""))
-    except ValueError:
-        fail("instance ephemeral external IPv4 address is missing or malformed")
-    if (
-        nat_ip.version != 4
-        or nat_ip.is_private
-        or nat_ip.is_loopback
-        or nat_ip.is_link_local
-        or nat_ip.is_multicast
-        or nat_ip.is_unspecified
-    ):
-        fail("instance ephemeral external IPv4 address is not externally routable")
+    nat_ip_raw = access_config.get("natIP", "")
+    if runtime_status == "TERMINATED" and nat_ip_raw in (None, ""):
+        # A stopped VM releases its ephemeral external IPv4. The access config
+        # itself must remain exact so the next scheduled start receives one.
+        pass
+    else:
+        try:
+            nat_ip = ipaddress.ip_address(nat_ip_raw)
+        except ValueError:
+            fail("instance ephemeral external IPv4 address is missing or malformed")
+        if (
+            nat_ip.version != 4
+            or nat_ip.is_private
+            or nat_ip.is_loopback
+            or nat_ip.is_link_local
+            or nat_ip.is_multicast
+            or nat_ip.is_unspecified
+        ):
+            fail("instance ephemeral external IPv4 address is not externally routable")
 
     disks = item.get("disks")
     if not isinstance(disks, list) or len(disks) != 2:
@@ -715,11 +900,11 @@ def validate_instance(item: dict[str, Any], zone: str) -> None:
     require_equal(data.get("mode"), "READ_WRITE", "data disk attachment mode drift")
 
 
-def decimal_from_money(value: Any) -> Decimal | None:
+def decimal_from_money(value: Any, expected_currency: str) -> Decimal | None:
     if not isinstance(value, dict):
         return None
     currency = value.get("currencyCode")
-    if currency != "USD":
+    if currency != expected_currency:
         return None
     try:
         units = Decimal(str(value.get("units", "0")))
@@ -784,6 +969,8 @@ def valid_budget_alerts(budget: dict[str, Any]) -> bool:
 
 
 def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
+    if args.require_running and not args.require_complete:
+        fail("--require-running is only valid together with --require-complete")
     root = Path(args.inventory_dir)
     cost = validate_cost(args.expected_monthly_usd, args.expected_90day_usd)
     full_zone = f"{REGION}-{args.zone}"
@@ -823,7 +1010,7 @@ def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
         amount = budget.get("amount")
         if not isinstance(amount, dict):
             continue
-        specified = decimal_from_money(amount.get("specifiedAmount"))
+        specified = decimal_from_money(amount.get("specifiedAmount"), BUDGET_CURRENCY)
         budget_filter = budget.get("budgetFilter")
         if not isinstance(budget_filter, dict):
             continue
@@ -840,12 +1027,13 @@ def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
             and budget_filter.get("calendarPeriod") in (None, "CALENDAR_PERIOD_UNSPECIFIED")
         )
         if (
-            specified == BUDGET_LIMIT
+            specified == BUDGET_AMOUNT
             and budget.get("displayName") == BUDGET_DISPLAY_NAME
             and isinstance(projects, list)
             and len(projects) == 1
             and projects[0] in expected_project_refs
             and not has_narrower_filter
+            and budget_filter.get("creditTypesTreatment") == BUDGET_CREDIT_TREATMENT
             and exact_period
             and valid_budget_alerts(budget)
         ):
@@ -853,7 +1041,8 @@ def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
     if not matching_budgets:
         fail(
             "no exact moneyworry-90day budget exists: require project-only scope, "
-            "2026-08-25..2026-11-23 custom period, USD 250.00, current-spend "
+            "2026-08-26..API endDate 2026-11-24 custom period, KRW 350000, "
+            "EXCLUDE_ALL_CREDITS, current-spend "
             "thresholds 25/50/70/85/95%, and both billing-IAM and project-owner email recipients"
         )
     matching_budgets.sort(key=lambda row: str(row[0].get("name", "")))
@@ -881,9 +1070,10 @@ def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
     ncc_spokes = load_json(root / "ncc-spokes.json", list)
     subnets = load_json(root / "subnets.json", list)
     firewalls = load_json(root / "firewalls.json", list)
-    effective_firewalls = load_json(root / "effective-firewalls.json", list)
+    effective_firewalls = load_json(root / "effective-firewalls.json", (list, dict))
     project_metadata = load_json(root / "project-metadata.json", dict)
     image = load_json(root / "image.json", dict)
+    resource_policies = load_json(root / "resource-policies.json", list)
     disks = load_json(root / "disks.json", list)
     instances = load_json(root / "instances.json", list)
 
@@ -895,11 +1085,13 @@ def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
     network = one_named(networks, NETWORK_NAME, "network")
     subnet = one_named(subnets, SUBNET_NAME, "subnet")
     firewall = one_named(firewalls, FIREWALL_NAME, "firewall")
+    schedule = one_named(resource_policies, SCHEDULE_NAME, "resource policy")
     boot_disk = one_named(disks, BOOT_DISK_NAME, "disk")
     data_disk = one_named(disks, DATA_DISK_NAME, "disk")
     instance = one_named(instances, VM_NAME, "instance")
     validate_effective_firewalls(
         effective_firewalls,
+        project=args.project,
         network_exists=network is not None,
         firewall_exists=firewall is not None,
     )
@@ -910,6 +1102,7 @@ def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
         network_exists=network is not None,
         subnet_exists=subnet is not None,
     )
+    allow_terminated = scheduled_termination_expected(datetime.now(timezone.utc))
 
     states = {
         "image": "exact",
@@ -917,19 +1110,35 @@ def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
         "routes": route_state,
         "subnet": resource_state(subnet, lambda row: validate_subnet(row, full_zone)),
         "firewall": resource_state(firewall, validate_firewall),
+        "schedule": resource_state(schedule, validate_schedule),
         "boot_disk": resource_state(
             boot_disk, lambda row: validate_disk(row, full_zone, boot=True)
         ),
         "data_disk": resource_state(
             data_disk, lambda row: validate_disk(row, full_zone, boot=False)
         ),
-        "instance": resource_state(instance, lambda row: validate_instance(row, full_zone)),
+        "instance": resource_state(
+            instance,
+            lambda row: validate_instance(
+                row,
+                full_zone,
+                require_running=args.require_running,
+                allow_terminated=allow_terminated,
+            ),
+        ),
     }
 
     if instance is None and boot_disk is not None:
         fail("orphaned VM boot disk exists while the instance is absent")
     if instance is not None:
-        for dependency in ("network", "subnet", "firewall", "boot_disk", "data_disk"):
+        for dependency in (
+            "network",
+            "subnet",
+            "firewall",
+            "schedule",
+            "boot_disk",
+            "data_disk",
+        ):
             if states[dependency] != "exact":
                 fail(f"instance exists but dependency {dependency} is absent")
         if data_disk is None:
@@ -957,16 +1166,25 @@ def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
         "budget": {
             "name": budget_name,
             "display_name": BUDGET_DISPLAY_NAME,
-            "limit_usd": f"{BUDGET_LIMIT:.2f}",
+            "currency_code": BUDGET_CURRENCY,
+            "amount": f"{BUDGET_AMOUNT:.0f}",
+            "credit_types_treatment": BUDGET_CREDIT_TREATMENT,
             "scope": budget_scope,
             "period": {
-                "start": "2026-08-25",
-                "end": "2026-11-23",
+                "start": "2026-08-26",
+                "api_end_date": "2026-11-24",
             },
             "threshold_percentages": [25, 50, 70, 85, 95],
             "email_recipients": ["billing-iam", "project-owners"],
         },
         "cost": cost,
+        "operating_schedule": {
+            "name": SCHEDULE_NAME,
+            "daily_window": "07:00-01:00",
+            "timezone": SCHEDULE_TIMEZONE,
+            "initiation": "2026-08-27T00:00:00+09:00",
+            "expiration": "2026-11-24T02:00:00+09:00",
+        },
         "region": REGION,
         "zone": full_zone,
         "resources": states,
@@ -1019,6 +1237,7 @@ def main() -> int:
     validate_parser.add_argument("--expected-monthly-usd", required=True)
     validate_parser.add_argument("--expected-90day-usd", required=True)
     validate_parser.add_argument("--require-complete", action="store_true")
+    validate_parser.add_argument("--require-running", action="store_true")
     validate_parser.add_argument("--pretty", action="store_true")
 
     args = parser.parse_args()
