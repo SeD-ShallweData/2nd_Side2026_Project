@@ -60,7 +60,7 @@ CREATE SCHEMA drizzle;
 CREATE TABLE drizzle.__drizzle_migrations (
   id serial PRIMARY KEY,
   hash text NOT NULL,
-  created_at numeric
+  created_at bigint
 );
 """
 
