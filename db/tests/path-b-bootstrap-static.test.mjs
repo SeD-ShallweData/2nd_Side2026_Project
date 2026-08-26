@@ -66,6 +66,11 @@ test("Path B bootstrap is valid Bash and confirmation fails closed", () => {
     bootstrap,
     /-c "SELECT EXISTS \(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'bot_user'\)/,
   );
+  assert.match(bootstrap, /exec 9<"\$TMP_DIR\/batches\.tsv"/);
+  assert.match(bootstrap, /safe_sha <&9; do/);
+  assert.match(bootstrap, /9<&- 2>&1 \| tee "\$REPORT_DIR\/wage-/);
+  assert.match(bootstrap, /colima ssh -- df -Pk \/var\/lib\/docker <\/dev\/null/);
+  assert.doesNotMatch(bootstrap, /done <"\$TMP_DIR\/batches\.tsv"/);
   const packageManifest = JSON.parse(readFileSync(resolve(DB_ROOT, "package.json"), "utf8"));
   assert.equal(
     packageManifest.scripts["bootstrap:path-b"],

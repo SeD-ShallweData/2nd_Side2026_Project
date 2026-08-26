@@ -516,6 +516,7 @@ describe("Path B release gate static contract", () => {
     assert.match(fingerprintHasher, /path_b_content_fingerprint\.v1\.2/);
     assert.match(commonScript, /path_b_verify_bot_login_boundary/);
     assert.match(commonScript, /CREATE TEMP TABLE path_b_forbidden_probe/);
+    assert.match(commonScript, /colima ssh -- df -Pk \/var\/lib\/docker <\/dev\/null/);
     assert.match(exportScript, /--expected-bootstrap-provenance-sha256/);
     assert.match(exportScript, /--expected-git-commit/);
     assert.match(exportScript, /--approved-content-fingerprint/);

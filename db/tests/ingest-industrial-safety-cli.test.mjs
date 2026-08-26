@@ -17,6 +17,11 @@ const DB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPT = resolve(DB_ROOT, "scripts/ingest-industrial-safety.sh");
 
 describe("industrial safety loader CLI", () => {
+  it("keeps Colima storage probes non-interactive", () => {
+    const script = readFileSync(SCRIPT, "utf8");
+    assert.match(script, /colima ssh -- df -Pk \/var\/lib\/docker <\/dev\/null/);
+  });
+
   it("deployment artifact root overrides are forwarded to validate-only", () => {
     const root = mkdtempSync(join(tmpdir(), "industrial-loader-cli-"));
     const fakePython = join(root, "python");

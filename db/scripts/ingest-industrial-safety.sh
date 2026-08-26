@@ -319,7 +319,7 @@ if [[ "$MODE" == "apply" && -z "$SAMPLE_PER_SOURCE" ]]; then
     colima:/var/lib/docker)
       command -v colima >/dev/null 2>&1 \
         || die "colima DB storage target requested but colima is unavailable"
-      available_free_kb="$(colima ssh -- df -Pk /var/lib/docker | awk 'NR == 2 { print $4 }')"
+      available_free_kb="$(colima ssh -- df -Pk /var/lib/docker </dev/null | awk 'NR == 2 { print $4 }')"
       ;;
     /*)
       [[ -d "$DB_STORAGE_TARGET" && ! -L "$DB_STORAGE_TARGET" ]] \
