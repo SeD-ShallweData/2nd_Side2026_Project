@@ -103,12 +103,12 @@ FIRM_RESULT_OUTPUT_COLUMNS = [
 FIRM_MATCH_METHOD = "exact_name_masked_business_registration_sido_industry"
 FIRM_VALIDATION_STATUS = "verified_exact"
 FIRM_CONFIDENCE_TIER = "exact_unique"
-EXPECTED_EXISTING_FIRM_RESULTS = 518_806
+EXPECTED_EXISTING_FIRM_RESULTS = 515_608
 EXPECTED_FIRM_MATCH_BUCKETS = {
-    "auto_approved_rows": 518_806,
-    "attribute_review_rows": 1_329,
-    "duplicate_source_review_rows": 382,
-    "unmatched_rows": 29_041,
+    "auto_approved_rows": 515_608,
+    "attribute_review_rows": 32_891,
+    "duplicate_source_review_rows": 386,
+    "unmatched_rows": 673,
 }
 
 CANONICAL_SIDO = {

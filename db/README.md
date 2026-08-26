@@ -124,7 +124,7 @@ DB 는 `127.0.0.1` 에만 묶여 있다. 공용 머신이라 사내망에 열지
 | scope | 적재 범위 | 로컬 DB 최소 여유공간 | 권장 용도 |
 | --- | --- | ---: | --- |
 | `cell-validation` | 셀 예측 92,140 + 라벨 184,280행 | 2 GiB | 모델/API 라벨 사전 검증 |
-| `existing-firms` | 위 셀 데이터 + strict 연결 518,806행 | 5 GiB | **LLM 사전검증 기본값** |
+| `existing-firms` | 위 셀 데이터 + strict 연결 515,608행 | 5 GiB | **LLM 사전검증 기본값** |
 | `full` | NPS/KCOMWEL 최신주 wide 원장·snapshot·배분 결과 | 40 GiB | 별도 승인된 연구/검증 |
 
 `full`도 2.59억 행 역사 backfill을 허가하지 않는다. `workplace_predictions` partition과

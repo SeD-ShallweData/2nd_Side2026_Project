@@ -152,7 +152,7 @@ release 출력 파일시스템은 최소 10GiB 여유 공간이 있어야 한다
 
 source assertion은 임금체불 7개 배치와 산업재해 existing-firms 정본을 exact하게 검사한다.
 산업재해 기대값은 runs 3, dependencies 1, cell predictions 92,140, label datasets 2,
-cell labels 184,280, firm results 및 LLM view 각각 518,806이며 full-scope table은 모두 0이다.
+cell labels 184,280, firm results 및 LLM view 각각 515,608이며 full-scope table은 모두 0이다.
 
 성공한 release 디렉터리:
 

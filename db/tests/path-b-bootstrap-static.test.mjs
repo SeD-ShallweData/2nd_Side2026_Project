@@ -451,7 +451,7 @@ test("final SQL is read-only and independently pins DB, UGC, and serving counts"
     "503887",
     "92140",
     "184280",
-    "518806",
+    "515608",
   ]) {
     assert.ok(assertionSql.includes(exactValue), `missing exact assertion ${exactValue}`);
   }
