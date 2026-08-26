@@ -351,7 +351,7 @@ require_storage_free_kb() {
     colima:/var/lib/docker)
       command -v colima >/dev/null 2>&1 \
         || die "$label requires colima, but colima is unavailable"
-      available_free_kb="$(colima ssh -- df -Pk /var/lib/docker | awk 'NR == 2 { print $4 }')"
+      available_free_kb="$(colima ssh -- df -Pk /var/lib/docker </dev/null | awk 'NR == 2 { print $4 }')"
       ;;
     /*)
       [[ -d "$storage_target" && ! -L "$storage_target" ]] \
@@ -1235,7 +1235,8 @@ PY
 
 CURRENT_PHASE="seven canonical wage batches"
 loaded_batches=0
-while IFS=$'\t' read -r sequence as_of target relative_output scored queue safe model_version model_sha scored_sha queue_sha safe_sha; do
+exec 9<"$TMP_DIR/batches.tsv"
+while IFS=$'\t' read -r sequence as_of target relative_output scored queue safe model_version model_sha scored_sha queue_sha safe_sha <&9; do
   [[ -n "$sequence" ]] || continue
   ((loaded_batches += 1))
   [[ "$sequence" == "$loaded_batches" ]] || die "wage manifest sequence changed after preflight"
@@ -1257,13 +1258,14 @@ while IFS=$'\t' read -r sequence as_of target relative_output scored queue safe 
     --model-sha "$model_sha" \
     --as-of "$as_of" \
     --expect-rows "$scored,$queue,$safe" \
-    2>&1 | tee "$REPORT_DIR/wage-${sequence}-${as_of}.log"
+    9<&- 2>&1 | tee "$REPORT_DIR/wage-${sequence}-${as_of}.log"
   verify_staged_db_env
   require_bootstrap_identity
   verify_staged_wage_batch \
     "$STAGED_WAGE_BUNDLE/$relative_output" \
     "$scored_sha" "$queue_sha" "$safe_sha"
-done <"$TMP_DIR/batches.tsv"
+done
+exec 9<&-
 [[ "$loaded_batches" == 7 ]] || die "expected seven wage batches, loaded $loaded_batches"
 
 CURRENT_PHASE="industrial existing-firms apply"

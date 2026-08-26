@@ -198,7 +198,7 @@ path_b_require_storage_free_kb() {
     colima:/var/lib/docker)
       command -v colima >/dev/null 2>&1 \
         || path_b_die "$label requires colima, but colima is unavailable"
-      available_free_kb="$(colima ssh -- df -Pk /var/lib/docker | awk 'NR == 2 { print $4 }')"
+      available_free_kb="$(colima ssh -- df -Pk /var/lib/docker </dev/null | awk 'NR == 2 { print $4 }')"
       ;;
     /*)
       [[ -d "$storage_target" && ! -L "$storage_target" ]] \
