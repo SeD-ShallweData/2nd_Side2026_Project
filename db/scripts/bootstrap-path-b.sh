@@ -159,7 +159,10 @@ done
   printf 'Refusing Path B rebuild: execute scripts/path-b-trusted-entry.sh directly.\n' >&2
   exit 2
 }
-export NPM_CONFIG_USERCONFIG=/dev/null
+NPM_USER_CONFIG="${TMPDIR:?trusted launcher did not set TMPDIR}/path-b-empty-npm-userconfig"
+[[ ! -e "$NPM_USER_CONFIG" && ! -L "$NPM_USER_CONFIG" ]] \
+  || die "trusted npm user config path must remain absent: $NPM_USER_CONFIG"
+export NPM_CONFIG_USERCONFIG="$NPM_USER_CONFIG"
 
 for command in bash git python3 node npm psql; do
   command -v "$command" >/dev/null 2>&1 || die "required command not found: $command"

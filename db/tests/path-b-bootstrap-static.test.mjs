@@ -280,7 +280,14 @@ test("trusted entry clears hostile pre-Bash state and exposes only its runtime a
     assert.match(observed, /^GIT_CONFIG_NOSYSTEM=1$/m);
     assert.match(observed, /^GIT_CONFIG_GLOBAL=\/dev\/null$/m);
     assert.match(observed, /^NPM_CONFIG_GLOBALCONFIG=\/dev\/null$/m);
-    assert.match(observed, /^NPM_CONFIG_USERCONFIG=\/dev\/null$/m);
+    assert.match(
+      observed,
+      new RegExp(
+        `^NPM_CONFIG_USERCONFIG=${resolvedTmp.replaceAll("/", "\\/")}\\/path-b-empty-npm-userconfig$`,
+        "m",
+      ),
+    );
+    assert.doesNotMatch(observed, /^NPM_CONFIG_USERCONFIG=\/dev\/null$/m);
     assert.match(observed, new RegExp(`^HOME=${resolvedHome.replaceAll("/", "\\/")}$`, "m"));
     assert.match(observed, new RegExp(`^TMPDIR=${resolvedTmp.replaceAll("/", "\\/")}$`, "m"));
     assert.doesNotMatch(
