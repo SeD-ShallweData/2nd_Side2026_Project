@@ -75,6 +75,19 @@ class IndustrialSafetyLoaderUnitTests(unittest.TestCase):
         self.assertEqual(left, right)
         self.assertRegex(left, r"^[0-9a-f]{64}$")
 
+    def test_path_b_seven_month_firm_funnel_contract_is_exact(self) -> None:
+        self.assertEqual(loader.EXPECTED_EXISTING_FIRM_RESULTS, 515_608)
+        self.assertEqual(
+            loader.EXPECTED_FIRM_MATCH_BUCKETS,
+            {
+                "auto_approved_rows": 515_608,
+                "attribute_review_rows": 32_891,
+                "duplicate_source_review_rows": 386,
+                "unmatched_rows": 673,
+            },
+        )
+        self.assertEqual(sum(loader.EXPECTED_FIRM_MATCH_BUCKETS.values()), 549_558)
+
     def test_scalar_serializers_preserve_null_and_boolean_semantics(self) -> None:
         self.assertEqual(loader.boolean_text(True), "true")
         self.assertEqual(loader.boolean_text(0), "false")

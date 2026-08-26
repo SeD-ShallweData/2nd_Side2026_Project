@@ -981,12 +981,12 @@ BEGIN
     RAISE EXCEPTION 'industrial_safety.cell_week_labels has % rows, expected 184280', observed;
   END IF;
   SELECT count(*) INTO observed FROM industrial_safety.firm_risk_results;
-  IF observed <> 518806 THEN
-    RAISE EXCEPTION 'industrial_safety.firm_risk_results has % rows, expected 518806', observed;
+  IF observed <> 515608 THEN
+    RAISE EXCEPTION 'industrial_safety.firm_risk_results has % rows, expected 515608', observed;
   END IF;
   SELECT count(*) INTO observed FROM industrial_safety.v_llm_firm_safety_context;
-  IF observed <> 518806 THEN
-    RAISE EXCEPTION 'industrial_safety LLM view has % rows, expected 518806', observed;
+  IF observed <> 515608 THEN
+    RAISE EXCEPTION 'industrial_safety LLM view has % rows, expected 515608', observed;
   END IF;
 
   IF EXISTS (

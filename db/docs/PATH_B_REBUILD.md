@@ -184,7 +184,7 @@ cd db
 | 최신 2026-06 배치 | 553,598 / 3,000 / 503,887 |
 | 산업재해 cell predictions | 92,140 |
 | 산업재해 cell labels | 184,280 |
-| 산업재해 strict firm results | 518,806 |
+| 산업재해 strict firm results | 515,608 |
 | `users/posts/comments/reviews` | 모두 0 |
 
 산업재해 target week는 `2026-04-20`으로 오래됐다. DB 적재 성공은 신선도를 뜻하지 않는다.

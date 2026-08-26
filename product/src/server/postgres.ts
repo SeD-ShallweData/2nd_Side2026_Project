@@ -78,7 +78,7 @@ export async function isDatabaseReady(): Promise<boolean> {
         AND (SELECT count(*) FROM scored_active WHERE batch_id = latest.id) = latest.n_scored
         AND (SELECT count(*) FROM inspector_queue WHERE batch_id = latest.id) = latest.n_queue
         AND (SELECT count(*) FROM safe_recommendation WHERE batch_id = latest.id) = latest.n_safe
-        AND (SELECT count(*) FROM industrial_safety.v_llm_firm_safety_context) = 518806
+        AND (SELECT count(*) FROM industrial_safety.v_llm_firm_safety_context) = 515608
         AS ready
       FROM latest
     `);

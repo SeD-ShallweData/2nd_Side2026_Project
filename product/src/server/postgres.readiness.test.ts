@@ -29,7 +29,7 @@ describe("PostgreSQL readiness", () => {
     const sql = String(database.query.mock.calls[0]?.[0]);
     expect(sql.match(/\bcount\s*\(/gi)).toHaveLength(4);
     expect(sql).toContain("= 553598");
-    expect(sql).toContain("= 518806");
+    expect(sql).toContain("= 515608");
     expect(sql).toContain("industrial_safety.v_llm_firm_safety_context");
   });
 
