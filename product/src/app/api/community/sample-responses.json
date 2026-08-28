@@ -1,0 +1,83 @@
+{
+  "session_anonymous": {
+    "authenticated": false,
+    "user": null,
+    "expires_at": null
+  },
+  "session_authenticated": {
+    "authenticated": true,
+    "user": {
+      "user_id": "10000000-0000-4000-8000-000000000001",
+      "email": "user@mock.donworry.local",
+      "display_name": "일반 사용자",
+      "role": "user"
+    },
+    "expires_at": "2026-08-27T12:00:00.000Z"
+  },
+  "post_list": {
+    "source": "mock_memory",
+    "capabilities": {
+      "write": true,
+      "comments": false,
+      "reactions": false,
+      "reports": true,
+      "moderation": false
+    },
+    "query": "임금",
+    "category": "pre_employment",
+    "items": [
+      {
+        "source": "mock_memory",
+        "capabilities": {
+          "write": true,
+          "comments": false,
+          "reactions": false,
+          "reports": true,
+          "moderation": false
+        },
+        "post_id": "post_mock_001",
+        "category": "pre_employment",
+        "category_label": "입사 전 확인",
+        "title": "면접에서 임금 지급일은 어떻게 물어보면 좋을까요?",
+        "body": "계약서 작성 전에 지급일과 지급 방법을 자연스럽게 확인했던 경험을 나눠주세요.",
+        "company_context": {
+          "company_id": "COMPANY_DEMO_008",
+          "region": "서울특별시",
+          "industry": "정보통신업"
+        },
+        "anonymous": true,
+        "author_label": null,
+        "created_at": "2026-08-20T03:00:00.000Z",
+        "updated_at": "2026-08-20T03:00:00.000Z",
+        "comment_count": 4,
+        "like_count": 11,
+        "status": "published",
+        "viewer_permissions": {
+          "can_edit": true,
+          "can_delete": true,
+          "can_report": false
+        }
+      }
+    ],
+    "total": 1,
+    "has_more": false,
+    "page": 1,
+    "page_size": 10,
+    "total_pages": 1
+  },
+  "report_receipt": {
+    "report_id": "20000000-0000-4000-8000-000000000001",
+    "post_id": "post_mock_002",
+    "status": "pending",
+    "created_at": "2026-08-27T04:00:00.000Z",
+    "reviewed_at": null
+  },
+  "authentication_error": {
+    "error": {
+      "code": "AUTHENTICATION_REQUIRED",
+      "message": "로그인이 필요한 기능입니다.",
+      "retryable": false,
+      "request_id": "req_example"
+    }
+  }
+}
