@@ -1,5 +1,12 @@
 # 인증·커뮤니티 API 통합 인계 계약
 
+## 전달용 분리 문서
+
+- 공통 API 명세: `API_SPEC.md`
+- 지유 프론트 연결서: `FRONTEND_HANDOFF_JIYU.md`
+- 나연 DB 요청서: `DB_HANDOFF_NAYEON.md`
+- 응답 예시: `sample-responses.json`
+
 ## 1. 현재 브랜치의 범위
 
 이 구현은 AI 루키 제출 기준본 뒤에 추가하는 플랫폼 승인 전 Mock 백엔드다.
@@ -57,7 +64,8 @@ Mock 이메일은 각각 `user@mock.donworry.local`, `admin@mock.donworry.local`
 | `GET /api/community/moderation/reports` | 관리자 | 신고 목록 조회 |
 | `PATCH /api/community/moderation/reports/{reportId}` | 관리자 | 신고 승인·기각 |
 
-상태 변경 요청은 `application/json`만 허용하고 64KiB를 넘는 본문과 다른 출처의 브라우저 요청을 거부한다.
+본문이 있는 상태 변경 요청은 JSON Content-Type만 허용하고 64KiB를 넘는 본문과 다른 출처의 브라우저
+요청을 거부한다. 로그아웃과 게시글 삭제는 본문 없이 호출한다.
 세션 응답과 사용자별 권한이 포함된 커뮤니티 응답에는 `Cache-Control: no-store`를 사용한다.
 
 ### 역할·권한 기준
