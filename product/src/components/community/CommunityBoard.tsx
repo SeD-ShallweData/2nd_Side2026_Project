@@ -87,6 +87,7 @@ export function CommunityBoard() {
               {categoryFilterLabel(item)}
             </button>
           ))}
+          {result?.capabilities.write ? <Link href="/community/new" className="button button-dark">글쓰기</Link> : null}
         </div>
         <label className="community-search-field"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="게시글 검색" /></label>
       </div>
