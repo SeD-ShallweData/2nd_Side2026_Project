@@ -1,0 +1,38 @@
+{
+  "_snapshot": "구성된 예시 (실제 조회 결과 아님)",
+  "_note": "실제 DB 조회 결과 스냅샷이다. 배치가 갱신되면 값이 달라진다. 고정 기준점으로만 쓴다.",
+  "_state": "공급자 오류. DB·산업안전 뷰 조회가 실패했을 때의 응답 형태",
+  "_warning": "unavailable(공급자 장애)과 no_data(결과 없음)를 같은 상태로 해석하지 않는다(POL-05-1). 오류를 Mock 성공으로 위장하지 않는다.",
+  "company_id": "0001d62c3009334a",
+  "company_name": "(주)빛나는",
+  "data_as_of": null,
+  "target_month": null,
+  "generated_at": null,
+  "valid_until": null,
+  "freshness": "unknown",
+  "wage_risk": {
+    "availability": "unavailable",
+    "level": "unknown",
+    "summary": "임금 지급 관련 정보를 현재 불러오지 못했습니다.",
+    "evidence_codes": [],
+    "evidence_items": [],
+    "confidence": "unavailable",
+    "official_listing": {
+      "status": "unavailable",
+      "as_of": null
+    }
+  },
+  "safety_context": {
+    "availability": "unavailable",
+    "scope": "validated_firm_context",
+    "level": "unknown",
+    "summary": "산업안전 참고정보를 현재 불러오지 못했습니다.",
+    "region": "경상북도",
+    "industry": "광고 대행업",
+    "evidence_codes": [],
+    "evidence_items": [],
+    "confidence": "unavailable",
+    "disclaimer": "연결 오류를 자료 없음이나 안전 신호로 해석하지 마세요."
+  },
+  "sources": []
+}
