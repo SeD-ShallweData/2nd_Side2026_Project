@@ -1,8 +1,8 @@
 {
-  "_snapshot": "batch 7 (as_of_date=2026-06-01, target_month=2026-12-01) · 2026-08-29 조회",
+  "_snapshot": "batch 7 (as_of_date=2026-06-01, target_month=2026-12-01) 실제 조회값 기반. 사업장 식별정보(company_id·company_name)만 합성했다.",
   "_note": "실제 DB 조회 결과 스냅샷이다. 배치가 갱신되면 값이 달라진다. 고정 기준점으로만 쓴다.",
-  "company_id": "0001d62c3009334a",
-  "company_name": "(주)빛나는",
+  "company_id": "COMPANY_DEMO_003",
+  "company_name": "새봄광고",
   "data_as_of": "2026-06-01",
   "target_month": "2026-12-01",
   "generated_at": "2026-08-14T15:02:34.715Z",

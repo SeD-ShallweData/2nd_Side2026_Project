@@ -1,10 +1,10 @@
 {
-  "_snapshot": "구성된 예시 (실제 조회 결과 아님)",
+  "_snapshot": "구성된 예시. 실제 조회 결과가 아니다.",
   "_note": "실제 DB 조회 결과 스냅샷이다. 배치가 갱신되면 값이 달라진다. 고정 기준점으로만 쓴다.",
-  "_state": "공급자 오류. DB·산업안전 뷰 조회가 실패했을 때의 응답 형태",
-  "_warning": "unavailable(공급자 장애)과 no_data(결과 없음)를 같은 상태로 해석하지 않는다(POL-05-1). 오류를 Mock 성공으로 위장하지 않는다.",
-  "company_id": "0001d62c3009334a",
-  "company_name": "(주)빛나는",
+  "_state": "부분 장애. HTTP 200 이며 실패한 신호만 availability=unavailable 이다. 한 카드의 실패가 다른 카드를 막지 않는다(POL-05-1).",
+  "_warning": "unavailable(공급자 장애)과 no_data(결과 없음)를 같은 상태로 해석하지 않는다. 오류를 Mock 성공으로 위장하지 않는다.",
+  "company_id": "COMPANY_DEMO_003",
+  "company_name": "새봄광고",
   "data_as_of": null,
   "target_month": null,
   "generated_at": null,
@@ -34,5 +34,6 @@
     "confidence": "unavailable",
     "disclaimer": "연결 오류를 자료 없음이나 안전 신호로 해석하지 마세요."
   },
-  "sources": []
+  "sources": [],
+  "_http_status": 200
 }
