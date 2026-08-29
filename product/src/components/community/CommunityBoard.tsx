@@ -1,14 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
   type CommunityCategory,
-  type CommunityCompanyContextDto,
   type CommunityPostListResponse,
 } from "@/app/api/community/communityApiContract";
 import { ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
+import { companyContextLabel, relativeTimeLabel } from "@/components/community/communityFormat";
 import { listCommunityPosts } from "@/services/communityClient";
 
 type CategoryFilter = CommunityCategory | "all";
@@ -24,24 +25,6 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 function categoryFilterLabel(filter: CategoryFilter): string {
   return filter === "all" ? "전체" : COMMUNITY_CATEGORY_LABELS[filter];
-}
-
-function companyContextLabel(context: CommunityCompanyContextDto | null): string {
-  if (!context) return "연결 사업장 없음";
-  return `${context.region ?? "지역 미확인"} · ${context.industry ?? "업종 미확인"}`;
-}
-
-function relativeTimeLabel(createdAt: string): string {
-  const createdMs = new Date(createdAt).getTime();
-  if (Number.isNaN(createdMs)) return "작성 시각 미확인";
-  const minutes = Math.floor((Date.now() - createdMs) / 60_000);
-  if (minutes < 1) return "방금 전";
-  if (minutes < 60) return `${minutes}분 전`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}일 전`;
-  return createdAt.slice(0, 10);
 }
 
 export function CommunityBoard() {
@@ -121,7 +104,7 @@ export function CommunityBoard() {
               <span>{post.category_label}</span>
               <small>{companyContextLabel(post.company_context)} · {post.author_label ?? "익명"} · {relativeTimeLabel(post.created_at)}</small>
             </div>
-            <h2>{post.title}</h2><p>{post.body}</p>
+            <h2><Link href={`/community/${encodeURIComponent(post.post_id)}`}>{post.title}</Link></h2><p>{post.body}</p>
             <strong>{post.like_count === null ? null : `공감 ${post.like_count}　`}댓글 {post.comment_count}</strong>
           </article>
         ))}
