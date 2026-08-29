@@ -8,7 +8,6 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { describe, it } from "node:test";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,7 +22,7 @@ describe("industrial safety loader CLI", () => {
   });
 
   it("deployment artifact root overrides are forwarded to validate-only", () => {
-    const root = mkdtempSync(join(tmpdir(), "industrial-loader-cli-"));
+    const root = mkdtempSync(join(DB_ROOT, ".industrial-loader-cli-"));
     const fakePython = join(root, "python");
     writeFileSync(
       fakePython,
@@ -65,7 +64,7 @@ describe("industrial safety loader CLI", () => {
   });
 
   it("existing-firms prepare and verify receive only the sealed staged roots", () => {
-    const root = mkdtempSync(join(tmpdir(), "industrial-loader-stage-cli-"));
+    const root = mkdtempSync(join(DB_ROOT, ".industrial-loader-stage-cli-"));
     const fakeBin = join(root, "bin");
     const fakePython = join(fakeBin, "industrial-python");
     const fakePsql = join(fakeBin, "psql");
