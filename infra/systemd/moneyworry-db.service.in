@@ -1,0 +1,40 @@
+[Unit]
+Description=MoneyWorry local PostgreSQL 16 (Docker Compose)
+Documentation=file://@PROJECT_ROOT@/infra/OPERATIONS.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+RequiresMountsFor=/srv/moneyworry
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=oneshot
+User=@DB_SERVICE_USER@
+Group=@DB_SERVICE_GROUP@
+SupplementaryGroups=docker
+WorkingDirectory=@PROJECT_ROOT@/db
+EnvironmentFile=@DB_ENV_FILE@
+ExecStartPre=@DOCKER_BIN@ compose --env-file @DB_ENV_FILE@ --file @PROJECT_ROOT@/db/docker-compose.yml config --quiet
+ExecStart=@DOCKER_BIN@ compose --env-file @DB_ENV_FILE@ --file @PROJECT_ROOT@/db/docker-compose.yml up --detach --wait --wait-timeout 120 db
+ExecStop=@DOCKER_BIN@ compose --env-file @DB_ENV_FILE@ --file @PROJECT_ROOT@/db/docker-compose.yml stop --timeout 60 db
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=180s
+TimeoutStopSec=90s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=full
+RestrictSUIDSGID=yes
+UMask=0027
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moneyworry-db
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=500
+
+[Install]
+WantedBy=multi-user.target

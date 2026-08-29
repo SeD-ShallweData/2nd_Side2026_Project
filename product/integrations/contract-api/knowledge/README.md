@@ -29,7 +29,8 @@ RAG를 붙이기 전까지, 여기 있는 문서는 **`<doc>` 태그로 감싸�
 4. 반영 확인:
 
 ```bash
-curl -s localhost:8000/api/health | jq .knowledge
+curl -s localhost:8000/api/health \
+  -H "Authorization: Bearer $CONTRACT_INTERNAL_TOKEN" | jq .knowledge
 ```
 
 ## 규칙

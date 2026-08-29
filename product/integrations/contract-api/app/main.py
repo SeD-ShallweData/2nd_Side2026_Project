@@ -4,17 +4,57 @@
                       → http://localhost:8000/chat  AI 상담 (모델 비교)
 """
 
+import hashlib
+import hmac
 import json
+import os
 import uuid
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from . import chat, config, demo, guardrails, llm, prompts, store
+from . import asset_integrity, chat, config, demo, guardrails, llm, prompts, store
 from .contract import parse as contract_parse
 from .contract import review as contract_review
 
 app = Flask(__name__, static_folder=str(config.WEB_DIR), static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
+
+
+def _authorized_internal_request() -> bool:
+    expected = os.getenv("CONTRACT_INTERNAL_TOKEN", "")
+    authorization = request.headers.get("Authorization", "")
+    candidate = authorization[len("Bearer "):] if authorization.startswith("Bearer ") else ""
+    expected_digest = hashlib.sha256(expected.encode("utf-8")).digest()
+    candidate_digest = hashlib.sha256(candidate.encode("utf-8")).digest()
+    return bool(expected) and hmac.compare_digest(expected_digest, candidate_digest)
+
+
+@app.before_request
+def require_internal_authentication():
+    if _authorized_internal_request():
+        return None
+    return (
+        jsonify({"error": "internal authentication required"}),
+        401,
+        {"WWW-Authenticate": "Bearer"},
+    )
+
+
+@app.before_request
+def require_verified_contract_assets():
+    """Never serve analysis from missing, altered, or silently skipped assets."""
+    if request.path == "/api/health":
+        return None
+    report = asset_integrity.asset_health()
+    if report["asset_integrity"]:
+        return None
+    return (
+        jsonify({
+            "error": "contract prompt/knowledge asset integrity check failed",
+            "asset_manifest_sha256": report.get("asset_manifest_sha256"),
+        }),
+        503,
+    )
 
 
 # ── 페이지 ────────────────────────────────────────────────────────────
@@ -51,15 +91,17 @@ def download_file(name):
 @app.get("/api/health")
 def health():
     """키·프롬프트·지식 로딩 상태. 키 값 자체는 내려주지 않습니다."""
-    return jsonify({
+    assets = asset_integrity.asset_health()
+    assets_ready = assets["asset_integrity"] is True
+    payload = {
         "providers": {
             name: {"label": cfg["label"], "model": cfg["model"], "key": bool(cfg["api_key"])}
             for name, cfg in config.PROVIDERS.items()
         },
         "default_provider": config.DEFAULT_PROVIDER,
         "key_file_error": config.TEAM_ENV_ERROR,
-        "personas": [p["id"] for p in prompts.personas()],
-        "knowledge": prompts.knowledge_stats(),
+        "personas": [p["id"] for p in prompts.personas()] if assets_ready else [],
+        "knowledge": prompts.knowledge_stats() if assets_ready else {},
         "knowledge_budget": config.KNOWLEDGE_BUDGET,
         "rewrite_enabled": config.REWRITE_ENABLED,
         "guardrails_enabled": config.GUARDRAILS_ENABLED,
@@ -73,7 +115,9 @@ def health():
             "samples": [s["id"] for s in _contract_samples()],
             **contract_review.standards_summary(),
         },
-    })
+        **assets,
+    }
+    return jsonify(payload), 200 if assets_ready else 503
 
 
 @app.get("/api/personas")

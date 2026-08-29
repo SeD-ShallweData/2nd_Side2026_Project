@@ -23,7 +23,7 @@ export function buildBotDatabaseUrl(values: Record<string, string>): string | un
   const direct = validDirectUrl(values.BOT_DATABASE_URL);
   if (direct) return direct;
 
-  const user = values.BOT_NAME?.trim();
+  const user = values.BOT_USER?.trim() || values.BOT_NAME?.trim();
   const password = values.BOT_PASSWORD?.trim();
   const database = values.DB_NAME?.trim();
   const host = values.DB_HOST?.trim() || "127.0.0.1";
@@ -35,8 +35,8 @@ export function buildBotDatabaseUrl(values: Record<string, string>): string | un
 
 export function getDatabaseConnectionString(): string | undefined {
   return (
-    validDirectUrl(process.env.DATABASE_URL) ??
     validDirectUrl(process.env.BOT_DATABASE_URL) ??
+    validDirectUrl(process.env.DATABASE_URL) ??
     buildBotDatabaseUrl(readDatabaseValues())
   );
 }

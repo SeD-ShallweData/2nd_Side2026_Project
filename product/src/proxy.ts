@@ -9,7 +9,16 @@ const NO_STORE_HEADERS = {
   "Cache-Control": "no-store",
 };
 
+const PUBLIC_HEALTH_PATHS = new Set([
+  "/api/health/live",
+  "/api/health/ready",
+]);
+
 export function proxy(request: NextRequest) {
+  if (PUBLIC_HEALTH_PATHS.has(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   const configuration = getDemoAuthConfiguration();
 
   if (configuration.status === "disabled") {
