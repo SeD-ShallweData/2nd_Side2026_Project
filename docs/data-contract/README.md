@@ -39,7 +39,7 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 | --- | --- | --- |
 | `README.md` | 이 문서. 계약 버전·범위·색인 | ✅ |
 | [`wage-risk.md`](wage-risk.md) | 임금체불 — 사용자 경로와 감독관 경로 분리, 판정·등급 매핑, 기준일, 식별키 | ✅ |
-| [`samples/`](samples/) | 상태별 API 응답 예시 4종 | ✅ |
+| [`samples/`](samples/) | 상태별 API 응답 예시 5종 | ✅ |
 | [`safety-risk.md`](safety-risk.md) | 산업재해 — band 매핑, `provisional`·`research_only` 취급, 셀→사업장 배분 | ✅ |
 
 ### `samples/` 구성
@@ -49,10 +49,15 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 | [`normal.json`](samples/normal.json) | `안정신호` | `normal` | 6.5% |
 | [`watch.json`](samples/watch.json) | `유보` | `watch` | **85.7%** |
 | [`unknown.json`](samples/unknown.json) | `유보_정보부족` | `unknown` | 3.5% |
-| [`error.json`](samples/error.json) | 공급자 오류 | `unknown` | — |
+| [`partial-unavailable.json`](samples/partial-unavailable.json) | 부분 장애 (HTTP 200) | `unknown` | — |
+| [`error-503.json`](samples/error-503.json) | 전체 장애 (HTTP 503) | — | — |
 
-샘플은 **batch 7 실제 조회 결과 스냅샷**이다. 각 파일의 `_snapshot` 필드에 조회 시점이
-적혀 있으며, 배치가 갱신되면 값이 달라진다. 고정 기준점으로만 쓴다.
+샘플 값은 **batch 7 실제 조회 결과 기반**이며, `company_id`·`company_name` 만 합성했다
+(`COMPANY_DEMO_*`). 저장소가 공개이므로 실존 사업장과 ML 판정을 연결해 두지 않는다.
+각 파일의 `_snapshot` 필드에 근거 시점이 적혀 있으며, 배치가 갱신되면 값이 달라진다.
+
+장애 샘플은 둘로 나눈다. **전체 장애는 비-200 이며 본문에 `error` 객체만 있고**,
+부분 장애는 HTTP 200 에 실패한 신호만 `availability: "unavailable"` 이다.
 
 `member-status.md` 는 3종(정상·자료 부족·오류)을 요구했으나, 실제 최다수인 `watch`(85.7%)가
 누락되지 않도록 4종으로 만들었다.
