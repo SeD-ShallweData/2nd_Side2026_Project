@@ -63,7 +63,8 @@ COMPANY_DATA_MODE=real
 CONTRACT_DATA_MODE=real
 ```
 
-`DATABASE_ENV_FILE`에서는 관리자 계정이 아니라 `BOT_NAME`·`BOT_PASSWORD`만 읽습니다. 비밀번호를
+`DATABASE_ENV_FILE`에서는 관리자 계정이 아니라 `BOT_USER`·`BOT_PASSWORD`만 읽습니다.
+기존 `BOT_NAME`도 호환하지만 새 배포는 `BOT_USER`를 사용합니다. 비밀번호를
 `product`나 Git에 복사하지 않습니다. `mock` 모드는 단위 테스트와 별도 정적 HTML 시연본을 보존하기 위한
 명시적 개발 옵션일 뿐이며, 실제 연동 실패를 성공 결과로 바꾸는 자동 Mock 전환은 사용하지 않습니다.
 
@@ -85,12 +86,22 @@ OPENAI_API_KEY=<배포 secret에 등록>
 
 ```bash
 cd integrations/rag-api
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+PYTHON312="${PYTHON312:-python3.12}"
+test "$("$PYTHON312" -I -S -c 'import platform, sys; print(sys.implementation.name, platform.python_version())')" = "cpython 3.12.13" || exit 1
+"$PYTHON312" -m venv .venv
+.venv/bin/python -m pip install --require-hashes -r requirements.lock
+RAG_HF_DIR="$PWD/.cache/huggingface"
+.venv/bin/python prepare_rag_assets.py prepare \
+  --manifest "$PWD/config/rag_assets.v1.json" \
+  --hf-home "$RAG_HF_DIR" \
+  --hub-cache "$RAG_HF_DIR/hub" \
+  --rag-db "$PWD/data/labor_law_db" \
+  --confirm PREPARE_BAAI_BGE_M3_5617A9F6
 
 cd ../contract-api
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+test "$("$PYTHON312" -I -S -c 'import platform, sys; print(sys.implementation.name, platform.python_version())')" = "cpython 3.12.13" || exit 1
+"$PYTHON312" -m venv .venv
+.venv/bin/python -m pip install --require-hashes -r requirements.lock
 
 cd ../..
 pwd
@@ -116,15 +127,17 @@ export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
 npm run dev:rag
 ```
 
-최초 실행은 BGE-M3 모델을 올리느라 시간이 걸립니다. 아래 두 문구가 나온 뒤 다음 단계로 갑니다.
+준비 단계에서 고정 revision의 BGE-M3를 한 번 내려받습니다. 실행 중에는 네트워크에서 모델을 받지
+않으며, 아래 두 문구가 나온 뒤 다음 단계로 갑니다.
 
 ```text
-RAG 모델과 노동법 컬렉션을 불러왔습니다.
+RAG 모델·컬렉션 무결성과 고정 질의 호환성을 검증했습니다.
 Running on http://127.0.0.1:5051
 ```
 
-`unauthenticated requests to the HF Hub` 경고는 모델 다운로드 속도·한도 안내이며, 위 정상 문구가
-나오면 실행에는 문제가 없습니다.
+모델 hash, Chroma 583건, 1024차원 embedding, 실제 고정 query 중 하나라도 맞지 않으면 RAG 서버는
+시작되지 않습니다. 모델 준비와 운영 서버 권한 절차는
+[`integrations/rag-api/README.md`](integrations/rag-api/README.md)를 따릅니다.
 
 터미널 2 — 계약서 분석:
 
@@ -224,7 +237,8 @@ RAG 터미널에는 `POST /api/retrieve ... 200` 로그가 남습니다. 응답 
 실제 분석 성공 결과처럼 표시되지 않습니다.
 
 실행 중 `npm: command not found`가 나오면 그 터미널에서 Node.js PATH의 `export` 명령을 다시
-실행합니다. `가상환경이 없습니다`가 나오면 1단계의 `python3 -m venv`와 `pip install`을 다시
+실행합니다. `가상환경이 없습니다`가 나오면 1단계의 CPython 3.12.13 확인, `venv` 생성과
+`pip --require-hashes` 설치를 다시
 확인합니다.
 
 ## 팀 시연용 임시 배포

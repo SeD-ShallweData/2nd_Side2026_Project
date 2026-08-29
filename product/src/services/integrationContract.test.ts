@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpRagRetriever } from "@/adapters/real/HttpRagRetriever";
 import { RealContractReviewProvider } from "@/adapters/real/RealContractReviewProvider";
 import { toWageRiskPublic } from "@/adapters/real/MlRiskProvider";
 import { getCompanyDataMode, getContractDataMode } from "@/config/dataMode";
-import { buildBotDatabaseUrl } from "@/server/databaseConfig";
+import { buildBotDatabaseUrl, getDatabaseConnectionString } from "@/server/databaseConfig";
 import { queryReadOnly } from "@/server/postgres";
 
 afterEach(() => {
@@ -61,17 +61,36 @@ describe("실제 ML DB 공개 경계", () => {
     expect(JSON.stringify(result)).not.toMatch(/risk_full|probability|percentile|shap/i);
   });
 
-  it("공유 DB 파일에서는 관리자 계정이 아니라 bot 계정 URL만 만든다", () => {
+  it("공유 DB 파일의 BOT_USER를 관리자와 기존 bot 이름보다 우선한다", () => {
     const url = buildBotDatabaseUrl({
       DB_NAME: "wageguard",
       DB_PORT: "5433",
       DB_USER: "admin",
       DB_PASSWORD: "admin-secret",
-      BOT_NAME: "wg_bot",
+      BOT_USER: "wg_bot",
+      BOT_NAME: "legacy_bot",
       BOT_PASSWORD: "bot:secret@value",
     });
     expect(url).toBe("postgresql://wg_bot:bot%3Asecret%40value@127.0.0.1:5433/wageguard");
     expect(url).not.toContain("admin");
+    expect(url).not.toContain("legacy_bot");
+  });
+
+  it("기존 공유 DB 파일의 BOT_NAME도 호환한다", () => {
+    expect(buildBotDatabaseUrl({
+      DB_NAME: "wageguard",
+      DB_PORT: "5433",
+      BOT_NAME: "legacy_bot",
+      BOT_PASSWORD: "legacy-secret",
+    })).toBe("postgresql://legacy_bot:legacy-secret@127.0.0.1:5433/wageguard");
+  });
+
+  it("관리자 DATABASE_URL이 함께 있어도 BOT_DATABASE_URL을 우선한다", () => {
+    vi.stubEnv("DATABASE_URL", "postgresql://admin:admin-secret@127.0.0.1:5433/wageguard");
+    vi.stubEnv("BOT_DATABASE_URL", "postgresql://wg_bot:bot-secret@127.0.0.1:5433/wageguard");
+    expect(getDatabaseConnectionString()).toBe(
+      "postgresql://wg_bot:bot-secret@127.0.0.1:5433/wageguard",
+    );
   });
 });
 
@@ -88,7 +107,10 @@ describe("PostgreSQL 읽기 전용 경계", () => {
 
 describe("RAG 내부 계약", () => {
   it("검색 문서와 출처를 공개 DTO로 정규화한다", async () => {
-    const fakeFetch = (async () => new Response(JSON.stringify({
+    let requestedAuthorization: string | undefined;
+    const fakeFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestedAuthorization = new Headers(init?.headers).get("Authorization") ?? undefined;
+      return new Response(JSON.stringify({
       status: "matched",
       query: "임금 지급일",
       retrieval_query: "임금 지급일 임금 지급 원칙",
@@ -106,9 +128,10 @@ describe("RAG 내부 계약", () => {
           document_id: "LABOR_STANDARDS_ACT_43",
         },
       }],
-    }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
 
-    const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("임금 지급일");
+    const result = await new HttpRagRetriever("http://rag.test", "rag-internal-token", 1_000, fakeFetch).retrieve("임금 지급일");
     expect(result.status).toBe("matched");
     expect(result).toMatchObject({
       retrieval_query: "임금 지급일 임금 지급 원칙",
@@ -119,6 +142,14 @@ describe("RAG 내부 계약", () => {
       citation: "근로기준법 제43조",
       source: { organization: "국가법령정보센터" },
     });
+    expect(requestedAuthorization).toBe("Bearer rag-internal-token");
+  });
+
+  it("내부 토큰이 없으면 RAG 네트워크 호출 없이 unavailable로 닫힌다", async () => {
+    const fakeFetch = vi.fn<typeof fetch>();
+    const result = await new HttpRagRetriever("http://rag.test", "", 1_000, fakeFetch).retrieve("질문");
+    expect(result).toMatchObject({ status: "unavailable", reason: "service_unavailable" });
+    expect(fakeFetch).not.toHaveBeenCalled();
   });
 
   it("범위 밖 이유와 주제를 보존한다", async () => {
@@ -132,7 +163,7 @@ describe("RAG 내부 계약", () => {
       items: [],
     }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
 
-    const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("산재 신청은 어떻게 하나요?");
+    const result = await new HttpRagRetriever("http://rag.test", "rag-internal-token", 1_000, fakeFetch).retrieve("산재 신청은 어떻게 하나요?");
     expect(result).toMatchObject({
       status: "no_match",
       reason: "out_of_scope",
@@ -144,7 +175,7 @@ describe("RAG 내부 계약", () => {
     const fakeFetch = (async () => {
       throw new TypeError("connection refused");
     }) as typeof fetch;
-    const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("질문");
+    const result = await new HttpRagRetriever("http://rag.test", "rag-internal-token", 1_000, fakeFetch).retrieve("질문");
     expect(result).toMatchObject({ status: "unavailable", documents: [] });
   });
 
@@ -155,7 +186,7 @@ describe("RAG 내부 계약", () => {
       threshold: 0.42,
       items: [],
     }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
-    const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("질문");
+    const result = await new HttpRagRetriever("http://rag.test", "rag-internal-token", 1_000, fakeFetch).retrieve("질문");
     expect(result).toMatchObject({
       query: "직접 근거 없는 질문",
       status: "no_match",
@@ -169,7 +200,7 @@ describe("RAG 내부 계약", () => {
       status: "matched",
       items: [{ content: "", citation: "" }],
     }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
-    const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("질문");
+    const result = await new HttpRagRetriever("http://rag.test", "rag-internal-token", 1_000, fakeFetch).retrieve("질문");
     expect(result).toMatchObject({ query: "질문", status: "unavailable", threshold: null, documents: [] });
   });
 
@@ -187,19 +218,25 @@ describe("RAG 내부 계약", () => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     })) as typeof fetch;
-    const result = await new HttpRagRetriever("http://rag.test", 1_000, fakeFetch).retrieve("질문");
+    const result = await new HttpRagRetriever("http://rag.test", "rag-internal-token", 1_000, fakeFetch).retrieve("질문");
     expect(result).toMatchObject({ query: "질문", status: "unavailable", threshold: null, documents: [] });
   });
 });
 
 describe("계약서 분석 내부 계약", () => {
+  beforeEach(() => {
+    vi.stubEnv("CONTRACT_INTERNAL_TOKEN", "contract-internal-token");
+  });
+
   it("CSH 규칙 엔진 결과를 제품 DTO로 정규화한다", async () => {
     vi.stubEnv("CONTRACT_ANALYSIS_URL", "http://contract.test");
     let requestedUrl = "";
     let requestedBody: FormData | undefined;
+    let requestedAuthorization: string | undefined;
     const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       requestedUrl = String(input);
       requestedBody = init?.body instanceof FormData ? init.body : undefined;
+      requestedAuthorization = new Headers(init?.headers).get("Authorization") ?? undefined;
       return new Response(JSON.stringify({
         ok: true,
         review_id: "review-1",
@@ -238,6 +275,7 @@ describe("계약서 분석 내부 계약", () => {
     expect(requestedUrl).toBe("http://contract.test/api/contract/review");
     expect(requestedBody?.get("ocr")).toBe("auto");
     expect(requestedBody?.get("file")).toBeInstanceOf(File);
+    expect(requestedAuthorization).toBe("Bearer contract-internal-token");
     expect(result.missing_items[0]).toMatchObject({
       code: "missing_required_wage",
       legal_basis: "근로기준법 제17조",
