@@ -2,6 +2,7 @@
 # ML export CSV → Postgres 적재.
 #
 #   ./scripts/ingest.sh --bundle ../_service_bundle \
+#                       --expected-database wageguard \
 #                       --model-version door1-voting-39f-v1 --as-of 2026-06 \
 #                       --expect-rows 553598,3000,503887
 #
@@ -13,7 +14,7 @@
 #          └── --as-of 2026-04 ──┘                    ↑ target_month 자동
 #
 # 매달 새 연금 파일로 재채점하면 --as-of 만 한 칸 밀면 된다(재학습 아님, 같은 pkl).
-# 생략하면 NULL 로 들어가고, 그 경우 화면에 "언제 기준" 이라고 쓸 수 없다.
+# 기준월은 재현 가능한 first_seen/last_seen에도 사용하므로 생략할 수 없다.
 #
 # 설계
 #  - 모든 CSV 를 **전부 TEXT 인 staging 테이블**에 \copy 로 벌크 적재한 뒤 SQL 로 변환한다.
@@ -23,6 +24,12 @@
 #  - 같은 (as_of_date, model_version) 을 다시 적재하면 그 batch 만 갈아끼운다. 멱등.
 #  - 적재가 끝나면 risk_tier 를 **그 batch 안에서만** 계산한다(§risk_tier).
 set -euo pipefail
+unset NODE_OPTIONS NODE_PATH NPM_CONFIG_USERCONFIG NPM_CONFIG_PREFIX
+unset PYTHONPATH PYTHONHOME PYTHONUSERBASE PYTHONSTARTUP PYTHONINSPECT
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+CALLER_CWD="$PWD"
 
 BUNDLE="../_service_bundle"
 OUT_DIR=""
@@ -30,6 +37,32 @@ MODEL_VERSION=""
 AS_OF=""
 MODEL_SHA=""
 EXPECT_ROWS=""
+ENV_FILE="${DB_ENV_FILE:-$PROJECT_ROOT/.env.local}"
+EXPECTED_DATABASE=""
+EXPECTED_SYSTEM_IDENTIFIER=""
+EXPECTED_DATABASE_OID=""
+CANONICAL_TIMESTAMP=""
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  scripts/ingest.sh --model-version VERSION [options]
+
+Options:
+  --bundle PATH          Service bundle root (default: ../_service_bundle)
+  --outputs PATH         Directory containing the three CSV exports
+  --model-version NAME   Model recipe identifier (required)
+  --as-of YYYY-MM        Observation-window end month (required)
+  --model-sha SHA        Model SHA prefix; inferred from the bundle when omitted
+  --expect-rows S,Q,F    Expected scored, queue, and safe row counts
+  --env-file PATH        Restricted DB key/value env file (never shell-sourced)
+  --expected-database N  Exact PostgreSQL 16 database identity (required)
+  --expected-system-identifier N  Exact PostgreSQL cluster system identifier
+  --expected-database-oid N       Exact target database OID
+  --canonical-timestamp RFC3339   Explicit UTC rebuild timestamp (required)
+  -h, --help             Show this help
+USAGE
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -42,11 +75,31 @@ while [[ $# -gt 0 ]]; do
     --model-sha)     MODEL_SHA="$2"; shift 2 ;;
     # ML팀이 알려준 기대 행수. 주면 다르면 롤백한다. "scored,queue,safe"
     --expect-rows)   EXPECT_ROWS="$2"; shift 2 ;;
+    --env-file)      ENV_FILE="$2"; shift 2 ;;
+    --expected-database) EXPECTED_DATABASE="$2"; shift 2 ;;
+    --expected-system-identifier) EXPECTED_SYSTEM_IDENTIFIER="$2"; shift 2 ;;
+    --expected-database-oid) EXPECTED_DATABASE_OID="$2"; shift 2 ;;
+    --canonical-timestamp) CANONICAL_TIMESTAMP="$2"; shift 2 ;;
+    -h|--help)       usage; exit 0 ;;
     *) echo "알 수 없는 인자: $1" >&2; exit 1 ;;
   esac
 done
 
 [[ -z "$MODEL_VERSION" ]] && { echo "--model-version 은 필수입니다" >&2; exit 1; }
+[[ "$MODEL_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] \
+  || { echo "--model-version 형식이 안전하지 않습니다" >&2; exit 1; }
+if [[ -z "$AS_OF" || ! "$AS_OF" =~ ^[0-9]{4}-(0[1-9]|1[0-2])$ ]]; then
+  echo "--as-of 형식은 YYYY-MM 입니다" >&2
+  exit 1
+fi
+[[ "$EXPECTED_DATABASE" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
+  || { echo "--expected-database 는 필수이며 안전한 DB 이름이어야 합니다" >&2; exit 1; }
+[[ "$EXPECTED_SYSTEM_IDENTIFIER" =~ ^[1-9][0-9]*$ ]] \
+  || { echo "--expected-system-identifier 는 양의 10진수여야 합니다" >&2; exit 1; }
+[[ "$EXPECTED_DATABASE_OID" =~ ^[1-9][0-9]*$ ]] \
+  || { echo "--expected-database-oid 는 양의 10진수여야 합니다" >&2; exit 1; }
+[[ "$CANONICAL_TIMESTAMP" =~ ^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\.[0-9]{3}Z$ ]] \
+  || { echo "--canonical-timestamp 는 밀리초와 Z가 있는 정확한 RFC3339 UTC여야 합니다" >&2; exit 1; }
 
 EXP_S=0; EXP_Q=0; EXP_F=0
 if [[ -n "$EXPECT_ROWS" ]]; then
@@ -55,38 +108,111 @@ if [[ -n "$EXPECT_ROWS" ]]; then
     || { echo "--expect-rows 형식: scored,queue,safe (숫자 3개)" >&2; exit 1; }
 fi
 
-cd "$(dirname "$0")/.."
-[[ -f .env.local ]] || { echo ".env.local 이 없습니다" >&2; exit 1; }
-set -a; . ./.env.local; set +a
+cd "$PROJECT_ROOT"
+if [[ "$ENV_FILE" != /* ]]; then
+  ENV_FILE="$CALLER_CWD/$ENV_FILE"
+fi
+[[ -r "$ENV_FILE" ]] || { echo "읽을 수 있는 env 파일이 없습니다: $ENV_FILE" >&2; exit 1; }
+[[ ! -L "$ENV_FILE" ]] || { echo "env 파일은 symlink일 수 없습니다: $ENV_FILE" >&2; exit 1; }
+
+# 비밀 파일을 shell code로 실행하지 않고 DB 연결에 필요한 key만 읽는다.
+unset DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD PGSSLMODE PGPASSWORD
+unset PGOPTIONS PGSERVICE PGSERVICEFILE PGPASSFILE PGHOST PGHOSTADDR PGPORT PGDATABASE PGUSER PGCONNECT_TIMEOUT
+DB_HOST=""; DB_PORT=""; DB_NAME=""; DB_USER=""; DB_PASSWORD=""; PGSSLMODE=""
+shopt -s extglob
+while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+  line="${raw_line##+([[:space:]])}"
+  [[ -z "$line" || "${line:0:1}" == "#" ]] && continue
+  if [[ "$line" =~ ^(export[[:space:]]+)?([A-Z_][A-Z0-9_]*)[[:space:]]*=(.*)$ ]]; then
+    key="${BASH_REMATCH[2]}"
+    value="${BASH_REMATCH[3]}"
+    value="${value##+([[:space:]])}"
+    value="${value%%+([[:space:]])}"
+    if [[ ${#value} -ge 2 ]]; then
+      if [[ "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+        value="${value:1:${#value}-2}"
+      elif [[ "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+        value="${value:1:${#value}-2}"
+      fi
+    fi
+    case "$key" in
+      DB_HOST|DB_PORT|DB_NAME|DB_USER|DB_PASSWORD|PGSSLMODE)
+        printf -v "$key" '%s' "$value"
+        ;;
+    esac
+  fi
+done < "$ENV_FILE"
+
+DB_HOST="${DB_HOST:-127.0.0.1}"
+: "${DB_PORT:?DB_PORT is required in the env file}"
+: "${DB_NAME:?DB_NAME is required in the env file}"
+: "${DB_USER:?DB_USER is required in the env file}"
+: "${DB_PASSWORD:?DB_PASSWORD is required in the env file}"
+[[ "$DB_NAME" == "$EXPECTED_DATABASE" ]] \
+  || { echo "env DB_NAME이 --expected-database와 다릅니다" >&2; exit 1; }
+[[ "$DB_PORT" =~ ^[0-9]+$ ]] && ((DB_PORT >= 1 && DB_PORT <= 65535)) \
+  || { echo "DB_PORT가 1~65535 범위의 정수가 아닙니다" >&2; exit 1; }
 
 OUT="${OUT_DIR:-$BUNDLE/outputs}"
+[[ "$OUT" != *"'"* && "$OUT" != *'\'* && "$OUT" != *$'\n'* && "$OUT" != *$'\r'* ]] \
+  || { echo "CSV 경로에는 quote, backslash, 줄바꿈을 사용할 수 없습니다" >&2; exit 1; }
 for f in scored_active_full.csv 감독관_위험큐_full.csv safe_recommendation_full.csv; do
   [[ -f "$OUT/$f" ]] || { echo "파일 없음: $OUT/$f" >&2; exit 1; }
+  [[ ! -L "$OUT/$f" ]] || { echo "CSV 파일은 symlink일 수 없습니다: $OUT/$f" >&2; exit 1; }
 done
 
 # .env.local 의 DB_PASSWORD 를 psql 에 넘긴다.
 # 이게 없으면 ~/.pgpass 가 있는 사람만 동작하고, 새로 clone 한 사람은 비밀번호 입력을 요구받는다.
 export PGPASSWORD="${DB_PASSWORD}"
-PSQL=(psql -h 127.0.0.1 -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -q)
+[[ -n "${PGSSLMODE:-}" ]] && export PGSSLMODE
+PSQL=(
+  psql -X --no-psqlrc -w -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}"
+  -v ON_ERROR_STOP=1 -q
+  -v "expected_database=$EXPECTED_DATABASE"
+  -v "expected_owner=$DB_USER"
+  -v "expected_system_identifier=$EXPECTED_SYSTEM_IDENTIFIER"
+  -v "expected_database_oid=$EXPECTED_DATABASE_OID"
+  -v "canonical_timestamp=$CANONICAL_TIMESTAMP"
+)
+CONNECTED_IDENTITY="$("${PSQL[@]}" -At -c "SELECT concat_ws(chr(9), current_database(), (current_setting('server_version_num')::integer / 10000)::text, (SELECT system_identifier::text FROM pg_catalog.pg_control_system()), (SELECT oid::text FROM pg_catalog.pg_database WHERE datname = current_database()))")"
+IFS=$'\t' read -r CONNECTED_DATABASE CONNECTED_MAJOR CONNECTED_SYSTEM_IDENTIFIER CONNECTED_DATABASE_OID <<<"$CONNECTED_IDENTITY"
+[[ "$CONNECTED_DATABASE" == "$EXPECTED_DATABASE" && "$CONNECTED_MAJOR" == "16" \
+   && "$CONNECTED_SYSTEM_IDENTIFIER" == "$EXPECTED_SYSTEM_IDENTIFIER" \
+   && "$CONNECTED_DATABASE_OID" == "$EXPECTED_DATABASE_OID" ]] \
+  || { echo "연결 대상은 지정한 PostgreSQL 16 데이터베이스가 아닙니다" >&2; exit 1; }
 
 # 모델 지문. model_version 은 레시피 이름이라 월 갱신에도 안 바뀌므로,
 # "이번 달 점수가 정말 같은 모델에서 나왔는가" 를 이 해시로 남긴다.
 # 월 재추론은 매 실행 재학습하지만 학습셋·파라미터·시드가 고정이라 결정론적이다
 # — 단 동일 환경(lightgbm==4.6.0 등)에서만 성립한다.
 if [[ -z "$MODEL_SHA" && -f "$BUNDLE/model/door1_final_model.pkl" ]]; then
-  MODEL_SHA=$(sha256sum "$BUNDLE/model/door1_final_model.pkl" | cut -c1-16)
+  if command -v sha256sum >/dev/null 2>&1; then
+    MODEL_SHA=$(sha256sum "$BUNDLE/model/door1_final_model.pkl" | cut -c1-16)
+  else
+    MODEL_SHA=$(shasum -a 256 "$BUNDLE/model/door1_final_model.pkl" | cut -c1-16)
+  fi
 fi
+[[ -z "$MODEL_SHA" || "$MODEL_SHA" =~ ^[a-f0-9]{8,64}$ ]] \
+  || { echo "--model-sha는 소문자 SHA-256 hex 8~64자여야 합니다" >&2; exit 1; }
 
 echo "▶ 적재 시작"
 echo "  번들       : $BUNDLE"
 echo "  model_ver  : $MODEL_VERSION"
 echo "  model_sha  : ${MODEL_SHA:-(pkl 없음 — 기록 안 함)}"
 # 예측 대상월 = 관측 기준월 + 6개월
-TARGET=""
-[[ -n "$AS_OF" ]] && TARGET=$(date -d "${AS_OF}-01 +6 months" +%Y-%m 2>/dev/null || true)
+as_of_year="${AS_OF%-*}"
+as_of_month="${AS_OF#*-}"
+target_month_index=$((10#$as_of_year * 12 + 10#$as_of_month - 1 + 6))
+printf -v TARGET '%04d-%02d' \
+  "$((target_month_index / 12))" "$((target_month_index % 12 + 1))"
 
-echo "  as_of_date : ${AS_OF:-(NULL — 미확정)}"
-echo "  target(t)  : ${TARGET:-(NULL)}   ← as_of + 6개월, 명단공개 예측 대상월"
+SOURCE_LABEL="$(basename "$(dirname "$OUT")")/$(basename "$OUT")"
+[[ "$SOURCE_LABEL" =~ ^[A-Za-z0-9._/-]+$ ]] \
+  || { echo "source label 형식이 안전하지 않습니다: $SOURCE_LABEL" >&2; exit 1; }
+
+echo "  as_of_date : $AS_OF"
+echo "  target(t)  : $TARGET   ← as_of + 6개월, 명단공개 예측 대상월"
+echo "  rebuild_at : $CANONICAL_TIMESTAMP"
 [[ -n "$EXPECT_ROWS" ]] && echo "  기대 행수  : scored=$EXP_S queue=$EXP_Q safe=$EXP_F"
 
 # firm_id  = sha1(사업장명 || '|' || 사업자번호)[:16]   ← **원본 이름 그대로**
@@ -108,8 +234,34 @@ substr(encode(digest(
   || '|' || bn, 'sha1'), 'hex'), 1, 16)
 SQL
 
-"${PSQL[@]}" <<SQL
+"${PSQL[@]}" \
+  -v "as_of_date=$AS_OF-01" \
+  -v "target_month=$TARGET-01" \
+  -v "model_version=$MODEL_VERSION" \
+  -v "model_sha=$MODEL_SHA" \
+  -v "source_label=$SOURCE_LABEL" \
+  -f "$SCRIPT_DIR/sql/assert-path-b-session-identity.sql" \
+  -f - <<SQL
 BEGIN;
+
+-- The canonical rebuild clock is explicit data, never transaction time.  The
+-- round trip also rejects impossible dates and any UTC normalization change.
+CREATE TEMP TABLE stg_path_b_canonical_clock (
+  canonical_timestamp timestamptz PRIMARY KEY
+) ON COMMIT DROP;
+INSERT INTO stg_path_b_canonical_clock (canonical_timestamp)
+SELECT :'canonical_timestamp'::timestamptz
+WHERE to_char(
+  :'canonical_timestamp'::timestamptz AT TIME ZONE 'UTC',
+  'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+) = :'canonical_timestamp';
+DO \$clock\$
+BEGIN
+  IF (SELECT count(*) FROM stg_path_b_canonical_clock) <> 1 THEN
+    RAISE EXCEPTION 'canonical timestamp failed exact UTC round trip';
+  END IF;
+END
+\$clock\$;
 
 -- ── staging (전부 TEXT) ────────────────────────────────────
 DROP TABLE IF EXISTS stg_scored, stg_queue, stg_safe;
@@ -147,15 +299,19 @@ CREATE UNLOGGED TABLE stg_safe (
 
 -- ── batch 확보 (같은 as_of+model 이면 재적재) ───────────────
 DELETE FROM batches
- WHERE as_of_date IS NOT DISTINCT FROM $( [[ -n "$AS_OF" ]] && echo "DATE '$AS_OF-01'" || echo "NULL" )
-   AND model_version = '$MODEL_VERSION';
+ WHERE as_of_date = :'as_of_date'::date
+   AND model_version = :'model_version';
 
-INSERT INTO batches (as_of_date, target_month, model_version, model_sha, source, n_scored, n_queue, n_safe)
-VALUES ($( [[ -n "$AS_OF" ]] && echo "DATE '$AS_OF-01'" || echo "NULL" ),
-        $( [[ -n "$TARGET" ]] && echo "DATE '$TARGET-01'" || echo "NULL" ),
-        '$MODEL_VERSION',
-        $( [[ -n "$MODEL_SHA" ]] && echo "'$MODEL_SHA'" || echo "NULL" ),
-        '$(basename "$(dirname "$OUT")")/$(basename "$OUT")', 0, 0, 0);
+INSERT INTO batches (
+  as_of_date, target_month, model_version, model_sha, source,
+  n_scored, n_queue, n_safe, ingested_at
+)
+VALUES (:'as_of_date'::date,
+        :'target_month'::date,
+        :'model_version',
+        nullif(:'model_sha', ''),
+        :'source_label', 0, 0, 0,
+        (SELECT canonical_timestamp FROM stg_path_b_canonical_clock));
 
 CREATE TEMP TABLE cur AS SELECT currval(pg_get_serial_sequence('batches','id')) AS id;
 
@@ -170,12 +326,16 @@ WITH src AS (
   SELECT DISTINCT ON ($FIRM_ID_SQL)
          $FIRM_ID_SQL AS firm_id, $CORP_KEY_SQL AS corp_key, nm, bn, sd, ind
   FROM src
+  ORDER BY $FIRM_ID_SQL, nm COLLATE "C", bn COLLATE "C",
+           sd COLLATE "C" NULLS LAST, ind COLLATE "C" NULLS LAST
 )
 INSERT INTO firms (firm_id, corp_key, name, biz_no, sido, industry, first_seen, last_seen)
-SELECT firm_id, corp_key, nm, bn, sd, ind, CURRENT_DATE, CURRENT_DATE FROM keyed
+SELECT firm_id, corp_key, nm, bn, sd, ind, :'as_of_date'::date, :'as_of_date'::date FROM keyed
 ON CONFLICT (firm_id) DO UPDATE
   SET corp_key=EXCLUDED.corp_key, name=EXCLUDED.name, biz_no=EXCLUDED.biz_no,
-      sido=EXCLUDED.sido, industry=EXCLUDED.industry, last_seen=CURRENT_DATE;
+      sido=EXCLUDED.sido, industry=EXCLUDED.industry,
+      first_seen=least(firms.first_seen, EXCLUDED.first_seen),
+      last_seen=greatest(firms.last_seen, EXCLUDED.last_seen);
 
 -- ── scored_active ─────────────────────────────────────────
 INSERT INTO scored_active

@@ -24,7 +24,7 @@ NPS/KCOMWEL 원장을 복제하는 `full`도 LLM 검증 경로의 기본값이 �
 | scope | DB에 적재하는 것 | 적재하지 않는 것 | 로컬 DB 최소 여유공간 |
 | --- | --- | --- | ---: |
 | `cell-validation` | `pipeline_runs`, dependencies, 셀 예측 92,140행, 두 라벨 184,280행 | 사업장 마스터·snapshot·사업장 결과 | 2 GiB |
-| `existing-firms` | `cell-validation` 전체 + 검증된 `firm_risk_results` 518,806행 | 별도 사업장 마스터, KCOMWEL 원장, ambiguous/unmatched 후보 | 5 GiB |
+| `existing-firms` | `cell-validation` 전체 + 검증된 `firm_risk_results` 515,608행 | 별도 사업장 마스터, KCOMWEL 원장, ambiguous/unmatched 후보 | 5 GiB |
 | `full` | 최신주 NPS/KCOMWEL wide 사업장·snapshot·배분 fact | 2.59억 역사 backfill | 40 GiB |
 
 현재 서비스 목적에는 `existing-firms`가 기본 선택이다. 셀 수준 비교만 필요하면
@@ -72,16 +72,23 @@ sha1(원본 사업장명 || '|' || 마스킹 사업자번호 6자리)[:16]
 
 ## 4. strict 매칭 funnel
 
-현재 고정 NPS source 549,558행의 acceptance 기준선은 다음과 같다. 네 결과 집합은 서로
+현재 고정 NPS source 549,558행과 Path B의 7개월 최종 `public.firms` 639,137행을 결합한
+acceptance 기준선은 다음과 같다. 네 결과 집합은 서로
 배타적이며 합계가 source 전체와 같아야 한다.
 
 | 결과 | 행수 | 처리 |
 | --- | ---: | --- |
-| `verified_exact` | **518,806** | `firm_risk_results` 적재 가능 |
-| exact identity 이후 canonical 시도 또는 업종 속성 불일치 | **1,329** | 적재 금지, review 대상 |
-| NPS 원천 raw-key 중복 | **382** | 적재 금지, ambiguous review 대상 |
-| 기존 `public.firms` exact identity 없음 | **29,041** | 적재 금지, unknown 처리 |
+| `verified_exact` | **515,608** | `firm_risk_results` 적재 가능 |
+| exact identity 이후 canonical 시도 또는 업종 속성 불일치 | **32,891** | 적재 금지, review 대상 |
+| NPS 원천 raw-key 중복 | **386** | 적재 금지, ambiguous review 대상 |
+| 기존 `public.firms` exact identity 없음 | **673** | 적재 금지, unknown 처리 |
 | 합계 | **549,558** | NPS source 행수와 일치해야 함 |
+
+과거 `518,806 / 1,329 / 382 / 29,041` 기준선은 2026-04 단일 임금 배치의
+사업장 마스터 552,500행에 정확히 대응한다. Path B는 2025-12부터 2026-06까지 순서대로
+적재하면서 동일 `firm_id`의 시도·업종을 최신 관측값으로 갱신하므로 최종 마스터와 그
+기준선을 사용할 수 없다. 4월 마스터로 산업재해를 연결한 뒤 5월·6월 속성을 덮어쓰는 것도
+최종 `public.firms`와 strict 연결 증거를 불일치시키므로 금지한다.
 
 자동승인 행은 다음 조건을 모두 만족한다.
 
@@ -149,11 +156,21 @@ industrial_safety.firm_risk.existing_firms.nps
 
 `existing-firms`는 다음 순서를 지켜야 한다.
 
-1. 대상 DB의 `public.firms`를 `firm_id` 순으로 mode-0600 CSV에 export한다.
-2. snapshot의 rows, bytes, SHA-256을 prepared manifest에 기록한다.
-3. snapshot과 strict 결과 파일 참조를 firm-risk run의 `artifact_bundle`과 fingerprint에 포함한다.
-4. DB 적재 transaction에서 `public.firms`를 잠근 뒤 snapshot과 live table을 양방향 비교한다.
-5. 한 행이라도 추가·삭제·변경됐으면 적재를 중단하고 새 snapshot으로 처음부터 다시 준비한다.
+1. registry와 승인된 다섯 source artifact를 각각 `O_NOFOLLOW` regular-file descriptor로 연다.
+2. 같은 descriptor에서 SHA-256을 계산하면서 mode-0700 private stage로 복사하고, source의
+   `fstat` identity/size/mtime/ctime을 복사 전후 비교한다.
+3. source bundle의 directory는 mode-0500, 파일은 mode-0400으로 봉인한다. prepare와
+   verify에는 원본 경로를 넘기지 않고 이 bundle의 config, `v2`, `extension` root만 넘긴다.
+4. 대상 DB의 `public.firms`를 `firm_id` 순으로 별도 mode-0600 prepared directory에 export한다.
+5. snapshot의 rows, bytes, SHA-256을 prepared manifest에 기록한다.
+6. snapshot과 strict 결과 파일 참조를 firm-risk run의 `artifact_bundle`과 fingerprint에 포함한다.
+7. DB 적재 transaction에서 `public.firms`를 잠근 뒤 snapshot과 live table을 양방향 비교한다.
+8. 한 행이라도 추가·삭제·변경됐으면 적재를 중단하고 새 snapshot으로 처음부터 다시 준비한다.
+
+봉인 대상은 `v2_cell`, `api_occurrence_bounded`, `nps_workplace`, `nps_display`,
+`nps_quality`와 이들을 지정하는 registry config다. source pathname을 해시한 뒤 다시 여는
+방식은 허용하지 않는다. `validate-only`는 DB나 credential을 사용하지 않는 원천 사전검사이고,
+실제 rollback/apply의 prepare·verify는 반드시 private source bundle을 새로 만든다.
 
 동일 fingerprint 재실행은 metadata와 실제 DB 행수·키셋을 다시 확인한 뒤 UPDATE 0건으로
 종료한다. current run을 다시 supersede/publish하거나 timestamp를 갱신하지 않는다.
@@ -163,8 +180,8 @@ industrial_safety.firm_risk.existing_firms.nps
 - `public.firms` snapshot 또는 prepared result SHA 변경: 새 fingerprint/run
 - loader/config SHA 변경인데 계약 버전이 그대로임: 재사용 거부
 
-stage는 기본적으로 종료 시 삭제한다. `--keep-stage`에는 canonical firm snapshot과 내부 source
-ID가 남으므로 접근 통제된 진단 상황 외에는 사용하지 않는다.
+stage는 기본적으로 종료 시 삭제한다. `--keep-stage`에는 canonical firm snapshot, 승인 source
+artifact 사본과 내부 source ID가 남으므로 접근 통제된 진단 상황 외에는 사용하지 않는다.
 
 ## 8. LLM 안전 view 계약
 
@@ -244,7 +261,7 @@ npm run migrate
 ```
 
 `validate-only existing-firms`는 NPS 원천을 검증하지만 DB snapshot을 만들지 않는다. strict
-518,806행 funnel은 rollback/apply 경로에서 확인한다.
+515,608행 funnel은 rollback/apply 경로에서 확인한다.
 
 ### 10.3 test DB rollback 시험
 
@@ -310,7 +327,7 @@ firm 검증이 필요하면 다음 하나로 셀 데이터와 strict firm 결과
 - 고정 source bytes/SHA/행수 일치
 - 셀 92,140행과 라벨 184,280행 계약 일치
 - `public.firms` snapshot rows/bytes/SHA와 live table 양방향 일치
-- strict funnel `518,806 + 1,329 + 382 + 29,041 = 549,558`
+- strict funnel `515,608 + 32,891 + 386 + 673 = 549,558`
 - verified source/target 1:1, PK/FK/unique 위반 0건
 - `prediction_as_of < target_week_start` KST
 - firm run metadata와 단일 target week CHECK 통과

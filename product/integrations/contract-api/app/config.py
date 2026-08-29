@@ -35,7 +35,9 @@ FONT_DIR = DATA_DIR / "fonts"                          # 더미 PDF 생성용 �
 
 # ── 키 로드 ───────────────────────────────────────────────────────────
 TEAM_ENV_FILE = os.getenv("API_KEY_ENV_FILE", "/data/shared-SeD/api_key.env")
-LOCAL_ENV_FILE = ROOT / "config.env"  # 선택. 모델명·포트 등 개인 오버라이드용
+LOCAL_ENV_FILE = Path(
+    os.getenv("LOCAL_CONFIG_ENV_FILE", str(ROOT / "config.env"))
+)  # 선택. 모델명·포트 등 개인 오버라이드용; 배포 unit은 /dev/null로 고정
 
 
 def _load_env(path, *, override: bool = False) -> str | None:
@@ -68,7 +70,8 @@ if LOCAL_ENV_FILE.exists():
 PROVIDERS = {
     "upstage": {
         "label": "Upstage Solar",
-        "api_key": os.getenv("Upstage_API_KEY"),  # CamelCase 주의
+        # 배포 secret은 표준 대문자 이름을 우선하고, 기존 팀 파일과의 호환은 유지합니다.
+        "api_key": os.getenv("UPSTAGE_API_KEY") or os.getenv("Upstage_API_KEY"),
         "url": os.getenv("UPSTAGE_API_URL", "https://api.upstage.ai/v1/chat/completions"),
         "model": os.getenv("UPSTAGE_MODEL", "solar-pro3"),
     },
