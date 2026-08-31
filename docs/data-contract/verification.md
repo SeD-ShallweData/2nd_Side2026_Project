@@ -74,14 +74,24 @@ batch 7   as_of_date = 2026-06-01   target_month = 2026-12-01
 > 🔴 `risk_tier` 는 **감독관 전용**이다. 구직자 화면에 노출하지 않는다(명예훼손 리스크).
 > 3절의 `판정` 과 **모집단·기준이 다르다.** 같은 단어로 부르지 않는다.
 
-`정보부족` 8.98% 와 아래 `risk_full` NULL 8.98% 가 일치한다 — 채점 불가 행이 `정보부족` 이다.
+> ⚠️ **`정보부족` 과 `risk_full` NULL 은 같은 집합이 아니다** **[실측 2026-08-31]**
+>
+> ```
+> risk_full IS NULL   49,711  =  정보부족 49,703  +  이미공개 8
+> 정보부족 중 risk_full 값이 있는 행 : 0
+> ```
+>
+> **포함 관계는 한 방향이다** — `정보부족` ⊂ `risk_full IS NULL`.
+> 백분율만 보면 둘 다 8.98% 라 같아 보이지만(8.9782% vs 8.9796%),
+> **`이미공개` 141행 중 8행이 채점되지 않은 상태**라 행수는 다르다.
+> 5절의 NULL 8.98% 는 **49,711 기준**이다.
 
 ## 5. 주의값
 
 | 값 | 실측 | 해석 |
 | --- | ---: | --- |
 | `risk_calibrated` non-NULL | **0 / 3,855,848** | 전 행 NULL. 결함이 아니라 **"아직 확률로 말할 수 없다"** 는 표시 |
-| `risk_full` NULL 비율 | **8.98%** | 채점 불가. **`0` 과 다르다** |
+| `risk_full` NULL 비율 | **8.98%** (49,711 / 553,598) | 채점 불가. **`0` 과 다르다** |
 | `biz_no` 최대 재사용 | **950곳** | 마스킹 6자리라 **비고유**. 식별키로 쓰지 않는다 |
 
 > `risk_full` 은 **확률이 아니다.** 1:1 다운샘플링 결과이므로 순위·분위·등급으로만 해석한다.
@@ -176,11 +186,11 @@ pg_description (public + industrial_safety) : 0건
 >
 > | API 키 | DB 컬럼 |
 > | --- | --- |
-> | `wage_risk.grade` | `inspector_queue.queue_priority` (4.5절) |
+> | `wage_risk.grade` | `inspector_queue.queue_priority` (wage-risk.md 4.5절) |
 > | `wage_risk.model_score` | `scored_active.risk_full` |
 > | `industrial_safety.priority_band` | `provisional_population_priority_band` |
 
-`grade` 값 4종과 건수는 **4.5절 표와 일치**한다 — 긴급 100 · 우선 400 · 주의 1,000 · 관찰 1,500.
+`grade` 값 4종과 건수는 [**`wage-risk.md` 4.5절**](wage-risk.md) 표와 일치한다 — 긴급 100 · 우선 400 · 주의 1,000 · 관찰 1,500.
 
 ### 9.3 🔴 위반 1건 — 감독관 `reasons` 에 영문 원본명이 그대로 나간다
 
@@ -204,7 +214,84 @@ pg_description (public + industrial_safety) : 0건
 
 > `product/src/**` 는 담당 경로 밖이라 **이 문서는 사실만 기록한다.** 코드는 고치지 않았다.
 
-## 10. 재현 명령
+## 10. 복구·재적재 후 계약 확인 체크리스트
+
+DB를 복원하거나 배치를 재적재한 뒤 **계약이 여전히 성립하는지** 확인하는 목록이다.
+
+### 10.1 이미 자동으로 검사되는 것 — 다시 하지 않는다
+
+`db/scripts/sql/assert-path-b-rebuild.sql`(1,214줄)이 **행수를 하드코딩해 단언**한다.
+`bootstrap-path-b.sh` · `export-path-b-release.sh` · `verify-path-b-release-restore.sh`
+세 곳에서 호출된다.
+
+```
+firms 639,137 · scored_active 3,855,848 · safe_recommendation 3,524,726
+inspector_queue 21,000 · firm_risk_results 515,608
+batch 7 (553,598 / 3,000 / 503,887) · cell 92,140 / 184,280
+```
+
+**행수가 틀리면 복구 스크립트가 이미 멈춘다.** 아래는 그 다음 단계다.
+
+### 10.2 자동 검사되지 않는 것 — 이 체크리스트의 대상
+
+> **행수가 맞아도 의미가 깨질 수 있다.** 예컨대 553,598행이 그대로인데 판정이 전부
+> `유보` 로 쏠렸다면 위 단언은 **통과한다.** 화면은 조용히 잘못된 값을 보여준다.
+
+| # | 확인 | 통과 기준 | 근거 절 |
+| ---: | --- | --- | :-: |
+| 1 | 판정 6종이 **모두 존재**하는가 | 한 종류라도 0이면 이상 | 3 |
+| 2 | 판정 합계 = `batches.n_safe` | 정확히 일치 | 3 |
+| 3 | `유보` 비중이 크게 변했는가 | 85.66% 대비 급변 시 조사 | 3 |
+| 4 | tier 6종이 **모두 존재**하는가 | 한 종류라도 0이면 이상 | 4 |
+| 5 | tier 합계 = `batches.n_scored` | 정확히 일치 | 4 |
+| 6 | `risk_calibrated` 가 여전히 **전 행 NULL** | 값이 생겼다면 **확률 해석이 가능해졌다는 뜻** — 계약 문서를 고쳐야 한다 | 5 |
+| 7 | `risk_full` NULL 비중 | 8.98% 대비 급변 시 조사 | 5 |
+| 8 | `정보부족` ⊂ `risk_full IS NULL` 포함 관계 | **`정보부족` 중 `risk_full` 값이 있는 행 = 0.** 1행이라도 생기면 채점 로직 변경 | 4·5 |
+| 9 | 밴드 4종 합계 = `firm_risk_results` 행수 | 정확히 일치 | 6 |
+| 10 | `reasons` 배열 길이가 항상 3 | `min = max = 3` | wage-risk 4.6 |
+| 11 | `reasons` 의 distinct 피처 목록이 늘었는가 | 새 영문명이 생기면 **라벨 없는 사유가 화면에 뜬다** | wage-risk 4.6 |
+| 12 | `biz_no` 최대 재사용 수 | 950곳에서 증가 시 문서 갱신 | 5 |
+
+### 10.3 확인 명령
+
+11절의 재현 명령을 그대로 쓰되, 아래 두 개를 추가한다.
+
+```sql
+-- 8번: 정보부족이 risk_full NULL 에 온전히 포함되는가
+select
+  count(*) filter (where risk_tier = '정보부족' and risk_full is not null) as must_be_zero,
+  count(*) filter (where risk_tier = '정보부족')                            as tier_null,
+  count(*) filter (where risk_full is null)                                as full_null
+from public.v_current_scored;
+-- must_be_zero = 0 이어야 한다
+-- 2026-08-31 기준: 0 / 49,703 / 49,711  (차이 8행은 '이미공개')
+-- ⚠️ 두 count 가 같을 것이라고 가정하지 말 것. 백분율은 둘 다 8.98% 로 보인다
+
+-- 10·11번: reasons 배열 길이와 피처 목록
+select min(array_length(reasons,1)) as min_len,
+       max(array_length(reasons,1)) as max_len,
+       count(distinct r) as distinct_features
+from public.inspector_queue, unnest(reasons) r
+where reasons is not null;
+-- min = max = 3, distinct = 20 (2026-08-31 기준)
+```
+
+### 10.4 담당 경로 밖 — 제안 항목
+
+이 문서는 `docs/data-contract/**` 안이라 **아래는 기록만 한다.**
+
+| # | 제안 | 왜 | 담당 |
+| ---: | --- | --- | --- |
+| 1 | `assert-path-b-rebuild.sql` 에 **10.2의 1·2·4·5·6·9번 단언 추가** | 행수만 보면 의미 붕괴를 못 잡는다 | DB 담당 |
+| 2 | 감독관 응답의 `score_interpretation`·`limitations` **존재를 단언하는 테스트** 추가 | 현재 **테스트 0건**. 리팩터링으로 빠져도 아무도 모른다. 원점수만 남으면 확률처럼 읽힌다 | 인프라 담당 |
+| 3 | [`samples/`](samples/) 5종을 인수 테스트 fixture로 연결 | 현재 참조 **0건**. 상태별 화면 검증에 그대로 쓸 수 있다 | QA 담당 |
+
+> 2번 보충 — 구직자 경로는 이미 보호돼 있다.
+> `integrationContract.test.ts:40-49` 가 판정 6종 → `SignalLevel` 매핑을,
+> `:61` 이 `risk_full|probability|percentile|shap` 비노출을 검사한다.
+> **비어 있는 쪽은 감독관 경로의 방어 문구다.**
+
+## 11. 재현 명령
 
 서버에서 실행한다. `wg_bot`(읽기 전용)으로도 대부분 확인할 수 있다.
 
@@ -241,7 +328,7 @@ select count(*) from pg_description d
  where n.nspname in ('public','industrial_safety');               -- 0
 ```
 
-## 11. 불일치·미확인
+## 12. 불일치·미확인
 
 **불일치: 0건.** 계약 문서에서 정정할 항목은 나오지 않았다.
 

@@ -60,8 +60,10 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 장애 샘플은 둘로 나눈다. **전체 장애는 비-200 이며 본문에 `error` 객체만 있고**,
 부분 장애는 HTTP 200 에 실패한 신호만 `availability: "unavailable"` 이다.
 
-`member-status.md` 는 3종(정상·자료 부족·오류)을 요구했으나, 실제 최다수인 `watch`(85.7%)가
-누락되지 않도록 4종으로 만들었다.
+「멤버별 해야할 일」 은 3종(정상·자료 부족·오류)을 요구했으나 **5종으로 만들었다.**
+
+- 실제 최다수인 `watch`(85.7%)가 누락되지 않도록 한 종을 더했다
+- '오류' 를 **전체 장애(HTTP 503)** 와 **부분 장애(HTTP 200)** 로 나눴다 — 응답 형태가 다르다
 
 ## 3. 이 계약의 근거
 
@@ -125,7 +127,7 @@ psql -c "select 판정, count(*) from v_current_safe group by 1 order by 2 desc;
 psql -c "select risk_tier, count(*) from v_current_scored group by 1 order by 2 desc;"
 
 # 변환 코드 대조
-sed -n '55,190p' product/src/adapters/real/MlRiskProvider.ts
+sed -n '56,190p' product/src/adapters/real/MlRiskProvider.ts
 ```
 
 ## 6. 미해결 항목

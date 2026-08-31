@@ -87,7 +87,7 @@ band는 누적이 아니라 **배타적 구간**이다. 화면 문구를 만들 
 
 ### 2.3 `confidence` 결정
 
-`safetyResult()` 186행. band와 별개 규칙이다.
+`safetyResult()` — 정의 149행, 판정부 `:155`(`current`)와 `:179-180`(`confidence`). band와 별개 규칙이다.
 
 ```
 confidence = (temporal_status == "current_target_week"
