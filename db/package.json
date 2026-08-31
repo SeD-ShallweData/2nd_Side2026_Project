@@ -17,7 +17,7 @@
     "studio": "drizzle-kit studio",
     "ingest": "bash scripts/ingest.sh",
     "ingest:industrial-safety": "bash scripts/ingest-industrial-safety.sh",
-    "test:industrial-safety-loader": "${INDUSTRIAL_SAFETY_PYTHON:-/data/shared-SeD/shared/model/weekly_workplace_risk_api_extension_v3_201512_202604/.venv/bin/python} -m unittest tests/test_industrial_safety_loader.py",
+    "test:industrial-safety-loader": "${INDUSTRIAL_SAFETY_PYTHON:?INDUSTRIAL_SAFETY_PYTHON을 지정하세요} -m unittest tests/test_industrial_safety_loader.py",
     "test:ingest-cli": "node --test tests/ingest-cli.test.mjs tests/ingest-industrial-safety-cli.test.mjs",
     "test:migration-drift": "node --test tests/migration-drift.test.mjs",
     "test:path-b-static": "node --test tests/path-b-bootstrap-static.test.mjs tests/path-b-canonical-timestamp-static.test.mjs tests/path-b-release-gate-static.test.mjs tests/path-b-sql-semantic-static.test.mjs",

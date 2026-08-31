@@ -25,7 +25,7 @@ catalog를 읽을 수 있어야 한다. `wg_bot`은 migration ledger 권한이 �
 
 ```bash
 cd db
-npm run check:migration-drift -- --env-file /data/shared-SeD/.env.local
+npm run check:migration-drift -- --env-file ./.env.local
 ```
 
 CI나 배포 환경에서는 파일 대신 별도 읽기 가능한 접속 URL을 사용할 수 있다.

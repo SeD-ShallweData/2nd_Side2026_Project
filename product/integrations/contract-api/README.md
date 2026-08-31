@@ -9,7 +9,7 @@ PYTHON312="${PYTHON312:-python3.12}"
 test "$("$PYTHON312" -I -S -c 'import platform, sys; print(sys.implementation.name, platform.python_version())')" = "cpython 3.12.13" || exit 1
 "$PYTHON312" -m venv .venv
 .venv/bin/python -m pip install --require-hashes -r requirements.lock
-API_KEY_ENV_FILE=/data/shared-SeD/api_key.env ./run.sh
+API_KEY_ENV_FILE=/경로/api_key.env ./run.sh   # 생략하면 환경변수의 키를 그대로 사용
 ```
 
 운영 설치에서는 `.venv` 전체를 `root:<CONTRACT_GROUP>` 소유로 바꾸고
