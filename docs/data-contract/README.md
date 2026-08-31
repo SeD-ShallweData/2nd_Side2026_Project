@@ -41,6 +41,7 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 | [`wage-risk.md`](wage-risk.md) | 임금체불 — 사용자 경로와 감독관 경로 분리, 판정·등급 매핑, 기준일, 식별키 | ✅ |
 | [`samples/`](samples/) | 상태별 API 응답 예시 5종 | ✅ |
 | [`safety-risk.md`](safety-risk.md) | 산업재해 — band 매핑, `provisional`·`research_only` 취급, 셀→사업장 배분 | ✅ |
+| [`verification.md`](verification.md) | **실측 검증** — 계약 수치와 운영 DB 대조 결과, 재현 명령 | ✅ |
 
 ### `samples/` 구성
 
