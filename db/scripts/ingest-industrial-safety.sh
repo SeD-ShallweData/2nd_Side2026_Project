@@ -10,8 +10,9 @@ MODE="validate-only"
 SCOPE="full"
 ENV_FILE="${DB_ENV_FILE:-$PROJECT_ROOT/.env.local}"
 CONFIG_FILE="$PROJECT_ROOT/config/industrial_safety_sources.v1.json"
-PYTHON_BIN="${INDUSTRIAL_SAFETY_PYTHON:-/data/shared-SeD/shared/model/weekly_workplace_risk_api_extension_v3_201512_202604/.venv/bin/python}"
-STAGE_PARENT="${INDUSTRIAL_SAFETY_STAGE_PARENT:-/data/shared-SeD}"
+# 기본값 없음. INDUSTRIAL_SAFETY_PYTHON 또는 --python 으로 지정한다.
+PYTHON_BIN="${INDUSTRIAL_SAFETY_PYTHON:-}"
+STAGE_PARENT="${INDUSTRIAL_SAFETY_STAGE_PARENT:-${TMPDIR:-/tmp}}"
 DB_STORAGE_TARGET="${INDUSTRIAL_SAFETY_DB_STORAGE_TARGET:-}"
 V2_ROOT="${INDUSTRIAL_SAFETY_V2_ROOT:-}"
 EXTENSION_ROOT="${INDUSTRIAL_SAFETY_EXTENSION_ROOT:-}"
@@ -152,6 +153,7 @@ fi
 unset PGPASSWORD PGOPTIONS PGSERVICE PGSERVICEFILE PGPASSFILE DB_PASSWORD BOT_PASSWORD
 unset PGHOST PGHOSTADDR PGPORT PGDATABASE PGUSER PGCONNECT_TIMEOUT
 
+[[ -n "$PYTHON_BIN" ]] || die "pandas/pyarrow가 설치된 python 경로를 INDUSTRIAL_SAFETY_PYTHON 또는 --python 으로 지정하세요"
 [[ -x "$PYTHON_BIN" ]] || die "Python is not executable: $PYTHON_BIN"
 [[ -f "$CONFIG_FILE" ]] || die "config not found: $CONFIG_FILE"
 python3 - "$PYTHON_BIN" <<'PY' || die "Python interpreter path is not trusted"

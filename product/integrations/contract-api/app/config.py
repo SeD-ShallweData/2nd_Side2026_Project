@@ -1,7 +1,7 @@
 """프로젝트 전역 설정.
 
-API 키는 팀 공용 원본(`/data/shared-SeD/api_key.env`)을 절대경로로 참조합니다.
-사본을 만들지 않습니다. 키 값은 절대 로그·응답에 노출하지 않습니다.
+API 키는 `API_KEY_ENV_FILE`이 가리키는 파일에서 읽습니다. 지정하지 않으면 읽지 않습니다.
+배포 unit은 이 값을 `/dev/null`로 고정합니다. 키 값은 절대 로그·응답에 노출하지 않습니다.
 """
 
 import os
@@ -34,7 +34,7 @@ CONTRACT_LOG_DIR = OUTPUT_DIR / "contract" / "reviews"    # 진단 로그
 FONT_DIR = DATA_DIR / "fonts"                          # 더미 PDF 생성용 한글 TTF
 
 # ── 키 로드 ───────────────────────────────────────────────────────────
-TEAM_ENV_FILE = os.getenv("API_KEY_ENV_FILE", "/data/shared-SeD/api_key.env")
+TEAM_ENV_FILE = os.getenv("API_KEY_ENV_FILE")
 LOCAL_ENV_FILE = Path(
     os.getenv("LOCAL_CONFIG_ENV_FILE", str(ROOT / "config.env"))
 )  # 선택. 모델명·포트 등 개인 오버라이드용; 배포 unit은 /dev/null로 고정

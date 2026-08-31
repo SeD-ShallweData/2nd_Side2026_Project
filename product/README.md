@@ -29,17 +29,18 @@ AI Rookie 및 창의종합설계 경진대회를 위한 구직자·근로자용 
 
 #### 1. 최초 설치 — 한 번만 수행
 
-먼저 저장소 안의 `product`로 이동합니다. 개인 폴더명과 저장소 위치가 다르면 자신의 경로에 맞게
-앞부분만 바꿉니다.
+각자 PC에 저장소를 clone한 뒤 `product`로 이동합니다.
 
 ```bash
-cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
+git clone https://github.com/SeD-ShallweData/2nd_Side2026_Project.git
+cd 2nd_Side2026_Project/product
 ```
 
-현재 AI Rookie 서버에서는 프로젝트용 Node.js 22를 PATH에 추가한 뒤 패키지를 설치합니다.
+Node.js는 22.x가 필요합니다(`engines: ">=22 <23"`). `node -v`로 확인하고, 버전이 맞지 않으면
+nvm 등으로 22를 사용한 뒤 패키지를 설치합니다.
 
 ```bash
-export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+node -v   # v22.x 확인
 node --version
 npm install
 ```
@@ -55,15 +56,16 @@ cp .env.example .env.local
 
 이미 `.env.local`을 수정했다면 위 명령을 다시 실행하지 않습니다. 다시 복사하면 기존 설정이
 `.env.example` 내용으로 초기화됩니다. 현재 기본값은 사업장 DB·ML, RAG, 계약서 분석과 두 LLM을
-모두 실제 연동으로 사용합니다. 팀 서버 설정은 다음 값인지 확인합니다.
+모두 실제 연동으로 사용합니다. 로컬에서는 읽기 전용 연결 문자열을 직접 지정하는 방식을 권장합니다.
 
 ```env
-DATABASE_ENV_FILE=/data/shared-SeD/.env.local
+BOT_DATABASE_URL=postgresql://읽기전용계정:비밀번호@127.0.0.1:5433/wageguard
 COMPANY_DATA_MODE=real
 CONTRACT_DATA_MODE=real
 ```
 
-`DATABASE_ENV_FILE`에서는 관리자 계정이 아니라 `BOT_USER`·`BOT_PASSWORD`만 읽습니다.
+파일에서 읽으려면 `DATABASE_ENV_FILE`에 각자 경로를 지정합니다. 지정하지 않으면 파일을 읽지
+않습니다. 이 파일에서는 관리자 계정이 아니라 `BOT_USER`·`BOT_PASSWORD`만 읽습니다.
 기존 `BOT_NAME`도 호환하지만 새 배포는 `BOT_USER`를 사용합니다. 비밀번호를
 `product`나 Git에 복사하지 않습니다. `mock` 모드는 단위 테스트와 별도 정적 HTML 시연본을 보존하기 위한
 명시적 개발 옵션일 뿐이며, 실제 연동 실패를 성공 결과로 바꾸는 자동 Mock 전환은 사용하지 않습니다.
@@ -122,8 +124,7 @@ DB·ML은 Next.js가 이미 실행 중인 PostgreSQL `wg_bot` 계정으로 직�
 터미널 1 — 공식 노동법 RAG:
 
 ```bash
-cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
-export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+cd 2nd_Side2026_Project/product
 npm run dev:rag
 ```
 
@@ -142,8 +143,7 @@ Running on http://127.0.0.1:5051
 터미널 2 — 계약서 분석:
 
 ```bash
-cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
-export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+cd 2nd_Side2026_Project/product
 npm run dev:contract
 ```
 
@@ -160,8 +160,7 @@ Next.js가 호출하는 내부 API를 제공합니다.
 터미널 3 — 통합 웹 UI와 API:
 
 ```bash
-cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
-export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+cd 2nd_Side2026_Project/product
 npm run dev
 ```
 
@@ -252,10 +251,10 @@ npm run build
 npm run start -- -H 127.0.0.1 -p 3111
 ```
 
-별도 터미널에서 프로젝트 외부의 개인 도구 폴더에 설치한 `cloudflared`로 터널을 실행합니다.
+별도 터미널에서 `cloudflared`로 터널을 실행합니다. 설치 위치는 각자 환경에 따라 다릅니다.
 
 ```bash
-/data/shared-SeD/jcu0304/.local/bin/cloudflared tunnel \
+cloudflared tunnel \
   --url http://127.0.0.1:3111 \
   --no-autoupdate
 ```
@@ -344,7 +343,7 @@ API 키와 숨은 시스템 프롬프트는 브라우저로 전송하지 않습�
 - `RealContractReviewProvider.ts`: 계약서 분석
 - `inspectorService.ts`: 감독관 위험큐·사업장 내부 지표 읽기 및 감독관용 듀얼 LLM 경계
 
-상담 키는 기본적으로 `/data/shared-SeD/api_key.env`에서 서버 런타임에만 읽습니다. 이 파일을 프로젝트로 복사하지 않으며 API 키나 원본 계약서는 Git에 저장하지 않습니다. 실제 DB/ML 어댑터와 계약서 분석은 기본적으로 `real`이며, 실제 공급자 장애를 Mock 성공처럼 숨기지 않습니다.
+상담 키는 환경변수(`UPSTAGE_API_KEY`·`SKT_API_KEY`)로 주입하거나 `SHARED_API_KEY_FILE`이 가리키는 파일에서 서버 런타임에만 읽습니다. 지정하지 않으면 파일을 읽지 않습니다. 키 파일을 프로젝트로 복사하지 않으며 API 키나 원본 계약서는 Git에 저장하지 않습니다. 실제 DB/ML 어댑터와 계약서 분석은 기본적으로 `real`이며, 실제 공급자 장애를 Mock 성공처럼 숨기지 않습니다.
 
 ## 설계 문서
 
