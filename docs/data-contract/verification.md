@@ -3,9 +3,10 @@
 - 검증일: **2026-08-31 16:00 KST**
 - 대상 DB: 운영 PostgreSQL 16 (Path B 복원본)
 - 대조 대상: [`wage-risk.md`](wage-risk.md) · [`safety-risk.md`](safety-risk.md) · [`README.md`](README.md)
-- 결과: **불일치 0건**
+- 결과: **수치 불일치 0건** · **표시 규칙 위반 1건** (9.3절 — 감독관 `reasons` 영문명 노출)
 
-> 계약 문서에 적힌 수치가 실제 DB와 같은지 확인한 기록이다.
+> 계약 문서에 적힌 수치가 실제 DB와 같은지(2~8절), 그리고 실제 API 응답이 계약대로
+> 표시되는지(9절) 확인한 기록이다.
 > 모든 항목에 **재현 명령**을 붙였다. 같은 명령으로 같은 값이 나와야 한다.
 > 값이 달라졌다면 배치가 바뀐 것이므로 **계약 문서와 이 파일을 함께 갱신**한다.
 
@@ -135,7 +136,75 @@ pg_description (public + industrial_safety) : 0건
 | `배제_` 접두가 `VERDICT_META` 조회보다 **먼저** 적용 | `:79` `startsWith("배제_")` | ✅ |
 | `안정신호`→`normal` · `유보`→`watch` · `유보_정보부족`→`unknown` | `VERDICT_META` | ✅ |
 
-## 9. 재현 명령
+## 9. 표시 검증 — 실제 API 응답
+
+**2026-08-31 16:2x KST**, 서버 내부(`127.0.0.1:3111`)에서 **6개 판정 상태 × 2개 라우트 = 12건**
+호출. 전부 HTTP 200. 인증 없으면 401.
+
+```
+구직자   GET /api/companies/{firm_id}/risk
+감독관   GET /api/inspector/companies/{firm_id}
+```
+
+### 9.1 구직자 라우트 — 통과
+
+| 검증 | 결과 |
+| --- | :-: |
+| `판정` → `SignalLevel` 매핑 6상태 | `배제_*`→`review` · `안정신호`→`normal` · `유보`→`watch` · `유보_정보부족`→`unknown` ✅ |
+| `risk_tier`·`risk_full`·`shap_value`·`percentile`·`raw_probability` 노출 | **0건** ✅ |
+| 영문 원본 피처명 노출 | **0건** ✅ |
+| 기준일 `data_as_of`·`target_month` | 6상태 전부 존재 ✅ |
+| `sources[]` | 6상태 전부 2건, 모두 `organization`·`as_of` 보유 ✅ |
+| `valid_until` | 6상태 전부 `null` — [`samples/`](samples/) 와 일치 ✅ |
+| `unknown` 이 `normal` 로 바뀌지 않음 | `유보_정보부족` → `unknown` 유지 ✅ |
+
+### 9.2 감독관 라우트 — 원점수 처리는 적절
+
+`model_score` 로 원점수가 나가지만 **확률로 오해되지 않도록 방어돼 있다.**
+
+```json
+"grade": "긴급",
+"model_score": 0.990447,
+"score_interpretation": "relative_model_score_not_probability",
+"rank": 1
+```
+
+`limitations[]` 3개가 함께 나간다 —
+*"모델 원점수는 실제 임금체불 확률이 아니며 순위·분위·등급으로만 해석합니다."* 등 ✅
+
+> ⚠️ **API 키 이름이 DB 컬럼과 다르다.** 문자열 검사로 점검할 때 놓치기 쉽다.
+>
+> | API 키 | DB 컬럼 |
+> | --- | --- |
+> | `wage_risk.grade` | `inspector_queue.queue_priority` (4.5절) |
+> | `wage_risk.model_score` | `scored_active.risk_full` |
+> | `industrial_safety.priority_band` | `provisional_population_priority_band` |
+
+`grade` 값 4종과 건수는 **4.5절 표와 일치**한다 — 긴급 100 · 우선 400 · 주의 1,000 · 관찰 1,500.
+
+### 9.3 🔴 위반 1건 — 감독관 `reasons` 에 영문 원본명이 그대로 나간다
+
+큐 1순위 사업장의 실제 응답:
+
+```json
+"reasons": ["체납액", "imputed_months_count", "door1_maxmonths"]
+```
+
+**3개 중 2개가 영문 원본 피처명이다.** 감독관 화면에 그대로 표시되면
+`imputed_months_count` 라는 변수명을 사람이 읽게 된다.
+
+[`wage-risk.md` 4.6절](wage-risk.md)의 표시 규칙 1번 —
+*"영문 원본명을 화면에 그대로 노출하지 않는다"* — 을 **API가 지키지 않고 있다.**
+
+| 필요한 조치 | 담당 |
+| --- | --- |
+| 영문 11종의 정의·산출식 제공 (저장소에 없음) | 모델 담당 |
+| 한글 라벨 확정 | 정보설계 담당 |
+| 라벨 매핑을 API 또는 화면에 적용. 라벨 없으면 `사유 확인 필요` | 화면 담당 |
+
+> `product/src/**` 는 담당 경로 밖이라 **이 문서는 사실만 기록한다.** 코드는 고치지 않았다.
+
+## 10. 재현 명령
 
 서버에서 실행한다. `wg_bot`(읽기 전용)으로도 대부분 확인할 수 있다.
 
@@ -172,14 +241,18 @@ select count(*) from pg_description d
  where n.nspname in ('public','industrial_safety');               -- 0
 ```
 
-## 10. 불일치·미확인
+## 11. 불일치·미확인
 
 **불일치: 0건.** 계약 문서에서 정정할 항목은 나오지 않았다.
 
+**표시 검증(9절)에서 위반 1건** — 감독관 `reasons` 의 영문 원본명 노출.
+계약 수치 자체의 불일치는 아니며, **화면 표기 미확정 항목**이다.
+
 | 미확인 | 내용 |
 | --- | --- |
-| 감독관 API 응답 | `/api/inspector/companies/{id}` 를 **아직 호출하지 않았다.** 영문 피처명이 실제로 노출되는지 미검증 |
-| `sources[]` 채움 | 구직자 응답 1건(`normal` 상태)만 확인. 4상태 전부는 미확인 |
+| `valid_until` 규정 | 전 상태 `null` 로 일관되나 **계약 문서에 필드 정의가 없다.** 채울 계획이 있는지 미확정 |
+| 산업재해 4상태 | 구직자 응답의 `safety_context` 는 `normal` 만 확인. 밴드별 상태는 미검증 |
+| 실제 화면 | API 응답만 봤다. **렌더링된 화면 문구는 미확인** |
 
 > 이 문서에는 **실존 사업장명·`firm_id` 를 싣지 않는다.** 저장소가 공개다.
 > 응답 형태는 [`samples/`](samples/) 의 `COMPANY_DEMO_*` 합성 식별자를 쓴다.

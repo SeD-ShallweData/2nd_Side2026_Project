@@ -41,7 +41,7 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 | [`wage-risk.md`](wage-risk.md) | 임금체불 — 사용자 경로와 감독관 경로 분리, 판정·등급 매핑, 기준일, 식별키 | ✅ |
 | [`samples/`](samples/) | 상태별 API 응답 예시 5종 | ✅ |
 | [`safety-risk.md`](safety-risk.md) | 산업재해 — band 매핑, `provisional`·`research_only` 취급, 셀→사업장 배분 | ✅ |
-| [`verification.md`](verification.md) | **실측 검증** — 계약 수치와 운영 DB 대조 결과, 재현 명령 | ✅ |
+| [`verification.md`](verification.md) | **실측 검증** — 계약 수치와 운영 DB 대조, **실제 API 응답 표시 검증**, 재현 명령 | ✅ |
 
 ### `samples/` 구성
 
@@ -138,7 +138,7 @@ sed -n '55,190p' product/src/adapters/real/MlRiskProvider.ts
 | 2 | **테스트 블록리스트에 `risk_tier` 없음** — 숫자 원점수는 막지만 등급 라벨은 통과한다 | 인프라 담당 |
 | 3 | `watch` 85.7% 편중을 반영한 위험카드 시각 설계 | 화면 담당 · 정보설계 담당 |
 | 4 | 화면별 기준일 표시(`as_of_date` vs `target_month`) 지정 | 화면 담당 · 정보설계 담당 |
-| 5 | `inspector_queue.reasons` 의 **영문 원본 피처명 11종** 라벨화 — **선행: 저장소에 정의가 없어 모델 담당의 피처 사전이 먼저 필요** ([wage-risk.md 4.6](wage-risk.md)) | 모델 담당 → 정보설계 담당 |
+| 5 | `inspector_queue.reasons` 의 **영문 원본 피처명 11종** 라벨화 — 🔴 **운영 API에서 노출 확인됨** ([verification.md 9.3](verification.md)). 선행: 저장소에 정의가 없어 피처 사전이 먼저 필요 ([wage-risk.md 4.6](wage-risk.md)) | 모델 담당 → 정보설계 담당 |
 | 6 | 미연결 3개 지표(이직률·고용 추이·데이터 충실도) 공개 데이터 계약 | ML·DB 검토 담당 (별도 과제) |
 
 6번은 본선 제안서 3.1.5의 보완 과제이며 공개 데이터 조사가 필요해 일정을 별도로 잡는다.
