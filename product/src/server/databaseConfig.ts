@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { parseEnvText } from "@/server/envText";
 
-const DEFAULT_DATABASE_ENV_FILE = "/data/shared-SeD/.env.local";
 const PLACEHOLDER_PATTERN = /READ_ONLY_USER|CHANGE_ME/i;
 
 function validDirectUrl(value: string | undefined): string | undefined {
@@ -11,7 +10,8 @@ function validDirectUrl(value: string | undefined): string | undefined {
 }
 
 function readDatabaseValues(): Record<string, string> {
-  const path = process.env.DATABASE_ENV_FILE?.trim() || DEFAULT_DATABASE_ENV_FILE;
+  const path = process.env.DATABASE_ENV_FILE?.trim();
+  if (!path) return {};
   try {
     return parseEnvText(readFileSync(/* turbopackIgnore: true */ path, "utf8"));
   } catch {
