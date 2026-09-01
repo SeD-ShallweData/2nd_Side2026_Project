@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { CommunityPostDto } from "@/app/api/community/communityApiContract";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { companyContextLabel, relativeTimeLabel } from "@/components/community/communityFormat";
+import { CommunityPostDeleteButton } from "@/components/community/CommunityPostDeleteButton";
 import { CommunityReportForm } from "@/components/community/CommunityReportForm";
 import { CommunityApiError, getCommunityPost } from "@/services/communityClient";
 
@@ -68,6 +69,16 @@ export function CommunityPostDetail({ postId }: { postId: string }) {
             <strong>{post.like_count === null ? null : `공감 ${post.like_count}　`}댓글 {post.comment_count}</strong>
           </article>
           <p className="field-help">댓글과 공감은 아직 제공하지 않습니다. 위 숫자는 현재 표시용 값입니다.</p>
+          {post.viewer_permissions.can_edit ? (
+            <p className="field-help">
+              <Link href={`/community/${encodeURIComponent(post.post_id)}/edit`} className="button button-outline button-small">
+                게시글 수정
+              </Link>
+            </p>
+          ) : null}
+          {post.viewer_permissions.can_delete ? (
+            <CommunityPostDeleteButton key={post.post_id} postId={post.post_id} />
+          ) : null}
           {post.capabilities.reports && post.viewer_permissions.can_report ? (
             <CommunityReportForm key={post.post_id} postId={post.post_id} />
           ) : null}

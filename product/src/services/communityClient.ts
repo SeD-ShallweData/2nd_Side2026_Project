@@ -5,6 +5,8 @@ import type {
   CommunityReportReceiptDto,
   CreateCommunityPostRequest,
   CreateCommunityReportRequest,
+  DeleteCommunityPostResponse,
+  UpdateCommunityPostRequest,
 } from "@/app/api/community/communityApiContract";
 import type { ErrorDetail } from "@/utils/errors";
 
@@ -100,9 +102,9 @@ async function requestCommunityApi<T>(
   return parsed as T;
 }
 
-function jsonMutation(body: unknown): RequestInit {
+function jsonMutation(method: "POST" | "PATCH", body: unknown): RequestInit {
   return {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   };
@@ -125,6 +127,17 @@ function toCreatePostBody(input: CreateCommunityPostRequest): CreateCommunityPos
     title: input.title,
     body: input.body,
   };
+  if (input.company_id !== undefined) body.company_id = input.company_id;
+  if (input.anonymous !== undefined) body.anonymous = input.anonymous;
+  return body;
+}
+
+// PATCH는 전달한 키만 반영하는 부분 수정이므로 지정된 필드만 담는다.
+function toUpdatePostBody(input: UpdateCommunityPostRequest): UpdateCommunityPostRequest {
+  const body: UpdateCommunityPostRequest = {};
+  if (input.category !== undefined) body.category = input.category;
+  if (input.title !== undefined) body.title = input.title;
+  if (input.body !== undefined) body.body = input.body;
   if (input.company_id !== undefined) body.company_id = input.company_id;
   if (input.anonymous !== undefined) body.anonymous = input.anonymous;
   return body;
@@ -164,7 +177,31 @@ export async function createCommunityPost(
 ): Promise<CommunityPostDto> {
   return requestCommunityApi<CommunityPostDto>(
     COMMUNITY_POSTS_PATH,
-    jsonMutation(toCreatePostBody(input)),
+    jsonMutation("POST", toCreatePostBody(input)),
+    options,
+  );
+}
+
+export async function updateCommunityPost(
+  postId: string,
+  input: UpdateCommunityPostRequest,
+  options: CommunityRequestOptions = {},
+): Promise<CommunityPostDto> {
+  return requestCommunityApi<CommunityPostDto>(
+    `${COMMUNITY_POSTS_PATH}/${encodeURIComponent(postId)}`,
+    jsonMutation("PATCH", toUpdatePostBody(input)),
+    options,
+  );
+}
+
+export async function deleteCommunityPost(
+  postId: string,
+  options: CommunityRequestOptions = {},
+): Promise<DeleteCommunityPostResponse> {
+  // 계약상 요청 본문이 없으므로 Content-Type도 보내지 않는다.
+  return requestCommunityApi<DeleteCommunityPostResponse>(
+    `${COMMUNITY_POSTS_PATH}/${encodeURIComponent(postId)}`,
+    { method: "DELETE" },
     options,
   );
 }
@@ -176,7 +213,7 @@ export async function reportCommunityPost(
 ): Promise<CommunityReportReceiptDto> {
   return requestCommunityApi<CommunityReportReceiptDto>(
     `${COMMUNITY_POSTS_PATH}/${encodeURIComponent(postId)}/reports`,
-    jsonMutation(toCreateReportBody(input)),
+    jsonMutation("POST", toCreateReportBody(input)),
     options,
   );
 }

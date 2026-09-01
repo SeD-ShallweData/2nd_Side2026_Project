@@ -4,14 +4,17 @@ import type {
   CommunityPostListResponse,
   CommunityReportReceiptDto,
   CreateCommunityPostRequest,
+  UpdateCommunityPostRequest,
 } from "@/app/api/community/communityApiContract";
 import samples from "@/app/api/community/sample-responses.json";
 import {
   CommunityApiError,
   createCommunityPost,
+  deleteCommunityPost,
   getCommunityPost,
   listCommunityPosts,
   reportCommunityPost,
+  updateCommunityPost,
 } from "@/services/communityClient";
 
 const POST_LIST = samples.post_list as unknown as CommunityPostListResponse;
@@ -266,6 +269,197 @@ describe("커뮤니티 게시글 신고", () => {
       reason: "privacy",
       detail: "개인정보가 포함되어 있습니다.",
     });
+  });
+});
+
+describe("커뮤니티 게시글 수정", () => {
+  it("PATCH로 수정된 게시글 DTO를 반환한다", async () => {
+    const fetchImpl = createFetchMock(jsonResponse(POST_DETAIL));
+
+    const result = await updateCommunityPost("post_mock_001", { title: "수정한 제목" }, { fetchImpl });
+
+    expect(result).toEqual(POST_DETAIL);
+
+    const { path, init } = readCall(fetchImpl);
+    expect(path).toBe("/api/community/posts/post_mock_001");
+    expect(init.method).toBe("PATCH");
+    expect(init.headers).toEqual({ "Content-Type": "application/json" });
+  });
+
+  it("지정한 필드만 부분 수정 본문에 담는다", async () => {
+    const fetchImpl = createFetchMock(jsonResponse(POST_DETAIL));
+
+    await updateCommunityPost("post_mock_001", { title: "제목만 수정" }, { fetchImpl });
+
+    expect(readJsonBody(readCall(fetchImpl).init)).toEqual({ title: "제목만 수정" });
+  });
+
+  it("명세에 없는 필드는 전송하지 않는다", async () => {
+    const fetchImpl = createFetchMock(jsonResponse(POST_DETAIL));
+    const input = {
+      title: "수정한 제목",
+      post_id: "덮어쓰기 시도",
+      status: "published",
+    } as unknown as UpdateCommunityPostRequest;
+
+    await updateCommunityPost("post_mock_001", input, { fetchImpl });
+
+    expect(Object.keys(readJsonBody(readCall(fetchImpl).init))).toEqual(["title"]);
+  });
+
+  it("company_id를 null로 지정하면 null을 전송한다", async () => {
+    const fetchImpl = createFetchMock(jsonResponse(POST_DETAIL));
+
+    await updateCommunityPost("post_mock_001", { company_id: null }, { fetchImpl });
+
+    expect(readJsonBody(readCall(fetchImpl).init)).toEqual({ company_id: null });
+  });
+
+  it("바뀐 값이 없으면 빈 본문을 그대로 보내고 서버 판단에 맡긴다", async () => {
+    const fetchImpl = createFetchMock(
+      errorResponse(400, "VALIDATION_ERROR", "수정할 항목이 없습니다."),
+    );
+
+    const caught = await captureError(updateCommunityPost("post_mock_001", {}, { fetchImpl }));
+
+    expect(readJsonBody(readCall(fetchImpl).init)).toEqual({});
+    expect(caught).toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+  });
+
+  it("postId를 encodeURIComponent로 감싼다", async () => {
+    const fetchImpl = createFetchMock(jsonResponse(POST_DETAIL));
+
+    await updateCommunityPost("post/mock 001", { title: "수정한 제목" }, { fetchImpl });
+
+    expect(readCall(fetchImpl).path).toBe("/api/community/posts/post%2Fmock%20001");
+  });
+});
+
+describe("커뮤니티 게시글 삭제", () => {
+  it("DELETE로 삭제 결과를 반환한다", async () => {
+    const fetchImpl = createFetchMock(jsonResponse({ deleted: true, post_id: "post_mock_001" }));
+
+    const result = await deleteCommunityPost("post_mock_001", { fetchImpl });
+
+    expect(result).toEqual({ deleted: true, post_id: "post_mock_001" });
+
+    const { path, init } = readCall(fetchImpl);
+    expect(path).toBe("/api/community/posts/post_mock_001");
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("본문과 Content-Type 없이 요청한다", async () => {
+    const fetchImpl = createFetchMock(jsonResponse({ deleted: true, post_id: "post_mock_001" }));
+
+    await deleteCommunityPost("post_mock_001", { fetchImpl });
+
+    const { init } = readCall(fetchImpl);
+    expect(init.body).toBeUndefined();
+    expect(init.headers).toBeUndefined();
+  });
+
+  it("postId를 encodeURIComponent로 감싼다", async () => {
+    const fetchImpl = createFetchMock(jsonResponse({ deleted: true, post_id: "x" }));
+
+    await deleteCommunityPost("post/mock 001", { fetchImpl });
+
+    expect(readCall(fetchImpl).path).toBe("/api/community/posts/post%2Fmock%20001");
+  });
+});
+
+describe("수정·삭제 오류 분기", () => {
+  interface MutationErrorCase {
+    label: string;
+    status: number;
+    code: string;
+    invoke: (fetchImpl: FetchMock) => Promise<unknown>;
+  }
+
+  const MUTATION_ERROR_CASES: MutationErrorCase[] = [
+    { label: "수정 로그인 필요", status: 401, code: "AUTHENTICATION_REQUIRED", invoke: (fetchImpl) => updateCommunityPost("post_mock_001", { title: "수정" }, { fetchImpl }) },
+    { label: "수정 소유자 아님", status: 403, code: "RESOURCE_OWNERSHIP_REQUIRED", invoke: (fetchImpl) => updateCommunityPost("post_mock_001", { title: "수정" }, { fetchImpl }) },
+    { label: "수정 교차 출처 차단", status: 403, code: "CROSS_SITE_REQUEST_REJECTED", invoke: (fetchImpl) => updateCommunityPost("post_mock_001", { title: "수정" }, { fetchImpl }) },
+    { label: "수정 게시글 없음", status: 404, code: "COMMUNITY_POST_NOT_FOUND", invoke: (fetchImpl) => updateCommunityPost("post_missing", { title: "수정" }, { fetchImpl }) },
+    { label: "수정 사업장 없음", status: 404, code: "COMPANY_NOT_FOUND", invoke: (fetchImpl) => updateCommunityPost("post_mock_001", { company_id: "NO_SUCH" }, { fetchImpl }) },
+    { label: "수정 불가 상태", status: 409, code: "COMMUNITY_POST_NOT_EDITABLE", invoke: (fetchImpl) => updateCommunityPost("post_mock_001", { title: "수정" }, { fetchImpl }) },
+    { label: "수정 본문 크기 초과", status: 413, code: "REQUEST_BODY_TOO_LARGE", invoke: (fetchImpl) => updateCommunityPost("post_mock_001", { title: "수정" }, { fetchImpl }) },
+    { label: "수정 지원하지 않는 형식", status: 415, code: "UNSUPPORTED_MEDIA_TYPE", invoke: (fetchImpl) => updateCommunityPost("post_mock_001", { title: "수정" }, { fetchImpl }) },
+    { label: "수정 저장소 미연결", status: 503, code: "COMMUNITY_PROVIDER_UNAVAILABLE", invoke: (fetchImpl) => updateCommunityPost("post_mock_001", { title: "수정" }, { fetchImpl }) },
+    { label: "삭제 로그인 필요", status: 401, code: "AUTHENTICATION_REQUIRED", invoke: (fetchImpl) => deleteCommunityPost("post_mock_001", { fetchImpl }) },
+    { label: "삭제 소유자 아님", status: 403, code: "RESOURCE_OWNERSHIP_REQUIRED", invoke: (fetchImpl) => deleteCommunityPost("post_mock_001", { fetchImpl }) },
+    { label: "삭제 교차 출처 차단", status: 403, code: "CROSS_SITE_REQUEST_REJECTED", invoke: (fetchImpl) => deleteCommunityPost("post_mock_001", { fetchImpl }) },
+    { label: "삭제 게시글 없음", status: 404, code: "COMMUNITY_POST_NOT_FOUND", invoke: (fetchImpl) => deleteCommunityPost("post_missing", { fetchImpl }) },
+    { label: "삭제 식별값 오류", status: 400, code: "VALIDATION_ERROR", invoke: (fetchImpl) => deleteCommunityPost("   ", { fetchImpl }) },
+    { label: "삭제 저장소 미연결", status: 503, code: "COMMUNITY_PROVIDER_UNAVAILABLE", invoke: (fetchImpl) => deleteCommunityPost("post_mock_001", { fetchImpl }) },
+    { label: "삭제 내부 오류", status: 500, code: "INTERNAL_ERROR", invoke: (fetchImpl) => deleteCommunityPost("post_mock_001", { fetchImpl }) },
+  ];
+
+  it.each(MUTATION_ERROR_CASES)("$label — status $status와 code $code를 그대로 전달한다", async ({ status, code, invoke }) => {
+    const fetchImpl = createFetchMock(errorResponse(status, code, "서버가 보낸 메시지"));
+
+    const caught = await captureError(invoke(fetchImpl));
+
+    expect(caught).toBeInstanceOf(CommunityApiError);
+    expect(caught).toMatchObject({ status, code, requestId: "req_test_0001" });
+  });
+
+  it("수정 검증 오류의 details를 보존한다", async () => {
+    const fetchImpl = createFetchMock(
+      jsonResponse(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "게시글 입력값을 확인해 주세요.",
+            details: [{ field: "title", reason: "title은 2자 이상 120자 이하여야 합니다." }],
+            retryable: false,
+            request_id: "req_edit",
+          },
+        },
+        400,
+      ),
+    );
+
+    const caught = (await captureError(
+      updateCommunityPost("post_mock_001", { title: "가" }, { fetchImpl }),
+    )) as CommunityApiError;
+
+    expect(caught.details).toEqual([
+      { field: "title", reason: "title은 2자 이상 120자 이하여야 합니다." },
+    ]);
+    expect(caught.requestId).toBe("req_edit");
+  });
+
+  it("수정 응답이 JSON이 아니면 기본 오류로 처리한다", async () => {
+    const fetchImpl = createFetchMock(
+      new Response("<html>500</html>", { status: 500, headers: { "content-type": "text/html" } }),
+    );
+
+    const caught = await captureError(updateCommunityPost("post_mock_001", { title: "수정" }, { fetchImpl }));
+
+    expect(caught).toMatchObject({ status: 500, code: "UNEXPECTED_ERROR_RESPONSE", retryable: true });
+  });
+
+  it("삭제의 네트워크 오류를 CommunityApiError로 바꾸지 않는다", async () => {
+    const fetchImpl = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
+    const networkError = new TypeError("fetch failed");
+    fetchImpl.mockRejectedValue(networkError);
+
+    const caught = await captureError(deleteCommunityPost("post_mock_001", { fetchImpl }));
+
+    expect(caught).toBe(networkError);
+    expect(caught).not.toBeInstanceOf(CommunityApiError);
+  });
+
+  it("수정 요청의 AbortError를 그대로 전달한다", async () => {
+    const fetchImpl = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
+    const abortError = new DOMException("The operation was aborted.", "AbortError");
+    fetchImpl.mockRejectedValue(abortError);
+
+    const caught = await captureError(updateCommunityPost("post_mock_001", { title: "수정" }, { fetchImpl }));
+
+    expect(caught).toBe(abortError);
+    expect((caught as DOMException).name).toBe("AbortError");
+    expect(caught).not.toBeInstanceOf(CommunityApiError);
   });
 });
 
