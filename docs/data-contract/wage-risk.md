@@ -92,6 +92,42 @@ POL-03 금지 목록을 따른다. 추가로 이 계약에서 명시한다.
 
 `판정` 원문은 근거 코드(`INSURANCE_PAYMENT_REVIEW` 등)로 변환해 내보낸다.
 
+### 3.4 LLM 상담에 넘어가는 범위 — `company_id` 가 있을 때만
+
+**POL-07** — *"신호 조회, 회사 컨텍스트 상담, 이력 연결은 `company_id`를 사용한다.
+사업장명이 비슷하다는 이유로 다른 회사의 수치나 공식 명단 상태를 인용하지 않는다."*
+
+코드가 이 정책을 4단계로 강제한다 **[실측 2026-09-02]**.
+
+| 단계 | 위치 | 동작 |
+| ---: | --- | --- |
+| 1 | `chatComparisonService.ts:155` | `if (request.company_id)` — 없으면 회사 조회 자체를 안 한다 |
+| 2 | `chatComparisonService.ts:158` | `getCompanyRisk()` → `CompanyRiskResult`. **금지 필드가 타입에 없다** |
+| 3 | `DualLlmChatProvider.ts:69-79` | `companyContext ? {…} : null` — 없으면 `company: null` 로 프롬프트 구성 |
+| 4 | `DualLlmChatProvider.ts:124-125` | `context_mode` · `company_context_attached` 로 첨부 여부를 기록 |
+
+프롬프트에 들어가는 회사 필드는 **7개뿐**이다.
+
+```
+company_id · company_name · address · region · industry · size_label
+public_signal_result   ← CompanyRiskResult (구직자 응답과 같은 형태)
+```
+
+`public_signal_result` 는 **구직자 API 응답과 같은 타입**이라
+`risk_full`·`risk_tier`·`shap_value`·`percentile`·`model_score` 가 **구조적으로 들어갈 수 없다**.
+
+#### 대화 기억 구조에 적용할 것
+
+| # | 규칙 | 이유 |
+| ---: | --- | --- |
+| 1 | 회사 컨텍스트는 **`company_id` 로만** 붙인다 | 사업장명 유추 금지 (POL-07) |
+| 2 | 기억에 **ML 수치를 저장하지 않는다** | POL-03 금지 목록 |
+| 3 | 저장은 **`company_id` + 조회 시점**까지. 값은 **매번 다시 조회**한다 | 배치가 갱신되면 값이 바뀐다. 기억된 값은 낡는다 |
+| 4 | 감독관 컨텍스트를 외부 LLM에 보내려면 **명시적 승인**이 필요하다 | `inspectorPolicy.test.ts:8` 이 검사한다 |
+
+> 3번이 특히 중요하다. `as_of_date` 는 6개월 주기로 바뀐다.
+> **어제 기억한 `유보` 가 오늘도 `유보` 라는 보장이 없다.**
+
 ## 4. 감독관 경로 — `scored_active.risk_tier`
 
 ### 4.1 등급 정의
