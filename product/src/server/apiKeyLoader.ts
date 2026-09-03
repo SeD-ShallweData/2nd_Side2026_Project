@@ -5,10 +5,10 @@ import { parseEnvText } from "@/server/envText";
 
 export { parseEnvText } from "@/server/envText";
 
-const DEFAULT_SHARED_KEY_FILE = "/data/shared-SeD/api_key.env";
 
 function readSharedValues(): Record<string, string> {
-  const path = process.env.SHARED_API_KEY_FILE || DEFAULT_SHARED_KEY_FILE;
+  const path = process.env.SHARED_API_KEY_FILE?.trim();
+  if (!path) return {};
   try {
     return parseEnvText(readFileSync(/* turbopackIgnore: true */ path, "utf8"));
   } catch {

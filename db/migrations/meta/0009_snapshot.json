@@ -1,0 +1,4487 @@
+{
+  "id": "57689f84-e02f-4878-8210-ceb8a6f13e78",
+  "prevId": "5ad87d11-627d-4be7-ad01-0281717b63e8",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.batches": {
+      "name": "batches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "batches_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "as_of_date": {
+          "name": "as_of_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_month": {
+          "name": "target_month",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model_version": {
+          "name": "model_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model_sha": {
+          "name": "model_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ingested_at": {
+          "name": "ingested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "n_scored": {
+          "name": "n_scored",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "n_queue": {
+          "name": "n_queue",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "n_safe": {
+          "name": "n_safe",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "batches_asof_model_uq": {
+          "name": "batches_asof_model_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "as_of_date",
+            "model_version"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.comments": {
+      "name": "comments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "post_id": {
+          "name": "post_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anonymous": {
+          "name": "anonymous",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "comments_post_idx": {
+          "name": "comments_post_idx",
+          "columns": [
+            {
+              "expression": "post_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "comments_post_id_posts_id_fk": {
+          "name": "comments_post_id_posts_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "posts",
+          "columnsFrom": [
+            "post_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "comments_author_id_users_id_fk": {
+          "name": "comments_author_id_users_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.feedback": {
+      "name": "feedback",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "feedback_user_id_users_id_fk": {
+          "name": "feedback_user_id_users_id_fk",
+          "tableFrom": "feedback",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "feedback_category_ck": {
+          "name": "feedback_category_ck",
+          "value": "\"feedback\".\"category\" in ('버그제보','기능제안','기타')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.firms": {
+      "name": "firms",
+      "schema": "",
+      "columns": {
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "corp_key": {
+          "name": "corp_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "biz_no": {
+          "name": "biz_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sido": {
+          "name": "sido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "industry": {
+          "name": "industry",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_seen": {
+          "name": "first_seen",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_seen": {
+          "name": "last_seen",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "firms_name_idx": {
+          "name": "firms_name_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "firms_biz_no_idx": {
+          "name": "firms_biz_no_idx",
+          "columns": [
+            {
+              "expression": "biz_no",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "firms_corp_key_idx": {
+          "name": "firms_corp_key_idx",
+          "columns": [
+            {
+              "expression": "corp_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "firms_sido_idx": {
+          "name": "firms_sido_idx",
+          "columns": [
+            {
+              "expression": "sido",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "industrial_safety.cell_label_datasets": {
+      "name": "cell_label_datasets",
+      "schema": "industrial_safety",
+      "columns": {
+        "label_dataset_id": {
+          "name": "label_dataset_id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "cell_label_datasets_label_dataset_id_seq",
+            "schema": "industrial_safety",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "source_run_id": {
+          "name": "source_run_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dataset_code": {
+          "name": "dataset_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_system": {
+          "name": "source_system",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_basis": {
+          "name": "time_basis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_definition": {
+          "name": "target_definition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approval_year_inference": {
+          "name": "approval_year_inference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label_maturity_window": {
+          "name": "label_maturity_window",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "record_unit": {
+          "name": "record_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "complete_through_week_start": {
+          "name": "complete_through_week_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "workplace_identifier_available": {
+          "name": "workplace_identifier_available",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_unique_accident_event_count": {
+          "name": "is_unique_accident_event_count",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "validated_workplace_probability_available": {
+          "name": "validated_workplace_probability_available",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "artifact_path": {
+          "name": "artifact_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "artifact_sha256": {
+          "name": "artifact_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expected_row_count": {
+          "name": "expected_row_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "loaded_row_count": {
+          "name": "loaded_row_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cell_label_datasets_source_run_fk": {
+          "name": "cell_label_datasets_source_run_fk",
+          "tableFrom": "cell_label_datasets",
+          "tableTo": "pipeline_runs",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "source_run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "cell_label_datasets_run_code_uq": {
+          "name": "cell_label_datasets_run_code_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "source_run_id",
+            "dataset_code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "cell_label_datasets_time_basis_ck": {
+          "name": "cell_label_datasets_time_basis_ck",
+          "value": "\"industrial_safety\".\"cell_label_datasets\".\"time_basis\" in ('occurrence_week','approval_week')"
+        },
+        "cell_label_datasets_sha_ck": {
+          "name": "cell_label_datasets_sha_ck",
+          "value": "\"industrial_safety\".\"cell_label_datasets\".\"artifact_sha256\" ~ '^[0-9a-f]{64}$'"
+        },
+        "cell_label_datasets_rows_ck": {
+          "name": "cell_label_datasets_rows_ck",
+          "value": "\"industrial_safety\".\"cell_label_datasets\".\"expected_row_count\" >= 0 and (\"industrial_safety\".\"cell_label_datasets\".\"loaded_row_count\" is null or \"industrial_safety\".\"cell_label_datasets\".\"loaded_row_count\" >= 0)"
+        },
+        "cell_label_datasets_loaded_ck": {
+          "name": "cell_label_datasets_loaded_ck",
+          "value": "\"industrial_safety\".\"cell_label_datasets\".\"loaded_row_count\" is null or \"industrial_safety\".\"cell_label_datasets\".\"loaded_row_count\" = \"industrial_safety\".\"cell_label_datasets\".\"expected_row_count\""
+        },
+        "cell_label_datasets_complete_week_ck": {
+          "name": "cell_label_datasets_complete_week_ck",
+          "value": "\"industrial_safety\".\"cell_label_datasets\".\"complete_through_week_start\" is null or extract(isodow from \"industrial_safety\".\"cell_label_datasets\".\"complete_through_week_start\") = 1"
+        },
+        "cell_label_datasets_metadata_ck": {
+          "name": "cell_label_datasets_metadata_ck",
+          "value": "jsonb_typeof(\"industrial_safety\".\"cell_label_datasets\".\"metadata\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "industrial_safety.cell_week_labels": {
+      "name": "cell_week_labels",
+      "schema": "industrial_safety",
+      "columns": {
+        "label_dataset_id": {
+          "name": "label_dataset_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "week_start": {
+          "name": "week_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sido": {
+          "name": "sido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "industry_big": {
+          "name": "industry_big",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label_available": {
+          "name": "label_available",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "first_care_approval_record_count": {
+          "name": "first_care_approval_record_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "cell_week_labels_week_idx": {
+          "name": "cell_week_labels_week_idx",
+          "columns": [
+            {
+              "expression": "week_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "label_dataset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cell_week_labels_dataset_fk": {
+          "name": "cell_week_labels_dataset_fk",
+          "tableFrom": "cell_week_labels",
+          "tableTo": "cell_label_datasets",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "label_dataset_id"
+          ],
+          "columnsTo": [
+            "label_dataset_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "cell_week_labels_pk": {
+          "name": "cell_week_labels_pk",
+          "columns": [
+            "label_dataset_id",
+            "week_start",
+            "sido",
+            "industry_big"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cell_week_labels_week_ck": {
+          "name": "cell_week_labels_week_ck",
+          "value": "extract(isodow from \"industrial_safety\".\"cell_week_labels\".\"week_start\") = 1"
+        },
+        "cell_week_labels_availability_ck": {
+          "name": "cell_week_labels_availability_ck",
+          "value": "(\"industrial_safety\".\"cell_week_labels\".\"label_available\" and \"industrial_safety\".\"cell_week_labels\".\"first_care_approval_record_count\" is not null and \"industrial_safety\".\"cell_week_labels\".\"first_care_approval_record_count\" >= 0) or (not \"industrial_safety\".\"cell_week_labels\".\"label_available\" and \"industrial_safety\".\"cell_week_labels\".\"first_care_approval_record_count\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "industrial_safety.cell_week_predictions": {
+      "name": "cell_week_predictions",
+      "schema": "industrial_safety",
+      "columns": {
+        "run_id": {
+          "name": "run_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "week_start": {
+          "name": "week_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "week_end": {
+          "name": "week_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data_as_of": {
+          "name": "data_as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_month": {
+          "name": "snapshot_month",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "available_from": {
+          "name": "available_from",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "availability_basis": {
+          "name": "availability_basis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "population_reconstructed": {
+          "name": "population_reconstructed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_age_days": {
+          "name": "snapshot_age_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sido": {
+          "name": "sido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "industry_big": {
+          "name": "industry_big",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "workplace_count": {
+          "name": "workplace_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "workers": {
+          "name": "workers",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exposure_workers": {
+          "name": "exposure_workers",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "population_cell_missing": {
+          "name": "population_cell_missing",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cell_total_expected_approved_record_count": {
+          "name": "cell_total_expected_approved_record_count",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "challenger_expected_approved_record_count": {
+          "name": "challenger_expected_approved_record_count",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "challenger_nb_alpha": {
+          "name": "challenger_nb_alpha",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "challenger_model_version": {
+          "name": "challenger_model_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "baseline_oof_expected_approved_record_count": {
+          "name": "baseline_oof_expected_approved_record_count",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "challenger_oof_expected_approved_record_count": {
+          "name": "challenger_oof_expected_approved_record_count",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "working_cell_probability_at_least_one_approval_record": {
+          "name": "working_cell_probability_at_least_one_approval_record",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cell_count_p05": {
+          "name": "cell_count_p05",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cell_count_p95": {
+          "name": "cell_count_p95",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cell_count_distribution": {
+          "name": "cell_count_distribution",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cell_nb_alpha": {
+          "name": "cell_nb_alpha",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prediction_regime": {
+          "name": "prediction_regime",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cell_model_calibration_status": {
+          "name": "cell_model_calibration_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label_vintage_replay_status": {
+          "name": "label_vintage_replay_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "cell_week_predictions_week_idx": {
+          "name": "cell_week_predictions_week_idx",
+          "columns": [
+            {
+              "expression": "week_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cell_week_predictions_run_fk": {
+          "name": "cell_week_predictions_run_fk",
+          "tableFrom": "cell_week_predictions",
+          "tableTo": "pipeline_runs",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "cell_week_predictions_pk": {
+          "name": "cell_week_predictions_pk",
+          "columns": [
+            "run_id",
+            "week_start",
+            "sido",
+            "industry_big"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cell_week_predictions_week_ck": {
+          "name": "cell_week_predictions_week_ck",
+          "value": "extract(isodow from \"industrial_safety\".\"cell_week_predictions\".\"week_start\") = 1 and \"industrial_safety\".\"cell_week_predictions\".\"week_end\" = \"industrial_safety\".\"cell_week_predictions\".\"week_start\" + 6"
+        },
+        "cell_week_predictions_population_ck": {
+          "name": "cell_week_predictions_population_ck",
+          "value": "\"industrial_safety\".\"cell_week_predictions\".\"workplace_count\" >= 0 and \"industrial_safety\".\"cell_week_predictions\".\"workers\" >= 0 and \"industrial_safety\".\"cell_week_predictions\".\"exposure_workers\" >= 0"
+        },
+        "cell_week_predictions_probability_ck": {
+          "name": "cell_week_predictions_probability_ck",
+          "value": "\"industrial_safety\".\"cell_week_predictions\".\"working_cell_probability_at_least_one_approval_record\" between 0 and 1"
+        },
+        "cell_week_predictions_interval_ck": {
+          "name": "cell_week_predictions_interval_ck",
+          "value": "\"industrial_safety\".\"cell_week_predictions\".\"cell_count_p05\" >= 0 and \"industrial_safety\".\"cell_week_predictions\".\"cell_count_p95\" >= \"industrial_safety\".\"cell_week_predictions\".\"cell_count_p05\""
+        },
+        "cell_week_predictions_asof_ck": {
+          "name": "cell_week_predictions_asof_ck",
+          "value": "\"industrial_safety\".\"cell_week_predictions\".\"data_as_of\" < (\"industrial_safety\".\"cell_week_predictions\".\"week_start\"::timestamp at time zone 'Asia/Seoul')"
+        },
+        "cell_week_predictions_snapshot_month_ck": {
+          "name": "cell_week_predictions_snapshot_month_ck",
+          "value": "extract(day from \"industrial_safety\".\"cell_week_predictions\".\"snapshot_month\") = 1"
+        },
+        "cell_week_predictions_expected_ck": {
+          "name": "cell_week_predictions_expected_ck",
+          "value": "\"industrial_safety\".\"cell_week_predictions\".\"cell_total_expected_approved_record_count\" >= 0 and (\"industrial_safety\".\"cell_week_predictions\".\"challenger_expected_approved_record_count\" is null or \"industrial_safety\".\"cell_week_predictions\".\"challenger_expected_approved_record_count\" >= 0) and (\"industrial_safety\".\"cell_week_predictions\".\"baseline_oof_expected_approved_record_count\" is null or \"industrial_safety\".\"cell_week_predictions\".\"baseline_oof_expected_approved_record_count\" >= 0) and (\"industrial_safety\".\"cell_week_predictions\".\"challenger_oof_expected_approved_record_count\" is null or \"industrial_safety\".\"cell_week_predictions\".\"challenger_oof_expected_approved_record_count\" >= 0)"
+        },
+        "cell_week_predictions_alpha_ck": {
+          "name": "cell_week_predictions_alpha_ck",
+          "value": "\"industrial_safety\".\"cell_week_predictions\".\"cell_nb_alpha\" >= 0 and (\"industrial_safety\".\"cell_week_predictions\".\"challenger_nb_alpha\" is null or \"industrial_safety\".\"cell_week_predictions\".\"challenger_nb_alpha\" >= 0)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "industrial_safety.firm_links": {
+      "name": "firm_links",
+      "schema": "industrial_safety",
+      "columns": {
+        "firm_link_id": {
+          "name": "firm_link_id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "firm_links_firm_link_id_seq",
+            "schema": "industrial_safety",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "link_run_id": {
+          "name": "link_run_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "workplace_snapshot_id": {
+          "name": "workplace_snapshot_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "candidate_rank": {
+          "name": "candidate_rank",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "candidate_state": {
+          "name": "candidate_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "decision_status": {
+          "name": "decision_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "match_method": {
+          "name": "match_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence_tier": {
+          "name": "confidence_tier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence_score": {
+          "name": "confidence_score",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_key_unique": {
+          "name": "source_key_unique",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "target_key_unique": {
+          "name": "target_key_unique",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "source_key_snapshot": {
+          "name": "source_key_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "target_key_snapshot": {
+          "name": "target_key_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "evidence": {
+          "name": "evidence",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "reviewed_by": {
+          "name": "reviewed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "firm_links_one_accepted_uq": {
+          "name": "firm_links_one_accepted_uq",
+          "columns": [
+            {
+              "expression": "link_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "workplace_snapshot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"industrial_safety\".\"firm_links\".\"decision_status\" in ('auto_accepted','human_accepted')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "firm_links_firm_current_idx": {
+          "name": "firm_links_firm_current_idx",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "link_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"industrial_safety\".\"firm_links\".\"decision_status\" in ('auto_accepted','human_accepted')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "firm_links_run_fk": {
+          "name": "firm_links_run_fk",
+          "tableFrom": "firm_links",
+          "tableTo": "pipeline_runs",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "link_run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "firm_links_snapshot_fk": {
+          "name": "firm_links_snapshot_fk",
+          "tableFrom": "firm_links",
+          "tableTo": "workplace_snapshots",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "workplace_snapshot_id"
+          ],
+          "columnsTo": [
+            "workplace_snapshot_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "firm_links_firm_fk": {
+          "name": "firm_links_firm_fk",
+          "tableFrom": "firm_links",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "firm_links_rank_uq": {
+          "name": "firm_links_rank_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "link_run_id",
+            "workplace_snapshot_id",
+            "candidate_rank"
+          ]
+        },
+        "firm_links_candidate_identity_uq": {
+          "name": "firm_links_candidate_identity_uq",
+          "nullsNotDistinct": true,
+          "columns": [
+            "link_run_id",
+            "workplace_snapshot_id",
+            "firm_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "firm_links_candidate_state_ck": {
+          "name": "firm_links_candidate_state_ck",
+          "value": "\"industrial_safety\".\"firm_links\".\"candidate_state\" in ('matched_candidate','ambiguous_candidate','unmatched')"
+        },
+        "firm_links_decision_status_ck": {
+          "name": "firm_links_decision_status_ck",
+          "value": "\"industrial_safety\".\"firm_links\".\"decision_status\" in ('auto_accepted','pending_review','human_accepted','human_rejected','not_applicable')"
+        },
+        "firm_links_candidate_rank_ck": {
+          "name": "firm_links_candidate_rank_ck",
+          "value": "\"industrial_safety\".\"firm_links\".\"candidate_rank\" between 1 and 100"
+        },
+        "firm_links_confidence_score_ck": {
+          "name": "firm_links_confidence_score_ck",
+          "value": "\"industrial_safety\".\"firm_links\".\"confidence_score\" is null or \"industrial_safety\".\"firm_links\".\"confidence_score\" between 0 and 1"
+        },
+        "firm_links_auto_accept_ck": {
+          "name": "firm_links_auto_accept_ck",
+          "value": "\"industrial_safety\".\"firm_links\".\"decision_status\" <> 'auto_accepted' or (\"industrial_safety\".\"firm_links\".\"firm_id\" is not null and \"industrial_safety\".\"firm_links\".\"candidate_state\" = 'matched_candidate' and \"industrial_safety\".\"firm_links\".\"match_method\" = 'exact_name_masked_business_registration' and \"industrial_safety\".\"firm_links\".\"source_key_unique\" and \"industrial_safety\".\"firm_links\".\"target_key_unique\")"
+        },
+        "firm_links_json_ck": {
+          "name": "firm_links_json_ck",
+          "value": "jsonb_typeof(\"industrial_safety\".\"firm_links\".\"source_key_snapshot\") = 'object' and jsonb_typeof(\"industrial_safety\".\"firm_links\".\"target_key_snapshot\") = 'object' and jsonb_typeof(\"industrial_safety\".\"firm_links\".\"evidence\") = 'object'"
+        },
+        "firm_links_accepted_target_ck": {
+          "name": "firm_links_accepted_target_ck",
+          "value": "\"industrial_safety\".\"firm_links\".\"decision_status\" not in ('auto_accepted','human_accepted') or (\"industrial_safety\".\"firm_links\".\"firm_id\" is not null and \"industrial_safety\".\"firm_links\".\"candidate_state\" = 'matched_candidate')"
+        },
+        "firm_links_unmatched_ck": {
+          "name": "firm_links_unmatched_ck",
+          "value": "\"industrial_safety\".\"firm_links\".\"candidate_state\" <> 'unmatched' or \"industrial_safety\".\"firm_links\".\"firm_id\" is null"
+        },
+        "firm_links_review_ck": {
+          "name": "firm_links_review_ck",
+          "value": "(\"industrial_safety\".\"firm_links\".\"decision_status\" not in ('human_accepted','human_rejected') or (\"industrial_safety\".\"firm_links\".\"reviewed_by\" is not null and \"industrial_safety\".\"firm_links\".\"reviewed_at\" is not null)) and (\"industrial_safety\".\"firm_links\".\"reviewed_at\" is null or \"industrial_safety\".\"firm_links\".\"reviewed_by\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "industrial_safety.firm_risk_results": {
+      "name": "firm_risk_results",
+      "schema": "industrial_safety",
+      "columns": {
+        "run_id": {
+          "name": "run_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_week_start": {
+          "name": "target_week_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prediction_as_of": {
+          "name": "prediction_as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_workplace_id": {
+          "name": "source_workplace_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "validation_status": {
+          "name": "validation_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "match_method": {
+          "name": "match_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence_tier": {
+          "name": "confidence_tier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reviewed_by": {
+          "name": "reviewed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provisional_population_priority_percentile": {
+          "name": "provisional_population_priority_percentile",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provisional_population_priority_band": {
+          "name": "provisional_population_priority_band",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "research_only_provisional_probability": {
+          "name": "research_only_provisional_probability",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "firm_risk_results_firm_history_idx": {
+          "name": "firm_risk_results_firm_history_idx",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "target_week_start",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "firm_risk_results_run_fk": {
+          "name": "firm_risk_results_run_fk",
+          "tableFrom": "firm_risk_results",
+          "tableTo": "pipeline_runs",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "firm_risk_results_firm_fk": {
+          "name": "firm_risk_results_firm_fk",
+          "tableFrom": "firm_risk_results",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "firm_risk_results_pk": {
+          "name": "firm_risk_results_pk",
+          "columns": [
+            "run_id",
+            "firm_id",
+            "target_week_start"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "firm_risk_results_source_uq": {
+          "name": "firm_risk_results_source_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "run_id",
+            "source_workplace_id",
+            "target_week_start"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "firm_risk_results_week_ck": {
+          "name": "firm_risk_results_week_ck",
+          "value": "extract(isodow from \"industrial_safety\".\"firm_risk_results\".\"target_week_start\") = 1"
+        },
+        "firm_risk_results_asof_ck": {
+          "name": "firm_risk_results_asof_ck",
+          "value": "\"industrial_safety\".\"firm_risk_results\".\"prediction_as_of\" < (\"industrial_safety\".\"firm_risk_results\".\"target_week_start\"::timestamp at time zone 'Asia/Seoul')"
+        },
+        "firm_risk_results_source_id_ck": {
+          "name": "firm_risk_results_source_id_ck",
+          "value": "\"industrial_safety\".\"firm_risk_results\".\"source_workplace_id\" ~ '^npss_[0-9a-f]{20}$'"
+        },
+        "firm_risk_results_probability_ck": {
+          "name": "firm_risk_results_probability_ck",
+          "value": "\"industrial_safety\".\"firm_risk_results\".\"research_only_provisional_probability\" between 0 and 1"
+        },
+        "firm_risk_results_priority_ck": {
+          "name": "firm_risk_results_priority_ck",
+          "value": "\"industrial_safety\".\"firm_risk_results\".\"provisional_population_priority_percentile\" between 0 and 1 and \"industrial_safety\".\"firm_risk_results\".\"provisional_population_priority_band\" in ('상위1%','상위5%','상위10%','일반')"
+        },
+        "firm_risk_results_review_pair_ck": {
+          "name": "firm_risk_results_review_pair_ck",
+          "value": "(\"industrial_safety\".\"firm_risk_results\".\"reviewed_by\" is null) = (\"industrial_safety\".\"firm_risk_results\".\"reviewed_at\" is null)"
+        },
+        "firm_risk_results_validation_ck": {
+          "name": "firm_risk_results_validation_ck",
+          "value": "(\"industrial_safety\".\"firm_risk_results\".\"validation_status\" = 'verified_exact' and \"industrial_safety\".\"firm_risk_results\".\"match_method\" = 'exact_name_masked_business_registration_sido_industry' and \"industrial_safety\".\"firm_risk_results\".\"confidence_tier\" = 'exact_unique') or (\"industrial_safety\".\"firm_risk_results\".\"validation_status\" = 'verified_human' and \"industrial_safety\".\"firm_risk_results\".\"match_method\" = 'human_review' and \"industrial_safety\".\"firm_risk_results\".\"confidence_tier\" = 'human_approved' and \"industrial_safety\".\"firm_risk_results\".\"reviewed_by\" is not null and \"industrial_safety\".\"firm_risk_results\".\"reviewed_at\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "industrial_safety.pipeline_run_dependencies": {
+      "name": "pipeline_run_dependencies",
+      "schema": "industrial_safety",
+      "columns": {
+        "run_id": {
+          "name": "run_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dependency_role": {
+          "name": "dependency_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "upstream_run_id": {
+          "name": "upstream_run_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "pipeline_run_dependencies_upstream_idx": {
+          "name": "pipeline_run_dependencies_upstream_idx",
+          "columns": [
+            {
+              "expression": "upstream_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pipeline_run_dependencies_run_fk": {
+          "name": "pipeline_run_dependencies_run_fk",
+          "tableFrom": "pipeline_run_dependencies",
+          "tableTo": "pipeline_runs",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "pipeline_run_dependencies_upstream_fk": {
+          "name": "pipeline_run_dependencies_upstream_fk",
+          "tableFrom": "pipeline_run_dependencies",
+          "tableTo": "pipeline_runs",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "upstream_run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "pipeline_run_dependencies_pk": {
+          "name": "pipeline_run_dependencies_pk",
+          "columns": [
+            "run_id",
+            "dependency_role",
+            "upstream_run_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "pipeline_run_dependencies_not_self_ck": {
+          "name": "pipeline_run_dependencies_not_self_ck",
+          "value": "\"industrial_safety\".\"pipeline_run_dependencies\".\"run_id\" <> \"industrial_safety\".\"pipeline_run_dependencies\".\"upstream_run_id\""
+        },
+        "pipeline_run_dependencies_role_ck": {
+          "name": "pipeline_run_dependencies_role_ck",
+          "value": "\"industrial_safety\".\"pipeline_run_dependencies\".\"dependency_role\" ~ '^[a-z][a-z0-9_]*$'"
+        },
+        "pipeline_run_dependencies_metadata_ck": {
+          "name": "pipeline_run_dependencies_metadata_ck",
+          "value": "jsonb_typeof(\"industrial_safety\".\"pipeline_run_dependencies\".\"metadata\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "industrial_safety.pipeline_runs": {
+      "name": "pipeline_runs",
+      "schema": "industrial_safety",
+      "columns": {
+        "run_id": {
+          "name": "run_id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "pipeline_runs_run_id_seq",
+            "schema": "industrial_safety",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "run_kind": {
+          "name": "run_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "publication_scope": {
+          "name": "publication_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pipeline_name": {
+          "name": "pipeline_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pipeline_version": {
+          "name": "pipeline_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_version": {
+          "name": "contract_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model_name": {
+          "name": "model_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model_version": {
+          "name": "model_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "population_tier": {
+          "name": "population_tier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scenario_id": {
+          "name": "scenario_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_definition": {
+          "name": "target_definition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approval_year_inference": {
+          "name": "approval_year_inference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label_maturity_window": {
+          "name": "label_maturity_window",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "calibration_status": {
+          "name": "calibration_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "probability_status": {
+          "name": "probability_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk_value_type": {
+          "name": "risk_value_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "priority_reference_population": {
+          "name": "priority_reference_population",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_week_start_min": {
+          "name": "target_week_start_min",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_week_start_max": {
+          "name": "target_week_start_max",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "primary_artifact_path": {
+          "name": "primary_artifact_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "primary_artifact_sha256": {
+          "name": "primary_artifact_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "artifact_bundle": {
+          "name": "artifact_bundle",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "run_fingerprint": {
+          "name": "run_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expected_row_count": {
+          "name": "expected_row_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "loaded_row_count": {
+          "name": "loaded_row_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'registered'"
+        },
+        "is_current": {
+          "name": "is_current",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "quality_metadata": {
+          "name": "quality_metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "source_generated_at": {
+          "name": "source_generated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "registered_at": {
+          "name": "registered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "validated_at": {
+          "name": "validated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "pipeline_runs_current_scope_uq": {
+          "name": "pipeline_runs_current_scope_uq",
+          "columns": [
+            {
+              "expression": "publication_scope",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"industrial_safety\".\"pipeline_runs\".\"is_current\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pipeline_runs_artifact_sha_idx": {
+          "name": "pipeline_runs_artifact_sha_idx",
+          "columns": [
+            {
+              "expression": "primary_artifact_sha256",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "pipeline_runs_fingerprint_uq": {
+          "name": "pipeline_runs_fingerprint_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "run_fingerprint"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "pipeline_runs_kind_ck": {
+          "name": "pipeline_runs_kind_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"run_kind\" in ('cell_prediction','cell_label','workplace_prediction','workplace_snapshot','firm_link','firm_risk')"
+        },
+        "pipeline_runs_status_ck": {
+          "name": "pipeline_runs_status_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"status\" in ('registered','loading','validated','published','failed','superseded')"
+        },
+        "pipeline_runs_scope_ck": {
+          "name": "pipeline_runs_scope_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"publication_scope\" ~ '^industrial_safety[.][a-z0-9_.-]+$'"
+        },
+        "pipeline_runs_primary_sha_ck": {
+          "name": "pipeline_runs_primary_sha_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"primary_artifact_sha256\" ~ '^[0-9a-f]{64}$'"
+        },
+        "pipeline_runs_fingerprint_ck": {
+          "name": "pipeline_runs_fingerprint_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"run_fingerprint\" ~ '^[0-9a-f]{64}$'"
+        },
+        "pipeline_runs_row_count_ck": {
+          "name": "pipeline_runs_row_count_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"expected_row_count\" >= 0 and (\"industrial_safety\".\"pipeline_runs\".\"loaded_row_count\" is null or \"industrial_safety\".\"pipeline_runs\".\"loaded_row_count\" >= 0)"
+        },
+        "pipeline_runs_validated_count_ck": {
+          "name": "pipeline_runs_validated_count_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"status\" not in ('validated','published') or (\"industrial_safety\".\"pipeline_runs\".\"loaded_row_count\" is not null and \"industrial_safety\".\"pipeline_runs\".\"loaded_row_count\" = \"industrial_safety\".\"pipeline_runs\".\"expected_row_count\")"
+        },
+        "pipeline_runs_current_ck": {
+          "name": "pipeline_runs_current_ck",
+          "value": "not \"industrial_safety\".\"pipeline_runs\".\"is_current\" or \"industrial_safety\".\"pipeline_runs\".\"status\" = 'published'"
+        },
+        "pipeline_runs_required_text_ck": {
+          "name": "pipeline_runs_required_text_ck",
+          "value": "btrim(\"industrial_safety\".\"pipeline_runs\".\"publication_scope\") <> '' and btrim(\"industrial_safety\".\"pipeline_runs\".\"pipeline_name\") <> '' and btrim(\"industrial_safety\".\"pipeline_runs\".\"pipeline_version\") <> '' and btrim(\"industrial_safety\".\"pipeline_runs\".\"contract_version\") <> '' and btrim(\"industrial_safety\".\"pipeline_runs\".\"primary_artifact_path\") <> ''"
+        },
+        "pipeline_runs_artifact_bundle_ck": {
+          "name": "pipeline_runs_artifact_bundle_ck",
+          "value": "jsonb_typeof(\"industrial_safety\".\"pipeline_runs\".\"artifact_bundle\") = 'array'"
+        },
+        "pipeline_runs_quality_metadata_ck": {
+          "name": "pipeline_runs_quality_metadata_ck",
+          "value": "jsonb_typeof(\"industrial_safety\".\"pipeline_runs\".\"quality_metadata\") = 'object'"
+        },
+        "pipeline_runs_published_ck": {
+          "name": "pipeline_runs_published_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"status\" <> 'published' or \"industrial_safety\".\"pipeline_runs\".\"published_at\" is not null"
+        },
+        "pipeline_runs_target_range_ck": {
+          "name": "pipeline_runs_target_range_ck",
+          "value": "(\"industrial_safety\".\"pipeline_runs\".\"target_week_start_min\" is null and \"industrial_safety\".\"pipeline_runs\".\"target_week_start_max\" is null) or (\"industrial_safety\".\"pipeline_runs\".\"target_week_start_min\" is not null and \"industrial_safety\".\"pipeline_runs\".\"target_week_start_max\" is not null and \"industrial_safety\".\"pipeline_runs\".\"target_week_start_min\" <= \"industrial_safety\".\"pipeline_runs\".\"target_week_start_max\" and extract(isodow from \"industrial_safety\".\"pipeline_runs\".\"target_week_start_min\") = 1 and extract(isodow from \"industrial_safety\".\"pipeline_runs\".\"target_week_start_max\") = 1)"
+        },
+        "pipeline_runs_prediction_metadata_ck": {
+          "name": "pipeline_runs_prediction_metadata_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"run_kind\" not in ('cell_prediction','workplace_prediction','firm_risk') or (\"industrial_safety\".\"pipeline_runs\".\"model_name\" is not null and \"industrial_safety\".\"pipeline_runs\".\"model_version\" is not null)"
+        },
+        "pipeline_runs_workplace_metadata_ck": {
+          "name": "pipeline_runs_workplace_metadata_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"run_kind\" <> 'workplace_prediction' or (\"industrial_safety\".\"pipeline_runs\".\"population_tier\" is not null and \"industrial_safety\".\"pipeline_runs\".\"scenario_id\" is not null and \"industrial_safety\".\"pipeline_runs\".\"calibration_status\" is not null and \"industrial_safety\".\"pipeline_runs\".\"probability_status\" is not null and \"industrial_safety\".\"pipeline_runs\".\"risk_value_type\" is not null and \"industrial_safety\".\"pipeline_runs\".\"priority_reference_population\" is not null)"
+        },
+        "pipeline_runs_firm_risk_metadata_ck": {
+          "name": "pipeline_runs_firm_risk_metadata_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"run_kind\" <> 'firm_risk' or (\"industrial_safety\".\"pipeline_runs\".\"population_tier\" is not null and \"industrial_safety\".\"pipeline_runs\".\"scenario_id\" is not null and \"industrial_safety\".\"pipeline_runs\".\"calibration_status\" is not null and \"industrial_safety\".\"pipeline_runs\".\"probability_status\" is not null and \"industrial_safety\".\"pipeline_runs\".\"risk_value_type\" is not null and \"industrial_safety\".\"pipeline_runs\".\"priority_reference_population\" is not null)"
+        },
+        "pipeline_runs_firm_risk_single_week_ck": {
+          "name": "pipeline_runs_firm_risk_single_week_ck",
+          "value": "\"industrial_safety\".\"pipeline_runs\".\"run_kind\" <> 'firm_risk' or (\"industrial_safety\".\"pipeline_runs\".\"target_week_start_min\" is not null and \"industrial_safety\".\"pipeline_runs\".\"target_week_start_max\" is not null and \"industrial_safety\".\"pipeline_runs\".\"target_week_start_max\" = \"industrial_safety\".\"pipeline_runs\".\"target_week_start_min\")"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "industrial_safety.workplace_allocation_cells": {
+      "name": "workplace_allocation_cells",
+      "schema": "industrial_safety",
+      "columns": {
+        "allocation_cell_id": {
+          "name": "allocation_cell_id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "workplace_allocation_cells_allocation_cell_id_seq",
+            "schema": "industrial_safety",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prediction_origin_week_start": {
+          "name": "prediction_origin_week_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prediction_as_of": {
+          "name": "prediction_as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_week_start": {
+          "name": "target_week_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_week_end": {
+          "name": "target_week_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "population_snapshot_month": {
+          "name": "population_snapshot_month",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "population_available_from": {
+          "name": "population_available_from",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "population_availability_basis": {
+          "name": "population_availability_basis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "population_reconstructed": {
+          "name": "population_reconstructed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "population_source_snapshot_date": {
+          "name": "population_source_snapshot_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "population_snapshot_age_days": {
+          "name": "population_snapshot_age_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "population_snapshot_age_days_at_target_week_start": {
+          "name": "population_snapshot_age_days_at_target_week_start",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "population_snapshot_age_basis": {
+          "name": "population_snapshot_age_basis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "population_2025_annual_register_used": {
+          "name": "population_2025_annual_register_used",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sido": {
+          "name": "sido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "industry_big": {
+          "name": "industry_big",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "represented_workplace_count": {
+          "name": "represented_workplace_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cell_total_expected_approved_record_count": {
+          "name": "cell_total_expected_approved_record_count",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coverage_observed_raw_workers": {
+          "name": "coverage_observed_raw_workers",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coverage_official_workers": {
+          "name": "coverage_official_workers",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coverage_q_raw_worker_share": {
+          "name": "coverage_q_raw_worker_share",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coverage_q_equal_unit_risk": {
+          "name": "coverage_q_equal_unit_risk",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coverage_q_was_capped": {
+          "name": "coverage_q_was_capped",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unallocated_expected_approved_record_count_q": {
+          "name": "unallocated_expected_approved_record_count_q",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false,
+          "generated": {
+            "as": "\"cell_total_expected_approved_record_count\" * (1 - \"coverage_q_equal_unit_risk\")",
+            "type": "stored"
+          }
+        },
+        "conservation_claim_scope": {
+          "name": "conservation_claim_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prediction_regime": {
+          "name": "prediction_regime",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cell_model_calibration_status": {
+          "name": "cell_model_calibration_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label_vintage_replay_status": {
+          "name": "label_vintage_replay_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size_rate_source_year": {
+          "name": "size_rate_source_year",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "coverage_source_year": {
+          "name": "coverage_source_year",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "workplace_allocation_cells_run_week_idx": {
+          "name": "workplace_allocation_cells_run_week_idx",
+          "columns": [
+            {
+              "expression": "run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "target_week_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "workplace_allocation_cells_run_fk": {
+          "name": "workplace_allocation_cells_run_fk",
+          "tableFrom": "workplace_allocation_cells",
+          "tableTo": "pipeline_runs",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "workplace_allocation_cells_natural_uq": {
+          "name": "workplace_allocation_cells_natural_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "run_id",
+            "target_week_start",
+            "sido",
+            "industry_big"
+          ]
+        },
+        "workplace_allocation_cells_fact_fk_uq": {
+          "name": "workplace_allocation_cells_fact_fk_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "allocation_cell_id",
+            "run_id",
+            "target_week_start"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "workplace_allocation_cells_week_ck": {
+          "name": "workplace_allocation_cells_week_ck",
+          "value": "extract(isodow from \"industrial_safety\".\"workplace_allocation_cells\".\"prediction_origin_week_start\") = 1 and extract(isodow from \"industrial_safety\".\"workplace_allocation_cells\".\"target_week_start\") = 1 and \"industrial_safety\".\"workplace_allocation_cells\".\"prediction_origin_week_start\" = \"industrial_safety\".\"workplace_allocation_cells\".\"target_week_start\" - 7 and \"industrial_safety\".\"workplace_allocation_cells\".\"target_week_end\" = \"industrial_safety\".\"workplace_allocation_cells\".\"target_week_start\" + 6"
+        },
+        "workplace_allocation_cells_counts_ck": {
+          "name": "workplace_allocation_cells_counts_ck",
+          "value": "\"industrial_safety\".\"workplace_allocation_cells\".\"represented_workplace_count\" >= 0 and \"industrial_safety\".\"workplace_allocation_cells\".\"coverage_observed_raw_workers\" >= 0 and \"industrial_safety\".\"workplace_allocation_cells\".\"coverage_official_workers\" >= 0"
+        },
+        "workplace_allocation_cells_values_ck": {
+          "name": "workplace_allocation_cells_values_ck",
+          "value": "\"industrial_safety\".\"workplace_allocation_cells\".\"cell_total_expected_approved_record_count\" >= 0 and \"industrial_safety\".\"workplace_allocation_cells\".\"coverage_q_raw_worker_share\" >= 0 and \"industrial_safety\".\"workplace_allocation_cells\".\"coverage_q_equal_unit_risk\" between 0 and 1 and \"industrial_safety\".\"workplace_allocation_cells\".\"unallocated_expected_approved_record_count_q\" >= 0"
+        },
+        "workplace_allocation_cells_coverage_capped_ck": {
+          "name": "workplace_allocation_cells_coverage_capped_ck",
+          "value": "\"industrial_safety\".\"workplace_allocation_cells\".\"coverage_q_was_capped\" = (\"industrial_safety\".\"workplace_allocation_cells\".\"coverage_q_raw_worker_share\" > 1) and \"industrial_safety\".\"workplace_allocation_cells\".\"coverage_q_equal_unit_risk\" = least(\"industrial_safety\".\"workplace_allocation_cells\".\"coverage_q_raw_worker_share\", 1::double precision)"
+        },
+        "workplace_allocation_cells_asof_ck": {
+          "name": "workplace_allocation_cells_asof_ck",
+          "value": "\"industrial_safety\".\"workplace_allocation_cells\".\"prediction_as_of\" < (\"industrial_safety\".\"workplace_allocation_cells\".\"target_week_start\"::timestamp at time zone 'Asia/Seoul')"
+        },
+        "workplace_allocation_cells_snapshot_month_ck": {
+          "name": "workplace_allocation_cells_snapshot_month_ck",
+          "value": "extract(day from \"industrial_safety\".\"workplace_allocation_cells\".\"population_snapshot_month\") = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "industrial_safety.workplace_predictions": {
+      "name": "workplace_predictions",
+      "schema": "industrial_safety",
+      "columns": {
+        "target_week_start": {
+          "name": "target_week_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "workplace_snapshot_id": {
+          "name": "workplace_snapshot_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allocation_cell_id": {
+          "name": "allocation_cell_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "workers_imputed": {
+          "name": "workers_imputed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size_bucket_broad": {
+          "name": "size_bucket_broad",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size_relative_risk": {
+          "name": "size_relative_risk",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allocation_weight_share": {
+          "name": "allocation_weight_share",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allocated_expected_approved_record_count_q": {
+          "name": "allocated_expected_approved_record_count_q",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "research_only_provisional_probability": {
+          "name": "research_only_provisional_probability",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "validated_probability_any_approved_accident_record": {
+          "name": "validated_probability_any_approved_accident_record",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provisional_population_priority_percentile": {
+          "name": "provisional_population_priority_percentile",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provisional_population_priority_band": {
+          "name": "provisional_population_priority_band",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "workplace_predictions_snapshot_history_idx": {
+          "name": "workplace_predictions_snapshot_history_idx",
+          "columns": [
+            {
+              "expression": "workplace_snapshot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "target_week_start",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "workplace_predictions_run_priority_idx": {
+          "name": "workplace_predictions_run_priority_idx",
+          "columns": [
+            {
+              "expression": "run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "target_week_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "provisional_population_priority_percentile",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "workplace_snapshot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "workplace_predictions_run_band_idx": {
+          "name": "workplace_predictions_run_band_idx",
+          "columns": [
+            {
+              "expression": "run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "target_week_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "provisional_population_priority_band",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "workplace_predictions_run_fk": {
+          "name": "workplace_predictions_run_fk",
+          "tableFrom": "workplace_predictions",
+          "tableTo": "pipeline_runs",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "workplace_predictions_snapshot_fk": {
+          "name": "workplace_predictions_snapshot_fk",
+          "tableFrom": "workplace_predictions",
+          "tableTo": "workplace_snapshots",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "workplace_snapshot_id"
+          ],
+          "columnsTo": [
+            "workplace_snapshot_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "workplace_predictions_allocation_cell_fk": {
+          "name": "workplace_predictions_allocation_cell_fk",
+          "tableFrom": "workplace_predictions",
+          "tableTo": "workplace_allocation_cells",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "allocation_cell_id",
+            "run_id",
+            "target_week_start"
+          ],
+          "columnsTo": [
+            "allocation_cell_id",
+            "run_id",
+            "target_week_start"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "workplace_predictions_pk": {
+          "name": "workplace_predictions_pk",
+          "columns": [
+            "target_week_start",
+            "run_id",
+            "workplace_snapshot_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "workplace_predictions_week_ck": {
+          "name": "workplace_predictions_week_ck",
+          "value": "extract(isodow from \"industrial_safety\".\"workplace_predictions\".\"target_week_start\") = 1"
+        },
+        "workplace_predictions_size_risk_ck": {
+          "name": "workplace_predictions_size_risk_ck",
+          "value": "\"industrial_safety\".\"workplace_predictions\".\"size_relative_risk\" >= 0"
+        },
+        "workplace_predictions_weight_ck": {
+          "name": "workplace_predictions_weight_ck",
+          "value": "\"industrial_safety\".\"workplace_predictions\".\"allocation_weight_share\" between 0 and 1"
+        },
+        "workplace_predictions_expected_ck": {
+          "name": "workplace_predictions_expected_ck",
+          "value": "\"industrial_safety\".\"workplace_predictions\".\"allocated_expected_approved_record_count_q\" >= 0"
+        },
+        "workplace_predictions_provisional_probability_ck": {
+          "name": "workplace_predictions_provisional_probability_ck",
+          "value": "\"industrial_safety\".\"workplace_predictions\".\"research_only_provisional_probability\" between 0 and 1"
+        },
+        "workplace_predictions_validated_probability_ck": {
+          "name": "workplace_predictions_validated_probability_ck",
+          "value": "\"industrial_safety\".\"workplace_predictions\".\"validated_probability_any_approved_accident_record\" is null or \"industrial_safety\".\"workplace_predictions\".\"validated_probability_any_approved_accident_record\" between 0 and 1"
+        },
+        "workplace_predictions_priority_ck": {
+          "name": "workplace_predictions_priority_ck",
+          "value": "\"industrial_safety\".\"workplace_predictions\".\"provisional_population_priority_percentile\" between 0 and 1 and \"industrial_safety\".\"workplace_predictions\".\"provisional_population_priority_band\" in ('상위1%','상위5%','상위10%','일반')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "industrial_safety.workplace_snapshots": {
+      "name": "workplace_snapshots",
+      "schema": "industrial_safety",
+      "columns": {
+        "workplace_snapshot_id": {
+          "name": "workplace_snapshot_id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "workplace_snapshots_workplace_snapshot_id_seq",
+            "schema": "industrial_safety",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "workplace_pk": {
+          "name": "workplace_pk",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_run_id": {
+          "name": "source_run_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_month": {
+          "name": "snapshot_month",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_version": {
+          "name": "snapshot_version",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "population_source_snapshot_date": {
+          "name": "population_source_snapshot_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_entity_link_id": {
+          "name": "source_entity_link_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "workplace_name": {
+          "name": "workplace_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "road_address": {
+          "name": "road_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lot_address": {
+          "name": "lot_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "postal_code": {
+          "name": "postal_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "business_registration_masked": {
+          "name": "business_registration_masked",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "business_registration_prefix6": {
+          "name": "business_registration_prefix6",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sido": {
+          "name": "sido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sigungu": {
+          "name": "sigungu",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "industry_code": {
+          "name": "industry_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "industry_name": {
+          "name": "industry_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "industry_big": {
+          "name": "industry_big",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "workers": {
+          "name": "workers",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "workplace_type": {
+          "name": "workplace_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entity_key_strength": {
+          "name": "entity_key_strength",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "population_definition_version": {
+          "name": "population_definition_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "management_number_available": {
+          "name": "management_number_available",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "source_record_count": {
+          "name": "source_record_count",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_duplicate_entity": {
+          "name": "source_duplicate_entity",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "source_workers_conflict": {
+          "name": "source_workers_conflict",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "source_industry_value_conflict": {
+          "name": "source_industry_value_conflict",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "workplace_snapshots_workplace_month_idx": {
+          "name": "workplace_snapshots_workplace_month_idx",
+          "columns": [
+            {
+              "expression": "workplace_pk",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "snapshot_month",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "workplace_snapshots_name_biz_idx": {
+          "name": "workplace_snapshots_name_biz_idx",
+          "columns": [
+            {
+              "expression": "workplace_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "business_registration_prefix6",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"industrial_safety\".\"workplace_snapshots\".\"workplace_name\" is not null and \"industrial_safety\".\"workplace_snapshots\".\"business_registration_prefix6\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "workplace_snapshots_region_industry_idx": {
+          "name": "workplace_snapshots_region_industry_idx",
+          "columns": [
+            {
+              "expression": "snapshot_month",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "sido",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "industry_big",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "workplace_snapshots_entity_link_idx": {
+          "name": "workplace_snapshots_entity_link_idx",
+          "columns": [
+            {
+              "expression": "source_entity_link_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "workplace_snapshots_workplace_fk": {
+          "name": "workplace_snapshots_workplace_fk",
+          "tableFrom": "workplace_snapshots",
+          "tableTo": "workplaces",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "workplace_pk"
+          ],
+          "columnsTo": [
+            "workplace_pk"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "workplace_snapshots_source_run_fk": {
+          "name": "workplace_snapshots_source_run_fk",
+          "tableFrom": "workplace_snapshots",
+          "tableTo": "pipeline_runs",
+          "schemaTo": "industrial_safety",
+          "columnsFrom": [
+            "source_run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "workplace_snapshots_version_uq": {
+          "name": "workplace_snapshots_version_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "workplace_pk",
+            "snapshot_month",
+            "snapshot_version"
+          ]
+        },
+        "workplace_snapshots_run_workplace_month_uq": {
+          "name": "workplace_snapshots_run_workplace_month_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "source_run_id",
+            "workplace_pk",
+            "snapshot_month"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "workplace_snapshots_month_ck": {
+          "name": "workplace_snapshots_month_ck",
+          "value": "extract(day from \"industrial_safety\".\"workplace_snapshots\".\"snapshot_month\") = 1"
+        },
+        "workplace_snapshots_version_ck": {
+          "name": "workplace_snapshots_version_ck",
+          "value": "\"industrial_safety\".\"workplace_snapshots\".\"snapshot_version\" >= 1"
+        },
+        "workplace_snapshots_workers_ck": {
+          "name": "workplace_snapshots_workers_ck",
+          "value": "\"industrial_safety\".\"workplace_snapshots\".\"workers\" >= 0"
+        },
+        "workplace_snapshots_prefix6_ck": {
+          "name": "workplace_snapshots_prefix6_ck",
+          "value": "\"industrial_safety\".\"workplace_snapshots\".\"business_registration_prefix6\" is null or \"industrial_safety\".\"workplace_snapshots\".\"business_registration_prefix6\" ~ '^[0-9]{6}$'"
+        },
+        "workplace_snapshots_source_record_count_ck": {
+          "name": "workplace_snapshots_source_record_count_ck",
+          "value": "\"industrial_safety\".\"workplace_snapshots\".\"source_record_count\" is null or \"industrial_safety\".\"workplace_snapshots\".\"source_record_count\" >= 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "industrial_safety.workplaces": {
+      "name": "workplaces",
+      "schema": "industrial_safety",
+      "columns": {
+        "workplace_pk": {
+          "name": "workplace_pk",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "workplaces_workplace_pk_seq",
+            "schema": "industrial_safety",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "source_system": {
+          "name": "source_system",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_workplace_id": {
+          "name": "source_workplace_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "workplaces_source_id_uq": {
+          "name": "workplaces_source_id_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "source_system",
+            "source_workplace_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "workplaces_source_system_ck": {
+          "name": "workplaces_source_system_ck",
+          "value": "\"industrial_safety\".\"workplaces\".\"source_system\" in ('nps','kcomwel')"
+        },
+        "workplaces_source_id_format_ck": {
+          "name": "workplaces_source_id_format_ck",
+          "value": "(\"industrial_safety\".\"workplaces\".\"source_system\" = 'nps' and \"industrial_safety\".\"workplaces\".\"source_workplace_id\" ~ '^npss_[0-9a-f]{20}$') or (\"industrial_safety\".\"workplaces\".\"source_system\" = 'kcomwel' and \"industrial_safety\".\"workplaces\".\"source_workplace_id\" ~ '^kwm_[0-9a-f]{24}$')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.inspector_queue": {
+      "name": "inspector_queue",
+      "schema": "",
+      "columns": {
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rank": {
+          "name": "rank",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "queue_priority": {
+          "name": "queue_priority",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "risk_full": {
+          "name": "risk_full",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_체납이력": {
+          "name": "door1_체납이력",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "이미_임금체불공개": {
+          "name": "이미_임금체불공개",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reasons": {
+          "name": "reasons",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "queue_batch_rank_idx": {
+          "name": "queue_batch_rank_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "rank",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "queue_batch_priority_idx": {
+          "name": "queue_batch_priority_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "queue_priority",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "inspector_queue_firm_id_firms_firm_id_fk": {
+          "name": "inspector_queue_firm_id_firms_firm_id_fk",
+          "tableFrom": "inspector_queue",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "inspector_queue_batch_id_batches_id_fk": {
+          "name": "inspector_queue_batch_id_batches_id_fk",
+          "tableFrom": "inspector_queue",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "inspector_queue_firm_id_batch_id_pk": {
+          "name": "inspector_queue_firm_id_batch_id_pk",
+          "columns": [
+            "firm_id",
+            "batch_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.posts": {
+      "name": "posts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anonymous": {
+          "name": "anonymous",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'published'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hidden_at": {
+          "name": "hidden_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hidden_by": {
+          "name": "hidden_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "posts_status_created_idx": {
+          "name": "posts_status_created_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "posts_category_status_created_idx": {
+          "name": "posts_category_status_created_idx",
+          "columns": [
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "posts_author_status_created_idx": {
+          "name": "posts_author_status_created_idx",
+          "columns": [
+            {
+              "expression": "author_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "posts_firm_idx": {
+          "name": "posts_firm_idx",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "posts_author_id_users_id_fk": {
+          "name": "posts_author_id_users_id_fk",
+          "tableFrom": "posts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "posts_firm_id_firms_firm_id_fk": {
+          "name": "posts_firm_id_firms_firm_id_fk",
+          "tableFrom": "posts",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "posts_hidden_by_users_id_fk": {
+          "name": "posts_hidden_by_users_id_fk",
+          "tableFrom": "posts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "hidden_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "posts_status_ck": {
+          "name": "posts_status_ck",
+          "value": "\"posts\".\"status\" in ('published','hidden','deleted')"
+        },
+        "posts_category_ck": {
+          "name": "posts_category_ck",
+          "value": "\"posts\".\"category\" in ('pre_employment','employment_contract','workplace_safety','wage')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.reports": {
+      "name": "reports",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "post_id": {
+          "name": "post_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reporter_id": {
+          "name": "reporter_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "detail": {
+          "name": "detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_by": {
+          "name": "reviewed_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolution_note": {
+          "name": "resolution_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "snapshot_title": {
+          "name": "snapshot_title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_body": {
+          "name": "snapshot_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_post_updated_at": {
+          "name": "snapshot_post_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "reports_reporter_post_pending_uq": {
+          "name": "reports_reporter_post_pending_uq",
+          "columns": [
+            {
+              "expression": "reporter_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "post_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"reports\".\"status\" = 'pending'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "reports_status_created_idx": {
+          "name": "reports_status_created_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "reports_post_created_idx": {
+          "name": "reports_post_created_idx",
+          "columns": [
+            {
+              "expression": "post_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "reports_post_id_posts_id_fk": {
+          "name": "reports_post_id_posts_id_fk",
+          "tableFrom": "reports",
+          "tableTo": "posts",
+          "columnsFrom": [
+            "post_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "reports_reporter_id_users_id_fk": {
+          "name": "reports_reporter_id_users_id_fk",
+          "tableFrom": "reports",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reporter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "reports_reviewed_by_users_id_fk": {
+          "name": "reports_reviewed_by_users_id_fk",
+          "tableFrom": "reports",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reviewed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "reports_reason_ck": {
+          "name": "reports_reason_ck",
+          "value": "\"reports\".\"reason\" in ('spam','abuse','privacy','misinformation','other')"
+        },
+        "reports_status_ck": {
+          "name": "reports_status_ck",
+          "value": "\"reports\".\"status\" in ('pending','accepted','dismissed')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.reviews": {
+      "name": "reviews",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anonymous": {
+          "name": "anonymous",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating_pay": {
+          "name": "rating_pay",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating_worklife": {
+          "name": "rating_worklife",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating_culture": {
+          "name": "rating_culture",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating_management": {
+          "name": "rating_management",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pros": {
+          "name": "pros",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cons": {
+          "name": "cons",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "reviews_firm_created_idx": {
+          "name": "reviews_firm_created_idx",
+          "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "reviews_author_id_users_id_fk": {
+          "name": "reviews_author_id_users_id_fk",
+          "tableFrom": "reviews",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "reviews_firm_id_firms_firm_id_fk": {
+          "name": "reviews_firm_id_firms_firm_id_fk",
+          "tableFrom": "reviews",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "reviews_firm_author_uq": {
+          "name": "reviews_firm_author_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "firm_id",
+            "author_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.risk_tier_meta": {
+      "name": "risk_tier_meta",
+      "schema": "",
+      "columns": {
+        "tier": {
+          "name": "tier",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "percentile_from": {
+          "name": "percentile_from",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "percentile_to": {
+          "name": "percentile_to",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recall_cum": {
+          "name": "recall_cum",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lift_low": {
+          "name": "lift_low",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lift_high": {
+          "name": "lift_high",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_prediction": {
+          "name": "is_prediction",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.safe_recommendation": {
+      "name": "safe_recommendation",
+      "schema": "",
+      "columns": {
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n_months": {
+          "name": "n_months",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "n_green": {
+          "name": "n_green",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk_full": {
+          "name": "risk_full",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "체불배제": {
+          "name": "체불배제",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "체납배제": {
+          "name": "체납배제",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_ever": {
+          "name": "door1_ever",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "판정": {
+          "name": "판정",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "safe_batch_verdict_idx": {
+          "name": "safe_batch_verdict_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "판정",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "safe_batch_risk_idx": {
+          "name": "safe_batch_risk_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "risk_full",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "safe_recommendation_firm_id_firms_firm_id_fk": {
+          "name": "safe_recommendation_firm_id_firms_firm_id_fk",
+          "tableFrom": "safe_recommendation",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "safe_recommendation_batch_id_batches_id_fk": {
+          "name": "safe_recommendation_batch_id_batches_id_fk",
+          "tableFrom": "safe_recommendation",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "safe_recommendation_firm_id_batch_id_pk": {
+          "name": "safe_recommendation_firm_id_batch_id_pk",
+          "columns": [
+            "firm_id",
+            "batch_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.scored_active": {
+      "name": "scored_active",
+      "schema": "",
+      "columns": {
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n_months": {
+          "name": "n_months",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g1_고용안정": {
+          "name": "g1_고용안정",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g2_성실납부": {
+          "name": "g2_성실납부",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g3_인건비안정": {
+          "name": "g3_인건비안정",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g4_인력유지": {
+          "name": "g4_인력유지",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g5_업력3년": {
+          "name": "g5_업력3년",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g6_낮은변동성": {
+          "name": "g6_낮은변동성",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "n_green": {
+          "name": "n_green",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "체불배제": {
+          "name": "체불배제",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "체납배제": {
+          "name": "체납배제",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk_full": {
+          "name": "risk_full",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk_calibrated": {
+          "name": "risk_calibrated",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk_tier": {
+          "name": "risk_tier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turnover_avg_12m": {
+          "name": "turnover_avg_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turnover_avg_3m": {
+          "name": "turnover_avg_3m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turnover_max_12m": {
+          "name": "turnover_max_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turnover_std_12m": {
+          "name": "turnover_std_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emp_change_3m": {
+          "name": "emp_change_3m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emp_change_6m": {
+          "name": "emp_change_6m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emp_change_12m": {
+          "name": "emp_change_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_avg_12m": {
+          "name": "salary_avg_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_last": {
+          "name": "salary_last",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_change_6m": {
+          "name": "salary_change_6m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_change_12m": {
+          "name": "salary_change_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replacement_avg_12m": {
+          "name": "replacement_avg_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replacement_avg_3m": {
+          "name": "replacement_avg_3m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replacement_min_12m": {
+          "name": "replacement_min_12m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_drop_consecutive": {
+          "name": "salary_drop_consecutive",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turnover_momentum": {
+          "name": "turnover_momentum",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "zero_emp_months": {
+          "name": "zero_emp_months",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emp_volatility": {
+          "name": "emp_volatility",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "log_emp_count": {
+          "name": "log_emp_count",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "firm_age_months": {
+          "name": "firm_age_months",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sido_code": {
+          "name": "sido_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "industry_category": {
+          "name": "industry_category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imputed_months_count": {
+          "name": "imputed_months_count",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imputed_ratio": {
+          "name": "imputed_ratio",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "has_missing_recent_3m": {
+          "name": "has_missing_recent_3m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_bill_last_ratio": {
+          "name": "nf_bill_last_ratio",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_bill_maxdrop": {
+          "name": "nf_bill_maxdrop",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_pc_slope": {
+          "name": "nf_pc_slope",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_pay_divergence": {
+          "name": "nf_pay_divergence",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_bill_cv": {
+          "name": "nf_bill_cv",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_emp_slope": {
+          "name": "nf_emp_slope",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nf_drawdown": {
+          "name": "nf_drawdown",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_ever": {
+          "name": "door1_ever",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_n_insu": {
+          "name": "door1_n_insu",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_maxamt": {
+          "name": "door1_maxamt",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_maxmonths": {
+          "name": "door1_maxmonths",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_health": {
+          "name": "door1_health",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_pension": {
+          "name": "door1_pension",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door1_labor": {
+          "name": "door1_labor",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "scored_batch_risk_idx": {
+          "name": "scored_batch_risk_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "risk_full",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "scored_batch_idx": {
+          "name": "scored_batch_idx",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "scored_active_firm_id_firms_firm_id_fk": {
+          "name": "scored_active_firm_id_firms_firm_id_fk",
+          "tableFrom": "scored_active",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scored_active_batch_id_batches_id_fk": {
+          "name": "scored_active_batch_id_batches_id_fk",
+          "tableFrom": "scored_active",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "scored_active_firm_id_batch_id_pk": {
+          "name": "scored_active_firm_id_batch_id_pk",
+          "columns": [
+            "firm_id",
+            "batch_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sessions": {
+      "name": "sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "sessions_token_hash_uq": {
+          "name": "sessions_token_hash_uq",
+          "columns": [
+            {
+              "expression": "token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sessions_user_idx": {
+          "name": "sessions_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sessions_expires_idx": {
+          "name": "sessions_expires_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sessions_user_id_users_id_fk": {
+          "name": "sessions_user_id_users_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth_role": {
+          "name": "auth_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'user'"
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "users_email_lower_uq": {
+          "name": "users_email_lower_uq",
+          "columns": [
+            {
+              "expression": "lower(\"email\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "users_firm_id_firms_firm_id_fk": {
+          "name": "users_firm_id_firms_firm_id_fk",
+          "tableFrom": "users",
+          "tableTo": "firms",
+          "columnsFrom": [
+            "firm_id"
+          ],
+          "columnsTo": [
+            "firm_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "users_role_ck": {
+          "name": "users_role_ck",
+          "value": "\"users\".\"role\" in ('구직자','재직 근로자','기업/노무 담당자','사업주','감독관')"
+        },
+        "users_auth_role_ck": {
+          "name": "users_auth_role_ck",
+          "value": "\"users\".\"auth_role\" in ('user','admin','inspector')"
+        },
+        "users_firm_scope_ck": {
+          "name": "users_firm_scope_ck",
+          "value": "\"users\".\"firm_id\" is null or \"users\".\"role\" in ('사업주','기업/노무 담당자')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {
+    "industrial_safety": "industrial_safety"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

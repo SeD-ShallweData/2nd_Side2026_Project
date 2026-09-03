@@ -41,6 +41,7 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 | [`wage-risk.md`](wage-risk.md) | 임금체불 — 사용자 경로와 감독관 경로 분리, 판정·등급 매핑, 기준일, 식별키 | ✅ |
 | [`samples/`](samples/) | 상태별 API 응답 예시 5종 | ✅ |
 | [`safety-risk.md`](safety-risk.md) | 산업재해 — band 매핑, `provisional`·`research_only` 취급, 셀→사업장 배분 | ✅ |
+| [`verification.md`](verification.md) | **실측 검증** — 계약 수치와 운영 DB 대조, **실제 API 응답 표시 검증**, 재현 명령 | ✅ |
 
 ### `samples/` 구성
 
@@ -59,8 +60,60 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 장애 샘플은 둘로 나눈다. **전체 장애는 비-200 이며 본문에 `error` 객체만 있고**,
 부분 장애는 HTTP 200 에 실패한 신호만 `availability: "unavailable"` 이다.
 
-`member-status.md` 는 3종(정상·자료 부족·오류)을 요구했으나, 실제 최다수인 `watch`(85.7%)가
-누락되지 않도록 4종으로 만들었다.
+「멤버별 해야할 일」 은 3종(정상·자료 부족·오류)을 요구했으나 **5종으로 만들었다.**
+
+- 실제 최다수인 `watch`(85.7%)가 누락되지 않도록 한 종을 더했다
+- '오류' 를 **전체 장애(HTTP 503)** 와 **부분 장애(HTTP 200)** 로 나눴다 — 응답 형태가 다르다
+
+### 화면 설계용 상태 매핑 — QA #9-1·#9-2 대응
+
+`SIGNAL_STATUS_META`(`product/src/domain/riskPresentation.ts`)가 정본이다 **[실측 2026-09-02]**.
+
+| `SignalLevel` | 화면 배지 | 임금 판정 | 산재 밴드 |
+| --- | --- | --- | --- |
+| `normal` | **뚜렷한 이상 신호 없음** | `안정신호` | `일반` |
+| `watch` | **추가 확인 권장** | `유보` (85.7%) | `상위10%` |
+| `review` | **우선 확인 필요** | `배제_*` 3종 | `상위1%` · `상위5%` |
+| `unknown` | **분석 자료 부족** | `유보_정보부족` | 그 밖 |
+
+데이터 신뢰도(`Confidence`)는 배지와 **별개 축**이다.
+
+| `Confidence` | 뜻 |
+| --- | --- |
+| `sufficient` | 자료 충분 |
+| `limited` | 제한적 자료 — **산재는 현재 전 행이 여기 해당한다** (대상 주 경과) |
+| `unavailable` | 자료 없음 |
+
+> ⚠️ **배지와 신뢰도를 한 축으로 합치면 안 된다.**
+> `unknown` 배지인데 `availability: ready` 인 경우가 있다 — `unknown.json` 이 그 예다.
+> **조회는 됐으나 판단할 자료가 부족한 상태**이며, 조회 실패(`unavailable`)와 다르다.
+
+### 상태별 샘플 대응
+
+| 샘플 | wage.level | wage.confidence | 용도 |
+| --- | --- | --- | --- |
+| `normal.json` | `normal` | `sufficient` | 정상 |
+| `watch.json` | `watch` | `sufficient` | **최다수 85.7%** |
+| `unknown.json` | `unknown` | `unavailable` | 자료 부족 (조회는 성공) |
+| `partial-unavailable.json` | `unknown` | `unavailable` | **부분 장애** — HTTP 200, 한쪽 신호만 실패 |
+| `error-503.json` | — | — | **전체 장애** — HTTP 503, `error` 객체만 |
+
+**뒤 두 개는 다르다.** 부분 장애는 카드가 뜨고 한쪽만 비며, 전체 장애는 카드 자체가 없다.
+화면이 둘을 같게 처리하면 **장애 상태 하나가 누락된다.**
+
+### 시각화에서 하면 안 되는 것
+
+| # | 금지 | 이유 |
+| ---: | --- | --- |
+| 1 | `유보`(85.7%)를 경고색으로 강조 | **거의 모든 사업장이 위험해 보인다** |
+| 2 | `unknown` 을 `normal` 과 합치기 | 자료 부족 ≠ 안전 |
+| 3 | `risk_tier` 6등급을 구직자 화면에 노출 | 감독관 전용 (명예훼손 리스크) |
+| 4 | 임금·산재를 합산한 단일 점수 | 별도 카드 원칙 |
+| 5 | 원점수를 확률·백분율로 표기 | 1:1 다운샘플링. 확률 아님 |
+| 6 | `상위5%` 를 "상위 5% 이내"로 표기 | **배타적 구간** — 상위 1% 제외 |
+
+미연결 3개 지표(**이직률(12개월) · 고용 추이 · 데이터 충실도**)는 `확인할 수 없음` 고정이다.
+`UNCONNECTED_WAGE_OBSERVATION_LABELS` 가 정본이며 **추정치로 채우지 않는다.**
 
 ## 3. 이 계약의 근거
 
@@ -100,14 +153,14 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 
 ## 4. 읽어야 하는 사람
 
-| 담당자 | 무엇을 위해 |
+| 역할 | 무엇을 위해 |
 | --- | --- |
-| 심수현 (프론트) | 위험카드 값의 의미, 4가지 상태별 화면 |
-| 김민서 (정보설계) | `unknown` 표시 기준, `is_prediction=false` 처리 |
-| 문지민 (QA) | 인수 테스트 fixture (`samples/`) |
-| 정창의 (RAG) | LLM에 넘길 DB 컨텍스트 범위 |
-| 정민규 (커뮤니티 API) | 해당 없음 — 커뮤니티는 ML과 무관 |
-| 권나연 (사용자 DB) | 해당 없음 — Path B 정본과 별개 |
+| 화면 담당 | 위험카드 값의 의미, 4가지 상태별 화면 |
+| 정보설계 담당 | `unknown` 표시 기준, `is_prediction=false` 처리 |
+| QA 담당 | 인수 테스트 fixture (`samples/`) |
+| RAG 담당 | LLM에 넘길 DB 컨텍스트 범위 |
+| 커뮤니티 API 담당 | 해당 없음 — 커뮤니티는 ML과 무관 |
+| 사용자 DB 담당 | 해당 없음 — Path B 정본과 별개 |
 
 ## 5. 유지 규칙
 
@@ -124,7 +177,7 @@ psql -c "select 판정, count(*) from v_current_safe group by 1 order by 2 desc;
 psql -c "select risk_tier, count(*) from v_current_scored group by 1 order by 2 desc;"
 
 # 변환 코드 대조
-sed -n '55,190p' product/src/adapters/real/MlRiskProvider.ts
+sed -n '56,190p' product/src/adapters/real/MlRiskProvider.ts
 ```
 
 ## 6. 미해결 항목
@@ -133,11 +186,11 @@ sed -n '55,190p' product/src/adapters/real/MlRiskProvider.ts
 
 | # | 내용 | 담당 |
 | --- | --- | --- |
-| 1 | **운영 DB에 스키마 주석 0건** — release dump 의 `--no-comments` 로 49건이 전부 제외됐다. `COMMENT ON` 재실행 필요(데이터 변경 없음) | 나연 · 윤빈 |
-| 2 | **테스트 블록리스트에 `risk_tier` 없음** — 숫자 원점수는 막지만 등급 라벨은 통과한다 | 윤빈 |
-| 3 | `watch` 85.7% 편중을 반영한 위험카드 시각 설계 | 수현 · 민서 |
-| 4 | 화면별 기준일 표시(`as_of_date` vs `target_month`) 지정 | 수현 · 민서 |
-| 5 | `inspector_queue.reasons` 의 영문 피처명 라벨화 | 민서 |
-| 6 | 미연결 3개 지표(이직률·고용 추이·데이터 충실도) 공개 데이터 계약 | 승석 (별도 과제) |
+| 1 | **운영 DB에 스키마 주석 0건** — release dump 의 `--no-comments` 로 49건이 전부 제외됐다. `COMMENT ON` 재실행 필요(데이터 변경 없음) | 사용자 DB 담당 · 인프라 담당 |
+| 2 | **테스트 블록리스트에 `risk_tier` 없음** — 숫자 원점수는 막지만 등급 라벨은 통과한다 | 인프라 담당 |
+| 3 | `watch` 85.7% 편중을 반영한 위험카드 시각 설계 | 화면 담당 · 정보설계 담당 |
+| 4 | 화면별 기준일 표시(`as_of_date` vs `target_month`) 지정 | 화면 담당 · 정보설계 담당 |
+| 5 | `inspector_queue.reasons` 의 **영문 원본 피처명 11종** 라벨화 — 🔴 **운영 API에서 노출 확인됨** ([verification.md 9.3](verification.md)). 선행: 저장소에 정의가 없어 피처 사전이 먼저 필요 ([wage-risk.md 4.6](wage-risk.md)) | 모델 담당 → 정보설계 담당 |
+| 6 | 미연결 3개 지표(이직률·고용 추이·데이터 충실도) 공개 데이터 계약 | ML·DB 검토 담당 (별도 과제) |
 
 6번은 본선 제안서 3.1.5의 보완 과제이며 공개 데이터 조사가 필요해 일정을 별도로 잡는다.
