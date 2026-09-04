@@ -3,9 +3,14 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 
 import type { SessionUserDto, UserRole } from "@/app/api/auth/authApiContract";
-import type { AuthRepository, IssuedSession, ResolvedSession } from "@/domain/auth";
-import { burnPasswordComparison, verifyPassword } from "@/server/auth/passwordHash";
-import { isWriteDatabaseConfigured, queryWrite, withWriteTransaction } from "@/server/postgresWrite";
+import type { AuthRepository, IssuedSession, NewUser, ResolvedSession } from "@/domain/auth";
+import { burnPasswordComparison, hashPassword, verifyPassword } from "@/server/auth/passwordHash";
+import {
+  isDatabaseError,
+  isWriteDatabaseConfigured,
+  queryWrite,
+  withWriteTransaction,
+} from "@/server/postgresWrite";
 import { ServiceError } from "@/utils/errors";
 
 /*
@@ -72,6 +77,45 @@ function invalidCredentials(): ServiceError {
   );
 }
 
+/*
+ * 가입 중 나온 DB 제약 위반을 사용자가 읽을 수 있는 안내로 바꾼다.
+ * 그대로 두면 503 "데이터베이스에 접근하지 못했습니다"로 보여 원인을 알 수 없다.
+ */
+function toSignupError(error: unknown): unknown {
+  if (!isDatabaseError(error)) return error;
+
+  // 23505: 유니크 제약 위반 — lower(email) 인덱스에 걸린 경우다.
+  if (error.code === "23505") {
+    return new ServiceError(
+      "EMAIL_ALREADY_REGISTERED",
+      "이미 가입된 이메일입니다.",
+      409,
+      false,
+      [{ field: "email", reason: "이미 사용 중인 이메일입니다." }],
+    );
+  }
+  // 23503: 외래키 위반 — 존재하지 않는 사업장을 연결하려 한 경우다.
+  if (error.code === "23503") {
+    return new ServiceError(
+      "COMPANY_NOT_FOUND",
+      "선택한 사업장을 찾을 수 없습니다.",
+      404,
+      false,
+      [{ field: "firm_id", reason: "등록된 사업장이 아닙니다." }],
+    );
+  }
+  // 23514: CHECK 위반 — 직업 구분과 사업장 연결 조합이 스키마 규칙에 어긋난다.
+  if (error.code === "23514") {
+    return new ServiceError(
+      "VALIDATION_ERROR",
+      "가입 정보를 확인해 주세요.",
+      400,
+      false,
+    );
+  }
+  return error;
+}
+
 export class RealAuthRepository implements AuthRepository {
   assertAvailable(): void {
     if (!isWriteDatabaseConfigured("auth")) {
@@ -81,6 +125,43 @@ export class RealAuthRepository implements AuthRepository {
         503,
         true,
       );
+    }
+  }
+
+  /*
+   * 권한 등급을 'user' 로 못박아 넣는다. 요청에서 받지 않는 이유는,
+   * 받는 순간 가입 요청 하나로 감독관 계정이 만들어질 수 있기 때문이다.
+   *
+   * 중복 이메일과 없는 사업장은 미리 조회해서 막지 않고 DB 제약에 맡긴다.
+   *   - 이메일: 미리 확인해도 그 사이에 다른 요청이 같은 주소로 가입할 수 있다.
+   *     lower(email) 유니크 인덱스만이 확실하다.
+   *   - 사업장: wg_auth 롤에는 firms 조회 권한이 없다. 외래키 위반으로만 알 수 있다.
+   */
+  async register(user: NewUser): Promise<SessionUserDto> {
+    const passwordHash = await hashPassword(user.password);
+
+    try {
+      const rows = await queryWrite<{ id: string; email: string; name: string }>(
+        "auth",
+        `INSERT INTO users (email, name, role, auth_role, firm_id, password_hash)
+         VALUES ($1, $2, $3, 'user', $4, $5)
+         RETURNING id, email, name`,
+        [user.email, user.name, user.persona_role, user.firm_id, passwordHash],
+      );
+
+      const created = rows[0];
+      if (!created) {
+        throw new ServiceError("SIGNUP_FAILED", "가입 처리를 완료하지 못했습니다.", 500, true);
+      }
+
+      return {
+        user_id: created.id,
+        email: created.email,
+        display_name: created.name,
+        role: "user",
+      };
+    } catch (error) {
+      throw toSignupError(error);
     }
   }
 

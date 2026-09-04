@@ -1,4 +1,4 @@
-import type { SessionUserDto } from "@/app/api/auth/authApiContract";
+import type { SessionUserDto, UserPersonaRole } from "@/app/api/auth/authApiContract";
 
 /*
  * 인증 저장소 포트.
@@ -24,12 +24,27 @@ export interface ResolvedSession {
   expires_at: string;
 }
 
+export interface NewUser {
+  email: string;
+  password: string;
+  name: string;
+  persona_role: UserPersonaRole;
+  firm_id: string | null;
+}
+
 export interface AuthRepository {
   /*
    * 저장소를 쓸 수 있는 상태인지 확인한다. 쓸 수 없으면 ServiceError 를 던진다.
    * Mock 은 운영 환경 외곽 인증 여부를, 실제 DB 는 접속 설정 여부를 본다.
    */
   assertAvailable(): void;
+
+  /*
+   * 계정을 만든다. 권한 등급은 저장소가 'user' 로 고정한다 —
+   * 가입으로 관리자·감독관이 만들어지면 안 된다.
+   * 이미 있는 이메일이면 ServiceError(EMAIL_ALREADY_REGISTERED).
+   */
+  register(user: NewUser): Promise<SessionUserDto>;
 
   /* 이메일·비밀번호를 대조한다. 실패하면 ServiceError(INVALID_CREDENTIALS). */
   authenticate(email: string, password: string): Promise<SessionUserDto>;

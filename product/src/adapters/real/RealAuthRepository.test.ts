@@ -9,6 +9,12 @@ const db = vi.hoisted(() => ({
 }));
 
 vi.mock("@/server/postgresWrite", () => ({
+  // 실제 모듈과 같은 판별 규칙 — SQLSTATE 다섯 자리가 붙은 오류만 DB 오류로 본다.
+  isDatabaseError: (error: unknown) => {
+    if (!(error instanceof Error)) return false;
+    const code = (error as Error & { code?: unknown }).code;
+    return typeof code === "string" && /^[0-9A-Z]{5}$/.test(code);
+  },
   isWriteDatabaseConfigured: db.configured,
   queryWrite: db.queryWrite,
   withWriteTransaction: async (
@@ -45,6 +51,74 @@ describe("설정 확인", () => {
     expect(() => repository.assertAvailable()).toThrowError(
       expect.objectContaining({ code: "AUTH_DATABASE_NOT_CONFIGURED", status: 503 }),
     );
+  });
+});
+
+describe("가입", () => {
+  const newUser = {
+    email: "new@example.com",
+    password: "long-enough-password",
+    name: "새 사용자",
+    persona_role: "구직자" as const,
+    firm_id: null,
+  };
+
+  /*
+   * 권한 등급을 요청에서 받으면 가입 요청 하나로 감독관 계정이 만들어진다.
+   */
+  it("권한 등급을 SQL 안에서 user 로 고정한다", async () => {
+    db.queryWrite.mockResolvedValueOnce([{ id: "u1", email: newUser.email, name: newUser.name }]);
+
+    const created = await repository.register(newUser);
+
+    const sql = String(db.queryWrite.mock.calls[0]?.[1]);
+    expect(sql).toContain("'user'");
+    const values = db.queryWrite.mock.calls[0]?.[2] as unknown[];
+    expect(values).not.toContain("admin");
+    expect(values).not.toContain("inspector");
+    expect(created.role).toBe("user");
+  });
+
+  it("비밀번호 원문을 저장하지 않는다", async () => {
+    db.queryWrite.mockResolvedValueOnce([{ id: "u1", email: newUser.email, name: newUser.name }]);
+
+    await repository.register(newUser);
+
+    const values = db.queryWrite.mock.calls[0]?.[2] as unknown[];
+    expect(values).not.toContain(newUser.password);
+    expect(String(values[4])).toMatch(/^scrypt\$/);
+  });
+
+  /*
+   * 중복 이메일·없는 사업장을 503 "DB 접근 실패"로 내보내면
+   * 사용자는 무엇을 고쳐야 하는지 알 수 없다.
+   */
+  it("중복 이메일은 409 로 안내한다", async () => {
+    db.queryWrite.mockRejectedValueOnce(Object.assign(new Error("duplicate"), { code: "23505" }));
+
+    await expect(repository.register(newUser)).rejects.toMatchObject({
+      code: "EMAIL_ALREADY_REGISTERED",
+      status: 409,
+    });
+  });
+
+  /* wg_auth 롤은 firms 조회 권한이 없어 외래키 위반으로만 알 수 있다. */
+  it("없는 사업장 연결은 404 로 안내한다", async () => {
+    db.queryWrite.mockRejectedValueOnce(Object.assign(new Error("fk"), { code: "23503" }));
+
+    await expect(repository.register(newUser)).rejects.toMatchObject({
+      code: "COMPANY_NOT_FOUND",
+      status: 404,
+    });
+  });
+
+  it("스키마 CHECK 위반은 400 으로 안내한다", async () => {
+    db.queryWrite.mockRejectedValueOnce(Object.assign(new Error("check"), { code: "23514" }));
+
+    await expect(repository.register(newUser)).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      status: 400,
+    });
   });
 });
 
