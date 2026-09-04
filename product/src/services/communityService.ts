@@ -207,7 +207,12 @@ function toPostDto(
     body: post.body,
     company_context: post.company_context ? { ...post.company_context } : null,
     anonymous: post.anonymous,
-    author_label: post.anonymous ? null : post.author_display_name,
+    /*
+     * 이름을 알 수 없으면 빈 문자열이 아니라 null 로 내보낸다.
+     * 빈 문자열은 화면에 그대로 찍혀 "이름이 없는 사람"처럼 보인다.
+     * 실제 DB 에서는 숨겨진 글의 작성자 이름을 가져올 수 없다(나연 문서 N11).
+     */
+    author_label: post.anonymous ? null : (post.author_display_name || null),
     created_at: post.created_at,
     updated_at: post.updated_at,
     comment_count: post.comment_count,

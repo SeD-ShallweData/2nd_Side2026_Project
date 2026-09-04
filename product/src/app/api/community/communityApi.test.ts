@@ -110,12 +110,21 @@ describe("커뮤니티 공개 조회 계약", () => {
     expect(await invalid.json()).toMatchObject({ error: { code: "VALIDATION_ERROR" } });
   });
 
+  /*
+   * 실제 DB 어댑터가 생긴 뒤로 접속 정보가 없을 때의 오류 코드가
+   * COMMUNITY_DATABASE_NOT_CONFIGURED 로 바뀌었다. 지켜야 할 것은 그대로다 —
+   * 저장소를 못 쓰는 상황을 Mock 성공으로 바꾸지 않는다.
+   */
   it("Real 모드 저장소 장애를 Mock 성공으로 바꾸지 않는다", async () => {
     vi.stubEnv("COMMUNITY_DATA_MODE", "real");
+    // 실행 환경에 실제 접속 정보가 있어도 이 테스트는 같게 동작해야 한다.
+    vi.stubEnv("COMMUNITY_DATABASE_URL", "");
+    vi.stubEnv("DATABASE_ENV_FILE", "");
+
     const response = await listPosts(new Request("http://localhost/api/community/posts"));
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
-      error: { code: "COMMUNITY_PROVIDER_UNAVAILABLE", retryable: true },
+      error: { code: "COMMUNITY_DATABASE_NOT_CONFIGURED", retryable: true },
     });
   });
 });

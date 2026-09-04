@@ -3,10 +3,10 @@ import "server-only";
 import { MockAuthRepository } from "@/adapters/mock/MockAuthRepository";
 import { MockCommunityRepository } from "@/adapters/mock/MockCommunityRepository";
 import { RealAuthRepository } from "@/adapters/real/RealAuthRepository";
+import { RealCommunityRepository } from "@/adapters/real/RealCommunityRepository";
 import { getAuthDataMode, getCommunityDataMode } from "@/config/dataMode";
 import type { AuthRepository } from "@/domain/auth";
 import type { CommunityRepository } from "@/domain/community";
-import { ServiceError } from "@/utils/errors";
 
 /*
  * 사용자 데이터(회원·세션·게시글·신고) 저장소 선택.
@@ -19,31 +19,13 @@ import { ServiceError } from "@/utils/errors";
 
 const mockAuthRepository = new MockAuthRepository();
 const realAuthRepository = new RealAuthRepository();
+const realCommunityRepository = new RealCommunityRepository();
 const mockCommunityRepository = new MockCommunityRepository();
-
-/*
- * 실제 DB 어댑터가 아직 없는 기능은 Mock 으로 조용히 대체하지 않고 거부한다.
- * 대체하면 저장한 줄 알았던 글이 재시작과 함께 사라진다.
- */
-function assertRealAdapterExists(
-  mode: string,
-  code: string,
-  message: string,
-): void {
-  if (mode === "real") {
-    throw new ServiceError(code, message, 503, true);
-  }
-}
 
 export function getAuthRepository(): AuthRepository {
   return getAuthDataMode() === "real" ? realAuthRepository : mockAuthRepository;
 }
 
 export function getCommunityRepository(): CommunityRepository {
-  assertRealAdapterExists(
-    getCommunityDataMode(),
-    "COMMUNITY_PROVIDER_UNAVAILABLE",
-    "커뮤니티 저장소가 아직 연결되지 않았습니다.",
-  );
-  return mockCommunityRepository;
+  return getCommunityDataMode() === "real" ? realCommunityRepository : mockCommunityRepository;
 }
