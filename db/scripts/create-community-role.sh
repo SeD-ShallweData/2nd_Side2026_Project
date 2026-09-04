@@ -90,7 +90,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE
 --    ② firms: 사업장 연결 표시용 조회만 허용, 쓰기는 ML 파이프라인 전용
 GRANT SELECT ON firms TO :"community_user";
 
---    ③ users/sessions 등은 이 계정의 책임 범위 밖 — 부여하지 않음.
+--    ③ comments: 게시글 목록·상세의 comment_count 집계용 조회만 허용한다.
+--       댓글 작성·수정·삭제 API는 아직 없으므로 쓰기 권한은 부여하지 않는다.
+--       댓글 기능을 만드는 시점에 INSERT/UPDATE/DELETE를 명시적으로 추가한다.
+GRANT SELECT ON comments TO :"community_user";
+
+--    ④ users/sessions 등은 이 계정의 책임 범위 밖 — 부여하지 않음.
 
 -- ⚠️ ALTER DEFAULT PRIVILEGES 를 일부러 쓰지 않는다.
 --    앞으로 만들 테이블에 권한이 자동으로 붙으면, 민감한 테이블이 생겼을 때
