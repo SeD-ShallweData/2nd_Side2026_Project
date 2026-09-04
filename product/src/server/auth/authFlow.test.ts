@@ -183,18 +183,30 @@ describe("Mock 사용자 인증 API", () => {
     expect(await malformed.json()).toMatchObject({ error: { code: "INVALID_JSON" } });
   });
 
+  /*
+   * Real 모드로 바꾸면 Mock 계정은 더 이상 통하지 않아야 한다.
+   * 실제 DB 어댑터가 생긴 뒤로는 접속 정보가 없을 때 나는 오류 코드가
+   * AUTH_DATABASE_NOT_CONFIGURED 로 바뀌었지만, 지켜야 할 것은 그대로다 —
+   * Mock 계정으로 조용히 로그인시키지 않는다.
+   */
   it("Real 모드에서 Mock 계정으로 자동 대체하지 않는다", async () => {
     const existing = await loginAs("user@mock.donworry.local", MOCK_PASSWORDS.user);
     vi.stubEnv("AUTH_DATA_MODE", "real");
+    // 실행 환경에 실제 접속 정보가 있어도 이 테스트는 같게 동작해야 한다.
+    vi.stubEnv("AUTH_DATABASE_URL", "");
+    vi.stubEnv("DATABASE_ENV_FILE", "");
+
     const response = await loginAs("user@mock.donworry.local", MOCK_PASSWORDS.user);
     expect(response.response.status).toBe(503);
-    expect(response.body).toMatchObject({ error: { code: "AUTH_PROVIDER_UNAVAILABLE" } });
+    expect(response.body).toMatchObject({ error: { code: "AUTH_DATABASE_NOT_CONFIGURED" } });
 
     const staleSession = await getSession(new Request("http://localhost/api/auth/session", {
       headers: { cookie: existing.cookie },
     }));
     expect(staleSession.status).toBe(503);
-    expect(await staleSession.json()).toMatchObject({ error: { code: "AUTH_PROVIDER_UNAVAILABLE" } });
+    expect(await staleSession.json()).toMatchObject({
+      error: { code: "AUTH_DATABASE_NOT_CONFIGURED" },
+    });
   });
 
   it("Content-Length가 없거나 거짓이어도 64KiB를 넘는 본문을 413으로 차단한다", async () => {

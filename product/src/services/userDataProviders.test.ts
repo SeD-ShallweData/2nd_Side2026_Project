@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 
 import { MockAuthRepository } from "@/adapters/mock/MockAuthRepository";
 import { MockCommunityRepository } from "@/adapters/mock/MockCommunityRepository";
+import { RealAuthRepository } from "@/adapters/real/RealAuthRepository";
 import { getAuthRepository, getCommunityRepository } from "@/services/userDataProviders";
 
 afterEach(() => {
@@ -26,19 +27,18 @@ describe("사용자 데이터 저장소 선택", () => {
     expect(getCommunityRepository()).toBeInstanceOf(MockCommunityRepository);
   });
 
-  /*
-   * 이 두 건이 핵심이다.
-   * 실제 DB 어댑터가 아직 없는데 Mock 으로 조용히 대체하면, 사용자는 글이
-   * 저장된 줄 알지만 서버가 재시작되는 순간 사라진다. 없는 것을 있는 척하지
-   * 않는다는 제품 원칙이 여기에도 적용된다.
-   */
-  it("실제 모드인데 어댑터가 없으면 Mock 으로 대체하지 않고 거부한다", () => {
+  it("인증은 실제 모드에서 실제 DB 저장소를 쓴다", () => {
     vi.stubEnv("AUTH_DATA_MODE", "real");
-    vi.stubEnv("COMMUNITY_DATA_MODE", "real");
+    expect(getAuthRepository()).toBeInstanceOf(RealAuthRepository);
+  });
 
-    expect(() => getAuthRepository()).toThrowError(
-      expect.objectContaining({ code: "AUTH_PROVIDER_UNAVAILABLE", status: 503 }),
-    );
+  /*
+   * 커뮤니티는 아직 실제 DB 어댑터가 없다. Mock 으로 조용히 대체하면 사용자는
+   * 글이 저장된 줄 알지만 서버가 재시작되는 순간 사라진다. 없는 것을 있는 척
+   * 하지 않는다는 제품 원칙이 여기에도 적용된다.
+   */
+  it("커뮤니티는 어댑터가 없으므로 실제 모드에서 대체하지 않고 거부한다", () => {
+    vi.stubEnv("COMMUNITY_DATA_MODE", "real");
     expect(() => getCommunityRepository()).toThrowError(
       expect.objectContaining({ code: "COMMUNITY_PROVIDER_UNAVAILABLE", status: 503 }),
     );
