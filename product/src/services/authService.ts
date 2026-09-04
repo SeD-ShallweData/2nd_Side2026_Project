@@ -55,13 +55,20 @@ function parseLoginRequest(input: unknown): LoginRequest {
 /*
  * 가입 비밀번호 규칙.
  *
- * 길이만 본다. 대소문자·특수문자 조합을 강제하면 사람들이 규칙을 만족시키는
- * 짧고 뻔한 비밀번호(Password1!)를 만들기 때문에, 길이를 확보하는 쪽이 낫다.
+ * 8~30자, 영문 대소문자·숫자·특수문자만 허용한다.
+ * 조합을 강제하지는 않는다 — 한 종류만 써도 길이만 맞으면 통과한다.
+ *
+ * 허용 문자는 공백을 뺀 ASCII 출력 문자다. 한글이나 이모지를 막는 이유는
+ * 입력기·기기에 따라 같은 글자가 다른 바이트로 들어와 "분명히 맞게 쳤는데
+ * 로그인이 안 되는" 상황이 생기기 때문이다. 공백도 앞뒤로 딸려 들어가면
+ * 같은 문제를 일으켜 제외한다.
+ *
  * 로그인에는 이 규칙을 적용하지 않는다 — 규칙이 생기기 전에 만든 계정도
  * 계속 로그인할 수 있어야 한다.
  */
-const MINIMUM_PASSWORD_LENGTH = 10;
-const MAXIMUM_PASSWORD_LENGTH = 128;
+const MINIMUM_PASSWORD_LENGTH = 8;
+const MAXIMUM_PASSWORD_LENGTH = 30;
+const PASSWORD_ALLOWED_PATTERN = /^[A-Za-z0-9!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]+$/;
 
 function invalidSignup(field: string, reason: string): ServiceError {
   return new ServiceError(
@@ -89,6 +96,12 @@ function parseSignupRequest(input: unknown): SignupRequest {
     throw invalidSignup(
       "password",
       `비밀번호는 ${MINIMUM_PASSWORD_LENGTH}자 이상 ${MAXIMUM_PASSWORD_LENGTH}자 이하여야 합니다.`,
+    );
+  }
+  if (!PASSWORD_ALLOWED_PATTERN.test(password)) {
+    throw invalidSignup(
+      "password",
+      "비밀번호는 영문 대소문자, 숫자, 특수문자만 사용할 수 있습니다.",
     );
   }
   // 이메일을 그대로 비밀번호로 쓰면 한 번의 추측으로 뚫린다.

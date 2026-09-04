@@ -9,7 +9,7 @@ import { resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 
 const VALID = {
   email: "new.worker@example.com",
-  password: "long-enough-password",
+  password: "Pw9!zx_-{}",
   name: "새 사용자",
   persona_role: "구직자",
 };
@@ -135,6 +135,69 @@ describe("가입 입력값 검증", () => {
     expect(result.response.status).toBe(400);
     expect(result.body).toMatchObject({
       error: { code: "VALIDATION_ERROR", details: [{ field }] },
+    });
+  });
+
+  describe("비밀번호 규칙 — 8~30자, 영문·숫자·특수문자만", () => {
+    it.each([
+      ["최소 길이 8자", "abcd1234"],
+      ["최대 길이 30자", "a".repeat(30)],
+      ["영문만", "abcdefgh"],
+      ["숫자만", "12345678"],
+      ["특수문자만", "!@#$%^&*"],
+      ["세 종류 섞어서", "Pw9!zx_-{}"],
+      ["대괄호와 역슬래시", "a[b]c\\d1"],
+    ])("%s 는 통과한다", async (label, password) => {
+      const result = await post({
+        ...VALID,
+        email: `ok${label.length}${password.length}@example.com`,
+        password,
+      });
+      expect(result.response.status).toBe(201);
+    });
+
+    it.each([
+      ["7자", "abc1234"],
+      ["31자", "a".repeat(31)],
+      ["빈 값", ""],
+    ])("길이를 벗어난 %s 는 거부한다", async (_label, password) => {
+      const result = await post({ ...VALID, password });
+
+      expect(result.response.status).toBe(400);
+      expect(result.body).toMatchObject({ error: { details: [{ field: "password" }] } });
+    });
+
+    /*
+     * 한글·이모지·공백을 막는 이유는 보안이 아니라 재현성이다.
+     * 입력기나 기기에 따라 같은 글자가 다른 바이트로 들어와
+     * "분명히 맞게 쳤는데 로그인이 안 되는" 상황이 생긴다.
+     */
+    it.each([
+      ["한글", "비밀번호1234"],
+      ["이모지", "pass\u{1F510}word"],
+      ["가운데 공백", "pass word12"],
+      ["앞뒤 공백", " password1 "],
+      ["줄바꿈", "password1\n"],
+    ])("허용하지 않는 문자가 든 %s 는 거부한다", async (_label, password) => {
+      const result = await post({ ...VALID, password });
+
+      expect(result.response.status).toBe(400);
+      expect(result.body).toMatchObject({ error: { details: [{ field: "password" }] } });
+    });
+
+    /*
+     * 규칙은 가입에만 적용한다. 규칙이 생기기 전에 만든 계정도 계속
+     * 로그인할 수 있어야 한다 — 로그인까지 막으면 기존 사용자가 잠긴다.
+     */
+    it("로그인에는 가입 규칙을 적용하지 않는다", async () => {
+      const response = await login(
+        jsonRequest("http://localhost/api/auth/login", {
+          email: "user@mock.donworry.local",
+          password: "local-user-password",
+        }),
+      );
+
+      expect(response.status).toBe(200);
     });
   });
 
