@@ -8,8 +8,8 @@ import { PATCH as reviewReport } from "@/app/api/community/moderation/reports/[r
 import { GET as getPost, PATCH as updatePost, DELETE as deletePost } from "@/app/api/community/posts/[postId]/route";
 import { POST as createReport } from "@/app/api/community/posts/[postId]/reports/route";
 import { GET as listPosts, POST as createPost } from "@/app/api/community/posts/route";
-import { issueSession, resetMockSessionsForTests } from "@/server/auth/sessionStore";
-import { resetMockCommunityStateForTests } from "@/services/communityService";
+import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
+import { resetMockCommunityState } from "@/adapters/mock/MockCommunityRepository";
 
 const USER: SessionUserDto = {
   user_id: "10000000-0000-4000-8000-000000000001",
@@ -32,8 +32,10 @@ const INSPECTOR: SessionUserDto = {
   role: "inspector",
 };
 
-function cookieFor(user: SessionUserDto): string {
-  return `donworry_session=${issueSession(user).token}`;
+const authRepository = new MockAuthRepository();
+
+async function cookieFor(user: SessionUserDto): Promise<string> {
+  return `donworry_session=${(await authRepository.issueSession(user)).token}`;
 }
 
 function jsonMutation(
@@ -65,13 +67,13 @@ function contextFor<Key extends "postId" | "reportId">(
 beforeEach(() => {
   vi.stubEnv("COMMUNITY_DATA_MODE", "mock");
   vi.stubEnv("APP_DATA_MODE", "mock");
-  resetMockSessionsForTests();
-  resetMockCommunityStateForTests();
+  resetMockSessions();
+  resetMockCommunityState();
 });
 
 afterEach(() => {
-  resetMockSessionsForTests();
-  resetMockCommunityStateForTests();
+  resetMockSessions();
+  resetMockCommunityState();
   vi.unstubAllEnvs();
 });
 
@@ -130,7 +132,7 @@ describe("게시글 작성자 권한", () => {
   });
 
   it("로그인 사용자가 글을 만들고 본인 글만 수정·삭제한다", async () => {
-    const userCookie = cookieFor(USER);
+    const userCookie = await cookieFor(USER);
     const createdResponse = await createPost(jsonMutation(
       "http://localhost/api/community/posts",
       "POST",
@@ -149,7 +151,7 @@ describe("게시글 작성자 권한", () => {
     expect(JSON.stringify(created)).not.toContain(USER.user_id);
     expect(JSON.stringify(created)).not.toContain(USER.email);
 
-    const inspectorCookie = cookieFor(INSPECTOR);
+    const inspectorCookie = await cookieFor(INSPECTOR);
     const forbidden = await updatePost(
       jsonMutation(
         `http://localhost/api/community/posts/${created.post_id}`,
@@ -197,7 +199,7 @@ describe("게시글 작성자 권한", () => {
   });
 
   it("사업장 ID를 Mock 기준본으로 검증하고 표시용 지역·업종을 서버에서 보강한다", async () => {
-    const userCookie = cookieFor(USER);
+    const userCookie = await cookieFor(USER);
     const created = await createPost(jsonMutation(
       "http://localhost/api/community/posts",
       "POST",
@@ -238,7 +240,7 @@ describe("게시글 작성자 권한", () => {
       "http://localhost/api/community/posts",
       "POST",
       { category: "wage", title: "차단 대상", body: "저장되면 안 되는 다른 출처의 요청입니다." },
-      cookieFor(USER),
+      await cookieFor(USER),
       { origin: "https://attacker.example", "sec-fetch-site": "cross-site" },
     ));
     expect(response.status).toBe(403);
@@ -253,14 +255,14 @@ describe("신고와 관리자 검토 권한", () => {
         "http://localhost/api/community/posts/post_mock_001/reports",
         "POST",
         { reason: "other", detail: "본인 신고는 허용되지 않아야 합니다." },
-        cookieFor(USER),
+        await cookieFor(USER),
       ),
       contextFor("postId", "post_mock_001"),
     );
     expect(selfReport.status).toBe(409);
     expect(await selfReport.json()).toMatchObject({ error: { code: "SELF_REPORT_NOT_ALLOWED" } });
 
-    const inspectorCookie = cookieFor(INSPECTOR);
+    const inspectorCookie = await cookieFor(INSPECTOR);
     const first = await createReport(
       jsonMutation(
         "http://localhost/api/community/posts/post_mock_001/reports",
@@ -291,7 +293,7 @@ describe("신고와 관리자 검토 권한", () => {
         "http://localhost/api/community/posts/post_mock_001/reports",
         "POST",
         { reason: "misinformation", detail: "내용 검토가 필요합니다." },
-        cookieFor(INSPECTOR),
+        await cookieFor(INSPECTOR),
       ),
       contextFor("postId", "post_mock_001"),
     );
@@ -302,7 +304,7 @@ describe("신고와 관리자 검토 권한", () => {
         "http://localhost/api/community/posts/post_mock_001",
         "PATCH",
         { title: "신고 뒤 수정된 현재 제목" },
-        cookieFor(USER),
+        await cookieFor(USER),
       ),
       contextFor("postId", "post_mock_001"),
     );
@@ -310,12 +312,12 @@ describe("신고와 관리자 검토 권한", () => {
 
     const forbidden = await listReports(new Request(
       "http://localhost/api/community/moderation/reports",
-      { headers: { cookie: cookieFor(USER) } },
+      { headers: { cookie: await cookieFor(USER) } },
     ));
     expect(forbidden.status).toBe(403);
     expect(await forbidden.json()).toMatchObject({ error: { code: "FORBIDDEN" } });
 
-    const adminCookie = cookieFor(ADMIN);
+    const adminCookie = await cookieFor(ADMIN);
     const pending = await listReports(new Request(
       "http://localhost/api/community/moderation/reports?status=pending",
       { headers: { cookie: adminCookie } },
@@ -359,7 +361,7 @@ describe("신고와 관리자 검토 권한", () => {
 
     const ownerView = await getPost(
       new Request("http://localhost/api/community/posts/post_mock_001", {
-        headers: { cookie: cookieFor(USER) },
+        headers: { cookie: await cookieFor(USER) },
       }),
       contextFor("postId", "post_mock_001"),
     );

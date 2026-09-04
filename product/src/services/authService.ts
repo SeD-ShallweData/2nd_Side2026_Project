@@ -6,13 +6,8 @@ import type {
   SessionResponse,
   SessionUserDto,
 } from "@/app/api/auth/authApiContract";
-import { assertMockAuthAvailable, authenticateMockUser } from "@/server/auth/mockAuthUsers";
-import {
-  issueSession,
-  resolveSession,
-  revokeSession,
-  type IssuedSession,
-} from "@/server/auth/sessionStore";
+import type { IssuedSession } from "@/domain/auth";
+import { getAuthRepository } from "@/services/userDataProviders";
 import { ServiceError } from "@/utils/errors";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -45,13 +40,22 @@ function parseLoginRequest(input: unknown): LoginRequest {
     );
   }
 
+  /*
+   * 이메일은 소문자로 맞춰 넘긴다. DB 에 lower(email) 유니크 인덱스가 걸려 있어
+   * 대소문자만 다른 같은 주소는 같은 계정이다.
+   */
   return { email: email.toLocaleLowerCase("en-US"), password };
 }
 
-export function loginUser(input: unknown): { response: LoginResponse; session: IssuedSession } {
+export async function loginUser(
+  input: unknown,
+): Promise<{ response: LoginResponse; session: IssuedSession }> {
   const request = parseLoginRequest(input);
-  const user = authenticateMockUser(request.email, request.password);
-  const session = issueSession(user);
+  const repository = getAuthRepository();
+  repository.assertAvailable();
+
+  const user = await repository.authenticate(request.email, request.password);
+  const session = await repository.issueSession(user);
   return {
     session,
     response: {
@@ -62,10 +66,12 @@ export function loginUser(input: unknown): { response: LoginResponse; session: I
   };
 }
 
-export function getSessionResponse(token: string | null): SessionResponse {
+export async function getSessionResponse(token: string | null): Promise<SessionResponse> {
   if (!token) return { authenticated: false, user: null, expires_at: null };
-  assertMockAuthAvailable();
-  const session = resolveSession(token);
+  const repository = getAuthRepository();
+  repository.assertAvailable();
+
+  const session = await repository.resolveSession(token);
   if (!session) return { authenticated: false, user: null, expires_at: null };
   return {
     authenticated: true,
@@ -74,12 +80,15 @@ export function getSessionResponse(token: string | null): SessionResponse {
   };
 }
 
-export function getOptionalSessionUser(token: string | null): SessionUserDto | null {
+export async function getOptionalSessionUser(token: string | null): Promise<SessionUserDto | null> {
   if (!token) return null;
-  assertMockAuthAvailable();
-  return resolveSession(token)?.user ?? null;
+  const repository = getAuthRepository();
+  repository.assertAvailable();
+
+  return (await repository.resolveSession(token))?.user ?? null;
 }
 
-export function logoutUser(token: string | null): void {
-  revokeSession(token);
+export async function logoutUser(token: string | null): Promise<void> {
+  if (!token) return;
+  await getAuthRepository().revokeSession(token);
 }

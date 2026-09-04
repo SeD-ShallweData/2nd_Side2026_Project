@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     assertSameOriginRequest(request);
-    logoutUser(getSessionTokenFromRequest(request));
+    await logoutUser(getSessionTokenFromRequest(request));
     const response = noStoreJson({ logged_out: true } satisfies LogoutResponse);
     clearSessionCookie(response);
     return response;

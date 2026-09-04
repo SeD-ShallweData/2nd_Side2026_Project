@@ -6,7 +6,7 @@ import { POST as login } from "@/app/api/auth/login/route";
 import { POST as logout } from "@/app/api/auth/logout/route";
 import { GET as getSession } from "@/app/api/auth/session/route";
 import { GET as getCurrentUser } from "@/app/api/users/me/route";
-import { resetMockSessionsForTests } from "@/server/auth/sessionStore";
+import { resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 
 const MOCK_PASSWORDS = {
   user: "local-user-password",
@@ -48,11 +48,11 @@ beforeEach(() => {
   vi.stubEnv("AUTH_SESSION_TTL_SECONDS", "3600");
   vi.stubEnv("DEMO_BASIC_AUTH_USER", "");
   vi.stubEnv("DEMO_BASIC_AUTH_PASSWORD", "");
-  resetMockSessionsForTests();
+  resetMockSessions();
 });
 
 afterEach(() => {
-  resetMockSessionsForTests();
+  resetMockSessions();
   vi.unstubAllEnvs();
 });
 

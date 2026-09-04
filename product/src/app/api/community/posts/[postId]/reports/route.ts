@@ -21,10 +21,10 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
   try {
     assertSameOriginRequest(request);
     const user = requireAuthenticatedUser(
-      getOptionalSessionUser(getSessionTokenFromRequest(request)),
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     const { postId } = await context.params;
-    return noStoreJson(reportCommunityPost(
+    return noStoreJson(await reportCommunityPost(
       postId,
       await readJsonBody(request),
       user,
