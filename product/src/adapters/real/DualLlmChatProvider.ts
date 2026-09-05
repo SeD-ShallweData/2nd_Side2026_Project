@@ -1,4 +1,5 @@
 import type { ChatResponse } from "@/domain/chat";
+import type { CompanyRiskResult } from "@/domain/risk";
 import type {
   ChatComparisonProvider,
   ChatComparisonResponse,
@@ -64,6 +65,48 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   return [...hits];
 }
 
+/** 순위 표기를 지운다. "우선 확인 범위가 ‘상위1%’으로 표시됐습니다" 같은 문장이 대상이다. */
+function stripBandLabel(text: string): string {
+  return text
+    .replace(/[‘'"“]?상위\s*\d+(?:\.\d+)?\s*(?:%|퍼센트)[’'"”]?/g, "상위 구간")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/**
+ * 모델에게 보여줄 사업장 판정 결과에서 내부 값을 걷어낸다.
+ *
+ * 프롬프트로 "등급·순위·근거 코드를 말하지 마세요"라고 적어도 모델은 컨텍스트에
+ * 있는 값을 그대로 옮깁니다. 실제로 `PUBLISHED_SAFETY_PRIORITY_BAND` 와 `상위1%`,
+ * 내부 배치·파이프라인 이름이 사용자 답변에 그대로 나왔습니다. 말하면 안 되는 값은
+ * 애초에 주지 않는 편이 확실합니다.
+ *
+ * 사람이 읽을 요약문과 면책 문구는 남깁니다. 그게 모델이 실제로 써야 할 재료입니다.
+ * 화면에 쓰이는 `/api/companies/{id}/risk` 응답은 건드리지 않습니다 — 여기서 만드는
+ * 것은 프롬프트에 넣을 사본뿐입니다.
+ */
+function publicSignalForPrompt(risk: CompanyRiskResult) {
+  return {
+    data_as_of: risk.data_as_of,
+    wage_signal: {
+      summary: stripBandLabel(risk.wage_risk.summary),
+      official_listing: {
+        status: risk.wage_risk.official_listing.status,
+        as_of: risk.wage_risk.official_listing.as_of,
+      },
+      check_points: risk.wage_risk.evidence_items.map((item) => stripBandLabel(item.label)),
+    },
+    safety_context: {
+      scope: risk.safety_context.scope,
+      summary: stripBandLabel(risk.safety_context.summary),
+      region: risk.safety_context.region,
+      industry: risk.safety_context.industry,
+      disclaimer: risk.safety_context.disclaimer,
+      check_points: risk.safety_context.evidence_items.map((item) => stripBandLabel(item.label)),
+    },
+  };
+}
+
 function buildSystemPrompt(context: ComparisonContext): string {
   const safeContext = {
     company: context.companyContext
@@ -74,7 +117,7 @@ function buildSystemPrompt(context: ComparisonContext): string {
           region: context.companyContext.region,
           industry: context.companyContext.industry,
           size_label: context.companyContext.size_label,
-          public_signal_result: context.companyContext.risk,
+          public_signal_result: publicSignalForPrompt(context.companyContext.risk),
         }
       : null,
     verified_sources: context.policyBaseline.sources,
