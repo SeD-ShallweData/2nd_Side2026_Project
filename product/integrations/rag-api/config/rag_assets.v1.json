@@ -1,0 +1,100 @@
+{
+  "contract": "donworry.rag.assets.v1",
+  "model": {
+    "repo_id": "BAAI/bge-m3",
+    "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "embedding_dimension": 1024,
+    "files": [
+      {
+        "path": "1_Pooling/config.json",
+        "size": 191,
+        "sha256": "e54c164a07274f2eb45bb724f54a79d1efcc90c41573887cd9a29aeee0597352"
+      },
+      {
+        "path": "config.json",
+        "size": 687,
+        "sha256": "26159e7ad065073448460117eb24b7a4572f6f4e78eadff65dc0a11c052449fa"
+      },
+      {
+        "path": "config_sentence_transformers.json",
+        "size": 123,
+        "sha256": "1eef72430e7194a1e59680e635aed81ffa083f05668dbc5bb1c56c04c0999c38"
+      },
+      {
+        "path": "modules.json",
+        "size": 349,
+        "sha256": "84e40c8e006c9b1d6c122e02cba9b02458120b5fb0c87b746c41e0207cf642cf"
+      },
+      {
+        "path": "pytorch_model.bin",
+        "size": 2271145830,
+        "sha256": "b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38"
+      },
+      {
+        "path": "sentence_bert_config.json",
+        "size": 54,
+        "sha256": "eb9b44b13c0f52a3b3685c3b1cbdea1ba8b04bea123b98f61610048940776eb1"
+      },
+      {
+        "path": "sentencepiece.bpe.model",
+        "size": 5069051,
+        "sha256": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865"
+      },
+      {
+        "path": "special_tokens_map.json",
+        "size": 964,
+        "sha256": "8c785abebea9ae3257b61681b4e6fd8365ceafde980c21970d001e834cf10835"
+      },
+      {
+        "path": "tokenizer.json",
+        "size": 17098108,
+        "sha256": "21106b6d7dab2952c1d496fb21d5dc9db75c28ed361a05f5020bbba27810dd08"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "size": 444,
+        "sha256": "a62b2b6784f990259fddef5f16388693a8043be4f69179e6a5257eeb3f9abac4"
+      }
+    ]
+  },
+  "collection": {
+    "name": "labor_law",
+    "document_count": 583,
+    "embedding_dimension": 1024,
+    "probe": {
+      "query": "제43조(임금 지급) ① 임금은 통화(通貨)로 직접 근로자에게 그 전액을 지급하여야 한다. 다만, 법령 또는 단체협약에 특별한 규정이 있는 경우에는 임금의 일부를 공제하거나 통화 이외의 것으로 지급할 수 있다.\n② 임금은 매월 1회 이상 일정한 날짜를 정하여 지급하여야 한다. 다만, 임시로 지급하는 임금, 수당, 그 밖에 이에 준하는 것 또는 대통령령으로 정하는 임금에 대하여는 그러하지 아니하다.",
+      "n_results": 1,
+      "expected_id": "kis_a43",
+      "expected_law": "근로기준법",
+      "expected_article_id": "제43조",
+      "max_distance": 0.0001
+    },
+    "files": [
+      {
+        "path": "chroma.sqlite3",
+        "size": 7028736,
+        "sha256": "4e2f39e7be02ca55f79ddaf6b790cb9a2210f3bcf282daf7705dc86e54b33741"
+      },
+      {
+        "path": "6c1e8e89-4864-41ee-95ce-4f703f458f13/data_level0.bin",
+        "size": 423600,
+        "sha256": "41b1d6558680207762d59e507f9dcba0cb9fbbd4c23c79e14025206d3742e17f"
+      },
+      {
+        "path": "6c1e8e89-4864-41ee-95ce-4f703f458f13/header.bin",
+        "size": 100,
+        "sha256": "bf12d4486518c7addf488cb4854526902c78e91951990e1e2f4e055cec814e5d"
+      },
+      {
+        "path": "6c1e8e89-4864-41ee-95ce-4f703f458f13/length.bin",
+        "size": 400,
+        "sha256": "7a12e561363385e9dfeeab326368731c030ed4b374e7f5897ac819159d2884c5"
+      },
+      {
+        "path": "6c1e8e89-4864-41ee-95ce-4f703f458f13/link_lists.bin",
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  }
+}

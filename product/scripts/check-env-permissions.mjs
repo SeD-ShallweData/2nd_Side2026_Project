@@ -3,9 +3,9 @@ import path from "node:path";
 
 const defaultCandidates = [
   path.join(process.cwd(), ".env.local"),
-  process.env.DATABASE_ENV_FILE || "/data/shared-SeD/.env.local",
-  process.env.SHARED_API_KEY_FILE || "/data/shared-SeD/api_key.env",
-];
+  process.env.DATABASE_ENV_FILE,
+  process.env.SHARED_API_KEY_FILE,
+].filter(Boolean);
 const requestedCandidates = process.argv.slice(2).filter(Boolean);
 const candidates = requestedCandidates.length > 0 ? requestedCandidates : defaultCandidates;
 

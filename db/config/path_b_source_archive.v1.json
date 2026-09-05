@@ -1,0 +1,329 @@
+{
+  "contract_version": "path_b_source_archive.v1.1",
+  "drive": {
+    "file_id": "1s7r3zt6mEYqI0I89dgRR4EzUh6sn4PQG",
+    "revision_before": "0B7g-BxntbHDzNXJMeGkvdzhrOWtpV1h0ZmFIN1kyRC9helIwPQ",
+    "revision_after": "0B7g-BxntbHDzNXJMeGkvdzhrOWtpV1h0ZmFIN1kyRC9helIwPQ"
+  },
+  "archive": {
+    "name": "shared-SeD-full-20260814.tar.gz",
+    "bytes": 66580543642,
+    "sha256": "10eef67eb19e7211e8163aaf9b765449216e72e078171108fee449273f4d9252",
+    "modified_time": "2026-08-14T15:02:34.715Z"
+  },
+  "extraction": {
+    "profile": "path_b_canonical",
+    "report_sha256": "310c7264d4244de569e409cba1456e31957d37039586ebdb1ad9136b4d9cbbce",
+    "regular_files": 51,
+    "bytes": 1929876663,
+    "records_manifest_sha256": "2ae2d6bc5fd03648a4dc66fb24f641d21a4b98db2788055272a6261cc8ddf8b8",
+    "records": [
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/AGENT_GUIDE.md",
+        "group": "service_bundle_current",
+        "bytes": 8540,
+        "sha256": "844c5d0d526394a516b83838eca89fa29c551a0a77b638250f2fb0cb89673279"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/DB_BUILD_PROMPT.md",
+        "group": "service_bundle_current",
+        "bytes": 6090,
+        "sha256": "8ebdf0c66c14befc55f35cd434f1ce393856ca2d01272b316d72c72380c7a2e3"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/MODEL_PARAMS.md",
+        "group": "service_bundle_current",
+        "bytes": 3157,
+        "sha256": "41354373bc70f13b56fdeae0623fde2fb310e71d6ae72cb675b9bf3bfe46c777"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/RISK_TIER_PROMPT.md",
+        "group": "service_bundle_current",
+        "bytes": 5346,
+        "sha256": "03cc7e19e6fe5d1fcd0f9474bcaa233fd44301141ea14cd28e54f8c4bc7cd504"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/README.md",
+        "group": "service_bundle_backfill",
+        "bytes": 4544,
+        "sha256": "a9a51ac82b53005a7ed46fa043829ea5c1c996459c3eb0d464ffe53be873a87a"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/backfill_manifest.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 1035,
+        "sha256": "a2f3913873f820a92213bade1b25a60abf74108f3490527a364d25cc03f491fc"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202512/safe_recommendation_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 58039426,
+        "sha256": "98418385eb451d8c522c3213ba8eb5c01a584fa253df58e8eb57809f6f284ac9"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202512/scored_active_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 172148727,
+        "sha256": "b5fd9ef5b8ce44258e95c3b06e42fecef3d4c35f90455e06c3deb9c24522b2e2"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202512/감독관_위험큐_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 462622,
+        "sha256": "6fe49315ebcb8ebb5e6e58398c113e9d0fcba637d377cd3abf0c8e59d841ba1a"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202601/safe_recommendation_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 56901278,
+        "sha256": "4df93d2c1f1212e8f0fcba0d21b5f6a34a45f8e62dd6c080407d4d2cebc528b3"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202601/scored_active_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 169973081,
+        "sha256": "19fcb2a8122dfe1da3a663c10aa698c0dea02ec6c8a78c13b28d5fffb06f43ba"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202601/감독관_위험큐_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 469840,
+        "sha256": "a7775cd2060e30b4df434b5b4990dd29f1db79e7421b58cd7d39fb3c3611ebf8"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202602/safe_recommendation_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 56974863,
+        "sha256": "50a275f08ac4c5fd9295235f92b0950cc2c13034fc71a12d9ef08a2303a090e2"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202602/scored_active_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 170751847,
+        "sha256": "54bff5f603d9516bd4499d260c9786e38a2bc71e851505a57a6b04b67f395cc0"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202602/감독관_위험큐_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 467300,
+        "sha256": "d8e03cd66e2aa00ccf7a3db3ad40da2700e2bc5c03e2f6eee2166b0861794614"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202603/safe_recommendation_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 56779990,
+        "sha256": "88944c1756e6c60334017acee34dcf5f6562195e524b7b59dd91c19b3cf97480"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202603/scored_active_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 170315722,
+        "sha256": "df2f5ddb00d2bc144dfb8ffbad5dc02496790250f206b816936e5c7575abf261"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202603/감독관_위험큐_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 459022,
+        "sha256": "0becbfe10ad4a54d88c04548ee486e3dbbfddddb80d321ac9167fa989c87a1d6"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202604/safe_recommendation_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 56824033,
+        "sha256": "6a937008e691f75a570777483c2a16f667458a1d25feec99a88528f032169171"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202604/scored_active_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 171363929,
+        "sha256": "a2a91ecc1a5a12638c3a4e1f8920efdb39f67fd037db5a2371a5bb02b280290c"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202604/감독관_위험큐_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 461270,
+        "sha256": "815d91b33d47bfa77e9e59db9fcb11bc05980267933c130b9924a44736d0ff40"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202605/safe_recommendation_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 56869733,
+        "sha256": "722cb56cec79ffe84c8c8632eb5616672b738daa1d4d4393bb41bd059c24a387"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202605/scored_active_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 171371299,
+        "sha256": "44f7dd7be39fd0335c0c1e0c238adbe3edfa2090bd7feb0c6e853f9b534b910f"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202605/감독관_위험큐_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 463405,
+        "sha256": "e47de6a7b124d83bb31a406df0909fa2e707166935a82295a77272e3ea39733c"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202606/safe_recommendation_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 57536076,
+        "sha256": "c69a8a88c92720b0d108f566cecad02cccb68cb9d7e8f91e27055261d1c57c0b"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202606/scored_active_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 172408832,
+        "sha256": "fb0d6c9e559b09238c4f0faeda8f9708de20ca82975037aa59c50081b51947da"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/backfill/outputs_202606/감독관_위험큐_full.csv",
+        "group": "service_bundle_backfill",
+        "bytes": 466268,
+        "sha256": "8ef1e840a3dc5d6de485a67ca168acb261f46078d30e24e0245dd3381d566feb"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/code/features_shared.py",
+        "group": "service_bundle_current",
+        "bytes": 9500,
+        "sha256": "f21469c9860d8cc06f1f33e287edaa78b2a6974da9d49130c8ffe0cba03b9731"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/model/door1_final_model.pkl",
+        "group": "service_bundle_current",
+        "bytes": 1581730,
+        "sha256": "cbe5d951f170527c662239af3ee3c636d092c2cfa9080b0d0a42b19d845682c6"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/model/ensemble_trees_model.pkl",
+        "group": "service_bundle_current",
+        "bytes": 1519565,
+        "sha256": "df2d4b1a20105287470ac3b026ec75ac2f0604abfbdcb2358c1f65aee572c842"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/model/lgbm_final_model.pkl",
+        "group": "service_bundle_current",
+        "bytes": 290233,
+        "sha256": "47b1bef91721881da7498b7c3ade6e1d9c9974ee66549747ef9e04923b36c3a0"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/outputs/safe_recommendation_full.csv",
+        "group": "service_bundle_current",
+        "bytes": 57536076,
+        "sha256": "c69a8a88c92720b0d108f566cecad02cccb68cb9d7e8f91e27055261d1c57c0b"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/outputs/scored_active_full.csv",
+        "group": "service_bundle_current",
+        "bytes": 172408832,
+        "sha256": "fb0d6c9e559b09238c4f0faeda8f9708de20ca82975037aa59c50081b51947da"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/outputs/감독관_위험큐_full.csv",
+        "group": "service_bundle_current",
+        "bytes": 466268,
+        "sha256": "8ef1e840a3dc5d6de485a67ca168acb261f46078d30e24e0245dd3381d566feb"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/predict_example.py",
+        "group": "service_bundle_current",
+        "bytes": 2427,
+        "sha256": "bf5cd45b7ba164c1345dad42c1e8ec98ec2d2f9412d71e2216376f87e10f1602"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/serve_inputs/ksic_code_mapping.csv",
+        "group": "service_bundle_current",
+        "bytes": 44800,
+        "sha256": "3b5f704c95bceb55e6462c8fd0562876ae7f84beabebf7a80de2cee9fa458be0"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/serve_inputs/ksic_industry_mapping.csv",
+        "group": "service_bundle_current",
+        "bytes": 4555,
+        "sha256": "96c2eba3f7647a97f122b8fce5324ba12e79d98c422f02b505bc7c2e3bee40f9"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/serve_inputs/산업별_기업수_활동_신생_소멸__20260503004855.csv",
+        "group": "service_bundle_current",
+        "bytes": 1379,
+        "sha256": "6ed7578743f952bb82afb4576a5d6701cc3a16fdfef25de859a070759f6eec7b"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/_service_bundle/serve_inputs/체납_통합_전체.csv",
+        "group": "service_bundle_current",
+        "bytes": 10679374,
+        "sha256": "342ea2d9e8a6dbe68f70b4c10fc0a1de436d73daea3d94946ac2cfad00a213dd"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/product/integrations/rag-api/data/labor_law_db/6c1e8e89-4864-41ee-95ce-4f703f458f13/data_level0.bin",
+        "group": "rag_db",
+        "bytes": 423600,
+        "sha256": "41b1d6558680207762d59e507f9dcba0cb9fbbd4c23c79e14025206d3742e17f"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/product/integrations/rag-api/data/labor_law_db/6c1e8e89-4864-41ee-95ce-4f703f458f13/header.bin",
+        "group": "rag_db",
+        "bytes": 100,
+        "sha256": "bf12d4486518c7addf488cb4854526902c78e91951990e1e2f4e055cec814e5d"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/product/integrations/rag-api/data/labor_law_db/6c1e8e89-4864-41ee-95ce-4f703f458f13/length.bin",
+        "group": "rag_db",
+        "bytes": 400,
+        "sha256": "7a12e561363385e9dfeeab326368731c030ed4b374e7f5897ac819159d2884c5"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/product/integrations/rag-api/data/labor_law_db/6c1e8e89-4864-41ee-95ce-4f703f458f13/link_lists.bin",
+        "group": "rag_db",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "shared-SeD/hss/2nd_Side2026_Project/product/integrations/rag-api/data/labor_law_db/chroma.sqlite3",
+        "group": "rag_db",
+        "bytes": 7028736,
+        "sha256": "4e2f39e7be02ca55f79ddaf6b790cb9a2210f3bcf282daf7705dc86e54b33741"
+      },
+      {
+        "path": "shared-SeD/shared/model/weekly_workplace_risk_api_extension_v3_201512_202604/data/processed/api_labels/occurrence_week_sido_industry_big_v2_compatible_bounded_panel.parquet",
+        "group": "industrial_existing_firms",
+        "bytes": 55821,
+        "sha256": "e81fc976c15099166e801a8a30125f740dbd7e783aba26777d3146ce61c93e40"
+      },
+      {
+        "path": "shared-SeD/shared/model/weekly_workplace_risk_v2_201512_202604/data/processed/cell_week_predictions.parquet",
+        "group": "industrial_existing_firms",
+        "bytes": 3106731,
+        "sha256": "8b44d736f822b242e51393163e3d38697cfe9589e6129b93da636ee72e39edda"
+      },
+      {
+        "path": "shared-SeD/shared/model/weekly_workplace_risk_v2_201512_202604/models/weekly_cell_count_production.joblib",
+        "group": "industrial_models",
+        "bytes": 243022,
+        "sha256": "cd483b3d9a6a01820cc2c436f6fe6570972f6cde304e7650a18527651a9f476f"
+      },
+      {
+        "path": "shared-SeD/shared/model/weekly_workplace_risk_v2_201512_202604/models/xgboost_weekly_cell_count.joblib",
+        "group": "industrial_models",
+        "bytes": 243088,
+        "sha256": "a8998e0e2a32840b1d50e8e70aa8e29271cf530fd8bb76816aa51925172f0451"
+      },
+      {
+        "path": "shared-SeD/shared/model/weekly_workplace_risk_v2_201512_202604/outputs/predictions/workplace_week/year=2026/month=04/week=2026-04-20.parquet",
+        "group": "industrial_existing_firms",
+        "bytes": 19114304,
+        "sha256": "39dcf06f71f30c5756d0877ac593c16c3386b12cf8611b286f2c80cad8c59047"
+      },
+      {
+        "path": "shared-SeD/shared/model/weekly_workplace_risk_v2_201512_202604/outputs/workplace_week_scores_2026_04_20.csv.gz",
+        "group": "industrial_existing_firms",
+        "bytes": 53574287,
+        "sha256": "581b7a4092905900f38590fe082e7e074d9b4357a42d0b828e2fa73ba31f8ab3"
+      },
+      {
+        "path": "shared-SeD/shared/model/weekly_workplace_risk_v2_201512_202604/reports/workplace_scoring_quality.json",
+        "group": "industrial_existing_firms",
+        "bytes": 4560,
+        "sha256": "b4a6fe86f8f33a5210138cbabd0fe83e41c5bd6b121a719be661287d6aa10bc0"
+      }
+    ]
+  }
+}

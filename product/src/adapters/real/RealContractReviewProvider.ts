@@ -107,6 +107,15 @@ export class RealContractReviewProvider implements ContractReviewProvider {
     if (!request.file) {
       throw new ServiceError("CONTRACT_FILE_REQUIRED", "실제 분석에는 PDF 또는 이미지 파일이 필요합니다.", 400, false);
     }
+    const internalToken = process.env.CONTRACT_INTERNAL_TOKEN?.trim();
+    if (!internalToken) {
+      throw new ServiceError(
+        "CONTRACT_PROVIDER_UNAVAILABLE",
+        "계약서 분석 서비스 내부 인증이 설정되지 않았습니다.",
+        503,
+        true,
+      );
+    }
 
     const form = new FormData();
     form.append("file", request.file, request.file.name);
@@ -116,6 +125,7 @@ export class RealContractReviewProvider implements ContractReviewProvider {
     try {
       response = await this.fetchFn(`${baseUrl.replace(/\/$/, "")}/api/contract/review`, {
         method: "POST",
+        headers: { Authorization: `Bearer ${internalToken}` },
         body: form,
         signal: request.signal
           ? AbortSignal.any([request.signal, AbortSignal.timeout(timeoutMs())])

@@ -403,4 +403,4 @@ CONTRACT_PROVIDER=mock | real
 | 승석 Next.js 웹 | TypeScript 도메인 타입, Mock CSV 분리, 오류 문구 | 구직자 위험 퍼센트, 안전 확정 표현, 감독관·사업주·커뮤니티 중심 범위 |
 | 공용 원천 데이터 | 향후 운영 DB와 검색 인덱스 생성의 입력 | 프론트엔드가 원천 CSV를 직접 읽는 구조 |
 
-다른 팀원 파일은 읽기 전용 참고 자료다. 통합 코드와 새 문서는 `/data/shared-SeD/jcu0304/2nd_Side2026_Project` 안에서만 작성한다.
+통합 코드와 새 문서는 각자 clone한 저장소 안에서 작성하고, 개인 task 브랜치로 PR을 올린다.

@@ -262,3 +262,6 @@ tsconfig.tsbuildinfo
 /tsconfig.json
 /package.json
 /package-lock.json
+
+db/*.dump
+db/migrate_log.txt

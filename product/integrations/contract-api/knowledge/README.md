@@ -29,7 +29,8 @@ RAG를 붙이기 전까지, 여기 있는 문서는 **`<doc>` 태그로 감싸�
 4. 반영 확인:
 
 ```bash
-curl -s localhost:8000/api/health | jq .knowledge
+curl -s localhost:8000/api/health \
+  -H "Authorization: Bearer $CONTRACT_INTERNAL_TOKEN" | jq .knowledge
 ```
 
 ## 규칙
@@ -57,7 +58,7 @@ curl -s localhost:8000/api/health | jq .knowledge
 ## RAG로 넘어갈 때
 
 합계가 16,000자에 닿으면 프롬프트 주입의 한계입니다.
-`data/rag/`(→ `/data/shared-SeD/csh/data/rag/`)로 옮겨 청킹·임베딩을 붙이고,
+`data/rag/`로 옮겨 청킹·임베딩을 붙이고,
 [app/prompts.py](../app/prompts.py)의 `_load_knowledge()`만 검색 결과로 교체하면 나머지는 그대로 씁니다.
 
 자세한 절차는 [docs/프롬프트_가이드.md](../docs/프롬프트_가이드.md) 10절.

@@ -1,0 +1,173 @@
+{
+  "contract": "donworry.contract.assets.v1",
+  "exact_roots": [
+    "prompts",
+    "knowledge/common",
+    "knowledge/contract",
+    "knowledge/safety",
+    "knowledge/wage"
+  ],
+  "entrypoints": {
+    "registry": "prompts/registry.json",
+    "rewrite": "prompts/rewrite/query_rewrite.md",
+    "contract_extract": "prompts/contract/extract.md"
+  },
+  "files": [
+    {
+      "path": "prompts/contract/extract.md",
+      "kind": "contract_extract",
+      "size": 10764,
+      "sha256": "7b1ba1254cc1a75b2470cc10c4fe8c40e7092e6aa9a4a0e05540f94b17cf9714"
+    },
+    {
+      "path": "prompts/few_shot/general.jsonl",
+      "kind": "few_shot",
+      "size": 2647,
+      "sha256": "237fc7642bae25398d088d15fcc26bedbb4d425ea837612658d9b85d13b0fc0d"
+    },
+    {
+      "path": "prompts/few_shot/safety_risk.jsonl",
+      "kind": "few_shot",
+      "size": 2503,
+      "sha256": "3afe5a09ca95027b9030429f9fce213332ea112b01ae1fad0cc78d44e0cfe57b"
+    },
+    {
+      "path": "prompts/few_shot/wage_arrears.jsonl",
+      "kind": "few_shot",
+      "size": 3800,
+      "sha256": "18c6c750b6d730401963ea2c14839dec448758cedad3791c03d8327ed84aedf5"
+    },
+    {
+      "path": "prompts/registry.json",
+      "kind": "registry",
+      "size": 2950,
+      "sha256": "7e30d8757a0dd024278e9ea83c1af1c7d8b3977fc5af5ba82f3e1420dee37f56"
+    },
+    {
+      "path": "prompts/rewrite/query_rewrite.md",
+      "kind": "rewrite",
+      "size": 1706,
+      "sha256": "4d467c0df0967f890e6b27ab3dd438fd22ad9a27655baf950de276d5786f16cd"
+    },
+    {
+      "path": "prompts/system/base/00-계약.md",
+      "kind": "system",
+      "size": 3150,
+      "sha256": "7b3a2fa12e5d52df4357f834a601cfccd247855b40701803aac81a79825557a2"
+    },
+    {
+      "path": "prompts/system/base/10-형식.md",
+      "kind": "system",
+      "size": 2032,
+      "sha256": "e909b375acb332b7fc925b036f3aa8bf7a70801ee5c80427360fcf57d874b7bb"
+    },
+    {
+      "path": "prompts/system/base/20-가드레일.md",
+      "kind": "system",
+      "size": 5177,
+      "sha256": "5470fa4c4d72dc2ca72f041b8fe48f1104726ae5bcc148bcdf7eea1f04419458"
+    },
+    {
+      "path": "prompts/system/persona/contract_review.md",
+      "kind": "system",
+      "size": 4761,
+      "sha256": "9445eca20e6cda64bbb60bdb3cacebb8fc2963c1c6748681781ea288023c1e59"
+    },
+    {
+      "path": "prompts/system/persona/general.md",
+      "kind": "system",
+      "size": 2485,
+      "sha256": "094e9365771a192e5fd1b067d14e63c516fce65d91a81df859bcc16e87e93321"
+    },
+    {
+      "path": "prompts/system/persona/safety_risk.md",
+      "kind": "system",
+      "size": 2425,
+      "sha256": "6fd1535da31bd4397b921cfc14bbe8be0c95d565f9d00909f28e60a367b62ae1"
+    },
+    {
+      "path": "prompts/system/persona/wage_arrears.md",
+      "kind": "system",
+      "size": 3103,
+      "sha256": "50da899b27a9f88271173b33be3cc0b42257fb22ae17da13b883c1465fb40e88"
+    },
+    {
+      "path": "knowledge/common/10-서비스정의.md",
+      "kind": "knowledge",
+      "size": 2959,
+      "sha256": "73fe6584cc5a1a2e4dbb54d95e126203e59ea94698662fa16a3b58d6b3ed19d5"
+    },
+    {
+      "path": "knowledge/common/20-상담창구.md",
+      "kind": "knowledge",
+      "size": 1698,
+      "sha256": "15ef3d703812ea0d8b92c18262624b7e40876f037331f73810415b12666bc2e4"
+    },
+    {
+      "path": "knowledge/common/30-표현규칙.md",
+      "kind": "knowledge",
+      "size": 3855,
+      "sha256": "23c23a305ee19f332fcb9bd04f1b2001abb04d088d5483b300c05ecb93c637df"
+    },
+    {
+      "path": "knowledge/contract/10-법정기준.md",
+      "kind": "knowledge",
+      "size": 7916,
+      "sha256": "f307cc68dd2413ec2ff04a6cad2457078ce35f3d4560bd3ed384a94440e62d29"
+    },
+    {
+      "path": "knowledge/contract/20-독소조항.md",
+      "kind": "knowledge",
+      "size": 5146,
+      "sha256": "7c0167298501c92263b552f00cb13e5105547b277baaf5d67b2e14eb8d473132"
+    },
+    {
+      "path": "knowledge/contract/30-대응절차.md",
+      "kind": "knowledge",
+      "size": 3420,
+      "sha256": "020b8970f8976c00e76c6ef70075882cc268ac16bf6a7fc48d7c31ec588dd6d8"
+    },
+    {
+      "path": "knowledge/safety/10-경보체계.md",
+      "kind": "knowledge",
+      "size": 2499,
+      "sha256": "3ea06ba2d2e754e0e20512084889cdb296d2c408cf7dcd6dcb7bc20e5fa3c977"
+    },
+    {
+      "path": "knowledge/safety/20-신호해석.md",
+      "kind": "knowledge",
+      "size": 2378,
+      "sha256": "1a6c758033b834b3e230bf6e7a4e63962c10961d632878e4307205531affbb59"
+    },
+    {
+      "path": "knowledge/safety/30-산재절차.md",
+      "kind": "knowledge",
+      "size": 3204,
+      "sha256": "b5072faeaac74335ef03f7541d98e3d7a765d9a060dce308720c620c317e817e"
+    },
+    {
+      "path": "knowledge/wage/10-관측지표.md",
+      "kind": "knowledge",
+      "size": 3327,
+      "sha256": "53f9372c8ae3bbb34a3b0e4223b9e55187ff52defc59547b7754bcfb8ba5b2ae"
+    },
+    {
+      "path": "knowledge/wage/20-확인체크리스트.md",
+      "kind": "knowledge",
+      "size": 2914,
+      "sha256": "2cba99c33ab569abf347c357c251835af63654afe1e2f92dc6575fafe6616067"
+    },
+    {
+      "path": "knowledge/wage/30-대응절차.md",
+      "kind": "knowledge",
+      "size": 2292,
+      "sha256": "6b03acf28fdafdb8d7e135a19d9ba09aaeb223bfa2e9739e4d1068cf2957ecbe"
+    },
+    {
+      "path": "knowledge/wage/40-제도기준.md",
+      "kind": "knowledge",
+      "size": 2395,
+      "sha256": "f727318e8c6150adad4565621e232eb3ff445f2eb40bb7b918b98c02f758b043"
+    }
+  ]
+}

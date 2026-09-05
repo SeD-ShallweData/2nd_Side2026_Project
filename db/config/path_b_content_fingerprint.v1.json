@@ -1,0 +1,126 @@
+{
+  "contract": "path_b_content_fingerprint.v1.2",
+  "encoding": "one PostgreSQL 16 REPEATABLE READ snapshot; ordered COPY text of to_jsonb(row) payload including row terminator; exact sequence definition and state; SHA-256",
+  "entries": [
+    {
+      "relation": "drizzle.__drizzle_migrations",
+      "rows": 9,
+      "sha256": "b0a30b935f947811e4e74458324c00faf40a84f0bf67e5fe46fb5e2c8194cd3b"
+    },
+    {
+      "relation": "industrial_safety.cell_label_datasets",
+      "rows": 2,
+      "sha256": "9590f96b48d5857cc1d1e3e03a08d601dd392c8fe1eda323a67d561bd500460d"
+    },
+    {
+      "relation": "industrial_safety.cell_week_labels",
+      "rows": 184280,
+      "sha256": "a013361ccff1b4ce72e7e19969122339e8699c3b48fbcff6d9576870aff922d1"
+    },
+    {
+      "relation": "industrial_safety.cell_week_predictions",
+      "rows": 92140,
+      "sha256": "ac1eb73e01da9d85db1407f5b130439071daf5fdbadf65702cd2e746561befd3"
+    },
+    {
+      "relation": "industrial_safety.firm_links",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relation": "industrial_safety.firm_risk_results",
+      "rows": 515608,
+      "sha256": "19a5229cc9c232c0e60caa7a4eb8aa4cdd427f0945651fca6830ed68a2ee97aa"
+    },
+    {
+      "relation": "industrial_safety.pipeline_run_dependencies",
+      "rows": 1,
+      "sha256": "d20c521f1b6b79749085f9b7a4a2812b6c3d6ee66644ad626e79c1ac0993b482"
+    },
+    {
+      "relation": "industrial_safety.pipeline_runs",
+      "rows": 3,
+      "sha256": "22ecdb3dd171e244c7e2d088a675db3424858e69b7e9f36d232b3418c0b79800"
+    },
+    {
+      "relation": "industrial_safety.workplace_allocation_cells",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relation": "industrial_safety.workplace_predictions",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relation": "industrial_safety.workplace_predictions_2026q2",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relation": "industrial_safety.workplace_snapshots",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relation": "industrial_safety.workplaces",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relation": "public.batches",
+      "rows": 7,
+      "sha256": "86f4c753d455350c68436d9f239ad992cec648fd32893831eaa76addae457924"
+    },
+    {
+      "relation": "public.comments",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relation": "public.firms",
+      "rows": 639137,
+      "sha256": "1e9bba3c537e83643a47ea5673903850a1b6662a9fe34b93813b8351c132259b"
+    },
+    {
+      "relation": "public.inspector_queue",
+      "rows": 21000,
+      "sha256": "1c722c8011767225147ab9c505ae90684aeb6d54bdbf77ee9152457458f64e7e"
+    },
+    {
+      "relation": "public.posts",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relation": "public.reviews",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relation": "public.risk_tier_meta",
+      "rows": 6,
+      "sha256": "02d8e28c47e090a387416bd78cd6a0d9e0bf597fc9a230b363481a2bb8020aa0"
+    },
+    {
+      "relation": "public.safe_recommendation",
+      "rows": 3524726,
+      "sha256": "39317202e3c26a2a7af289d917827e6cff5af43759e5004cc381625e2dc697b4"
+    },
+    {
+      "relation": "public.scored_active",
+      "rows": 3855848,
+      "sha256": "1766d55db0747dd6a57faf039294c11f043e90556b4f776789df4a75535eebec"
+    },
+    {
+      "relation": "public.users",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relation": "__sequence_state__",
+      "rows": 8,
+      "sha256": "82b79bda6a424dfa92fae14b5186d8e8da9c4deca69b81f5cd74e3ae36bca0dc"
+    }
+  ]
+}

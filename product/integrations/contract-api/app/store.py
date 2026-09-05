@@ -1,7 +1,7 @@
 """대화 로그 저장.
 
 JSONL 한 줄 = 한 턴. 나중에 프롬프트 평가·RAG 학습 데이터로 재활용합니다.
-저장 위치는 outputs/chat_logs/ (→ /data/shared-SeD/csh/outputs/chat_logs/).
+저장 위치는 outputs/chat_logs/ 입니다.
 """
 
 import json

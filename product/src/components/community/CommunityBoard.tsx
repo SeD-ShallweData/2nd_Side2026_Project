@@ -1,40 +1,129 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  COMMUNITY_CATEGORIES,
+  COMMUNITY_CATEGORY_LABELS,
+  type CommunityCategory,
+  type CommunityPostListResponse,
+} from "@/app/api/community/communityApiContract";
+import { ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
+import { companyContextLabel, relativeTimeLabel } from "@/components/community/communityFormat";
+import { listCommunityPosts } from "@/services/communityClient";
 
-const POSTS = [
-  { category: "입사 전 확인", place: "서울 · 서비스업", title: "면접에서 임금 지급일은 어떻게 물어보면 좋을까요?", body: "계약서 작성 전에 지급일과 지급 방법을 자연스럽게 확인했던 경험을 나눠주세요.", author: "구직자", time: "12분 전", comments: 4, likes: 11 },
-  { category: "근로계약서", place: "경기 · 제조업", title: "포괄임금 조항을 받았을 때 먼저 확인할 항목", body: "기본급과 고정 연장수당이 분리되어 있는지부터 확인해보려고 합니다.", author: "익명 근로자", time: "35분 전", comments: 7, likes: 8 },
-  { category: "현장 안전", place: "인천 · 건설업", title: "보호구와 안전교육 여부를 확인한 경험을 나눠요", body: "첫 출근 전에 안전교육 일정과 보호구 지급 시점을 문의해도 괜찮았습니다.", author: "익명", time: "1시간 전", comments: 3, likes: 6 },
-  { category: "임금", place: "부산 · 운수업", title: "급여일이 달라졌을 때 어떤 기록을 남기셨나요?", body: "문자와 입금내역 외에 함께 보관하면 좋은 자료가 궁금합니다.", author: "근로자", time: "2시간 전", comments: 5, likes: 9 },
-] as const;
+type CategoryFilter = CommunityCategory | "all";
 
-const CATEGORIES = ["전체", "입사 전 확인", "근로계약서", "현장 안전", "임금"] as const;
+interface LoadedList {
+  key: string;
+  result: CommunityPostListResponse | null;
+  error: string | null;
+}
+
+const CATEGORY_FILTERS: CategoryFilter[] = ["all", ...COMMUNITY_CATEGORIES];
+const SEARCH_DEBOUNCE_MS = 300;
+
+function categoryFilterLabel(filter: CategoryFilter): string {
+  return filter === "all" ? "전체" : COMMUNITY_CATEGORY_LABELS[filter];
+}
 
 export function CommunityBoard() {
-  const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("전체");
   const [query, setQuery] = useState("");
-  const filtered = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase("ko-KR");
-    return POSTS.filter((post) => (category === "전체" || post.category === category) && (!term || `${post.title} ${post.body} ${post.place}`.toLocaleLowerCase("ko-KR").includes(term)));
-  }, [category, query]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [category, setCategory] = useState<CategoryFilter>("all");
+  const [page, setPage] = useState(1);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [loaded, setLoaded] = useState<LoadedList | null>(null);
+
+  const requestKey = `${reloadToken}|${category}|${page}|${searchTerm}`;
+  // 요청 조건이 바뀌면 아직 도착하지 않은 결과이므로 로딩으로 본다.
+  const loading = loaded?.key !== requestKey;
+  const result = loading ? null : loaded?.result ?? null;
+  const error = loading ? null : loaded?.error ?? null;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchTerm(query.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    listCommunityPosts(
+      {
+        q: searchTerm || undefined,
+        category: category === "all" ? null : category,
+        page,
+      },
+      { signal: controller.signal },
+    )
+      .then((response) => setLoaded({ key: requestKey, result: response, error: null }))
+      .catch((caught: unknown) => {
+        if (caught instanceof DOMException && caught.name === "AbortError") return;
+        setLoaded({
+          key: requestKey,
+          result: null,
+          error: caught instanceof Error ? caught.message : "커뮤니티 게시물을 불러오지 못했습니다.",
+        });
+      });
+    return () => controller.abort();
+  }, [requestKey, searchTerm, category, page]);
+
+  function changeQuery(value: string) {
+    setQuery(value);
+    setPage(1);
+  }
+
+  function changeCategory(next: CategoryFilter) {
+    setCategory(next);
+    setPage(1);
+  }
 
   return (
     <>
       <div className="community-interaction-row">
         <div className="community-toolbar" aria-label="커뮤니티 분류">
-          {CATEGORIES.map((item) => <button key={item} className={category === item ? "is-active" : ""} type="button" onClick={() => setCategory(item)}>{item}</button>)}
+          {CATEGORY_FILTERS.map((item) => (
+            <button key={item} className={category === item ? "is-active" : ""} type="button" onClick={() => changeCategory(item)}>
+              {categoryFilterLabel(item)}
+            </button>
+          ))}
+          {result?.capabilities.write ? <Link href="/community/new" className="button button-dark">글쓰기</Link> : null}
         </div>
-        <label className="community-search-field"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="게시글 검색" /></label>
+        <label className="community-search-field"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="게시글 검색" aria-label="게시글 검색" /></label>
       </div>
-      <section className="community-post-list" aria-label="더미 커뮤니티 게시물">
-        {filtered.map((post) => (
-          <article className="community-post-card" key={post.title}>
-            <div><span>{post.category}</span><small>{post.place} · {post.author} · {post.time}</small></div>
-            <h2>{post.title}</h2><p>{post.body}</p><strong>공감 {post.likes}　댓글 {post.comments}</strong>
+      <section className="community-post-list" aria-label="커뮤니티 게시물" aria-live="polite" aria-busy={loading}>
+        {loading ? <LoadingSkeleton label="커뮤니티 게시물을 불러오고 있습니다." /> : null}
+        {error ? <ErrorState message={error} onRetry={() => setReloadToken((current) => current + 1)} /> : null}
+        {result && result.total > 0 ? (
+          <p className="field-help">
+            전체 {result.total.toLocaleString("ko-KR")}건 · {result.page.toLocaleString("ko-KR")}/{result.total_pages.toLocaleString("ko-KR")} 페이지 · 한 페이지 {result.page_size.toLocaleString("ko-KR")}건
+          </p>
+        ) : null}
+        {result?.items.map((post) => (
+          <article className="community-post-card" key={post.post_id}>
+            <div>
+              <span>{post.category_label}</span>
+              <small>{companyContextLabel(post.company_context)} · {post.author_label ?? "익명"} · {relativeTimeLabel(post.created_at)}</small>
+            </div>
+            <h2><Link href={`/community/${encodeURIComponent(post.post_id)}`}>{post.title}</Link></h2><p>{post.body}</p>
+            <strong>{post.like_count === null ? null : `공감 ${post.like_count}　`}댓글 {post.comment_count}</strong>
           </article>
         ))}
-        {filtered.length === 0 ? <div className="community-empty">조건에 맞는 DEMO 게시물이 없습니다.</div> : null}
+        {result && result.items.length === 0 ? <div className="community-empty">조건에 맞는 게시물이 없습니다.</div> : null}
+        {result && result.total_pages > 1 ? (
+          <nav className="search-pagination" aria-label="커뮤니티 게시물 페이지">
+            <button type="button" className="button button-outline" disabled={result.page <= 1} onClick={() => setPage(result.page - 1)}>
+              ← 이전
+            </button>
+            <span className="pagination-page">
+              <span>{result.page.toLocaleString("ko-KR")}</span>
+              <span>/ {result.total_pages.toLocaleString("ko-KR")} 페이지</span>
+            </span>
+            <button type="button" className="button button-outline" disabled={!result.has_more} onClick={() => setPage(result.page + 1)}>
+              다음 →
+            </button>
+          </nav>
+        ) : null}
       </section>
     </>
   );

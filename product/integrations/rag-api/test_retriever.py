@@ -1,4 +1,6 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import retriever
 
@@ -78,6 +80,187 @@ class RetrievalPolicyTest(unittest.TestCase):
         self.assertTrue(evidence[1]["suppress_vector_when_matched"])
         self.assertEqual([], retriever._guide_candidates("회사 자료를 어디에 저장할까요?"))
         self.assertEqual([], retriever._guide_candidates("해고에 관해 어떤 자료를 준비해야 하나요?"))
+
+
+class RetrievalReadinessTest(unittest.TestCase):
+    def setUp(self):
+        retriever._reset_for_tests()
+
+    def tearDown(self):
+        retriever._reset_for_tests()
+
+    @staticmethod
+    def _ready_dependencies():
+        model = Mock()
+        model.get_sentence_embedding_dimension.return_value = 1024
+        model.encode.return_value = [[0.0] * 1024]
+        collection = Mock()
+        collection.count.return_value = 583
+        collection.query.return_value = {
+            "ids": [["kis_a43"]],
+            "documents": [["제43조(임금 지급) 임금은 매월 1회 이상 지급하여야 한다."]],
+            "metadatas": [[{
+                "law": "근로기준법",
+                "article_id": "제43조",
+            }]],
+            "distances": [[0.000001]],
+        }
+        return model, collection
+
+    def test_warmup_requires_hashes_exact_count_and_a_real_query(self):
+        model, collection = self._ready_dependencies()
+        with (
+            patch.object(
+                retriever,
+                "verify_runtime_assets",
+                return_value={"manifest_sha256": retriever.PINNED_ASSET_MANIFEST_SHA256},
+            ) as verify_assets,
+            patch.object(retriever, "_create_model", return_value=model),
+            patch.object(retriever, "_open_collection", return_value=collection),
+        ):
+            health = retriever.warmup()
+
+        self.assertTrue(health["ready"])
+        self.assertTrue(health["asset_integrity"])
+        self.assertTrue(health["query_compatible"])
+        self.assertEqual(583, health["document_count"])
+        self.assertEqual(1024, health["embedding_dimension"])
+        verify_assets.assert_called_once_with(
+            retriever.ASSET_MANIFEST,
+            hf_home=retriever.HF_HOME,
+            hub_cache=retriever.HF_HUB_CACHE,
+            rag_db=retriever.DB_PATH,
+            require_seal=True,
+        )
+        model.encode.assert_called_once_with(
+            [retriever.ASSET_MANIFEST.collection.probe.query],
+            normalize_embeddings=True,
+        )
+        collection.query.assert_called_once()
+        query_call = collection.query.call_args.kwargs
+        self.assertEqual(1, query_call["n_results"])
+        self.assertEqual(1024, len(query_call["query_embeddings"][0]))
+
+    def test_wrong_document_count_fails_before_query(self):
+        model, collection = self._ready_dependencies()
+        collection.count.return_value = 582
+        with (
+            patch.object(
+                retriever,
+                "verify_runtime_assets",
+                return_value={"manifest_sha256": retriever.PINNED_ASSET_MANIFEST_SHA256},
+            ),
+            patch.object(retriever, "_create_model", return_value=model),
+            patch.object(retriever, "_open_collection", return_value=collection),
+        ):
+            with self.assertRaisesRegex(retriever.RetrievalUnavailable, "expected 583, got 582"):
+                retriever.warmup()
+
+        model.encode.assert_not_called()
+        self.assertFalse(retriever.status()["ready"])
+
+    def test_embedding_dimension_mismatch_fails_closed(self):
+        model, collection = self._ready_dependencies()
+        model.get_sentence_embedding_dimension.return_value = 768
+        with (
+            patch.object(
+                retriever,
+                "verify_runtime_assets",
+                return_value={"manifest_sha256": retriever.PINNED_ASSET_MANIFEST_SHA256},
+            ),
+            patch.object(retriever, "_create_model", return_value=model),
+            patch.object(retriever, "_open_collection", return_value=collection),
+        ):
+            with self.assertRaisesRegex(retriever.RetrievalUnavailable, "dimension mismatch"):
+                retriever.warmup()
+
+        self.assertFalse(retriever.status()["query_compatible"])
+
+    def test_empty_probe_result_never_becomes_ready(self):
+        model, collection = self._ready_dependencies()
+        collection.query.return_value["documents"] = [[]]
+        with (
+            patch.object(
+                retriever,
+                "verify_runtime_assets",
+                return_value={"manifest_sha256": retriever.PINNED_ASSET_MANIFEST_SHA256},
+            ),
+            patch.object(retriever, "_create_model", return_value=model),
+            patch.object(retriever, "_open_collection", return_value=collection),
+        ):
+            with self.assertRaisesRegex(retriever.RetrievalUnavailable, "no documents"):
+                retriever.warmup()
+
+        self.assertFalse(retriever.status()["ready"])
+
+    def test_semantically_wrong_top_document_never_becomes_ready(self):
+        model, collection = self._ready_dependencies()
+        collection.query.return_value["ids"] = [["kis_a44"]]
+        collection.query.return_value["metadatas"] = [[{
+            "law": "근로기준법",
+            "article_id": "제44조",
+        }]]
+        with (
+            patch.object(
+                retriever,
+                "verify_runtime_assets",
+                return_value={"manifest_sha256": retriever.PINNED_ASSET_MANIFEST_SHA256},
+            ),
+            patch.object(retriever, "_create_model", return_value=model),
+            patch.object(retriever, "_open_collection", return_value=collection),
+        ):
+            with self.assertRaisesRegex(retriever.RetrievalUnavailable, "semantic probe id mismatch"):
+                retriever.warmup()
+
+        self.assertFalse(retriever.status()["ready"])
+
+    def test_semantic_probe_distance_is_bounded(self):
+        model, collection = self._ready_dependencies()
+        collection.query.return_value["distances"] = [[0.01]]
+        with (
+            patch.object(
+                retriever,
+                "verify_runtime_assets",
+                return_value={"manifest_sha256": retriever.PINNED_ASSET_MANIFEST_SHA256},
+            ),
+            patch.object(retriever, "_create_model", return_value=model),
+            patch.object(retriever, "_open_collection", return_value=collection),
+        ):
+            with self.assertRaisesRegex(retriever.RetrievalUnavailable, "distance exceeded"):
+                retriever.warmup()
+
+        self.assertFalse(retriever.status()["ready"])
+
+    def test_model_loader_is_revision_pinned_and_local_only(self):
+        loader = Mock(return_value=object())
+        fake_module = SimpleNamespace(SentenceTransformer=loader)
+        with patch.dict("sys.modules", {"sentence_transformers": fake_module}):
+            retriever._create_model()
+
+        loader.assert_called_once_with(
+            "BAAI/bge-m3",
+            device=retriever.DEVICE,
+            revision="5617a9f61b028005a4858fdac845db406aefb181",
+            cache_folder=str(retriever.HF_HUB_CACHE),
+            local_files_only=True,
+            trust_remote_code=False,
+            model_kwargs={"use_safetensors": False},
+        )
+
+    def test_distance_policy_cannot_be_disabled_by_environment_drift(self):
+        with patch.object(retriever, "NO_MATCH_DISTANCE_THRESHOLD", 1_000_000.0):
+            with self.assertRaisesRegex(
+                retriever.RetrievalUnavailable,
+                "RAG_DISTANCE_THRESHOLD must remain pinned to 0.42",
+            ):
+                retriever.warmup()
+
+        with patch.object(retriever, "STRONG_MATCH_DISTANCE", float("nan")):
+            with self.assertRaisesRegex(
+                retriever.RetrievalUnavailable,
+                "RAG_STRONG_MATCH_DISTANCE must remain pinned to 0.30",
+            ):
+                retriever.warmup()
 
 
 if __name__ == "__main__":

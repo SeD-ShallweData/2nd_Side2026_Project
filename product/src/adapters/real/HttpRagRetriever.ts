@@ -56,6 +56,7 @@ function parseDocument(value: unknown): RagDocument | null {
 export class HttpRagRetriever implements RagRetriever {
   constructor(
     private readonly baseUrl: string,
+    private readonly internalToken: string,
     private readonly timeoutMs = 20_000,
     private readonly fetchFn: typeof fetch = fetch,
   ) {}
@@ -65,10 +66,24 @@ export class HttpRagRetriever implements RagRetriever {
     limit = 5,
     signal?: AbortSignal,
   ): Promise<RagRetrievalResult> {
+    if (!this.internalToken) {
+      return {
+        query,
+        status: "unavailable",
+        reason: "service_unavailable",
+        topic: null,
+        threshold: null,
+        top1_distance: null,
+        documents: [],
+      };
+    }
     try {
       const response = await this.fetchFn(`${this.baseUrl.replace(/\/$/, "")}/api/retrieve`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.internalToken}`,
+        },
         body: JSON.stringify({ query, limit }),
         signal: signal
           ? AbortSignal.any([signal, AbortSignal.timeout(this.timeoutMs)])

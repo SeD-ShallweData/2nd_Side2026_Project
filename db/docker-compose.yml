@@ -9,7 +9,9 @@ name: ${COMPOSE_PROJECT_NAME:-wageguard}
 
 services:
   db:
-    image: postgres:16-alpine
+    # Multi-architecture OCI index pinned on 2026-08-26. Update deliberately
+    # after PG16 restore rehearsal; a moving tag must not alter a release rebuild.
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
     # Docker 기본 /dev/shm 은 64MB 다. Postgres 의 병렬 워커(VACUUM·인덱스 빌드·해시 조인)가
     # 여기에 공유메모리를 잡는데, 수백만 행 규모에서는 64MB 로 부족해 이렇게 실패한다:
@@ -23,11 +25,13 @@ services:
       POSTGRES_DB: ${DB_NAME:-wageguard}
       POSTGRES_USER: ${DB_USER:-wageguard}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?.env.local 에 DB_PASSWORD 를 설정하세요}
-      # 한글 사업장명 정렬을 위해 ko_KR 대신 C.UTF-8 + ICU 를 쓴다.
-      # alpine 이미지는 ko_KR 로케일이 없어 initdb 가 실패한다.
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+      # Path B 정본 계약과 동일한 libc locale을 쓴다. 정렬은 SQL의 명시적
+      # COLLATE "C"로 고정하며, Alpine에 없는 ko_KR/ICU를 암묵 사용하지 않는다.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale-provider=libc --lc-collate=C --lc-ctype=C.UTF-8"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # 로컬 기본값은 named volume이다. GCP VM에서는 POSTGRES_DATA_DIR을
+      # /srv/moneyworry/postgres처럼 별도 Persistent Disk의 절대경로로 둔다.
+      - "${POSTGRES_DATA_DIR:-pgdata}:/var/lib/postgresql/data"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-wageguard} -d ${DB_NAME:-wageguard}"]
       interval: 5s
