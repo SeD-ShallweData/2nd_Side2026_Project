@@ -220,19 +220,28 @@ def law(key: str) -> dict:
         raise KeyError(f"조문 표에 없는 키입니다: {key}. standards.LAWS 에 먼저 추가하세요.") from None
 
 
-def monthly_scheduled_hours(weekly_hours: float) -> float:
+def monthly_scheduled_hours(weekly_hours: float) -> int:
     """주 소정근로시간 → 월 소정근로시간(유급 주휴 포함).
 
     주휴시간은 통상근로자(주 40시간)에 비례해 계산합니다.
-      주 40시간 → (40 + 8) × 4.345 ≒ 208.6  (고시 환산 209시간)
-      주 20시간 → (20 + 4) × 4.345 ≒ 104.3
+      주 40시간 → (40 + 8) × 4.345 = 208.56 → 209  (고용노동부 고시 환산 시간)
+      주 20시간 → (20 + 4) × 4.345 = 104.28 → 104
 
     주 15시간 미만은 주휴수당이 발생하지 않으므로 주휴시간을 더하지 않습니다.
+
+    **정수로 반올림합니다.** 소수점을 남기면 주 40시간에서 208.6시간이 되는데,
+    고시 월 환산액 2,156,880원은 209시간 기준입니다. 208.6으로 나누면 환산 시급이
+    높게 나와, 월급 2,152,543~2,156,880원 구간의 계약서가 고시 기준으로는 미달인데
+    통과합니다. 실측에서 확인했습니다 — 월급 2,154,711원은 209시간 환산 시급이
+    10,310원으로 최저임금 10,320원에 미달하지만 판정은 통과였습니다.
+
+    최저임금 미달을 놓치는 것은 거짓 음성입니다. 사용자가 받을 수 있는 차액을
+    모르고 넘어가므로 오탐보다 무겁습니다.
     """
     if weekly_hours <= 0:
-        return 0.0
+        return 0
     paid_weekly_holiday = (weekly_hours / LEGAL_WEEKLY_HOURS) * 8 if weekly_hours >= 15 else 0.0
-    return round((weekly_hours + paid_weekly_holiday) * WEEKS_PER_MONTH, 1)
+    return round((weekly_hours + paid_weekly_holiday) * WEEKS_PER_MONTH)
 
 
 def required_break_minutes(daily_hours: float) -> int:

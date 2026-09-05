@@ -71,15 +71,14 @@ def variant(**over) -> dict:
 def fixed_term(months: int) -> dict:
     """계약기간 개월 수를 term_start/term_end 로 표현합니다.
 
-    종료일을 시작일과 **같은 날짜**로 둡니다. schema.term_months 가
-    (종료일 - 시작일) / 30 을 더하는 방식이라, 실무에서 흔한 "전날 종료" 표기
-    (3/2 ~ 이듬해 3/1)를 쓰면 11.97개월이 되어 의도한 경계를 못 잽니다.
-    그 차이 자체는 observed_gaps() 에서 따로 봅니다.
+    종료일을 **시작일의 전날**로 둡니다. 실무에서 1년 계약은 "3월 2일부터
+    이듬해 3월 1일까지"로 씁니다. schema.term_months 가 종료일을 포함해 세므로
+    이 표기가 정확히 12.00개월이 됩니다.
     """
     year, month = 2026, 3 + months
     end_year, end_month = year + (month - 1) // 12, (month - 1) % 12 + 1
     return {"contract_type": "fixed_term", "term_start": "2026-03-02",
-            "term_end": f"{end_year}-{end_month:02d}-02"}
+            "term_end": f"{end_year}-{end_month:02d}-01"}
 
 
 # ── 유형 B — 값의 경계 ────────────────────────────────────────────────
@@ -220,18 +219,17 @@ SCENARIOS = B + C + D
 def observed_gaps() -> list[str]:
     gaps: list[str] = []
 
-    # ① 최저임금 월 환산 시간: 엔진 208.6h vs 고용노동부 고시 209h
-    lower, upper = ENGINE_FLOOR_MONTHLY, MONTHLY_209
-    probe = (lower + upper) // 2
-    result = rules.evaluate(variant(wage={"amount": probe, "base_amount": probe}), YEAR)
-    engine_says = {f["code"] for f in result["findings"] if f["level"] == rules.VIOLATION}
-    if "min_wage_below" not in engine_says:
+    # ① 최저임금 월 환산 시간이 고시 기준과 같은가.
+    #    고시 월환산액 2,156,880원 = 최저시급 x 209시간 이므로, 엔진이 주 40시간에
+    #    쓰는 월 소정근로시간도 209여야 한다. 다르면 환산 시급이 어긋나 미달 판정이
+    #    밀린다. rules.py 의 1원 반올림 여유는 의도된 것이라 여기서 세지 않는다.
+    official_hours = MONTHLY_209 / MIN_HOURLY
+    if ENGINE_MONTHLY_HOURS != official_hours:
+        drift = abs(ENGINE_MONTHLY_HOURS - official_hours) * MIN_HOURLY
         gaps.append(
-            f"최저임금 환산 시간 — 엔진은 {ENGINE_MONTHLY_HOURS}시간으로 나누고 고시 월환산액은 "
-            f"209시간 기준입니다. 월급 {lower:,}~{upper:,}원 구간(약 {upper - lower:,}원)에서 "
-            f"고시 기준으로는 미달인데 엔진은 통과시킵니다. "
-            f"예: 월급 {probe:,}원 → 고시 209h 환산 시급 {probe / 209:,.0f}원 "
-            f"(최저 {MIN_HOURLY:,}원 미달)인데 판정은 통과입니다.")
+            f"최저임금 환산 시간 — 엔진은 주 40시간에 {ENGINE_MONTHLY_HOURS}시간을 쓰고 "
+            f"고시 월환산액 {MONTHLY_209:,}원은 {official_hours:g}시간 기준입니다. "
+            f"월급 기준 약 {drift:,.0f}원만큼 판정이 어긋납니다.")
 
     # ② standards.SEVERANCE_MIN_MONTHS 미사용 — C5 참고
     short = rules.evaluate(
