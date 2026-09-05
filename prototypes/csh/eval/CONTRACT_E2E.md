@@ -235,6 +235,66 @@ noncompete · confidentiality_penalty · duty_change_broad · unpaid_training ·
 
 ---
 
+## 측정 결과 — 실제 추출 (2026-09-06)
+
+[`eval/contract_extract.py`](contract_extract.py) 로 새 계약서 3종을 **실제 Upstage
+solar-pro3 추출**에 태웠습니다. 계약서 본문을 마크다운으로 직접 넣어 ② 만 분리했습니다.
+Document Parse 를 건너뛰므로 계약서당 호출 1회입니다. **총 4회 사용**(재측정 1회 포함).
+
+| 케이스 | 추출 정확도 | 판정 |
+| --- | --- | --- |
+| A 자유 양식 (조항 번호·항목명이 다름) | **19/19** | 기대와 일치 |
+| B 값의 경계 (최저임금 미달 경계 아래) | **14/14** | 기대와 일치 |
+| C 근무기간 (11개월·주15시간·수습 감액) | **11/11** | 기대와 일치 |
+
+**유형 A 가 이 측정의 핵심이었습니다.** 조항 제목이 `제1조` 가 아니라 `1.` 이고 항목명이
+표준서식과 다른 계약서에서도 19개 필드를 전부 정확히 읽었습니다. **추출이 서식에
+의존하지 않습니다.**
+
+### 찾아서 고친 것 — `contract_type` 오추출
+
+B 케이스에서 계약기간이 명시된 기간제 계약서를 `permanent` 로 분류했습니다.
+날짜(`term_start` `2026-03-02`, `term_end` `2027-03-01`)는 정확히 읽었는데 유형만
+틀렸습니다.
+
+영향이 작지 않습니다. `rule_term` 은 `contract_type != "fixed_term"` 이면 아무것도
+반환하지 않아, **기간제법 제4조(2년 초과 무기계약 전환) 검사가 통째로 건너뛰어집니다.**
+
+원인은 지시문이었습니다. `schema.EXTRACTION_SCHEMA` 는 `{SCHEMA}` 자리에 그대로
+프롬프트로 들어가는데([prompts.py:124](../../../product/integrations/contract-api/app/prompts.py)),
+해당 줄이 이랬습니다.
+
+```
+"contract_type": "'permanent'|'fixed_term'|null — 기간의 정함이 없으면 permanent"
+```
+
+**`permanent` 가 되는 조건만 있고 `fixed_term` 이 되는 조건이 없습니다.** 모델은
+긍정 규칙이 없는 쪽으로 기울었습니다. [docs/prompt/README.md](../../../docs/prompt/README.md)
+6장의 *"여지를 주면 느슨한 쪽으로 갑니다"* 와 같은 형태입니다.
+
+한 줄을 고쳤습니다.
+
+```
+"contract_type": "'permanent'|'fixed_term'|null — 계약 종료일이 적혀 있으면 fixed_term, 기간의 정함이 없으면 permanent"
+```
+
+재측정 결과 **11/12 → 12/12**. 자산 무결성 게이트는 그대로 통과합니다(스키마는
+매니페스트 대상 파일이 아닙니다).
+
+### 관찰 — `required_items` 판정 기준이 없습니다
+
+`EXTRACTION_SCHEMA` 의 `required_items` 는 7개 항목 전부에 `"boolean|null — 계약서에
+적혀 있는가"` 하나만 붙어 있습니다. 항목별 정의가 없습니다.
+
+그래서 B 케이스의 *"임금은 기본급으로만 구성하며 고정연장수당은 없다"* 를 모델이
+`wage_components: False` 로 읽었습니다. 구성항목을 밝힌 문장으로 볼 여지가 있어
+판단이 갈립니다. 지금은 관측값을 기대값으로 적어 두었습니다.
+
+제17조 각 호가 무엇을 요구하는지 항목별로 적으면 판정이 안정됩니다. 다만 이건
+법 해석이 섞여 있어 **계약 규칙 담당과 함께 정해야 합니다.**
+
+---
+
 ## 담당별 요청
 
 | # | 내용 | 담당 |
@@ -245,6 +305,7 @@ noncompete · confidentiality_penalty · duty_change_broad · unpaid_training ·
 | 4 | `CLAUSE_CODES` 에 가산수당 코드 추가 | 계약 규칙 담당 |
 | 5 | `requirements.lock` 에 `colorama; sys_platform == "win32"` 추가 — Windows 설치 불가 | 인프라 담당 |
 | 6 | 루트 `.gitattributes` 도입 여부 — Windows 기본 클론 시 자산 무결성 게이트 실패 | 팀 합의 |
+| 7 | `required_items` 7개 항목의 판정 기준을 제17조 각 호에 맞춰 명시 | 계약 규칙 담당 · 프롬프트 |
 
 1·2번은 사용자가 받을 판정을 직접 바꿉니다. 특히 1번은 **받아야 할 돈을 못 받게
 되는 방향**이라 우선순위가 높습니다.
