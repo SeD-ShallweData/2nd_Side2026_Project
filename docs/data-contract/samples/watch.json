@@ -1,0 +1,71 @@
+{
+  "_snapshot": "batch 7 (as_of_date=2026-06-01, target_month=2026-12-01) 실제 조회값 기반. 사업장 식별정보(company_id·company_name)만 합성했다.",
+  "_note": "실제 DB 조회 결과 스냅샷이다. 배치가 갱신되면 값이 달라진다. 고정 기준점으로만 쓴다.",
+  "company_id": "COMPANY_DEMO_002",
+  "company_name": "다온디자인",
+  "data_as_of": "2026-06-01",
+  "target_month": "2026-12-01",
+  "generated_at": "2026-08-14T15:02:34.715Z",
+  "valid_until": null,
+  "freshness": "unknown",
+  "wage_risk": {
+    "availability": "ready",
+    "level": "watch",
+    "summary": "현재 자료만으로 판단하기 어려워 근로조건을 추가로 확인하는 것이 좋습니다.",
+    "evidence_codes": [
+      "SAFE_RECOMMENDATION_HOLD"
+    ],
+    "evidence_items": [
+      {
+        "code": "SAFE_RECOMMENDATION_HOLD",
+        "label": "추가 확인 유보",
+        "description": "공개 판정에서 안정 신호 3개가 확인됐으며, 다른 판정 조건과 함께 해석해야 합니다."
+      }
+    ],
+    "confidence": "sufficient",
+    "official_listing": {
+      "status": "not_listed",
+      "as_of": null,
+      "source_name": "고용노동부 체불사업주 명단공개 연계 결과"
+    }
+  },
+  "safety_context": {
+    "availability": "ready",
+    "scope": "validated_firm_context",
+    "level": "normal",
+    "summary": "공표된 산업안전 자료에서 우선 확인 범위가 ‘일반’으로 표시됐습니다. 대상 기간이 지나 최신 현장 정보를 추가로 확인해야 합니다.",
+    "region": "인천광역시",
+    "industry": "시각 디자인업",
+    "target_start": "2026-04-20",
+    "target_end": "2026-04-26",
+    "evidence_codes": [
+      "PUBLISHED_SAFETY_PRIORITY_BAND"
+    ],
+    "evidence_items": [
+      {
+        "code": "PUBLISHED_SAFETY_PRIORITY_BAND",
+        "label": "공표 우선순위 일반",
+        "description": "검증된 사업장 연결과 공표된 순위 구간만 사용했으며 연구용 확률은 사용하지 않았습니다."
+      }
+    ],
+    "confidence": "limited",
+    "disclaimer": "검증된 사업장 사고 확률이 아닙니다. 공표된 모델 결과에서 현장 확인 순서를 돕는 우선순위 구간입니다."
+  },
+  "sources": [
+    {
+      "name": "국민연금 사업장 자료 및 ML 공개 판정",
+      "category": "wage",
+      "organization": "돈워리 임금체불 데이터 파이프라인",
+      "as_of": "2026-06-01",
+      "document_id": "door1-voting-39f-v1:batch-7"
+    },
+    {
+      "name": "산업재해 공표 우선순위 안전 뷰",
+      "category": "safety",
+      "organization": "돈워리 산업안전 데이터 파이프라인",
+      "as_of": "2026-08-14T15:02:34.715Z",
+      "document_id": "industrial_accident_workplace_week_allocation:v2.1.0-p0-contract"
+    }
+  ],
+  "_state": "safe_recommendation.판정 = '유보' → level=watch (최신 배치 431,646곳 · 85.7% — 실제 최다수)"
+}

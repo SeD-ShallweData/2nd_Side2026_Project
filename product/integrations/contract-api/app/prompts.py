@@ -1,8 +1,8 @@
 """프롬프트·지식 로더.
 
-프롬프트를 코드에서 분리해 파일로 둡니다. 서버를 껐다 켜지 않아도
-파일 수정 시각(mtime)이 바뀌면 다시 읽으므로, 프롬프트만 고쳐가며
-바로 결과를 확인할 수 있습니다.
+프롬프트를 코드에서 분리해 파일로 둡니다. 파일 캐시는 mtime으로 관리하지만,
+모든 읽기 전에 고정 manifest를 검증합니다. 따라서 검토되지 않은 hot edit는
+자동 반영되지 않고 서비스가 fail-closed 됩니다.
 
 RAG 도입 전 단계라 `knowledge/` 아래 문서를 통째로 프롬프트에 붙입니다.
 그래서 문자 예산(KNOWLEDGE_BUDGET)으로 상한을 둡니다.
@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from . import config
+from .asset_integrity import AssetIntegrityError, verify_committed_assets
 
 REGISTRY_FILE = config.PROMPT_DIR / "registry.json"
 REWRITE_FILE = config.PROMPT_DIR / "rewrite" / "query_rewrite.md"
@@ -36,6 +37,7 @@ def _read_cached(path: Path, loader):
 
 
 def load_registry() -> dict:
+    verify_committed_assets()
     data = _read_cached(REGISTRY_FILE, lambda p: json.loads(p.read_text(encoding="utf-8")))
     if data is None:
         raise FileNotFoundError(f"페르소나 정의가 없습니다: {REGISTRY_FILE}")
@@ -84,8 +86,9 @@ def system_prompt(persona_id: str) -> str:
     for rel in spec.get("system", []):
         path = config.PROMPT_DIR / rel
         text = _read_cached(path, lambda p: p.read_text(encoding="utf-8").strip())
-        if text:
-            parts.append(text)
+        if not text:
+            raise AssetIntegrityError(f"필수 시스템 프롬프트가 비어 있습니다: {rel}")
+        parts.append(text)
 
     knowledge = _load_knowledge(spec.get("knowledge", []))
     if knowledge:
@@ -97,6 +100,7 @@ def system_prompt(persona_id: str) -> str:
 
 def rewrite_prompt() -> str:
     """멀티턴 질의 재작성용 시스템 프롬프트 (호출 ①)."""
+    verify_committed_assets()
     text = _read_cached(REWRITE_FILE, lambda p: p.read_text(encoding="utf-8").strip())
     if not text:
         raise FileNotFoundError(f"재작성 프롬프트가 없습니다: {REWRITE_FILE}")
@@ -109,6 +113,7 @@ def contract_extract_prompt() -> str:
     `{SCHEMA}` 자리에 app/contract/schema.py 의 EXTRACTION_SCHEMA 를 끼워 넣습니다.
     스키마를 코드와 프롬프트 두 곳에 적어 두면 반드시 어긋나므로 한 곳에서만 정의합니다.
     """
+    verify_committed_assets()
     from .contract import schema as contract_schema   # 순환 임포트를 피해 지연 로드합니다
 
     text = _read_cached(CONTRACT_EXTRACT_FILE, lambda p: p.read_text(encoding="utf-8").strip())
@@ -131,13 +136,17 @@ def _load_knowledge(topics: list[str]) -> str:
     for topic in topics:
         topic_dir = config.KNOWLEDGE_DIR / topic
         if not topic_dir.is_dir():
-            continue
+            raise AssetIntegrityError(f"필수 지식 주제 폴더가 없습니다: {topic}")
+        found = False
         for path in sorted(topic_dir.iterdir()):
             if path.suffix.lower() not in (".md", ".txt") or path.name.startswith("_"):
                 continue
             text = _read_cached(path, lambda p: p.read_text(encoding="utf-8").strip())
             if not text:
-                continue
+                raise AssetIntegrityError(
+                    f"필수 지식 블록이 비어 있습니다: {topic}/{path.name}"
+                )
+            found = True
             remain = budget - used
             if len(text) > remain:
                 if remain > 500:
@@ -147,6 +156,8 @@ def _load_knowledge(topics: list[str]) -> str:
                 return "\n\n".join(chunks)
             chunks.append(f'<doc id="{topic}/{path.stem}">\n{text}\n</doc>')
             used += len(text)
+        if not found:
+            raise AssetIntegrityError(f"필수 지식 블록이 없습니다: {topic}")
     return "\n\n".join(chunks)
 
 
@@ -172,17 +183,29 @@ def few_shot(persona_id: str) -> list[dict]:
 
     def _load(path: Path) -> list[dict]:
         out = []
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             line = line.strip()
             if not line or line.startswith("//"):
                 continue
             try:
                 item = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if item.get("user") and item.get("assistant"):
-                out.append({"role": "user", "content": item["user"]})
-                out.append({"role": "assistant", "content": item["assistant"]})
+            except json.JSONDecodeError as error:
+                raise AssetIntegrityError(
+                    f"few-shot JSONL이 올바르지 않습니다: {path.name}:{line_number}"
+                ) from error
+            if not isinstance(item, dict) or set(item) != {"user", "assistant"}:
+                raise AssetIntegrityError(
+                    f"few-shot 블록 형식이 올바르지 않습니다: {path.name}:{line_number}"
+                )
+            if not all(isinstance(item[key], str) and item[key].strip()
+                       for key in ("user", "assistant")):
+                raise AssetIntegrityError(
+                    f"few-shot 필수 블록이 비어 있습니다: {path.name}:{line_number}"
+                )
+            out.append({"role": "user", "content": item["user"]})
+            out.append({"role": "assistant", "content": item["assistant"]})
+        if not out:
+            raise AssetIntegrityError(f"few-shot 예시가 없습니다: {path.name}")
         return out
 
     return _read_cached(config.PROMPT_DIR / rel, _load) or []
@@ -190,6 +213,7 @@ def few_shot(persona_id: str) -> list[dict]:
 
 def knowledge_stats() -> dict:
     """어떤 지식 문서가 실제로 로드되는지 점검용."""
+    verify_committed_assets()
     stats = {}
     for topic_dir in sorted(config.KNOWLEDGE_DIR.glob("*")):
         # _source/ 처럼 언더스코어로 시작하는 폴더는 원본 보관용이라 주입되지 않습니다.

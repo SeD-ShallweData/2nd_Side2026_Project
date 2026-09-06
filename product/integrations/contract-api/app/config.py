@@ -1,7 +1,7 @@
 """프로젝트 전역 설정.
 
-API 키는 팀 공용 원본(`/data/shared-SeD/api_key.env`)을 절대경로로 참조합니다.
-사본을 만들지 않습니다. 키 값은 절대 로그·응답에 노출하지 않습니다.
+API 키는 `API_KEY_ENV_FILE`이 가리키는 파일에서 읽습니다. 지정하지 않으면 읽지 않습니다.
+배포 unit은 이 값을 `/dev/null`로 고정합니다. 키 값은 절대 로그·응답에 노출하지 않습니다.
 """
 
 import os
@@ -34,8 +34,10 @@ CONTRACT_LOG_DIR = OUTPUT_DIR / "contract" / "reviews"    # 진단 로그
 FONT_DIR = DATA_DIR / "fonts"                          # 더미 PDF 생성용 한글 TTF
 
 # ── 키 로드 ───────────────────────────────────────────────────────────
-TEAM_ENV_FILE = os.getenv("API_KEY_ENV_FILE", "/data/shared-SeD/api_key.env")
-LOCAL_ENV_FILE = ROOT / "config.env"  # 선택. 모델명·포트 등 개인 오버라이드용
+TEAM_ENV_FILE = os.getenv("API_KEY_ENV_FILE")
+LOCAL_ENV_FILE = Path(
+    os.getenv("LOCAL_CONFIG_ENV_FILE", str(ROOT / "config.env"))
+)  # 선택. 모델명·포트 등 개인 오버라이드용; 배포 unit은 /dev/null로 고정
 
 
 def _load_env(path, *, override: bool = False) -> str | None:
@@ -68,7 +70,8 @@ if LOCAL_ENV_FILE.exists():
 PROVIDERS = {
     "upstage": {
         "label": "Upstage Solar",
-        "api_key": os.getenv("Upstage_API_KEY"),  # CamelCase 주의
+        # 배포 secret은 표준 대문자 이름을 우선하고, 기존 팀 파일과의 호환은 유지합니다.
+        "api_key": os.getenv("UPSTAGE_API_KEY") or os.getenv("Upstage_API_KEY"),
         "url": os.getenv("UPSTAGE_API_URL", "https://api.upstage.ai/v1/chat/completions"),
         "model": os.getenv("UPSTAGE_MODEL", "solar-pro3"),
     },

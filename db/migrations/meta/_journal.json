@@ -64,6 +64,13 @@
       "when": 1786838400000,
       "tag": "0008_deterministic_current_batch",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787992622681,
+      "tag": "0009_busy_puck",
+      "breakpoints": true
     }
   ]
 }

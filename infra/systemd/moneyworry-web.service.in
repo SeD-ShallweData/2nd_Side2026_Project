@@ -1,0 +1,42 @@
+[Unit]
+Description=MoneyWorry Next.js production web
+Documentation=file://@PROJECT_ROOT@/product/README.md
+Wants=network-online.target moneyworry-db.service moneyworry-rag.service moneyworry-contract.service
+After=network-online.target moneyworry-db.service moneyworry-rag.service moneyworry-contract.service
+RequiresMountsFor=/srv/moneyworry
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=@WEB_SERVICE_USER@
+Group=@WEB_SERVICE_GROUP@
+WorkingDirectory=@PROJECT_ROOT@/product
+EnvironmentFile=@WEB_ENV_FILE@
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=DATABASE_ENV_FILE=/dev/null
+Environment=SHARED_API_KEY_FILE=/dev/null
+ExecStartPre=/usr/bin/test -r @PROJECT_ROOT@/product/.next/BUILD_ID
+ExecStart=@NODE_BIN@ @PROJECT_ROOT@/product/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3111
+Restart=always
+RestartSec=5s
+TimeoutStopSec=60s
+KillSignal=SIGTERM
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadOnlyPaths=@PROJECT_ROOT@
+RestrictSUIDSGID=yes
+UMask=0027
+LimitNOFILE=65536
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moneyworry-web
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=500
+
+[Install]
+WantedBy=multi-user.target

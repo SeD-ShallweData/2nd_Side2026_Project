@@ -3,6 +3,8 @@
 -- to cell-validation or existing-firms.
 \set ON_ERROR_STOP on
 
+\ir assert-path-b-session-identity.sql
+
 SELECT :'loader_scope' = 'existing-firms' AS load_firm_results \gset
 
 BEGIN;
@@ -10,6 +12,30 @@ SET LOCAL lock_timeout = '10s';
 SET LOCAL statement_timeout = :'loader_statement_timeout';
 SET LOCAL idle_in_transaction_session_timeout = '35min';
 SELECT pg_advisory_xact_lock(hashtextextended('industrial_safety.loader.v1', 0));
+
+\if :{?canonical_timestamp}
+\else
+  \echo 'canonical_timestamp is required'
+  SELECT 1 / 0;
+\endif
+CREATE TEMP TABLE stg_path_b_canonical_clock (
+  canonical_timestamp timestamptz PRIMARY KEY
+) ON COMMIT DROP;
+INSERT INTO stg_path_b_canonical_clock (canonical_timestamp)
+SELECT :'canonical_timestamp'::timestamptz
+WHERE :'canonical_timestamp' ~
+        '^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9][.][0-9]{3}Z$'
+  AND to_char(
+        :'canonical_timestamp'::timestamptz AT TIME ZONE 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+      ) = :'canonical_timestamp';
+DO $clock$
+BEGIN
+  IF (SELECT count(*) FROM stg_path_b_canonical_clock) <> 1 THEN
+    RAISE EXCEPTION 'canonical timestamp failed exact UTC round trip';
+  END IF;
+END
+$clock$;
 
 CREATE TEMP TABLE stg_loader_config (
   loader_scope text PRIMARY KEY
@@ -257,7 +283,7 @@ INSERT INTO industrial_safety.pipeline_runs (
   probability_status, risk_value_type, priority_reference_population,
   target_week_start_min, target_week_start_max, primary_artifact_path,
   primary_artifact_sha256, artifact_bundle, run_fingerprint,
-  expected_row_count, status, is_current, quality_metadata
+  expected_row_count, status, is_current, quality_metadata, registered_at
 )
 SELECT
   staged.run_kind, staged.publication_scope, staged.pipeline_name,
@@ -273,10 +299,12 @@ SELECT
   staged.primary_artifact_path, staged.primary_artifact_sha256,
   staged.artifact_bundle::jsonb, staged.run_fingerprint,
   staged.expected_row_count::bigint, 'registered', false,
-  staged.quality_metadata::jsonb
+  staged.quality_metadata::jsonb,
+  (SELECT canonical_timestamp FROM stg_path_b_canonical_clock)
 FROM stg_runs AS staged
 LEFT JOIN stg_existing_runs AS existing USING (run_code)
-WHERE existing.run_id IS NULL;
+WHERE existing.run_id IS NULL
+ORDER BY staged.run_code COLLATE "C";
 
 CREATE TEMP TABLE stg_run_ids ON COMMIT DROP AS
 SELECT staged.run_code, actual.run_id, actual.status, actual.expected_row_count,
@@ -306,10 +334,11 @@ END
 $loader$;
 
 INSERT INTO industrial_safety.pipeline_run_dependencies (
-  run_id, dependency_role, upstream_run_id, metadata
+  run_id, dependency_role, upstream_run_id, metadata, created_at
 )
 SELECT child.run_id, dependency.dependency_role, upstream.run_id,
-       dependency.metadata::jsonb
+       dependency.metadata::jsonb,
+       (SELECT canonical_timestamp FROM stg_path_b_canonical_clock)
 FROM stg_dependencies AS dependency
 JOIN stg_run_ids AS child ON child.run_code = dependency.run_code
 JOIN stg_run_ids AS upstream ON upstream.run_code = dependency.upstream_run_code
@@ -320,7 +349,7 @@ INSERT INTO industrial_safety.cell_label_datasets (
   approval_year_inference, label_maturity_window, record_unit,
   complete_through_week_start, workplace_identifier_available,
   is_unique_accident_event_count, validated_workplace_probability_available,
-  artifact_path, artifact_sha256, expected_row_count, metadata
+  artifact_path, artifact_sha256, expected_row_count, metadata, created_at
 )
 SELECT
   run_ids.run_id, dataset.dataset_code, dataset.source_system, dataset.time_basis,
@@ -331,10 +360,12 @@ SELECT
   dataset.is_unique_accident_event_count::boolean,
   dataset.validated_workplace_probability_available::boolean,
   dataset.artifact_path, dataset.artifact_sha256,
-  dataset.expected_row_count::bigint, dataset.metadata::jsonb
+  dataset.expected_row_count::bigint, dataset.metadata::jsonb,
+  (SELECT canonical_timestamp FROM stg_path_b_canonical_clock)
 FROM stg_datasets AS dataset
 JOIN stg_run_ids AS run_ids ON run_ids.run_code = dataset.source_run_code
-WHERE NOT run_ids.was_existing;
+WHERE NOT run_ids.was_existing
+ORDER BY dataset.source_run_code COLLATE "C", dataset.dataset_code COLLATE "C";
 
 CREATE TEMP TABLE stg_dataset_ids ON COMMIT DROP AS
 SELECT staged.source_run_code, staged.dataset_code, actual.label_dataset_id,
@@ -410,7 +441,8 @@ SELECT
   staged.cell_count_distribution,
   staged.cell_nb_alpha::double precision AS cell_nb_alpha,
   staged.prediction_regime, staged.cell_model_calibration_status,
-  staged.label_vintage_replay_status
+  staged.label_vintage_replay_status,
+  (SELECT canonical_timestamp FROM stg_path_b_canonical_clock) AS created_at
 FROM stg_cell_predictions AS staged
 JOIN stg_run_ids AS run_ids USING (run_code);
 CREATE UNIQUE INDEX ON stg_cell_predictions_normalized (
@@ -424,7 +456,8 @@ SELECT
   staged.sido, staged.industry_big,
   staged.label_available::boolean AS label_available,
   nullif(staged.first_care_approval_record_count, '')::bigint
-    AS first_care_approval_record_count
+    AS first_care_approval_record_count,
+  (SELECT canonical_timestamp FROM stg_path_b_canonical_clock) AS created_at
 FROM stg_cell_labels AS staged
 JOIN stg_dataset_ids AS dataset_ids USING (dataset_code);
 CREATE UNIQUE INDEX ON stg_cell_labels_normalized (
@@ -441,7 +474,8 @@ INSERT INTO industrial_safety.cell_week_predictions (
   challenger_oof_expected_approved_record_count,
   working_cell_probability_at_least_one_approval_record,
   cell_count_p05, cell_count_p95, cell_count_distribution, cell_nb_alpha,
-  prediction_regime, cell_model_calibration_status, label_vintage_replay_status
+  prediction_regime, cell_model_calibration_status, label_vintage_replay_status,
+  created_at
 )
 SELECT normalized.*
 FROM stg_cell_predictions_normalized AS normalized
@@ -450,7 +484,7 @@ WHERE NOT run_ids.was_existing;
 
 INSERT INTO industrial_safety.cell_week_labels (
   label_dataset_id, week_start, sido, industry_big,
-  label_available, first_care_approval_record_count
+  label_available, first_care_approval_record_count, created_at
 )
 SELECT normalized.*
 FROM stg_cell_labels_normalized AS normalized
@@ -682,7 +716,8 @@ $loader$;
       AS provisional_population_priority_percentile,
     staged.provisional_population_priority_band,
     staged.research_only_provisional_probability::double precision
-      AS research_only_provisional_probability
+      AS research_only_provisional_probability,
+    (SELECT canonical_timestamp FROM stg_path_b_canonical_clock) AS created_at
   FROM stg_firm_results AS staged
   JOIN stg_run_ids AS run_ids USING (run_code);
   CREATE UNIQUE INDEX ON stg_firm_normalized (run_id, firm_id, target_week_start);
@@ -694,7 +729,7 @@ $loader$;
     reviewed_by, reviewed_at, prediction_as_of,
     provisional_population_priority_percentile,
     provisional_population_priority_band,
-    research_only_provisional_probability
+    research_only_provisional_probability, created_at
   )
   SELECT normalized.*
   FROM stg_firm_normalized AS normalized
@@ -884,10 +919,57 @@ WHERE previous.publication_scope = incoming.publication_scope
 UPDATE industrial_safety.pipeline_runs AS current_run
 SET loaded_row_count = current_run.expected_row_count,
     status = 'published', is_current = true,
-    validated_at = now(), published_at = now()
+    validated_at = (SELECT canonical_timestamp FROM stg_path_b_canonical_clock),
+    published_at = (SELECT canonical_timestamp FROM stg_path_b_canonical_clock)
 FROM stg_run_ids AS ids
 WHERE current_run.run_id = ids.run_id
   AND NOT ids.was_existing;
+
+DO $canonical_clock_integrity$
+DECLARE
+  canonical_timestamp timestamptz := (
+    SELECT clock.canonical_timestamp FROM stg_path_b_canonical_clock AS clock
+  );
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM industrial_safety.pipeline_runs AS actual
+    WHERE actual.run_id IN (SELECT run_id FROM stg_run_ids)
+      AND (
+        actual.registered_at IS DISTINCT FROM canonical_timestamp
+        OR actual.validated_at IS DISTINCT FROM canonical_timestamp
+        OR actual.published_at IS DISTINCT FROM canonical_timestamp
+      )
+  ) OR EXISTS (
+    SELECT 1
+    FROM industrial_safety.pipeline_run_dependencies AS actual
+    WHERE actual.run_id IN (SELECT run_id FROM stg_run_ids)
+      AND actual.created_at IS DISTINCT FROM canonical_timestamp
+  ) OR EXISTS (
+    SELECT 1
+    FROM industrial_safety.cell_label_datasets AS actual
+    WHERE actual.label_dataset_id IN (SELECT label_dataset_id FROM stg_dataset_ids)
+      AND actual.created_at IS DISTINCT FROM canonical_timestamp
+  ) OR EXISTS (
+    SELECT 1
+    FROM industrial_safety.cell_week_predictions AS actual
+    WHERE actual.run_id IN (SELECT run_id FROM stg_run_ids)
+      AND actual.created_at IS DISTINCT FROM canonical_timestamp
+  ) OR EXISTS (
+    SELECT 1
+    FROM industrial_safety.cell_week_labels AS actual
+    WHERE actual.label_dataset_id IN (SELECT label_dataset_id FROM stg_dataset_ids)
+      AND actual.created_at IS DISTINCT FROM canonical_timestamp
+  ) OR EXISTS (
+    SELECT 1
+    FROM industrial_safety.firm_risk_results AS actual
+    WHERE actual.run_id IN (SELECT run_id FROM stg_run_ids)
+      AND actual.created_at IS DISTINCT FROM canonical_timestamp
+  ) THEN
+    RAISE EXCEPTION 'reduced loader produced or reused a non-canonical rebuild timestamp';
+  END IF;
+END
+$canonical_clock_integrity$;
 
 \if :finalize_commit
   COMMIT;

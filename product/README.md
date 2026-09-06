@@ -29,17 +29,18 @@ AI Rookie 및 창의종합설계 경진대회를 위한 구직자·근로자용 
 
 #### 1. 최초 설치 — 한 번만 수행
 
-먼저 저장소 안의 `product`로 이동합니다. 개인 폴더명과 저장소 위치가 다르면 자신의 경로에 맞게
-앞부분만 바꿉니다.
+각자 PC에 저장소를 clone한 뒤 `product`로 이동합니다.
 
 ```bash
-cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
+git clone https://github.com/SeD-ShallweData/2nd_Side2026_Project.git
+cd 2nd_Side2026_Project/product
 ```
 
-현재 AI Rookie 서버에서는 프로젝트용 Node.js 22를 PATH에 추가한 뒤 패키지를 설치합니다.
+Node.js는 22.x가 필요합니다(`engines: ">=22 <23"`). `node -v`로 확인하고, 버전이 맞지 않으면
+nvm 등으로 22를 사용한 뒤 패키지를 설치합니다.
 
 ```bash
-export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+node -v   # v22.x 확인
 node --version
 npm install
 ```
@@ -55,15 +56,17 @@ cp .env.example .env.local
 
 이미 `.env.local`을 수정했다면 위 명령을 다시 실행하지 않습니다. 다시 복사하면 기존 설정이
 `.env.example` 내용으로 초기화됩니다. 현재 기본값은 사업장 DB·ML, RAG, 계약서 분석과 두 LLM을
-모두 실제 연동으로 사용합니다. 팀 서버 설정은 다음 값인지 확인합니다.
+모두 실제 연동으로 사용합니다. 로컬에서는 읽기 전용 연결 문자열을 직접 지정하는 방식을 권장합니다.
 
 ```env
-DATABASE_ENV_FILE=/data/shared-SeD/.env.local
+BOT_DATABASE_URL=postgresql://읽기전용계정:비밀번호@127.0.0.1:5433/wageguard
 COMPANY_DATA_MODE=real
 CONTRACT_DATA_MODE=real
 ```
 
-`DATABASE_ENV_FILE`에서는 관리자 계정이 아니라 `BOT_NAME`·`BOT_PASSWORD`만 읽습니다. 비밀번호를
+파일에서 읽으려면 `DATABASE_ENV_FILE`에 각자 경로를 지정합니다. 지정하지 않으면 파일을 읽지
+않습니다. 이 파일에서는 관리자 계정이 아니라 `BOT_USER`·`BOT_PASSWORD`만 읽습니다.
+기존 `BOT_NAME`도 호환하지만 새 배포는 `BOT_USER`를 사용합니다. 비밀번호를
 `product`나 Git에 복사하지 않습니다. `mock` 모드는 단위 테스트와 별도 정적 HTML 시연본을 보존하기 위한
 명시적 개발 옵션일 뿐이며, 실제 연동 실패를 성공 결과로 바꾸는 자동 Mock 전환은 사용하지 않습니다.
 
@@ -85,12 +88,22 @@ OPENAI_API_KEY=<배포 secret에 등록>
 
 ```bash
 cd integrations/rag-api
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+PYTHON312="${PYTHON312:-python3.12}"
+test "$("$PYTHON312" -I -S -c 'import platform, sys; print(sys.implementation.name, platform.python_version())')" = "cpython 3.12.13" || exit 1
+"$PYTHON312" -m venv .venv
+.venv/bin/python -m pip install --require-hashes -r requirements.lock
+RAG_HF_DIR="$PWD/.cache/huggingface"
+.venv/bin/python prepare_rag_assets.py prepare \
+  --manifest "$PWD/config/rag_assets.v1.json" \
+  --hf-home "$RAG_HF_DIR" \
+  --hub-cache "$RAG_HF_DIR/hub" \
+  --rag-db "$PWD/data/labor_law_db" \
+  --confirm PREPARE_BAAI_BGE_M3_5617A9F6
 
 cd ../contract-api
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+test "$("$PYTHON312" -I -S -c 'import platform, sys; print(sys.implementation.name, platform.python_version())')" = "cpython 3.12.13" || exit 1
+"$PYTHON312" -m venv .venv
+.venv/bin/python -m pip install --require-hashes -r requirements.lock
 
 cd ../..
 pwd
@@ -111,26 +124,26 @@ DB·ML은 Next.js가 이미 실행 중인 PostgreSQL `wg_bot` 계정으로 직�
 터미널 1 — 공식 노동법 RAG:
 
 ```bash
-cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
-export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+cd 2nd_Side2026_Project/product
 npm run dev:rag
 ```
 
-최초 실행은 BGE-M3 모델을 올리느라 시간이 걸립니다. 아래 두 문구가 나온 뒤 다음 단계로 갑니다.
+준비 단계에서 고정 revision의 BGE-M3를 한 번 내려받습니다. 실행 중에는 네트워크에서 모델을 받지
+않으며, 아래 두 문구가 나온 뒤 다음 단계로 갑니다.
 
 ```text
-RAG 모델과 노동법 컬렉션을 불러왔습니다.
+RAG 모델·컬렉션 무결성과 고정 질의 호환성을 검증했습니다.
 Running on http://127.0.0.1:5051
 ```
 
-`unauthenticated requests to the HF Hub` 경고는 모델 다운로드 속도·한도 안내이며, 위 정상 문구가
-나오면 실행에는 문제가 없습니다.
+모델 hash, Chroma 583건, 1024차원 embedding, 실제 고정 query 중 하나라도 맞지 않으면 RAG 서버는
+시작되지 않습니다. 모델 준비와 운영 서버 권한 절차는
+[`integrations/rag-api/README.md`](integrations/rag-api/README.md)를 따릅니다.
 
 터미널 2 — 계약서 분석:
 
 ```bash
-cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
-export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+cd 2nd_Side2026_Project/product
 npm run dev:contract
 ```
 
@@ -147,8 +160,7 @@ Next.js가 호출하는 내부 API를 제공합니다.
 터미널 3 — 통합 웹 UI와 API:
 
 ```bash
-cd /data/shared-SeD/내폴더/2nd_Side2026_Project/product
-export PATH=/data/shared-SeD/jcu0304/.local/node-v22.23.2-linux-x64/bin:$PATH
+cd 2nd_Side2026_Project/product
 npm run dev
 ```
 
@@ -224,7 +236,8 @@ RAG 터미널에는 `POST /api/retrieve ... 200` 로그가 남습니다. 응답 
 실제 분석 성공 결과처럼 표시되지 않습니다.
 
 실행 중 `npm: command not found`가 나오면 그 터미널에서 Node.js PATH의 `export` 명령을 다시
-실행합니다. `가상환경이 없습니다`가 나오면 1단계의 `python3 -m venv`와 `pip install`을 다시
+실행합니다. `가상환경이 없습니다`가 나오면 1단계의 CPython 3.12.13 확인, `venv` 생성과
+`pip --require-hashes` 설치를 다시
 확인합니다.
 
 ## 팀 시연용 임시 배포
@@ -238,10 +251,10 @@ npm run build
 npm run start -- -H 127.0.0.1 -p 3111
 ```
 
-별도 터미널에서 프로젝트 외부의 개인 도구 폴더에 설치한 `cloudflared`로 터널을 실행합니다.
+별도 터미널에서 `cloudflared`로 터널을 실행합니다. 설치 위치는 각자 환경에 따라 다릅니다.
 
 ```bash
-/data/shared-SeD/jcu0304/.local/bin/cloudflared tunnel \
+cloudflared tunnel \
   --url http://127.0.0.1:3111 \
   --no-autoupdate
 ```
@@ -330,7 +343,7 @@ API 키와 숨은 시스템 프롬프트는 브라우저로 전송하지 않습�
 - `RealContractReviewProvider.ts`: 계약서 분석
 - `inspectorService.ts`: 감독관 위험큐·사업장 내부 지표 읽기 및 감독관용 듀얼 LLM 경계
 
-상담 키는 기본적으로 `/data/shared-SeD/api_key.env`에서 서버 런타임에만 읽습니다. 이 파일을 프로젝트로 복사하지 않으며 API 키나 원본 계약서는 Git에 저장하지 않습니다. 실제 DB/ML 어댑터와 계약서 분석은 기본적으로 `real`이며, 실제 공급자 장애를 Mock 성공처럼 숨기지 않습니다.
+상담 키는 환경변수(`UPSTAGE_API_KEY`·`SKT_API_KEY`)로 주입하거나 `SHARED_API_KEY_FILE`이 가리키는 파일에서 서버 런타임에만 읽습니다. 지정하지 않으면 파일을 읽지 않습니다. 키 파일을 프로젝트로 복사하지 않으며 API 키나 원본 계약서는 Git에 저장하지 않습니다. 실제 DB/ML 어댑터와 계약서 분석은 기본적으로 `real`이며, 실제 공급자 장애를 Mock 성공처럼 숨기지 않습니다.
 
 ## 설계 문서
 
