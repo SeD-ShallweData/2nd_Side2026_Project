@@ -6,8 +6,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "돈워리 — 일하기 전, 일하는 중에도",
-    template: "%s | 돈워리",
+    default: "Co끼리 — 일하기 전, 일하는 중에도",
+    template: "%s | Co끼리",
   },
   description:
     "공공데이터 기반 고용 신호와 공식 노동 정보를 연결해 입사 전과 재직 중 확인할 정보를 안내합니다.",
