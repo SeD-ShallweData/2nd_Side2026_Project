@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActionChecklist } from "@/components/common/ActionChecklist";
 import { DataFreshnessNotice } from "@/components/common/DataFreshnessNotice";
-import { ErrorState, LimitationNotice, LoadingSkeleton } from "@/components/common/AsyncStates";
+import { EmptyState, ErrorState, LimitationNotice, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { RiskInformationCard } from "@/components/risk/RiskInformationCard";
 import type { Company } from "@/domain/company";
 import type { CompanyRiskResult } from "@/domain/risk";
@@ -82,6 +82,12 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
       <div className="shell detail-content">
         {loading ? <LoadingSkeleton label="임금·산업재해 신호를 불러오고 있습니다." /> : null}
         {!loading && error ? <ErrorState message={error} onRetry={() => void loadRisk()} /> : null}
+        {!loading && !error && !risk ? (
+          <EmptyState
+            title="표시할 위험 정보가 없습니다"
+            description="이 사업장은 아직 임금·산업재해 신호 분석 결과가 연결되지 않았습니다. 사업장 정보를 다시 확인하거나 다른 사업장을 검색해 보세요."
+          />
+        ) : null}
         {!loading && risk ? (
           <>
             <DataFreshnessNotice
