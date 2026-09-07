@@ -87,7 +87,7 @@ band는 누적이 아니라 **배타적 구간**이다. 화면 문구를 만들 
 
 ### 2.3 `confidence` 결정
 
-`safetyResult()` 186행. band와 별개 규칙이다.
+`safetyResult()` — 정의 149행, 판정부 `:155`(`current`)와 `:179-180`(`confidence`). band와 별개 규칙이다.
 
 ```
 confidence = (temporal_status == "current_target_week"
@@ -200,7 +200,9 @@ DB 주석(`0004`):
 > `business_registration_prefix6` — 공개 마스킹 번호의 앞 6자리.
 > **비고유이며 단독 사업장 식별·FK·자동승인에 사용하지 않는다.**
 
-`firms.biz_no` 는 한 번호가 최대 788곳에 재사용된다([`wage-risk.md`](wage-risk.md) 7절).
+`firms.biz_no` 는 한 번호가 최대 **950곳**에 재사용된다([`wage-risk.md`](wage-risk.md) 7절, 2026-08-29 실측).
+
+> ⚠️ DB 주석은 **788곳**으로 적고 있으나 데이터 증가로 낡았다([`wage-risk.md`](wage-risk.md) 11.3절).
 
 ### 5.3 `validation_status` 의 범위
 
