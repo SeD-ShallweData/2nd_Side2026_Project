@@ -15,6 +15,7 @@ vi.mock("pg", () => ({
 }));
 
 import { isDatabaseReady } from "@/server/postgres";
+import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
 
 afterEach(() => {
   database.query.mockReset();
@@ -28,7 +29,9 @@ describe("PostgreSQL readiness", () => {
 
     const sql = String(database.query.mock.calls[0]?.[0]);
     expect(sql.match(/\bcount\s*\(/gi)).toHaveLength(4);
-    expect(sql).toContain("= 553598");
+    expect(sql).toContain("+ INTERVAL '6 months'");
+    expect(sql).toContain(LATEST_BATCH_ORDER_SQL);
+    expect(sql).not.toContain("553598");
     expect(sql).toContain("= 515608");
     expect(sql).toContain("industrial_safety.v_llm_firm_safety_context");
   });
