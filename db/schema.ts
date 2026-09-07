@@ -479,6 +479,47 @@ export const feedback = pgTable(
   (t) => [check("feedback_category_ck", sql`${t.category} in ('버그제보','기능제안','기타')`)],
 );
 
+/* ── 현장 제보 ────────────────────────────────────────────── */
+
+export const worksiteTips = pgTable(
+  "worksite_tips",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    reporterId: uuid("reporter_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    category: text().notNull().default("worksite_tip"),
+    title: text().notNull(),
+    body: text(),
+    firmId: text("firm_id").references(() => firms.firmId, { onDelete: "set null" }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("worksite_tips_reporter_idx").on(t.reporterId),
+    index("worksite_tips_firm_idx").on(t.firmId),
+    index("worksite_tips_submitted_idx").on(t.submittedAt.desc()),
+    check("worksite_tips_category_ck", sql`${t.category} = 'worksite_tip'`),
+  ],
+);
+
+export const worksiteTipAttachments = pgTable(
+  "worksite_tip_attachments",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    tipId: uuid("tip_id").notNull().references(() => worksiteTips.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    mediaType: text("media_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sha256: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("worksite_tip_attachments_storage_key_uq").on(t.storageKey),
+    index("worksite_tip_attachments_tip_idx").on(t.tipId),
+    check("worksite_tip_attachments_media_type_ck", sql`${t.mediaType} in ('image/jpeg','image/png','image/webp')`),
+    check("worksite_tip_attachments_size_ck", sql`${t.sizeBytes} > 0 and ${t.sizeBytes} <= 5242880`),
+    check("worksite_tip_attachments_sha256_ck", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
+  ],
+);
+
 /* ── 산업재해 ML 산출물 (별도 schema) ─────────────────────
  *
  * 주의:
