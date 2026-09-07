@@ -124,3 +124,5 @@ npm run test:migration-drift
 
 테스트는 정상 일치, 일반 pending, 현재 운영 DB 형태의 schema-ahead, 부분 적용, hash 불일치,
 DB-ahead, ledger 누락을 모두 검증한다.
+
+- 드리프트 검사 공백과 수동 검증: [DRIFT_CHECK_COVERAGE.md](DRIFT_CHECK_COVERAGE.md)
