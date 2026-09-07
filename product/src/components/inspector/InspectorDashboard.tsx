@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { EmptyState, ErrorState } from "@/components/common/AsyncStates";
 import type {
   InspectorCompanyDetail,
   InspectorOverview,
@@ -31,7 +32,16 @@ function QueueTable({ items, onSelect }: { items: InspectorQueueItem[]; onSelect
           <tr><th>순위</th><th>사업장</th><th>점검 등급</th></tr>
         </thead>
         <tbody>
-          {items.map((item) => (
+          {items.length === 0 ? (
+            <tr>
+              <td colSpan={3}>
+                <EmptyState
+                  title="위험큐 결과가 없습니다"
+                  description="이 페이지에 표시할 위험큐 사업장이 없습니다. 다른 페이지를 확인하거나 사업장을 직접 검색해 보세요."
+                />
+              </td>
+            </tr>
+          ) : items.map((item) => (
             <tr key={item.company_id}>
               <td><strong>#{item.rank.toLocaleString("ko-KR")}</strong></td>
               <td>
@@ -158,6 +168,8 @@ export function InspectorDashboard() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [lastFailedCompanyId, setLastFailedCompanyId] = useState<string | null>(null);
   const [editingQueuePage, setEditingQueuePage] = useState(false);
   const [queuePageDraft, setQueuePageDraft] = useState("");
   const [queuePageValidation, setQueuePageValidation] = useState<string | null>(null);
@@ -165,11 +177,15 @@ export function InspectorDashboard() {
   async function selectCompany(companyId: string) {
     setLoadingDetail(true);
     setError(null);
+    setDetailError(null);
     try {
       const response = await fetch(`/api/inspector/companies/${encodeURIComponent(companyId)}`, { cache: "no-store" });
       setDetail(await readApiResponse<InspectorCompanyDetail>(response));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "사업장 내부 데이터를 불러오지 못했습니다.");
+      const message = caught instanceof Error ? caught.message : "사업장 내부 데이터를 불러오지 못했습니다.";
+      setError(message);
+      setDetailError(message);
+      setLastFailedCompanyId(companyId);
     } finally {
       setLoadingDetail(false);
     }
@@ -268,10 +284,30 @@ export function InspectorDashboard() {
             {overview ? <p>{dateLabel(overview.batch.data_as_of)} 데이터 기준 · {dateLabel(overview.batch.target_month)} 예측 대상</p> : null}
           </div>
           <div className="inspector-stat-grid">
-            <article><span>전체 채점</span><strong>{overview ? overview.totals.scored.toLocaleString("ko-KR") : "—"}</strong><small>사업장</small></article>
-            <article className="stat-queue"><span>감독관 위험큐</span><strong>{overview ? overview.totals.queue.toLocaleString("ko-KR") : "—"}</strong><small>상위 점검 대상</small></article>
-            <article className="stat-critical"><span>긴급</span><strong>{overview ? overview.queue_counts.긴급.toLocaleString("ko-KR") : "—"}</strong><small>1~100위</small></article>
-            <article className="stat-high"><span>우선</span><strong>{overview ? overview.queue_counts.우선.toLocaleString("ko-KR") : "—"}</strong><small>101~500위</small></article>
+            <article>
+              <span>전체 채점</span>
+              <strong>{overview ? overview.totals.scored.toLocaleString("ko-KR") : "—"}</strong>
+              <small>사업장</small>
+              {overview && overview.totals.scored === 0 ? <small>최신 배치 기준 채점된 사업장이 0건입니다</small> : null}
+            </article>
+            <article className="stat-queue">
+              <span>감독관 위험큐</span>
+              <strong>{overview ? overview.totals.queue.toLocaleString("ko-KR") : "—"}</strong>
+              <small>상위 점검 대상</small>
+              {overview && overview.totals.queue === 0 ? <small>최신 배치 기준 위험큐 대상이 0건입니다</small> : null}
+            </article>
+            <article className="stat-critical">
+              <span>긴급</span>
+              <strong>{overview ? overview.queue_counts.긴급.toLocaleString("ko-KR") : "—"}</strong>
+              <small>1~100위</small>
+              {overview && overview.queue_counts.긴급 === 0 ? <small>해당 구간 대상이 0건입니다</small> : null}
+            </article>
+            <article className="stat-high">
+              <span>우선</span>
+              <strong>{overview ? overview.queue_counts.우선.toLocaleString("ko-KR") : "—"}</strong>
+              <small>101~500위</small>
+              {overview && overview.queue_counts.우선 === 0 ? <small>해당 구간 대상이 0건입니다</small> : null}
+            </article>
           </div>
         </section>
 
@@ -369,7 +405,18 @@ export function InspectorDashboard() {
           </section>
 
           <div className="inspector-detail-column" aria-busy={loadingDetail}>
-            {loadingDetail ? <div className="inspector-loading inspector-detail-loading"><span className="spinner" />사업장 지표를 불러오는 중입니다.</div> : detail ? <DetailPanel detail={detail} /> : <div className="inspector-empty"><strong>사업장을 선택하세요.</strong><p>검색 결과나 위험큐 행을 누르면 상세 지표가 표시됩니다.</p></div>}
+            {loadingDetail ? (
+              <div className="inspector-loading inspector-detail-loading"><span className="spinner" />사업장 지표를 불러오는 중입니다.</div>
+            ) : detailError ? (
+              <ErrorState
+                message={detailError}
+                onRetry={lastFailedCompanyId ? () => void selectCompany(lastFailedCompanyId) : undefined}
+              />
+            ) : detail ? (
+              <DetailPanel detail={detail} />
+            ) : (
+              <div className="inspector-empty"><strong>사업장을 선택하세요.</strong><p>검색 결과나 위험큐 행을 누르면 상세 지표가 표시됩니다.</p></div>
+            )}
           </div>
         </div>
 
