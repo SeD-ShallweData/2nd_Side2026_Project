@@ -17,3 +17,6 @@
 - [ML→DB 데이터 계약](./mlops/ml-db-data-contract.md)
 - [배치 전환·결과 비교 설계](./mlops/batch-switch-design.md)
 - [드리프트 검사 공백](../db/docs/DRIFT_CHECK_COVERAGE.md)
+
+## 결정 기록
+- [2026-09-08 결정 사항](./decisions/2026-09-08.md) — 배지 문구·역할값·담당·브랜드 등 12항목. 다른 문서와 어긋나면 이 기록이 우선
