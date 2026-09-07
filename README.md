@@ -1,44 +1,55 @@
-# 돈워리 (Money Worry)
+# Co끼리
 
-AI Rookie 및 창의종합설계 경진대회를 위한 팀 프로젝트 저장소입니다.
+일하기 전에도, 일하는 중에도 미리 대비하는 노동정보 서비스. AI Rookie · 창의종합설계 경진대회 팀 프로젝트 저장소.
 
-이 저장소는 팀원별 프로토타입을 원형에 가깝게 보존하고, 검토가 끝난 기능만 별도의 통합 제품으로 발전시키는 구조를 사용합니다.
+사업장 검색 → 임금체불·산업재해 신호 카드 → 노동법 상담(RAG + LLM) → 근로계약서 진단 → 커뮤니티·현장 제보로 이어지는 흐름을 하나의 Next.js 서비스로 제공한다. 챗봇 이름은 「돈워리」.
 
-## 저장소 구조
+## 지금 어디에 무엇이 있나
 
-| 경로 | 역할 |
-| --- | --- |
-| [`prototypes/`](prototypes/) | 팀원별 프로토타입과 작업 기록 보존 |
-| [`product/`](product/) | `jcu_branch`를 초기 기준으로 한 최종 통합 제품 개발 공간 |
-| [`db/`](db/) | PostgreSQL 스키마·마이그레이션·ML 결과 적재 도구 |
-| [`docs/`](docs/) | 팀 공용 회의록·API 계약·통합 설계 문서 |
-| [`infra/`](infra/) | 배포·컨테이너·운영 설정 |
-
-## 보존된 프로토타입
-
-| 프로토타입 | 원본 | 주요 내용 |
+| 경로 | 역할 | 주 담당 |
 | --- | --- | --- |
-| [`prototypes/jcu/`](prototypes/jcu/) | `jcu_branch` | Next.js 기반 통합 UI, Mock/Real 어댑터, 두 LLM 비교 |
-| [`prototypes/csh/`](prototypes/csh/) | PR #1의 `cshproj/` | Flask 상담, 프롬프트·가드레일, 계약서 규칙 엔진 |
-| [`prototypes/hb/`](prototypes/hb/) | `hb-rag-bot`의 `webapp/` | 법령 Chroma RAG, 계약서 검토, 검색·생성 평가 |
-| [`prototypes/hss/`](prototypes/hss/) | `feat/db` | DB 기여 범위와 원본 커밋 안내 |
-| [`prototypes/shyun_64/`](prototypes/shyun_64/) | 서버 보존본 | Figma 추출 컴포넌트·에셋과 단일 HTML 랜딩 |
+| [`product/`](product/) | 통합 제품 (Next.js 웹·API, RAG·계약서 분석 통합) | 프론트 수현·지유, API 민규·창의, 프롬프트 성현 |
+| [`db/`](db/) | PostgreSQL 스키마·migration(0000~0011)·ML 결과 적재·Path B 재구축 | 나연(사용자 DB), 승석(ML·DB 검토), 팀장(적재·게이트) |
+| [`docs/`](docs/) | 팀 공용 문서 — 결정 기록·데이터 계약·프롬프트·MLOps·QA·페르소나·시연 | 전원 |
+| [`infra/`](infra/) | GCP VM 배포·systemd·환경 검증·공개 진입점 | 팀장 |
+| [`prototypes/`](prototypes/) | 8월 프로토타입 보존(수정하지 않음) | — |
 
-프로토타입은 개인 작업을 보존하고 비교하기 위한 공간입니다. 실제 통합 개발은 [`product/`](product/)에서 진행하며, 프로토타입을 직접 운영 코드로 간주하지 않습니다. 현재 제품 기준본은 `jcu_branch`의 Next.js 통합 프로토타입입니다.
+## 먼저 읽을 문서
+
+| 알고 싶은 것 | 문서 |
+| --- | --- |
+| 최근 결정 사항 | [`docs/decisions/`](docs/decisions/) — 날짜별. 다른 문서와 어긋나면 결정 기록이 우선 |
+| 화면 문구·배지·금지 표현 | [`product/docs/service-policy.md`](product/docs/service-policy.md) |
+| API 요청·응답 형태 | [`product/docs/api-contract.md`](product/docs/api-contract.md) |
+| DB 값의 의미(판정·등급·피처) | [`docs/data-contract/`](docs/data-contract/) |
+| 프롬프트에 무엇이 들어 있나 | [`docs/prompt/CONTENTS.md`](docs/prompt/CONTENTS.md) |
+| ML 결과를 DB에 넣는 규격·배치 운영 | [`docs/mlops/`](docs/mlops/) |
+| DB 변경(migration)·복구·드리프트 검사 | [`db/docs/MIGRATION_OPERATIONS.md`](db/docs/MIGRATION_OPERATIONS.md) · [`db/docs/DRIFT_CHECK_COVERAGE.md`](db/docs/DRIFT_CHECK_COVERAGE.md) |
+| 서버 배포·롤백·접속 | [`infra/OPERATIONS.md`](infra/OPERATIONS.md) · 공개 진입점 문서 |
+| QA 항목·페르소나·시연 대본 | [`docs/qa/`](docs/qa/) · [`docs/persona/`](docs/persona/) · [`docs/demo/`](docs/demo/) |
+
+## 시연 서버
+
+- 주소: 팀 공유 문서 참조(Basic Auth). 매일 07:00~다음 날 01:00(KST) 가동.
+- 상태 확인: `/api/health/live`, `/api/health/ready`(인증 불필요), `/api/system/status`(인증 필요).
+- 배포는 [`infra/scripts/deploy-from-git.sh`](infra/scripts/) 로만. migration은 배포와 분리해 적용한다.
 
 ## 개발 흐름
 
-1. 최신 `main`에서 기능 브랜치를 만듭니다.
-2. 통합 제품 변경은 주로 `product/`에서 진행합니다.
-3. 필요한 경우 `db/`, `docs/`, `infra/`를 함께 수정합니다.
-4. 검증 후 Pull Request로 `main`에 반영합니다.
-5. `main` 직접 push와 force push는 사용하지 않습니다.
+1. 최신 `main`에서 `task/<주제>` 브랜치를 만든다.
+2. 자기 담당 경로만 수정한다. 공통 파일(`product/src/server/**`, `db/migrations/**`, `infra/**`)은 담당자와 먼저 맞춘다.
+3. `cd product && npm run check`(웹) 또는 `cd db && npm test`(DB)를 통과시킨다.
+4. PR을 올리고 팀장이 병합한다. 셀프 머지·`main` 직접 push·force push는 하지 않는다.
+5. 브랜치는 오래 두지 않는다. 오래 두면 병합이 아니라 재적용이 된다(8월 프롬프트 브랜치 사례).
+6. 새 migration을 만들면 드리프트 검사 후조건 등록을 같은 PR에서 한다.
 
 ## 보안과 데이터
 
-- API 키, `.env`, 원본 계약서와 개인정보는 Git에 저장하지 않습니다.
-- 가상환경, 모델 캐시, 실행 로그와 재생성 가능한 대용량 산출물은 추적하지 않습니다.
-- ML 운영 DB(PostgreSQL)와 노동법 RAG DB(Chroma)는 역할과 접근 권한을 분리합니다.
-- 대용량 원본 데이터는 별도 저장소에 보관하고 복원 절차만 문서화합니다.
+- API 키, `.env*`, 원본 계약서, 개인정보, 실존 사업장 식별정보는 Git에 넣지 않는다. 저장소는 공개다.
+- 웹 프로세스는 읽기 전용 DB 계정(`wg_bot`)과 기능별 최소권한 계정(`wg_auth`·`wg_community`·`wg_tip`)만 쓴다.
+- ML 산출물 원본과 대용량 데이터는 저장소 밖에 두고 복원 절차만 문서화한다.
+- 팀원 실명 대신 역할명으로 문서를 쓴다.
 
-각 프로토타입의 실행법과 제약은 해당 폴더의 README를 참고하세요.
+## 프로토타입
+
+8월 개인 작업본은 [`prototypes/`](prototypes/)에 원형대로 보존한다(jcu·csh·hb·hss·shyun_64). 실행법은 각 폴더 README 참조. 운영 코드로 간주하지 않는다.
