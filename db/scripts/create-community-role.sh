@@ -15,7 +15,9 @@
 # 무엇을 못 하게 했나
 #  - posts/reports 를 제외한 모든 테이블 접근
 #  - firms 는 사업장 연결 표시용 조회(SELECT)만 허용, 쓰기는 ML 파이프라인 전용
-#  - users/sessions 등은 이 계정의 책임 범위 밖 — 부여하지 않는다.
+#  - users 는 id/name 컬럼만 조회(SELECT) 허용 — 관리자 모더레이션 화면에서
+#    posts.author_id 로 users.name 을 조인해서 보여주기 위함. 그 외 컬럼·쓰기는 불가.
+#  - sessions 등은 이 계정의 책임 범위 밖 — 부여하지 않는다.
 set -Eeuo pipefail
 
 cd "$(dirname "$0")/.."
@@ -90,7 +92,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE
 --    ② firms: 사업장 연결 표시용 조회만 허용, 쓰기는 ML 파이프라인 전용
 GRANT SELECT ON firms TO :"community_user";
 
---    ③ users/sessions 등은 이 계정의 책임 범위 밖 — 부여하지 않음.
+--    ③ users: 관리자 모더레이션 화면에서 posts.author_id로 users.name을
+--       조인해서 보여주기 위함. id/name 컬럼만 조회 허용, 그 외 컬럼·쓰기는 불가.
+GRANT SELECT (id, name) ON users TO :"community_user";
+
+--    ④ sessions 등은 이 계정의 책임 범위 밖 — 부여하지 않음.
 
 -- ⚠️ ALTER DEFAULT PRIVILEGES 를 일부러 쓰지 않는다.
 --    앞으로 만들 테이블에 권한이 자동으로 붙으면, 민감한 테이블이 생겼을 때
