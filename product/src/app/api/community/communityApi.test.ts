@@ -296,6 +296,41 @@ describe("신고와 관리자 검토 권한", () => {
     expect(await duplicate.json()).toMatchObject({ error: { code: "DUPLICATE_REPORT" } });
   });
 
+  /*
+   * 기각은 "이번엔 문제없다"는 판단이지 다시는 신고하지 말라는 뜻이 아니다.
+   * 같은 글이 나중에 다시 문제가 될 수 있고, DB 의 유니크 인덱스도
+   * 대기중 신고만 중복으로 본다(`WHERE status = 'pending'`).
+   */
+  it("기각된 뒤에는 같은 글을 다시 신고할 수 있다", async () => {
+    const reporterCookie = await cookieFor(INSPECTOR);
+    const reportUrl = "http://localhost/api/community/posts/post_mock_001/reports";
+
+    const first = await createReport(
+      jsonMutation(reportUrl, "POST", { reason: "spam" }, reporterCookie),
+      contextFor("postId", "post_mock_001"),
+    );
+    expect(first.status).toBe(201);
+    const { report_id } = await first.json() as { report_id: string };
+
+    const dismissed = await reviewReport(
+      jsonMutation(
+        `http://localhost/api/community/moderation/reports/${report_id}`,
+        "PATCH",
+        { decision: "dismiss", resolution_note: "문제 없는 글로 판단" },
+        await cookieFor(ADMIN),
+      ),
+      contextFor("reportId", report_id),
+    );
+    expect(dismissed.status).toBe(200);
+    expect(await dismissed.json()).toMatchObject({ status: "dismissed" });
+
+    const again = await createReport(
+      jsonMutation(reportUrl, "POST", { reason: "abuse" }, reporterCookie),
+      contextFor("postId", "post_mock_001"),
+    );
+    expect(again.status).toBe(201);
+  });
+
   it("관리자만 신고 목록을 보고 승인된 게시글을 숨긴다", async () => {
     const reportResponse = await createReport(
       jsonMutation(

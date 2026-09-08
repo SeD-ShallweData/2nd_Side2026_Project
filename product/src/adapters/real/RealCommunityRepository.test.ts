@@ -117,16 +117,50 @@ describe("사용자 입력으로 들어온 식별값", () => {
 });
 
 describe("게시글 읽기", () => {
-  it("작성자 이름을 v_posts 에서 가져온다", async () => {
+  /*
+   * 예전에는 v_posts 뷰에서 이름을 가져왔는데, 그 뷰가 공개 글만 담아서
+   * 숨겨진 글의 작성자를 관리자도 볼 수 없었다. 이제 users 를 직접 조인한다.
+   */
+  it("작성자 이름을 users 에서 가져온다", async () => {
     db.queryWrite.mockResolvedValueOnce([postRow()]);
 
     const post = await repository.findPostById(POST_ID);
 
     expect(post?.author_display_name).toBe("김근로");
     const sql = String(db.queryWrite.mock.calls[0]?.[1]);
-    expect(sql).toContain("v_posts");
-    // wg_community 는 users 에 접근할 수 없다.
-    expect(sql).not.toMatch(/\busers\b/);
+    expect(sql).toMatch(/JOIN users u ON u\.id = p\.author_id/);
+    // 공개 글만 담는 뷰로 되돌아가면 숨겨진 글의 이름이 다시 사라진다.
+    expect(sql).not.toContain("v_posts");
+  });
+
+  /*
+   * ⚠️ 익명 보장의 유일한 지점이다.
+   *
+   * v_posts 는 익명 글의 이름을 뷰 안에서 지워 줬다. users 를 직접 조인하면서
+   * 그 안전망이 사라졌으므로, 익명 처리가 SQL 에 남아 있는지 확인한다.
+   * 이 조건이 빠지면 익명으로 쓴 글의 실명이 그대로 나간다.
+   */
+  it("익명 글은 SQL 단계에서 이름을 지운다", async () => {
+    db.queryWrite.mockResolvedValueOnce([postRow()]);
+
+    await repository.findPostById(POST_ID);
+
+    const sql = String(db.queryWrite.mock.calls[0]?.[1]);
+    expect(sql).toMatch(/CASE WHEN p\.anonymous THEN ''/);
+  });
+
+  /*
+   * wg_community 는 users 의 id·name 만 읽을 수 있다(컬럼 단위 GRANT).
+   * 다른 컬럼을 넣으면 42501 권한 오류가 나고, 그건 목록 전체가 503 이 된다.
+   */
+  it("users 에서 허용된 컬럼만 읽는다", async () => {
+    db.queryWrite.mockResolvedValueOnce([postRow()]);
+
+    await repository.findPostById(POST_ID);
+
+    const sql = String(db.queryWrite.mock.calls[0]?.[1]);
+    expect(sql).not.toMatch(/\bu\.(?!id\b|name\b)\w+/);
+    expect(sql).not.toMatch(/\bu\.\*/);
   });
 
   it("사업장 정보를 firms 에서 붙인다", async () => {
@@ -285,6 +319,20 @@ describe("신고", () => {
         post_snapshot: { title: "t", body: "b", updated_at: "2026-09-01T00:00:00.000Z" },
       }),
     ).rejects.toMatchObject({ code: "DUPLICATE_REPORT", status: 409 });
+  });
+
+  /*
+   * DB 의 유니크 인덱스가 `WHERE status = 'pending'` 이라 대기중 신고만 중복으로
+   * 본다. 조회도 같은 조건이어야 한다. 상태를 가리지 않고 막던 시절에는 기각된
+   * 신고를 다시 올릴 수 없어 DB 설계와 어긋났다.
+   */
+  it("중복 확인은 대기중 신고만 본다", async () => {
+    db.queryWrite.mockResolvedValueOnce([]);
+
+    await repository.findPendingReport(POST_ID, USER_ID);
+
+    const sql = String(db.queryWrite.mock.calls[0]?.[1]);
+    expect(sql).toMatch(/r\.status = 'pending'/);
   });
 });
 

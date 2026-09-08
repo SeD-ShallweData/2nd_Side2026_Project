@@ -29,15 +29,20 @@ import { ServiceError } from "@/utils/errors";
  * PostgreSQL 커뮤니티 저장소. wg_community 롤로 붙는다.
  *
  * 이 롤이 볼 수 있는 것은 posts·reports(전체), comments·firms·v_posts(조회),
- * feedback(조회·작성)뿐이다. users 에는 접근 권한이 없다.
+ * feedback(조회·작성), 그리고 users 의 id·name 두 컬럼(조회)뿐이다.
  *
- * 그래서 작성자 이름은 users 를 직접 읽지 않고 v_posts 뷰에서 가져온다.
- * 익명 처리(익명이면 이름을 내보내지 않음)가 뷰 안에 이미 들어 있으므로
- * 여기서 다시 익명 처리를 하지 않는다 — 이중 처리하면 규칙이 두 곳에 흩어진다.
+ * 작성자 이름은 users 를 직접 조인해서 가져온다. 예전에는 v_posts 뷰에서
+ * 가져왔는데, 그 뷰가 공개(published) 글만 담아서 신고 승인으로 숨겨진 글의
+ * 작성자를 관리자도 볼 수 없었다. users 에 컬럼 단위 조회 권한이 생기면서
+ * 상태와 무관하게 이름을 가져올 수 있다.
  *
- * 다만 v_posts 는 공개 상태(published) 글만 담는다. 숨김·삭제된 글의 작성자
- * 이름은 이 롤로는 알 수 없어 빈 값이 된다. 자세한 내용은
- * docs/handoff/for-nayeon.md 의 N11 을 참고한다.
+ * ⚠️ 그 대신 익명 처리가 앱 책임이 됐다. 뷰가 대신 지워주던 것을 이제 이
+ * 파일의 SQL 이 직접 해야 한다. 익명 글은 상태·조회자와 무관하게 이름을
+ * 내보내지 않는다 — 관리자에게도 마찬가지다. 익명으로 쓴 사람과의 약속이고,
+ * 반복 신고자 추적이 필요하면 이름 대신 author_id 를 쓰면 된다.
+ *
+ * users 는 id·name 만 읽을 수 있다. SELECT * 나 다른 컬럼을 넣으면
+ * 42501(권한 없음)이 난다.
  */
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -92,14 +97,22 @@ interface ReportRow {
 }
 
 /*
- * 작성자 이름은 v_posts 에서만 가져올 수 있다(users 접근 권한 없음).
+ * 작성자 이름은 users 를 조인해서 가져온다. 숨겨진 글도 이름이 나와야 해서
+ * v_posts(공개 글만) 대신 원본 테이블을 본다.
+ *
+ * 익명 글은 여기서 이름을 지운다. 이 CASE 가 익명 보장의 유일한 지점이므로
+ * 지우거나 조건을 바꾸면 익명 글의 실명이 그대로 나간다.
+ *
+ * LEFT JOIN 인 이유는 작성자 행이 없어도 글은 보여야 하기 때문이다.
+ * INNER JOIN 이면 글이 목록에서 통째로 사라져 원인을 찾기 어렵다.
+ *
  * 댓글 수는 comments 를 세어 만든다 — 좋아요는 테이블 자체가 없어 null 이다.
  */
 const POST_SELECT = `
   SELECT
     p.id::text                                          AS post_id,
     p.author_id::text                                   AS author_id,
-    COALESCE(v.author_name, '')                         AS author_display_name,
+    CASE WHEN p.anonymous THEN '' ELSE COALESCE(u.name, '') END AS author_display_name,
     p.category,
     p.title,
     p.body,
@@ -112,7 +125,7 @@ const POST_SELECT = `
     p.status,
     (SELECT count(*)::int FROM comments c WHERE c.post_id = p.id) AS comment_count
   FROM posts p
-  LEFT JOIN v_posts v ON v.id = p.id
+  LEFT JOIN users u ON u.id = p.author_id
   LEFT JOIN firms f ON f.firm_id = p.firm_id
 `;
 
@@ -265,9 +278,8 @@ export class RealCommunityRepository implements CommunityRepository {
   }
 
   /*
-   * 새 글은 조회로 되읽지 않고 입력값으로 조립한다. v_posts 는 뷰라서 방금 넣은
-   * 행을 같은 요청에서 곧바로 보여준다는 보장을 굳이 기대할 필요가 없고,
-   * 작성자 이름은 이미 인자로 들어와 있다.
+   * 새 글은 조회로 되읽지 않고 입력값으로 조립한다. 작성자 이름이 이미 인자로
+   * 들어와 있어 다시 조회할 이유가 없다.
    */
   async insertPost(input: NewCommunityPost): Promise<StoredCommunityPost> {
     const rows = await queryWrite<{
@@ -373,12 +385,18 @@ export class RealCommunityRepository implements CommunityRepository {
   }
 
   /*
-   * 같은 사람이 같은 글을 이미 신고했는지 본다. 상태를 가리지 않는다 —
-   * 현재 API 규칙이 "한 번 신고한 글은 다시 신고할 수 없다"이기 때문이다.
-   * DB 의 유니크 인덱스는 대기중 신고만 막으므로 앱 쪽이 더 엄격하다.
-   * 어느 쪽에 맞출지는 docs/handoff/for-nayeon.md 의 N12 에서 정리한다.
+   * 같은 사람이 같은 글을 신고해 두고 아직 처리되지 않은 건이 있는지 본다.
+   *
+   * 대기중(pending)만 본다. DB 의 유니크 인덱스가
+   * `UNIQUE (reporter_id, post_id) WHERE status = 'pending'` 이라 조건을 똑같이
+   * 맞춘 것이다. 예전에는 상태를 가리지 않고 막아서 앱이 DB 보다 엄격했고,
+   * 기각된 신고를 다시 올릴 수 없었다.
+   *
+   * 처리가 끝난 신고(기각·승인)는 막지 않는다. 기각은 "이번엔 문제없다"는
+   * 판단이지 다시는 신고하지 말라는 뜻이 아니고, 승인된 글은 이미 숨겨져서
+   * 다시 신고할 경로가 없다.
    */
-  async findExistingReport(
+  async findPendingReport(
     postId: string,
     reporterId: string,
   ): Promise<StoredCommunityReport | null> {
@@ -387,7 +405,9 @@ export class RealCommunityRepository implements CommunityRepository {
     const rows = await queryWrite<ReportRow>(
       "community",
       `${REPORT_SELECT}
-        WHERE r.post_id = $1::uuid AND r.reporter_id = $2::uuid
+        WHERE r.post_id = $1::uuid
+          AND r.reporter_id = $2::uuid
+          AND r.status = 'pending'
         ORDER BY r.created_at DESC
         LIMIT 1`,
       [postId, reporterId],

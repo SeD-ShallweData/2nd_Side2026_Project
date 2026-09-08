@@ -130,8 +130,11 @@ export interface CommunityRepository {
 
   setPostStatus(postId: string, status: CommunityPostStatus): Promise<StoredCommunityPost>;
 
-  /* 같은 사람이 같은 글을 이미 신고했는지 본다. */
-  findExistingReport(postId: string, reporterId: string): Promise<StoredCommunityReport | null>;
+  /*
+   * 같은 사람이 같은 글을 신고해 두고 아직 처리되지 않은 건을 찾는다.
+   * 기각·승인으로 끝난 신고는 여기서 걸리지 않는다 — 기각 뒤 재신고는 허용한다.
+   */
+  findPendingReport(postId: string, reporterId: string): Promise<StoredCommunityReport | null>;
 
   insertReport(report: NewCommunityReport): Promise<StoredCommunityReport>;
 

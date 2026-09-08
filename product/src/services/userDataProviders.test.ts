@@ -66,7 +66,7 @@ describe("저장소 교체 가능성", () => {
       "insertPost",
       "updatePost",
       "setPostStatus",
-      "findExistingReport",
+      "findPendingReport",
       "insertReport",
       "listReports",
       "findReportById",

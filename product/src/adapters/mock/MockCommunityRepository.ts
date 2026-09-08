@@ -214,12 +214,16 @@ export class MockCommunityRepository implements CommunityRepository {
     return clonePost(post);
   }
 
-  async findExistingReport(
+  /* 대기중 신고만 본다 — 실제 DB 의 부분 유니크 인덱스와 같은 조건이다. */
+  async findPendingReport(
     postId: string,
     reporterId: string,
   ): Promise<StoredCommunityReport | null> {
     const found = [...memoryState.reports.values()].find(
-      (report) => report.post_id === postId && report.reporter_id === reporterId,
+      (report) =>
+        report.post_id === postId
+        && report.reporter_id === reporterId
+        && report.status === "pending",
     );
     return found ? cloneReport(found) : null;
   }

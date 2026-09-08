@@ -392,9 +392,19 @@ export async function reportCommunityPost(
     throw new ServiceError("SELF_REPORT_NOT_ALLOWED", "본인이 작성한 게시글은 신고할 수 없습니다.", 409, false);
   }
 
-  const duplicate = await repository.findExistingReport(post.post_id, user.user_id);
-  if (duplicate) {
-    throw new ServiceError("DUPLICATE_REPORT", "이미 신고한 게시글입니다.", 409, false);
+  /*
+   * 처리를 기다리는 신고가 이미 있으면 막는다. 기각된 신고는 막지 않는다 —
+   * 같은 글이 나중에 다시 문제가 될 수 있고, DB 의 유니크 인덱스도 대기중
+   * 신고만 중복으로 본다.
+   */
+  const pending = await repository.findPendingReport(post.post_id, user.user_id);
+  if (pending) {
+    throw new ServiceError(
+      "DUPLICATE_REPORT",
+      "이미 신고한 게시글입니다. 처리 결과를 기다려 주세요.",
+      409,
+      false,
+    );
   }
 
   const request = parseReportRequest(input);
