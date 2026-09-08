@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<NextResponse> {
   try {
     const user = requireAuthenticatedUser(
-      getOptionalSessionUser(getSessionTokenFromRequest(request)),
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     const url = new URL(request.url);
     const limitValue = url.searchParams.get("limit");
@@ -29,7 +29,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     assertSameOriginRequest(request);
     const user = requireAuthenticatedUser(
-      getOptionalSessionUser(getSessionTokenFromRequest(request)),
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     return noStoreJson(await createWorksiteTip(request, user), 201);
   } catch (error) {

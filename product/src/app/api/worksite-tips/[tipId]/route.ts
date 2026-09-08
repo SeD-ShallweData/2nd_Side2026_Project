@@ -15,7 +15,7 @@ interface RouteContext {
 export async function GET(request: Request, context: RouteContext): Promise<NextResponse> {
   try {
     const user = requireAuthenticatedUser(
-      getOptionalSessionUser(getSessionTokenFromRequest(request)),
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     const { tipId } = await context.params;
     return noStoreJson(getWorksiteTip(tipId, user));

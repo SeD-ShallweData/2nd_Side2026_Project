@@ -9,8 +9,8 @@ import { GET as getTip } from "@/app/api/worksite-tips/[tipId]/route";
 import { GET as getAttachment } from "@/app/api/worksite-tips/[tipId]/attachments/[attachmentId]/route";
 import { GET as listTips, POST as createTip } from "@/app/api/worksite-tips/route";
 import { GET as listCommunityPosts } from "@/app/api/community/posts/route";
-import { issueSession, resetMockSessionsForTests } from "@/server/auth/sessionStore";
-import { resetMockCommunityStateForTests } from "@/services/communityService";
+import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
+import { resetMockCommunityState } from "@/adapters/mock/MockCommunityRepository";
 import {
   resetMockWorksiteTipsForTests,
   WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER,
@@ -37,8 +37,14 @@ const INSPECTOR: SessionUserDto = {
   role: "inspector",
 };
 
-function cookieFor(user: SessionUserDto): string {
-  return `donworry_session=${issueSession(user).token}`;
+const authRepository = new MockAuthRepository();
+
+/*
+ * 사용자당 활성 세션은 1개다. 같은 사용자로 두 번 부르면 앞의 쿠키가 끊기므로,
+ * 한 테스트 안에서는 받아둔 값을 재사용한다.
+ */
+async function cookieFor(user: SessionUserDto): Promise<string> {
+  return `donworry_session=${(await authRepository.issueSession(user)).token}`;
 }
 
 function validImageFile(name = "evidence.png"): File {
@@ -110,14 +116,14 @@ beforeEach(() => {
   vi.stubEnv("AUTH_DATA_MODE", "mock");
   vi.stubEnv("COMMUNITY_DATA_MODE", "mock");
   vi.stubEnv("WORKSITE_TIP_DATA_MODE", "mock");
-  resetMockSessionsForTests();
-  resetMockCommunityStateForTests();
+  resetMockSessions();
+  resetMockCommunityState();
   resetMockWorksiteTipsForTests();
 });
 
 afterEach(() => {
-  resetMockSessionsForTests();
-  resetMockCommunityStateForTests();
+  resetMockSessions();
+  resetMockCommunityState();
   resetMockWorksiteTipsForTests();
   vi.unstubAllEnvs();
 });
@@ -125,7 +131,7 @@ afterEach(() => {
 describe("현장 제보 작성 계약", () => {
   it("일반 사용자가 글 제보를 접수하고 감독관만 목록과 상세를 본다", async () => {
     const createdResponse = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "안전난간이 없는 작업 구역",
       body: "작업 구역 가장자리에 안전난간이 설치되어 있지 않습니다.",
       companyId: "COMPANY_DEMO_001",
@@ -141,7 +147,7 @@ describe("현장 제보 작성 계약", () => {
     expect(JSON.stringify(receipt)).not.toContain(USER.user_id);
     expect(JSON.stringify(receipt)).not.toContain(USER.email);
 
-    const inspectorCookie = cookieFor(INSPECTOR);
+    const inspectorCookie = await cookieFor(INSPECTOR);
     const listResponse = await listTips(new Request(
       "http://localhost/api/worksite-tips?page=1&limit=10",
       { headers: { cookie: inspectorCookie } },
@@ -182,7 +188,7 @@ describe("현장 제보 작성 계약", () => {
     const photo = validImageFile("local-secret-name.png");
     const originalBytes = new Uint8Array(await photo.arrayBuffer());
     const createdResponse = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "현장 사진 제보",
       photos: [photo],
     }));
@@ -190,7 +196,7 @@ describe("현장 제보 작성 계약", () => {
     expect(createdResponse.status).toBe(201);
     expect(receipt.attachment_count).toBe(1);
 
-    const inspectorCookie = cookieFor(INSPECTOR);
+    const inspectorCookie = await cookieFor(INSPECTOR);
     const detailResponse = await getTip(
       new Request(`http://localhost/api/worksite-tips/${receipt.tip_id}`, {
         headers: { cookie: inspectorCookie },
@@ -226,7 +232,7 @@ describe("현장 제보 작성 계약", () => {
     const beforeBody = await before.json() as { total: number };
 
     await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "커뮤니티와 분리할 제보",
       body: "이 내용은 일반 게시글 목록에 표시되면 안 됩니다.",
     }));
@@ -245,7 +251,7 @@ describe("현장 제보 작성 계약", () => {
     expect(anonymousCreate.status).toBe(401);
 
     const inspectorCreate = await createTip(submissionRequest({
-      cookie: cookieFor(INSPECTOR),
+      cookie: await cookieFor(INSPECTOR),
       title: "감독관 작성",
       body: "감독관 계정은 일반 사용자 제보를 작성하지 않습니다.",
     }));
@@ -255,19 +261,19 @@ describe("현장 제보 작성 계약", () => {
     expect(anonymousList.status).toBe(401);
 
     const userList = await listTips(new Request("http://localhost/api/worksite-tips", {
-      headers: { cookie: cookieFor(USER) },
+      headers: { cookie: await cookieFor(USER) },
     }));
     expect(userList.status).toBe(403);
 
     const adminList = await listTips(new Request("http://localhost/api/worksite-tips", {
-      headers: { cookie: cookieFor(ADMIN) },
+      headers: { cookie: await cookieFor(ADMIN) },
     }));
     expect(adminList.status).toBe(403);
   });
 
   it("다른 출처의 작성 요청을 저장 전에 차단한다", async () => {
     const response = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "다른 출처 요청",
       body: "허용되지 않은 출처에서 보낸 요청입니다.",
       origin: "https://attacker.example",
@@ -279,7 +285,7 @@ describe("현장 제보 작성 계약", () => {
     });
 
     const list = await listTips(new Request("http://localhost/api/worksite-tips", {
-      headers: { cookie: cookieFor(INSPECTOR) },
+      headers: { cookie: await cookieFor(INSPECTOR) },
     }));
     expect(await list.json()).toMatchObject({ total: 0 });
   });
@@ -288,7 +294,7 @@ describe("현장 제보 작성 계약", () => {
 describe("현장 제보 입력·조회 안전장치", () => {
   it("본문과 사진이 모두 없거나 multipart가 아닌 요청을 거부한다", async () => {
     const empty = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "내용 없는 제보",
     }));
     expect(empty.status).toBe(400);
@@ -298,7 +304,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        cookie: cookieFor(USER),
+        cookie: await cookieFor(USER),
         origin: "http://localhost",
       },
       body: JSON.stringify({ title: "JSON 제보", body: "지원하지 않는 형식" }),
@@ -310,7 +316,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
   it("허용되지 않은 파일과 위장 이미지 및 사진 개수 초과를 거부한다", async () => {
     const textFile = new File(["not an image"], "evidence.txt", { type: "text/plain" });
     const unsupported = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "텍스트 파일 첨부",
       photos: [textFile],
     }));
@@ -318,7 +324,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
 
     const disguised = new File(["not a jpeg"], "fake.jpg", { type: "image/jpeg" });
     const invalid = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "위장 이미지 첨부",
       photos: [disguised],
     }));
@@ -331,7 +337,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
       { type: "image/jpeg" },
     );
     const broken = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "손상 이미지 첨부",
       photos: [brokenHeaderOnly],
     }));
@@ -339,7 +345,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
     expect(await broken.json()).toMatchObject({ error: { code: "INVALID_IMAGE_FILE" } });
 
     const tooMany = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "사진 개수 초과",
       photos: [
         validImageFile("1.png"),
@@ -354,7 +360,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
   it("정상 JPEG·WebP는 받고 선언한 MIME과 실제 형식이 다르면 거부한다", async () => {
     for (const format of ["jpeg", "webp"] as const) {
       const response = await createTip(submissionRequest({
-        cookie: cookieFor(USER),
+        cookie: await cookieFor(USER),
         title: `정상 ${format} 사진 제보`,
         photos: [await generatedImageFile(format)],
       }));
@@ -368,7 +374,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
       { type: "image/jpeg" },
     );
     const response = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "MIME 불일치 사진",
       photos: [mismatched],
     }));
@@ -389,7 +395,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
     ];
     for (const [index, photo] of invalidFiles.entries()) {
       const response = await createTip(submissionRequest({
-        cookie: cookieFor(USER),
+        cookie: await cookieFor(USER),
         title: `PNG 컨테이너 검증 ${index + 1}`,
         photos: [photo],
       }));
@@ -405,7 +411,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
         { type: `image/${format}` },
       );
       const response = await createTip(submissionRequest({
-        cookie: cookieFor(USER),
+        cookie: await cookieFor(USER),
         title: `${format} 종단 검증`,
         photos: [withTrailingData],
       }));
@@ -419,7 +425,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
     bytes.set([0xff, 0xd8, 0xff], 0);
     const oversized = new File([bytes], "oversized.jpg", { type: "image/jpeg" });
     const response = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "크기 제한을 넘는 사진",
       photos: [oversized],
     }));
@@ -443,7 +449,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
       method: "POST",
       headers: {
         "content-type": "multipart/form-data; boundary=oversized",
-        cookie: cookieFor(USER),
+        cookie: await cookieFor(USER),
         origin: "http://localhost",
       },
       body,
@@ -465,7 +471,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
   });
 
   it("동시 제출에서도 Mock 제보자별 저장 건수를 넘지 않는다", async () => {
-    const cookie = cookieFor(USER);
+    const cookie = await cookieFor(USER);
     const responses = await Promise.all(Array.from(
       { length: WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER + 10 },
       (_, index) => createTip(submissionRequest({
@@ -483,7 +489,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
     expect(await rejected[0].json()).toMatchObject({ error: { code: "MOCK_STORAGE_LIMIT_REACHED" } });
 
     const list = await listTips(new Request("http://localhost/api/worksite-tips", {
-      headers: { cookie: cookieFor(INSPECTOR) },
+      headers: { cookie: await cookieFor(INSPECTOR) },
     }));
     expect(await list.json()).toMatchObject({ total: WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER });
   });
@@ -499,7 +505,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
     }).png({ compressionLevel: 0 }).toBuffer();
     expect(bytes.byteLength).toBeLessThanOrEqual(WORKSITE_TIP_MAX_PHOTO_BYTES);
     const photo = new File([Uint8Array.from(bytes)], "large-evidence.png", { type: "image/png" });
-    const cookie = cookieFor(USER);
+    const cookie = await cookieFor(USER);
 
     const responses = await Promise.all(Array.from({ length: 6 }, (_, index) => (
       createTip(submissionRequest({
@@ -515,7 +521,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
     expect(await rejected[0].json()).toMatchObject({ error: { code: "MOCK_STORAGE_LIMIT_REACHED" } });
 
     const list = await listTips(new Request("http://localhost/api/worksite-tips", {
-      headers: { cookie: cookieFor(INSPECTOR) },
+      headers: { cookie: await cookieFor(INSPECTOR) },
     }));
     expect(await list.json()).toMatchObject({ total: 4 });
   });
@@ -523,14 +529,14 @@ describe("현장 제보 입력·조회 안전장치", () => {
   it("목록 페이지 입력과 존재하지 않는 제보를 구분한다", async () => {
     const invalidPage = await listTips(new Request(
       "http://localhost/api/worksite-tips?page=0&limit=21",
-      { headers: { cookie: cookieFor(INSPECTOR) } },
+      { headers: { cookie: await cookieFor(INSPECTOR) } },
     ));
     expect(invalidPage.status).toBe(400);
     expect(await invalidPage.json()).toMatchObject({ error: { code: "VALIDATION_ERROR" } });
 
     const missing = await getTip(
       new Request("http://localhost/api/worksite-tips/missing", {
-        headers: { cookie: cookieFor(INSPECTOR) },
+        headers: { cookie: await cookieFor(INSPECTOR) },
       }),
       tipContext("missing"),
     );
@@ -540,14 +546,14 @@ describe("현장 제보 입력·조회 안전장치", () => {
 
   it("다른 제보의 사진 ID를 조합한 조회를 404로 차단한다", async () => {
     const firstResponse = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "사진이 있는 첫 번째 제보",
       photos: [validImageFile()],
     }));
     const first = await firstResponse.json() as { tip_id: string };
     const firstDetailResponse = await getTip(
       new Request(`http://localhost/api/worksite-tips/${first.tip_id}`, {
-        headers: { cookie: cookieFor(INSPECTOR) },
+        headers: { cookie: await cookieFor(INSPECTOR) },
       }),
       tipContext(first.tip_id),
     );
@@ -556,14 +562,14 @@ describe("현장 제보 입력·조회 안전장치", () => {
     };
 
     const secondResponse = await createTip(submissionRequest({
-      cookie: cookieFor(USER),
+      cookie: await cookieFor(USER),
       title: "글만 있는 두 번째 제보",
       body: "첫 번째 제보의 사진을 이 제보 ID로 읽을 수 없어야 합니다.",
     }));
     const second = await secondResponse.json() as { tip_id: string };
     const mismatched = await getAttachment(
       new Request("http://localhost/api/worksite-tips/mismatched/attachments/mismatched", {
-        headers: { cookie: cookieFor(INSPECTOR) },
+        headers: { cookie: await cookieFor(INSPECTOR) },
       }),
       attachmentContext(second.tip_id, firstDetail.attachments[0].attachment_id),
     );
@@ -576,7 +582,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
   it("Real 모드에서 저장소 미연결을 Mock 성공으로 대체하지 않는다", async () => {
     vi.stubEnv("WORKSITE_TIP_DATA_MODE", "real");
     const response = await listTips(new Request("http://localhost/api/worksite-tips", {
-      headers: { cookie: cookieFor(INSPECTOR) },
+      headers: { cookie: await cookieFor(INSPECTOR) },
     }));
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
