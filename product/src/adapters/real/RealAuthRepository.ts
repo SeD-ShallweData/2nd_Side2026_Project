@@ -17,9 +17,9 @@ import { ServiceError } from "@/utils/errors";
  * PostgreSQL 인증 저장소. wg_auth 롤로만 붙으며 회원·세션 두 테이블만 볼 수 있다.
  *
  * 스키마와 맞춰야 하는 지점
- *   - users 에는 "역할"이 두 개다. role 은 구직자·사업주 같은 직업 구분이고,
- *     auth_role 이 일반·관리자·감독관 권한 등급이다. 화면 권한은 auth_role 이며,
- *     여기서 잘못 연결하면 일반 사용자에게 감독관 화면이 열린다.
+ *   - 역할은 auth_role 하나뿐이다(일반·관리자·감독관). 예전에는 직업 구분을 담는
+ *     role 컬럼이 따로 있었지만 0011 에서 없앴다. 둘을 섞어 쓰면 일반 사용자에게
+ *     감독관 화면이 열리던 자리라, 컬럼 자체가 사라진 지금이 더 안전하다.
  *   - 이메일 유니크 인덱스가 lower(email) 기준이라 조회도 소문자로 맞춰야 한다.
  *   - 세션은 원문 토큰을 저장하지 않는다. token_hash 만 둔다.
  */
@@ -80,6 +80,10 @@ function invalidCredentials(): ServiceError {
 /*
  * 가입 중 나온 DB 제약 위반을 사용자가 읽을 수 있는 안내로 바꾼다.
  * 그대로 두면 503 "데이터베이스에 접근하지 못했습니다"로 보여 원인을 알 수 없다.
+ *
+ * 지금 가입에서 걸릴 수 있는 제약은 이메일 중복 하나뿐이다. 0011 이 users.role 과
+ * users.firm_id 를 없애면서 외래키·CHECK 위반 경로가 사라졌다. 다른 SQLSTATE 는
+ * 우리가 모르는 상황이므로 안내로 바꾸지 않고 그대로 올려보낸다.
  */
 function toSignupError(error: unknown): unknown {
   if (!isDatabaseError(error)) return error;
@@ -92,25 +96,6 @@ function toSignupError(error: unknown): unknown {
       409,
       false,
       [{ field: "email", reason: "이미 사용 중인 이메일입니다." }],
-    );
-  }
-  // 23503: 외래키 위반 — 존재하지 않는 사업장을 연결하려 한 경우다.
-  if (error.code === "23503") {
-    return new ServiceError(
-      "COMPANY_NOT_FOUND",
-      "선택한 사업장을 찾을 수 없습니다.",
-      404,
-      false,
-      [{ field: "firm_id", reason: "등록된 사업장이 아닙니다." }],
-    );
-  }
-  // 23514: CHECK 위반 — 직업 구분과 사업장 연결 조합이 스키마 규칙에 어긋난다.
-  if (error.code === "23514") {
-    return new ServiceError(
-      "VALIDATION_ERROR",
-      "가입 정보를 확인해 주세요.",
-      400,
-      false,
     );
   }
   return error;
@@ -131,11 +116,11 @@ export class RealAuthRepository implements AuthRepository {
   /*
    * 권한 등급을 'user' 로 못박아 넣는다. 요청에서 받지 않는 이유는,
    * 받는 순간 가입 요청 하나로 감독관 계정이 만들어질 수 있기 때문이다.
+   * 관리자·감독관 승격은 DB 에서 직접 한다.
    *
-   * 중복 이메일과 없는 사업장은 미리 조회해서 막지 않고 DB 제약에 맡긴다.
-   *   - 이메일: 미리 확인해도 그 사이에 다른 요청이 같은 주소로 가입할 수 있다.
-   *     lower(email) 유니크 인덱스만이 확실하다.
-   *   - 사업장: wg_auth 롤에는 firms 조회 권한이 없다. 외래키 위반으로만 알 수 있다.
+   * 중복 이메일은 미리 조회해서 막지 않고 DB 제약에 맡긴다. 미리 확인해도
+   * 그 사이에 다른 요청이 같은 주소로 가입할 수 있어, lower(email) 유니크
+   * 인덱스만이 확실하다.
    */
   async register(user: NewUser): Promise<SessionUserDto> {
     const passwordHash = await hashPassword(user.password);
@@ -143,10 +128,10 @@ export class RealAuthRepository implements AuthRepository {
     try {
       const rows = await queryWrite<{ id: string; email: string; name: string }>(
         "auth",
-        `INSERT INTO users (email, name, role, auth_role, firm_id, password_hash)
-         VALUES ($1, $2, $3, 'user', $4, $5)
+        `INSERT INTO users (email, name, auth_role, password_hash)
+         VALUES ($1, $2, 'user', $3)
          RETURNING id, email, name`,
-        [user.email, user.name, user.persona_role, user.firm_id, passwordHash],
+        [user.email, user.name, passwordHash],
       );
 
       const created = rows[0];

@@ -11,7 +11,6 @@ const VALID = {
   email: "new.worker@example.com",
   password: "Pw9!zx_-{}",
   name: "새 사용자",
-  persona_role: "구직자",
 };
 
 function jsonRequest(url: string, body: unknown, headers: HeadersInit = {}): Request {
@@ -128,7 +127,6 @@ describe("가입 입력값 검증", () => {
     ["이메일 형식", { ...VALID, email: "not-an-email" }, "email"],
     ["짧은 비밀번호", { ...VALID, password: "short" }, "password"],
     ["빈 이름", { ...VALID, name: "   " }, "name"],
-    ["지원하지 않는 직업 구분", { ...VALID, persona_role: "대표이사" }, "persona_role"],
   ])("%s 은 400 으로 거부하고 어느 항목인지 알려준다", async (_label, body, field) => {
     const result = await post(body);
 
@@ -214,24 +212,29 @@ describe("가입 입력값 검증", () => {
   });
 
   /*
-   * 사업장 연결은 사업주·기업/노무 담당자만 가능하다.
-   * DB 에도 같은 제약이 있지만, 여기서 걸러야 어느 항목이 잘못됐는지 알 수 있다.
+   * 직업 구분(5종)과 사업장 연결은 0011 로 DB 에서 사라졌다. 예전 화면이나
+   * 옛 문서를 보고 만든 요청이 계속 들어올 수 있는데, 그때 400 으로 막으면
+   * 지유 쪽 화면이 원인 모를 오류를 만난다. 조용히 무시하고 통과시킨다.
    */
-  it("구직자는 사업장을 연결할 수 없다", async () => {
-    const result = await post({ ...VALID, persona_role: "구직자", firm_id: "firm-1" });
+  it("사라진 항목을 보내도 무시하고 가입시킨다", async () => {
+    const result = await post({
+      ...VALID,
+      persona_role: "사업주",
+      firm_id: "firm-1",
+    });
 
-    expect(result.response.status).toBe(400);
-    expect(result.body).toMatchObject({ error: { details: [{ field: "firm_id" }] } });
-  });
-
-  it("사업주는 사업장을 연결할 수 있다", async () => {
-    const result = await post({ ...VALID, persona_role: "사업주", firm_id: "firm-1" });
     expect(result.response.status).toBe(201);
   });
 
-  it("사업장 값이 비어 있으면 직업 구분과 무관하게 통과한다", async () => {
-    const result = await post({ ...VALID, persona_role: "구직자", firm_id: "" });
+  /*
+   * 권한 등급은 요청에서 받지 않는다. 받는 순간 가입 요청 하나로
+   * 감독관·관리자 계정이 만들어진다.
+   */
+  it("권한 등급을 끼워 넣어도 일반 사용자로 만든다", async () => {
+    const result = await post({ ...VALID, role: "admin", auth_role: "inspector" });
+
     expect(result.response.status).toBe(201);
+    expect(result.body).toMatchObject({ user: { role: "user" } });
   });
 
   it("다른 출처에서 온 요청은 거부한다", async () => {

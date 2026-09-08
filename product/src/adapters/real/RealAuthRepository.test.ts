@@ -59,8 +59,6 @@ describe("가입", () => {
     email: "new@example.com",
     password: "long-enough-password",
     name: "새 사용자",
-    persona_role: "구직자" as const,
-    firm_id: null,
   };
 
   /*
@@ -86,12 +84,27 @@ describe("가입", () => {
 
     const values = db.queryWrite.mock.calls[0]?.[2] as unknown[];
     expect(values).not.toContain(newUser.password);
-    expect(String(values[4])).toMatch(/^scrypt\$/);
+    expect(String(values[2])).toMatch(/^scrypt\$/);
   });
 
   /*
-   * 중복 이메일·없는 사업장을 503 "DB 접근 실패"로 내보내면
-   * 사용자는 무엇을 고쳐야 하는지 알 수 없다.
+   * 0011 로 users.role·users.firm_id 가 사라졌다. 남은 컬럼만 쓰는지 확인한다.
+   * 없는 컬럼에 넣으려 하면 가입이 통째로 실패한다.
+   */
+  it("사라진 컬럼(role·firm_id)을 쓰지 않는다", async () => {
+    db.queryWrite.mockResolvedValueOnce([{ id: "u1", email: newUser.email, name: newUser.name }]);
+
+    await repository.register(newUser);
+
+    const sql = String(db.queryWrite.mock.calls[0]?.[1]);
+    expect(sql).not.toMatch(/\bfirm_id\b/);
+    // auth_role 은 남아 있어야 하므로 단독 role 컬럼만 골라서 본다.
+    expect(sql).not.toMatch(/[(,]\s*role\s*[,)]/);
+  });
+
+  /*
+   * 중복 이메일을 503 "DB 접근 실패"로 내보내면 사용자는 무엇을 고쳐야
+   * 하는지 알 수 없다.
    */
   it("중복 이메일은 409 로 안내한다", async () => {
     db.queryWrite.mockRejectedValueOnce(Object.assign(new Error("duplicate"), { code: "23505" }));
@@ -102,23 +115,15 @@ describe("가입", () => {
     });
   });
 
-  /* wg_auth 롤은 firms 조회 권한이 없어 외래키 위반으로만 알 수 있다. */
-  it("없는 사업장 연결은 404 로 안내한다", async () => {
+  /*
+   * 모르는 SQLSTATE 를 그럴듯한 안내로 바꾸면 원인이 가려진다.
+   * 예전에는 외래키·CHECK 위반을 사업장 오류로 옮겼지만, 0011 로 그 경로가
+   * 사라졌으므로 이제는 손대지 않고 그대로 올려보낸다.
+   */
+  it("모르는 DB 오류는 가입 안내로 바꾸지 않는다", async () => {
     db.queryWrite.mockRejectedValueOnce(Object.assign(new Error("fk"), { code: "23503" }));
 
-    await expect(repository.register(newUser)).rejects.toMatchObject({
-      code: "COMPANY_NOT_FOUND",
-      status: 404,
-    });
-  });
-
-  it("스키마 CHECK 위반은 400 으로 안내한다", async () => {
-    db.queryWrite.mockRejectedValueOnce(Object.assign(new Error("check"), { code: "23514" }));
-
-    await expect(repository.register(newUser)).rejects.toMatchObject({
-      code: "VALIDATION_ERROR",
-      status: 400,
-    });
+    await expect(repository.register(newUser)).rejects.toMatchObject({ code: "23503" });
   });
 });
 
@@ -134,9 +139,10 @@ describe("로그인", () => {
   });
 
   /*
-   * users 에는 "역할"이 두 개다. role 은 구직자·사업주 같은 직업 구분이고
-   * auth_role 이 권한 등급이다. 여기서 잘못 연결하면 일반 사용자에게
-   * 감독관 화면이 열린다.
+   * 권한 등급은 auth_role 하나뿐이다. 예전에는 직업 구분을 담는 role 컬럼이
+   * 따로 있어서 둘을 헷갈리면 일반 사용자에게 감독관 화면이 열렸다.
+   * 0011 로 role 은 사라졌지만, 같은 이름의 컬럼이 다시 생겼을 때 실수로
+   * 권한에 연결되지 않도록 확인은 남겨 둔다.
    */
   it("권한 등급은 auth_role 에서 가져오고 직업 구분은 쓰지 않는다", async () => {
     const stored = await hashPassword("correct-password");

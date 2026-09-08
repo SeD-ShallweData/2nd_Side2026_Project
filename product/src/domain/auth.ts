@@ -1,4 +1,4 @@
-import type { SessionUserDto, UserPersonaRole } from "@/app/api/auth/authApiContract";
+import type { SessionUserDto } from "@/app/api/auth/authApiContract";
 
 /*
  * 인증 저장소 포트.
@@ -28,8 +28,6 @@ export interface NewUser {
   email: string;
   password: string;
   name: string;
-  persona_role: UserPersonaRole;
-  firm_id: string | null;
 }
 
 export interface AuthRepository {
