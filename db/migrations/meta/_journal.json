@@ -78,6 +78,13 @@
       "when": 1788693607078,
       "tag": "0010_crazy_talos",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788844266022,
+      "tag": "0011_lumpy_proteus",
+      "breakpoints": true
     }
   ]
 }

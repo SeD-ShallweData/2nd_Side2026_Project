@@ -30,7 +30,7 @@ ALTER TABLE inspector_queue RENAME COLUMN grade TO queue_priority;
 ALTER INDEX queue_batch_grade_idx RENAME TO queue_batch_priority_idx;
 
 COMMENT ON COLUMN inspector_queue.queue_priority IS
-  '큐 top3000 안에서의 순위 기반 우선순위. 긴급(rank<100)/우선(<500)/주의(<1500)/관찰. '
+  '큐 top3000 안에서의 순위 기반 우선순위. 긴급(1~100위)/우선(<500)/주의(<1500)/관찰. '
   'scored_active.risk_tier 와 다른 척도다 — 같은 단어로 부르지 말 것.';
 
 /* ── ③ 모델 지문 ──────────────────────────────────────────── */
