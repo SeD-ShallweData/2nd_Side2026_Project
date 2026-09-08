@@ -1,5 +1,6 @@
 import { Pool, type QueryResultRow } from "pg";
 import { getDatabaseConnectionString } from "@/server/databaseConfig";
+import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
 import { ServiceError } from "@/utils/errors";
 
 let pool: Pool | undefined;
@@ -65,16 +66,14 @@ export async function isDatabaseReady(): Promise<boolean> {
       WITH latest AS (
         SELECT id, as_of_date, target_month, n_scored, n_queue, n_safe
         FROM batches
-        WHERE as_of_date IS NOT NULL
-        ORDER BY as_of_date DESC, ingested_at DESC, id DESC
-        LIMIT 1
+        ${LATEST_BATCH_ORDER_SQL}
       )
       SELECT
-        latest.as_of_date = DATE '2026-06-01'
-        AND latest.target_month = DATE '2026-12-01'
-        AND latest.n_scored = 553598
-        AND latest.n_queue = 3000
-        AND latest.n_safe = 503887
+        latest.as_of_date IS NOT NULL
+        AND latest.target_month = (latest.as_of_date + INTERVAL '6 months')::date
+        AND latest.n_scored > 0
+        AND latest.n_queue > 0
+        AND latest.n_safe > 0
         AND (SELECT count(*) FROM scored_active WHERE batch_id = latest.id) = latest.n_scored
         AND (SELECT count(*) FROM inspector_queue WHERE batch_id = latest.id) = latest.n_queue
         AND (SELECT count(*) FROM safe_recommendation WHERE batch_id = latest.id) = latest.n_safe
