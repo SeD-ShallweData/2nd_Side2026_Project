@@ -15,7 +15,7 @@ interface RouteContext {
 export async function GET(request: Request, context: RouteContext): Promise<NextResponse> {
   try {
     const user = requireAuthenticatedUser(
-      getOptionalSessionUser(getSessionTokenFromRequest(request)),
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     const { tipId, attachmentId } = await context.params;
     const attachment = getWorksiteTipAttachment(tipId, attachmentId, user);
