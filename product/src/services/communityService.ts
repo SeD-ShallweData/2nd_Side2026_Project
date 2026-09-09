@@ -210,7 +210,9 @@ function toPostDto(
     /*
      * 이름을 알 수 없으면 빈 문자열이 아니라 null 로 내보낸다.
      * 빈 문자열은 화면에 그대로 찍혀 "이름이 없는 사람"처럼 보인다.
-     * 실제 DB 에서는 숨겨진 글의 작성자 이름을 가져올 수 없다(나연 문서 N11).
+     *
+     * 익명 글은 저장소가 이미 이름을 지워서 내려주지만, 여기서 한 번 더 막는다.
+     * 저장소가 바뀌어도 익명 약속이 화면까지 새지 않게 하는 두 번째 방어선이다.
      */
     author_label: post.anonymous ? null : (post.author_display_name || null),
     created_at: post.created_at,
