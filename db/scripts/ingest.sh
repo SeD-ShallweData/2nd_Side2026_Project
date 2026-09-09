@@ -88,7 +88,8 @@ done
 [[ -z "$MODEL_VERSION" ]] && { echo "--model-version 은 필수입니다" >&2; exit 1; }
 [[ "$MODEL_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] \
   || { echo "--model-version 형식이 안전하지 않습니다" >&2; exit 1; }
-if [[ -z "$AS_OF" || ! "$AS_OF" =~ ^[0-9]{4}-(0[1-9]|1[0-2])$ ]]; then
+[[ -z "$AS_OF" ]] && { echo "--as-of 는 필수입니다 (관측창 종료월, YYYY-MM)" >&2; exit 1; }
+if [[ ! "$AS_OF" =~ ^[0-9]{4}-(0[1-9]|1[0-2])$ ]]; then
   echo "--as-of 형식은 YYYY-MM 입니다" >&2
   exit 1
 fi
@@ -293,9 +294,10 @@ CREATE UNLOGGED TABLE stg_safe (
   risk_full text,"체불배제" text,"체납배제" text,door1_ever text,"판정" text
 );
 
-\copy stg_scored FROM '$OUT/scored_active_full.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
-\copy stg_queue  FROM '$OUT/감독관_위험큐_full.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
-\copy stg_safe   FROM '$OUT/safe_recommendation_full.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+-- HEADER MATCH: CSV 첫 줄의 컬럼명이 staging 테이블 컬럼명과 순서·이름 모두 같아야 한다. 다르면 적재가 즉시 실패한다(순서가 밀린 채 조용히 들어가는 사고 방지).
+\copy stg_scored FROM '$OUT/scored_active_full.csv' WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')
+\copy stg_queue  FROM '$OUT/감독관_위험큐_full.csv' WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')
+\copy stg_safe   FROM '$OUT/safe_recommendation_full.csv' WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')
 
 -- ── batch 확보 (같은 as_of+model 이면 재적재) ───────────────
 DELETE FROM batches

@@ -21,10 +21,10 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
   try {
     assertSameOriginRequest(request);
     const user = requireAuthenticatedUser(
-      getOptionalSessionUser(getSessionTokenFromRequest(request)),
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     const { reportId } = await context.params;
-    return noStoreJson(reviewCommunityReport(
+    return noStoreJson(await reviewCommunityReport(
       reportId,
       await readJsonBody(request),
       user,

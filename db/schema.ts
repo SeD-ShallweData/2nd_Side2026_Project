@@ -311,27 +311,22 @@ export const safeRecommendation = pgTable(
 
 /* ── 사용자 생성 데이터 ──────────────────────────────────── */
 
-/* ── users: 페르소나(role)와 권한(auth_role) 분리 + 이메일 대소문자 무시 ──── */
+/* ── users: 권한(auth_role) + 이메일 대소문자 무시 ──── */
 export const users = pgTable(
   "users",
   {
     id: uuid().primaryKey().defaultRandom(),
     email: text().notNull(),
     name: text().notNull(),
-    /** 구직자/재직 근로자/기업·노무 담당자/사업주/감독관 — AI 상담 페르소나 겸 업무 역할 */
-    role: text().notNull(),
-    /** API 권한 등급. role과 별개 — 로그인·글쓰기·관리자 화면 접근을 이걸로 가른다 */
+    /** API 권한 등급 — 로그인·글쓰기·관리자 화면 접근을 이걸로 가른다 */
     authRole: text("auth_role").notNull().default("user"),
-    firmId: text("firm_id").references(() => firms.firmId, { onDelete: "set null" }),
     passwordHash: text("password_hash").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     // 대소문자 다른 같은 이메일 중복 가입 방지 (Test@test.com === test@test.com)
     uniqueIndex("users_email_lower_uq").on(sql`lower(${t.email})`),
-    check("users_role_ck", sql`${t.role} in ('구직자','재직 근로자','기업/노무 담당자','사업주','감독관')`),
     check("users_auth_role_ck", sql`${t.authRole} in ('user','admin','inspector')`),
-    check("users_firm_scope_ck", sql`${t.firmId} is null or ${t.role} in ('사업주','기업/노무 담당자')`),
   ],
 );
 
@@ -477,6 +472,47 @@ export const feedback = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("feedback_category_ck", sql`${t.category} in ('버그제보','기능제안','기타')`)],
+);
+
+/* ── 현장 제보 ────────────────────────────────────────────── */
+
+export const worksiteTips = pgTable(
+  "worksite_tips",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    reporterId: uuid("reporter_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    category: text().notNull().default("worksite_tip"),
+    title: text().notNull(),
+    body: text(),
+    firmId: text("firm_id").references(() => firms.firmId, { onDelete: "set null" }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("worksite_tips_reporter_idx").on(t.reporterId),
+    index("worksite_tips_firm_idx").on(t.firmId),
+    index("worksite_tips_submitted_idx").on(t.submittedAt.desc()),
+    check("worksite_tips_category_ck", sql`${t.category} = 'worksite_tip'`),
+  ],
+);
+
+export const worksiteTipAttachments = pgTable(
+  "worksite_tip_attachments",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    tipId: uuid("tip_id").notNull().references(() => worksiteTips.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    mediaType: text("media_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sha256: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("worksite_tip_attachments_storage_key_uq").on(t.storageKey),
+    index("worksite_tip_attachments_tip_idx").on(t.tipId),
+    check("worksite_tip_attachments_media_type_ck", sql`${t.mediaType} in ('image/jpeg','image/png','image/webp')`),
+    check("worksite_tip_attachments_size_ck", sql`${t.sizeBytes} > 0 and ${t.sizeBytes} <= 5242880`),
+    check("worksite_tip_attachments_sha256_ck", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
+  ],
 );
 
 /* ── 산업재해 ML 산출물 (별도 schema) ─────────────────────

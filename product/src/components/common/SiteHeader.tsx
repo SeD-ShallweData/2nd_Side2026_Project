@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 
 export function Brand() {
   return (
-    <span className="brand" aria-label="돈워리 홈">
+    <span className="brand" aria-label="Co끼리 홈">
       <span className="brand-mark" aria-hidden="true">
-        돈
+        C
       </span>
-      <span className="brand-word">돈워리</span>
+      <span className="brand-word">Co끼리</span>
     </span>
   );
 }
@@ -32,11 +32,16 @@ export function SiteHeader() {
             <Link href="/community">커뮤니티</Link>
             <Link href="/chat" className="consumer-ai-link">AI 노동 상담</Link>
           </nav>
+          {!isInspector ? (
+            <Link href="/inspector" className="consumer-mode-switch" aria-label="일반 사용자 모드에서 근로감독관 모드로 전환">
+              근로감독관 모드 <span aria-hidden="true">↗</span>
+            </Link>
+          ) : null}
         </div>
       </header>
       {!isInspector && pathname !== "/chat" ? (
-        <Link href="/chat" className="consumer-floating-chat" aria-label="AI 노동 상담 바로가기">
-          <span>AI</span> 바로 상담
+        <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리와 상담 바로가기">
+          <span>AI</span> 돈워리와 상담
         </Link>
       ) : null}
       <nav className="consumer-mobile-nav" aria-label="모바일 주요 메뉴">
