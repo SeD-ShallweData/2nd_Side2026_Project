@@ -17,6 +17,14 @@ export function getContractDataMode(): DataMode {
   return parseDataMode(process.env.CONTRACT_DATA_MODE) ?? getDataMode();
 }
 
+export function getAuthDataMode(): DataMode {
+  return parseDataMode(process.env.AUTH_DATA_MODE) ?? getDataMode();
+}
+
+export function getCommunityDataMode(): DataMode {
+  return parseDataMode(process.env.COMMUNITY_DATA_MODE) ?? getDataMode();
+}
+
 export function getMockDelayMs(): number {
   const parsed = Number(process.env.MOCK_DELAY_MS ?? 250);
   if (!Number.isFinite(parsed)) return 250;
