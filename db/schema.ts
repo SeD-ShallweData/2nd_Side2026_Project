@@ -311,36 +311,75 @@ export const safeRecommendation = pgTable(
 
 /* ── 사용자 생성 데이터 ──────────────────────────────────── */
 
-export const users = pgTable("users", {
-  id: uuid().primaryKey().defaultRandom(),
-  email: text().notNull().unique(),
-  name: text().notNull(),
-  /** 감독관 / 사업주 / 구직자 */
-  role: text().notNull(),
-  /** 사업주만 — 본인 사업장 */
-  firmId: text("firm_id").references(() => firms.firmId, { onDelete: "set null" }),
-  passwordHash: text("password_hash").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+/* ── users: 권한(auth_role) + 이메일 대소문자 무시 ──── */
+export const users = pgTable(
+  "users",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    email: text().notNull(),
+    name: text().notNull(),
+    /** API 권한 등급 — 로그인·글쓰기·관리자 화면 접근을 이걸로 가른다 */
+    authRole: text("auth_role").notNull().default("user"),
+    passwordHash: text("password_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // 대소문자 다른 같은 이메일 중복 가입 방지 (Test@test.com === test@test.com)
+    uniqueIndex("users_email_lower_uq").on(sql`lower(${t.email})`),
+    check("users_auth_role_ck", sql`${t.authRole} in ('user','admin','inspector')`),
+  ],
+);
 
+/* ── sessions: 로그인 세션 저장소 (신규) ──────────────────────────
+ * 원문 토큰은 절대 저장하지 않는다 — token_hash만 저장.
+ * 사용자당 활성 세션 1개 정책은 앱 로직에서 강제(로그인 시 기존 세션 revoke).
+ */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    tokenHash: text("token_hash").notNull(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("sessions_token_hash_uq").on(t.tokenHash),
+    index("sessions_user_idx").on(t.userId),
+    index("sessions_expires_idx").on(t.expiresAt),
+  ],
+);
+
+/* ── posts: API 계약에 맞춘 상태값 + 카테고리 + 수정/삭제/숨김 이력 ────── */
 export const posts = pgTable(
   "posts",
   {
     id: uuid().primaryKey().defaultRandom(),
-    /**
-     * 익명 글이어도 작성자를 저장한다 — 본인 삭제·신고 처리에 필요.
-     * 익명성은 조회 계층에서 이름을 빼는 것으로 지킨다.
-     */
-    authorId: uuid("author_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     anonymous: boolean().notNull().default(true),
+    /** 'pre_employment' | 'employment_contract' | 'workplace_safety' | 'wage' */
+    category: text().notNull(),
     title: text().notNull(),
     body: text().notNull(),
     firmId: text("firm_id").references(() => firms.firmId, { onDelete: "set null" }),
+    /** 'published' | 'hidden' | 'deleted' — API 계약과 동일한 영문 3종 */
+    status: text().notNull().default("published"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }),
+    hiddenBy: uuid("hidden_by").references(() => users.id, { onDelete: "set null" }),
   },
-  (t) => [index("posts_created_idx").on(t.createdAt), index("posts_firm_idx").on(t.firmId)],
+  (t) => [
+    index("posts_status_created_idx").on(t.status, t.createdAt.desc()),
+    index("posts_category_status_created_idx").on(t.category, t.status, t.createdAt.desc()),
+    index("posts_author_status_created_idx").on(t.authorId, t.status, t.createdAt.desc()),
+    index("posts_firm_idx").on(t.firmId),
+    check("posts_status_ck", sql`${t.status} in ('published','hidden','deleted')`),
+    check("posts_category_ck", sql`${t.category} in ('pre_employment','employment_contract','workplace_safety','wage')`),
+  ],
 );
 
 export const comments = pgTable(
@@ -384,6 +423,95 @@ export const reviews = pgTable(
   (t) => [
     unique("reviews_firm_author_uq").on(t.firmId, t.authorId),
     index("reviews_firm_created_idx").on(t.firmId, t.createdAt),
+  ],
+);
+
+/* ── reports: 게시글 전용 신고 (전면 재설계, target_type 다형성 제거) ──── */
+export const reports = pgTable(
+  "reports",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    postId: uuid("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+    reporterId: uuid("reporter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** 'spam' | 'abuse' | 'privacy' | 'misinformation' | 'other' */
+    reason: text().notNull(),
+    detail: text(),
+    /** 'pending' | 'accepted' | 'dismissed' */
+    status: text().notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    resolutionNote: text("resolution_note"),
+    // 신고 당시 원문 스냅샷 — 이후 작성자가 글을 고쳐도 이 값은 안 바뀜
+    snapshotTitle: text("snapshot_title").notNull(),
+    snapshotBody: text("snapshot_body").notNull(),
+    snapshotPostUpdatedAt: timestamp("snapshot_post_updated_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    // 대기중(pending) 신고만 중복 방지 — 기각된 뒤 재신고는 허용
+    uniqueIndex("reports_reporter_post_pending_uq")
+      .on(t.reporterId, t.postId)
+      .where(sql`${t.status} = 'pending'`),
+    index("reports_status_created_idx").on(t.status, t.createdAt.desc()),
+    index("reports_post_created_idx").on(t.postId, t.createdAt.desc()),
+    check("reports_reason_ck", sql`${t.reason} in ('spam','abuse','privacy','misinformation','other')`),
+    check("reports_status_ck", sql`${t.status} in ('pending','accepted','dismissed')`),
+  ],
+);
+
+export const feedback = pgTable(
+  "feedback",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** 버그제보 / 기능제안 / 기타 */
+    category: text().notNull(),
+    content: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("feedback_category_ck", sql`${t.category} in ('버그제보','기능제안','기타')`)],
+);
+
+/* ── 현장 제보 ────────────────────────────────────────────── */
+
+export const worksiteTips = pgTable(
+  "worksite_tips",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    reporterId: uuid("reporter_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    category: text().notNull().default("worksite_tip"),
+    title: text().notNull(),
+    body: text(),
+    firmId: text("firm_id").references(() => firms.firmId, { onDelete: "set null" }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("worksite_tips_reporter_idx").on(t.reporterId),
+    index("worksite_tips_firm_idx").on(t.firmId),
+    index("worksite_tips_submitted_idx").on(t.submittedAt.desc()),
+    check("worksite_tips_category_ck", sql`${t.category} = 'worksite_tip'`),
+  ],
+);
+
+export const worksiteTipAttachments = pgTable(
+  "worksite_tip_attachments",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    tipId: uuid("tip_id").notNull().references(() => worksiteTips.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    mediaType: text("media_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sha256: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("worksite_tip_attachments_storage_key_uq").on(t.storageKey),
+    index("worksite_tip_attachments_tip_idx").on(t.tipId),
+    check("worksite_tip_attachments_media_type_ck", sql`${t.mediaType} in ('image/jpeg','image/png','image/webp')`),
+    check("worksite_tip_attachments_size_ck", sql`${t.sizeBytes} > 0 and ${t.sizeBytes} <= 5242880`),
+    check("worksite_tip_attachments_sha256_ck", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
   ],
 );
 

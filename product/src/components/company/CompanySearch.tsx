@@ -187,6 +187,9 @@ export function CompanySearch() {
                       </option>
                     ))}
                   </select>
+                  {filterOptions.regions.length === 0 ? (
+                    <small className="filter-state">등록된 지역 정보가 없어 지역 필터를 적용할 수 없습니다.</small>
+                  ) : null}
                 </label>
                 <label>
                   <span>업종</span>
@@ -201,6 +204,9 @@ export function CompanySearch() {
                       </option>
                     ))}
                   </select>
+                  {filterOptions.industries.length === 0 ? (
+                    <small className="filter-state">등록된 업종 정보가 없어 업종 필터를 적용할 수 없습니다.</small>
+                  ) : null}
                 </label>
                 <button type="button" className="button button-dark filter-apply" disabled={loading} onClick={applyFilters}>
                   필터 적용

@@ -51,7 +51,7 @@ EXTRACTION_SCHEMA = {
     "headcount": "number|null — 상시 근로자 수. 계약서에 적혀 있을 때만. 추측 금지",
     "job_title": "string|null — 종사할 업무",
     "work_place": "string|null — 취업 장소",
-    "contract_type": "'permanent'|'fixed_term'|null — 기간의 정함이 없으면 permanent",
+    "contract_type": "'permanent'|'fixed_term'|null — 계약 종료일이 적혀 있으면 fixed_term, 기간의 정함이 없으면 permanent",
     "term_start": "string|null — YYYY-MM-DD",
     "term_end": "string|null — YYYY-MM-DD. 기간의 정함이 없으면 null",
     "wage": {
@@ -448,7 +448,11 @@ def term_months(contract: dict) -> float | None:
         return None
     ys, ms, ds = (int(x) for x in start.split("-"))
     ye, me, de = (int(x) for x in end.split("-"))
-    return round((ye - ys) * 12 + (me - ms) + (de - ds) / 30.0, 2)
+    # 계약기간은 종료일을 포함합니다. +1 을 빼면 실무에서 가장 흔한 표기인
+    # "3월 2일부터 이듬해 3월 1일까지"(= 1년)가 11.97개월이 되어, 적법한 수습
+    # 감액이 1년 미만 계약으로 오판됩니다. "1월 1일 ~ 12월 31일"은 12.00이 나와
+    # 같은 1년인데 표기에 따라 판정이 갈렸습니다.
+    return round((ye - ys) * 12 + (me - ms) + (de - ds + 1) / 30.0, 2)
 
 
 def weekly_hours(contract: dict) -> float | None:

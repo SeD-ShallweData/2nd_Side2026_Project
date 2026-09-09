@@ -8,7 +8,7 @@ export function LandingHero() {
           <span className="eyebrow">구직자와 근로자를 위한 AI 노동 정보</span>
           <h1 id="home-title">
             <span>일하기 전에도, 일하는 중에도</span>
-            <mark>미리 대비하는 <span className="refresh-brand-word">돈워리</span></mark>
+            <mark>미리 대비하는 <span className="refresh-brand-word">Co끼리</span></mark>
           </h1>
           <p>사업장의 공개 정보부터 계약서, 노동 상담까지. 막막했던 확인을 한곳에서 시작하세요.</p>
           <div className="refresh-button-row">
@@ -22,10 +22,10 @@ export function LandingHero() {
           </dl>
         </div>
 
-        <div className="refresh-hero-visual" aria-label="돈워리 위험카드 화면 예시">
+        <div className="refresh-hero-visual" aria-label="Co끼리 위험카드 화면 예시">
           <span className="refresh-demo-label">화면 예시</span>
           <div className="refresh-demo-window">
-            <div className="refresh-demo-bar"><i /><i /><i /><span>돈워리 · 사업장 확인</span></div>
+            <div className="refresh-demo-bar"><i /><i /><i /><span>Co끼리 · 사업장 확인</span></div>
             <div className="refresh-demo-company">
               <b>OO</b><div><strong>OO건설</strong><span>인천광역시 · 건설업</span></div>
             </div>

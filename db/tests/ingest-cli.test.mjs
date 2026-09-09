@@ -115,7 +115,23 @@ describe("wage bundle ingest CLI", () => {
       { cwd: DB_ROOT, encoding: "utf8" },
     );
     assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /--as-of 는 필수입니다/);
+  });
+
+  it("rejects a malformed reproducibility month", () => {
+    const result = spawnSync(
+      "bash",
+      [SCRIPT, "--model-version", "door1-voting-39f-v1", "--as-of", "2026-6"],
+      { cwd: DB_ROOT, encoding: "utf8" },
+    );
+    assert.notEqual(result.status, 0);
     assert.match(result.stderr, /--as-of 형식은 YYYY-MM/);
+  });
+
+  it("copies CSVs with HEADER MATCH so column-name drift fails instead of shifting values", () => {
+    const script = readFileSync(SCRIPT, "utf8");
+    assert.equal((script.match(/HEADER MATCH, ENCODING/g) ?? []).length, 3);
+    assert.doesNotMatch(script, /HEADER true/);
   });
 
   it("rejects a SQL-shaped model version before opening an env file", () => {

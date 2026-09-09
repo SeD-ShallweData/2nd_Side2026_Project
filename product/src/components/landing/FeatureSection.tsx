@@ -21,7 +21,7 @@ export function FeatureSection() {
   return (
     <section className="section refresh-flow" aria-labelledby="flow-title">
       <div className="shell">
-        <div className="section-heading"><span className="eyebrow">돈워리 이용 흐름</span><h2 id="flow-title">확인하고, 질문하고, 대비하세요</h2><p>입사 전부터 문제가 생긴 뒤까지 필요한 확인을 순서대로 연결합니다.</p></div>
+        <div className="section-heading"><span className="eyebrow">Co끼리 이용 흐름</span><h2 id="flow-title">확인하고, 질문하고, 대비하세요</h2><p>입사 전부터 문제가 생긴 뒤까지 필요한 확인을 순서대로 연결합니다.</p></div>
         <div className="refresh-step-grid">
           {STEPS.map((step) => <article key={step.number}><i>{step.icon}</i><span>STEP {step.number}</span><h3>{step.title}</h3><p>{step.body}</p><b>{step.tag}</b></article>)}
         </div>
@@ -90,6 +90,6 @@ export function ConsultPreviewSection() {
 
 export function FinalCta() {
   return (
-    <section className="refresh-final-cta"><div className="shell"><span className="eyebrow">지금 시작하세요</span><h2>일하기 전에도, 일하는 중에도<br />미리 대비하는 돈워리</h2><p>회사명을 입력하면 공개 데이터에서 관측된 사실과 확인할 항목을 정리합니다.</p><div className="refresh-button-row"><Link href="/companies" className="button button-ai button-large">무료로 위험카드 보기 →</Link><Link href="/chat" className="button button-dark button-large">AI 상담 먼저 해보기</Link></div></div></section>
+    <section className="refresh-final-cta"><div className="shell"><span className="eyebrow">지금 시작하세요</span><h2>일하기 전에도, 일하는 중에도<br />미리 대비하는 Co끼리</h2><p>회사명을 입력하면 공개 데이터에서 관측된 사실과 확인할 항목을 정리합니다.</p><div className="refresh-button-row"><Link href="/companies" className="button button-dark button-large">무료로 위험카드 보기 →</Link><Link href="/chat" className="button button-outline button-large">AI 상담 먼저 해보기</Link></div></div></section>
   );
 }

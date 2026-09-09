@@ -52,20 +52,69 @@ const LAW_CITATION_NAMES = [
 ];
 const LAW_CITATION_SOURCE = `(?:「\\s*)?(?:${LAW_CITATION_NAMES.join("|")})(?:\\s*」)?\\s*제\\s*\\d+\\s*조(?:의\\s*\\d+)?`;
 
+/**
+ * 적재 목록에 **없는** 법령의 조문 인용.
+ *
+ * `LAW_CITATION_SOURCE` 는 적재된 법령만 알기 때문에, 모델이 "노동조합 및
+ * 노동관계조정법 제2조"처럼 DB에 없는 법을 인용하면 인용이 아예 발견되지 않아
+ * 검증을 통과해 버렸습니다. 실제로 관측됐습니다 — 검색이 out_of_scope 로 막힌
+ * 질문에 모델이 조문을 지어내 붙였는데 가드레일이 걸리지 않았습니다.
+ *
+ * 법령 이름에는 공백을 허용하지 않습니다. 허용하면 "임금을 못 받았다면
+ * 근로기준법 제43조" 처럼 앞 문장까지 이름으로 삼켜 검증 키가 어긋납니다.
+ * 공백이 있는 이름("노동조합 및 노동관계조정법")은 마지막 마디만 잡히는데,
+ * 어차피 적재 목록에 없으므로 미검증으로 판정되어 결과는 같습니다.
+ */
+const UNKNOWN_LAW_CITATION_SOURCE =
+  "(?:「\\s*)?([가-힣ㆍ]{2,20}법(?:률)?)(?:\\s*」)?\\s*제\\s*\\d+\\s*조(?:의\\s*\\d+)?";
+
+/**
+ * 공식 안내 문서 인용. 벡터DB의 조문과 달리 `official_guides.json` 에서 오며
+ * 「기관 「문서 이름」」 형태입니다. 조문 정규식만 검사하면 모델이 지어낸
+ * "고용노동부 노동포털 「노동조합 설립 절차」" 같은 문서명을 놓칩니다.
+ */
+const GUIDE_CITATION_SOURCE =
+  "[가-힣]{2,12}(?:부|청|공단|포털|위원회|원|센터|상담)\\s*[^「\\n]{0,15}「[^」\\n]{2,40}」";
+
 /** `g` 플래그가 있는 정규식은 lastIndex 상태를 가지므로 호출마다 새로 만든다. */
 function lawCitationPattern(): RegExp {
   return new RegExp(LAW_CITATION_SOURCE, "g");
 }
 
+function unknownLawCitationPattern(): RegExp {
+  return new RegExp(UNKNOWN_LAW_CITATION_SOURCE, "g");
+}
+
+function guideCitationPattern(): RegExp {
+  return new RegExp(GUIDE_CITATION_SOURCE, "g");
+}
+
+/**
+ * 비교용 키. 괄호·공백을 지워 표기 차이를 흡수하고, 계약 규칙 엔진의 짧은
+ * 법률명(`근기법 제17조`)을 정식명으로 맞춘 뒤 비교한다.
+ */
+function citationKey(citation: string): string {
+  return normalizeContractLegalBasis(
+    citation.replace(/[「」]/g, "").replace(/\s+/g, " ").trim(),
+  )!.replace(/\s/g, "");
+}
+
 /** 답변에서 법령 인용을 뽑아 공백·괄호를 지운 비교용 키로 만든다. */
 export function citationKeys(text: string): Set<string> {
-  return new Set(
-    (text.match(lawCitationPattern()) ?? []).map((citation) =>
-      normalizeContractLegalBasis(
-        citation.replace(/[「」]/g, "").replace(/\s+/g, " ").trim(),
-      )!.replace(/\s/g, ""),
-    ),
-  );
+  return new Set((text.match(lawCitationPattern()) ?? []).map(citationKey));
+}
+
+/**
+ * 검증 대상이 되는 모든 근거 인용. 적재된 법령, 적재되지 않은 법령, 공식 안내
+ * 문서를 함께 본다. `citationKeys` 는 이미 설명한 근거를 추리는 용도라 적재된
+ * 법령만 보면 되지만, 검증은 답변이 내세운 근거 전부를 봐야 한다.
+ */
+function verifiableCitationKeys(text: string): Set<string> {
+  const keys = new Set<string>();
+  for (const citation of text.match(lawCitationPattern()) ?? []) keys.add(citationKey(citation));
+  for (const citation of text.match(unknownLawCitationPattern()) ?? []) keys.add(citationKey(citation));
+  for (const citation of text.match(guideCitationPattern()) ?? []) keys.add(citationKey(citation));
+  return keys;
 }
 
 /** 화면에 보여줄 형태로 인용을 뽑는다. 공백은 한 칸으로 정리하되 지우지 않는다. */
@@ -138,24 +187,28 @@ export function scanRules(answer: string, rules: GuardrailRule[]): Set<string> {
 }
 
 /**
- * 검색으로 확인되지 않은 법령 인용인지 판정한다.
+ * 검색으로 확인되지 않은 근거 인용인지 판정한다.
  *
  * 검색이 성공했더라도 답변이 검색 결과에 없는 조문을 인용하면 걸린다.
  * `retrievedCitations` 를 주지 않으면 검색 성공 여부만 본다.
+ *
+ * 적재된 법령뿐 아니라 적재 목록 밖의 법령과 공식 안내 문서명까지 본다.
+ * 조문만 검사하던 동안 "노동조합 및 노동관계조정법 제2조"나 지어낸
+ * "고용노동부 노동포털 「노동조합 설립 절차」" 가 그대로 사용자에게 나갔다.
  */
 export function hasUnverifiedCitation(
   answer: string,
   ragStatus: "matched" | "no_match" | "unavailable",
   retrievedCitations?: Iterable<string>,
 ): boolean {
-  const cited = citationKeys(answer);
+  const cited = verifiableCitationKeys(answer);
   if (cited.size === 0) return false;
   if (ragStatus !== "matched") return true;
   if (!retrievedCitations) return false;
 
   const verified = new Set<string>();
   for (const citation of retrievedCitations) {
-    for (const key of citationKeys(citation)) verified.add(key);
+    for (const key of verifiableCitationKeys(citation)) verified.add(key);
   }
   return [...cited].some((citation) => !verified.has(citation));
 }
