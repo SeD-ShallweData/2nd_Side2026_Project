@@ -7,3 +7,16 @@
 ## 구현·통합 보고서
 
 - [OpenAI Responses 도구 흐름 구현·통합 보고서](./2026-08-12-openai-responses-도구흐름-구현-통합-보고서.md)
+
+## 프롬프트 엔지니어링
+
+- [프롬프트에 무엇이 들어 있나](./prompt/CONTENTS.md) — 지금 적용 중인 지시문과 가드레일 내용
+- [프롬프트·가드레일 개선 총정리](./prompt/README.md) — 개선 이력, 측정 방법, 프롬프트를 고칠 때 알아야 할 것
+
+## MLOps
+- [ML→DB 데이터 계약](./mlops/ml-db-data-contract.md)
+- [배치 전환·결과 비교 설계](./mlops/batch-switch-design.md)
+- [드리프트 검사 공백](../db/docs/DRIFT_CHECK_COVERAGE.md)
+
+## 결정 기록
+- [2026-09-08 결정 사항](./decisions/2026-09-08.md) — 배지 문구·역할값·담당·브랜드 등 12항목. 다른 문서와 어긋나면 이 기록이 우선

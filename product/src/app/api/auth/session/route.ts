@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
-    return noStoreJson(getSessionResponse(getSessionTokenFromRequest(request)));
+    return noStoreJson(await getSessionResponse(getSessionTokenFromRequest(request)));
   } catch (error) {
     return noStoreError(error);
   }

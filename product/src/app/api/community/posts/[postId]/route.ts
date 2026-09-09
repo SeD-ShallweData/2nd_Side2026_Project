@@ -24,8 +24,8 @@ interface RouteContext {
 export async function GET(request: Request, context: RouteContext): Promise<NextResponse> {
   try {
     const { postId } = await context.params;
-    const viewer = getOptionalSessionUser(getSessionTokenFromRequest(request));
-    return noStoreJson(getCommunityPost(postId, viewer));
+    const viewer = await getOptionalSessionUser(getSessionTokenFromRequest(request));
+    return noStoreJson(await getCommunityPost(postId, viewer));
   } catch (error) {
     return noStoreError(error);
   }
@@ -35,10 +35,10 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
   try {
     assertSameOriginRequest(request);
     const user = requireAuthenticatedUser(
-      getOptionalSessionUser(getSessionTokenFromRequest(request)),
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     const { postId } = await context.params;
-    return noStoreJson(updateCommunityPost(
+    return noStoreJson(await updateCommunityPost(
       postId,
       await readJsonBody(request),
       user,
@@ -52,10 +52,10 @@ export async function DELETE(request: Request, context: RouteContext): Promise<N
   try {
     assertSameOriginRequest(request);
     const user = requireAuthenticatedUser(
-      getOptionalSessionUser(getSessionTokenFromRequest(request)),
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     const { postId } = await context.params;
-    return noStoreJson(deleteCommunityPost(postId, user));
+    return noStoreJson(await deleteCommunityPost(postId, user));
   } catch (error) {
     return noStoreError(error);
   }
