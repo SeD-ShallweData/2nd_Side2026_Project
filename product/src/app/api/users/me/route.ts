@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<NextResponse> {
   try {
     const user = requireAuthenticatedUser(
-      getOptionalSessionUser(getSessionTokenFromRequest(request)),
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     return noStoreJson({ user });
   } catch (error) {

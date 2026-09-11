@@ -42,6 +42,7 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 | [`samples/`](samples/) | 상태별 API 응답 예시 5종 | ✅ |
 | [`safety-risk.md`](safety-risk.md) | 산업재해 — band 매핑, `provisional`·`research_only` 취급, 셀→사업장 배분 | ✅ |
 | [`verification.md`](verification.md) | **실측 검증** — 계약 수치와 운영 DB 대조, **실제 API 응답 표시 검증**, 재현 명령 | ✅ |
+| [`aggregation-spec.md`](aggregation-spec.md) | **지역·업종 집계 정의** — KPI 모집단 4종 구분, 업종·지역 축, 최소 칸 크기, 검증된 집계 SQL | ✅ |
 
 ### `samples/` 구성
 

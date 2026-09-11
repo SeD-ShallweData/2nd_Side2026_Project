@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useId, useRef, useState } from "react";
 import { DataSourceList } from "@/components/common/DataSourceList";
@@ -437,7 +438,7 @@ export function ChatPanel({
             />
           ) : (
             <div className={`chat-row chat-row-${message.role}`} key={message.id}>
-              {message.role === "assistant" ? <div className="chat-avatar" aria-hidden="true">돈</div> : null}
+              {message.role === "assistant" ? <Image className="chat-avatar" src="/brand/donworry-avatar.png" alt="" width={192} height={192} /> : null}
               {message.role === "user" ? (
                 <div className="user-message-wrap">
                   <button type="button" className="message-retry" onClick={() => void sendMessage(message.content)} disabled={loading} aria-label={`질문 다시 보내기: ${message.content}`}>
