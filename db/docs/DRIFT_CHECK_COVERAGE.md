@@ -1,11 +1,11 @@
-# 드리프트 검사기 후조건 커버리지 — 알려진 공백
+# 드리프트 검사기 후조건 커버리지
 
 > **한 줄 요약**
-> `npm run check:migration-drift` 는 **0009·0010 이 실제로 DB 에 존재하는지 검사하지 않는다.**
-> 원장에 기록만 있으면 "정상"으로 통과한다. 덤프 복원·부분 적용 이후에는
-> [수동 검증](#수동-검증-절차)을 반드시 돌릴 것.
+> `npm run check:migration-drift` 는 이제 **0006~0011 을 모두 검사한다.**
+> 2026-09-09 에 0009·0010·0011 키 28개를 등록해 공백을 메웠다.
+> `0000`~`0005` 는 여전히 후조건이 없다 — 그 구간은 [수동 검증](#수동-검증-절차) 범위 밖이다.
 
-기록 시점: 2026-09-07 · 대상 `db/scripts/check-migration-drift.mjs`,
+기록 시점: 2026-09-07 · **갱신 2026-09-09** · 대상 `db/scripts/check-migration-drift.mjs`,
 `db/scripts/migration-drift-core.mjs`
 
 ## 검사기가 비교하는 세 가지
@@ -29,12 +29,18 @@
 
 | migration | 3번 후조건 검사 | 비고 |
 | --- | :---: | --- |
-| `0000_init` ~ `0005_existing_firms_projection` | ✗ | 애초에 없었음 |
+| `0000_init` ~ `0005_existing_firms_projection` | ✗ | 애초에 없었음. 메울 계획도 없다 |
 | `0006_risk_tier` | ✓ | 7개 키 |
 | `0007_current_batch_views` | ✓ | 7개 키 |
 | `0008_deterministic_current_batch` | ✓ | 1개 키 |
-| **`0009_busy_puck`** | **✗** | sessions·reports·feedback, users.auth_role, v_posts 재정의 |
-| **`0010_crazy_talos`** | **✗** | worksite_tips, worksite_tip_attachments |
+| `0009_busy_puck` | ✓ | **16개 키** — sessions·reports·feedback, users.auth_role, v_posts 재정의, 0009 가 지운 것들의 부재 |
+| `0010_crazy_talos` | ✓ | **7개 키** — worksite_tips, worksite_tip_attachments |
+| `0011_lumpy_proteus` | ✓ | **5개 키** — 전부 부재 확인(users.role·firm_id 와 그 제약 3종) |
+
+**합계 43개 키.** 2026-09-09 에 PostgreSQL 16 에 migration 12개를 순서대로 적용한 뒤
+`POSTCONDITIONS_SQL` 을 실행해 **43/43 통과**를 실측했다. 이어서 `users.role` 을 되살려
+`column_absent:public.users.role` 이 `false` 로 뒤집히는 것까지 확인했다 — 검사가 실제로
+드리프트를 잡는다는 뜻이다.
 
 `evaluatePostconditions()` 는 `POSTCONDITION_KEYS` 에 없는 tag 에 대해 `null` 을 반환하고,
 호출부가 그 결과를 `.filter(Boolean)` 으로 버린다. 즉 **미등록 migration 은 조용히
@@ -116,3 +122,20 @@ migration 을 더 추가하게 되면 그때 함께 하는 편이 싸다. 순서
 ## 2026-09-08 추가
 - 2026-09-08 결정으로 0011(users.role 컬럼 삭제)을 만들기로 함. 위 전제("migration을 더 만들지 않는다")는 깨졌으므로 0011 PR에서 "나중에 공백을 메우려면" 절차를 함께 수행한다.
 - 서버 실측 2026-09-07(UTC): `verify-uncovered-postconditions.sql` 23/23 `t`, `f` 0건.
+
+
+## 2026-09-09 추가 — 공백을 메웠다
+
+0011 이 PR #40 으로 병합되면서 `db/docs/DRIFT_CHECK_COVERAGE.md` 가 예고한 "0011 을 만드는
+순간 절차를 함께 수행한다"가 지켜지지 않았다. 뒤늦게 0009·0010·0011 을 한꺼번에 등록했다.
+
+같은 일이 반복되지 않도록 `db/tests/migration-drift.test.mjs` 에 검사 두 개를 넣었다.
+
+| 검사 | 무엇을 막나 |
+| --- | --- |
+| `POSTCONDITION_KEYS와 POSTCONDITIONS_SQL의 키가 정확히 같다` | 한쪽에만 키를 적어 검사가 조용히 통과하거나 모든 배포가 막히는 것 |
+| `journal의 모든 migration이 등록 여부를 명시적으로 갖는다` | 0006 이후 migration 을 후조건 없이 추가하는 것. **CI 가 실패한다** |
+
+`verify-uncovered-postconditions.sql` 은 남겨 둔다. 검사기를 못 돌리는 상황(원장 자체가
+깨졌거나 node 를 쓸 수 없을 때)에서 psql 만으로 확인하는 수단으로 여전히 쓸모가 있다.
+다만 이제 그 SQL 의 23개는 검사기가 자동으로 보는 것과 같은 내용이다.
