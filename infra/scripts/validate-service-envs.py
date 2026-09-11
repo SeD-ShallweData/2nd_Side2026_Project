@@ -162,6 +162,85 @@ def validate_bot_url(candidate: str, db: dict[str, str]) -> None:
     require_secret(unquote(parsed.password or ""), "web.env bot password", 24)
 
 
+def validate_write_role_url(candidate: str, db: dict[str, str], label: str) -> None:
+    """인증·커뮤니티 쓰기 롤 연결 문자열.
+
+    소유자(DB_USER)나 읽기 전용(BOT_USER)으로 붙는 것을 막는 것이 이 검사의 요점이다.
+    앱이 조용히 전체 권한 계정으로 붙으면 롤을 분리한 이유가 통째로 사라진다.
+    product/src/server/databaseConfig.ts 가 같은 이유로 소유자 URL 대체를 거부한다.
+    """
+    username = ""
+    try:
+        parsed = urlsplit(candidate)
+        query = parse_qs(parsed.query, strict_parsing=True) if parsed.query else {}
+        username = unquote(parsed.username or "")
+        valid = (
+            parsed.scheme in {"postgres", "postgresql"}
+            and parsed.hostname == "127.0.0.1"
+            and parsed.port == 5433
+            and bool(username)
+            and bool(parsed.password)
+            and unquote(parsed.path.removeprefix("/")) == db["DB_NAME"]
+            and not parsed.fragment
+            and (not query or query == {"sslmode": ["disable"]})
+        )
+    except (TypeError, ValueError):
+        valid = False
+    if not valid:
+        fail(f"web.env {label} is not a pinned loopback write-role URL")
+    if username in {db["DB_USER"], db["BOT_USER"]}:
+        fail(f"web.env {label} must not reuse the owner or read-only role: {username}")
+    require_secret(unquote(parsed.password or ""), f"web.env {label} password", 24)
+
+
+def validate_user_data_modes(web: dict[str, str], db: dict[str, str]) -> None:
+    """인증·커뮤니티·현장 제보의 데이터 모드.
+
+    세 키 모두 **생략하면 안 된다.** 생략하면 APP_DATA_MODE=real 을 따라가는데
+    (product/src/config/dataMode.ts), real 로 떨어진 채 연결 문자열이 없으면
+    로그인·글쓰기가 조용히 503 이 된다. 빠뜨리기 쉬운 사고라 명시를 강제한다.
+    """
+    for key in ("AUTH_DATA_MODE", "COMMUNITY_DATA_MODE", "WORKSITE_TIP_DATA_MODE"):
+        if key not in web:
+            fail(f"web.env must define {key} explicitly (it falls back to APP_DATA_MODE=real)")
+
+    for key in ("AUTH_DATA_MODE", "COMMUNITY_DATA_MODE"):
+        if web[key] not in {"real", "mock"}:
+            fail(f"web.env {key} must be real or mock")
+
+    # 현장 제보에는 아직 real 어댑터가 없다. worksiteTipService.ensureMockMode() 가
+    # mock 이 아니면 503 을 던진다. 나연의 저장소 어댑터가 들어오면 이 검사를 푼다.
+    if web["WORKSITE_TIP_DATA_MODE"] != "mock":
+        fail("web.env WORKSITE_TIP_DATA_MODE must be mock until the real tip adapter ships")
+
+    pairs = (
+        ("AUTH_DATA_MODE", "AUTH_DATABASE_URL"),
+        ("COMMUNITY_DATA_MODE", "COMMUNITY_DATABASE_URL"),
+    )
+    for mode_key, url_key in pairs:
+        if web[mode_key] == "real":
+            if not web.get(url_key, "").strip():
+                fail(f"web.env {url_key} is required when {mode_key}=real")
+            validate_write_role_url(web[url_key], db, url_key)
+        elif web.get(url_key, "").strip():
+            fail(f"web.env {url_key} must be absent when {mode_key}=mock")
+
+    mock_secrets = (
+        "MOCK_AUTH_USER_PASSWORD",
+        "MOCK_AUTH_ADMIN_PASSWORD",
+        "MOCK_AUTH_INSPECTOR_PASSWORD",
+    )
+    if web["AUTH_DATA_MODE"] == "mock":
+        for key in mock_secrets:
+            if not web.get(key, "").strip():
+                fail(f"web.env {key} is required when AUTH_DATA_MODE=mock")
+            require_secret(web[key], f"web.env {key}", 12)
+    else:
+        leaked = sorted(key for key in mock_secrets if web.get(key, "").strip())
+        if leaked:
+            fail(f"web.env must not keep mock auth passwords in real mode: {', '.join(leaked)}")
+
+
 def validate_web(web: dict[str, str], db: dict[str, str]) -> None:
     require(
         web,
@@ -255,8 +334,19 @@ def validate_web(web: dict[str, str], db: dict[str, str]) -> None:
             "CONTRACT_TIMEOUT_MS",
             "RAG_INTERNAL_TOKEN",
             "CONTRACT_INTERNAL_TOKEN",
+            # 인증·커뮤니티·현장 제보 (PR #40·#45). 생략하면 APP_DATA_MODE=real 을
+            # 따라가므로 반드시 명시한다 — 아래 검사가 그것을 강제한다.
+            "AUTH_DATA_MODE",
+            "COMMUNITY_DATA_MODE",
+            "WORKSITE_TIP_DATA_MODE",
+            "AUTH_DATABASE_URL",
+            "COMMUNITY_DATABASE_URL",
+            "MOCK_AUTH_USER_PASSWORD",
+            "MOCK_AUTH_ADMIN_PASSWORD",
+            "MOCK_AUTH_INSPECTOR_PASSWORD",
         },
     )
+    validate_user_data_modes(web, db)
     for key, minimum, maximum in (
         ("LLM_TIMEOUT_MS", 1_000, 120_000),
         ("LLM_HEALTH_TIMEOUT_MS", 500, 30_000),
