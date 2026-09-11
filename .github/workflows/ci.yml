@@ -47,6 +47,9 @@ jobs:
         working-directory: db
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # 적용된 migration 수정 검사가 merge-base 를 필요로 한다.
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.23.2
@@ -56,6 +59,9 @@ jobs:
         with:
           python-version: "3.12.13"
       - run: npm ci
+      - name: 적용된 migration 이 수정되지 않았는지
+        working-directory: .
+        run: db/scripts/check-migration-immutability.sh origin/${{ github.base_ref || 'main' }}
       - run: npm run test:migration-drift
       - run: npm run test:ingest-cli
       - run: PATH_B_TEST_PYTHON="$pythonLocation/bin/python3" npm run test:path-b-static
