@@ -23,7 +23,7 @@ fail-closed CLI 계층이다. PostgreSQL 16은 VM 내부 Docker로 실행하고 
 | SSH ingress | IAP `35.235.240.0/20`에서 대상 tag의 TCP 22만 허용 |
 | login | OS Login + OS Login 2FA, project SSH key 차단 |
 | workload identity | VM service account와 OAuth scope 없음 |
-| instance schedule | 매일 `07:00` 시작, 다음 날 `01:00` 종료 (`Asia/Seoul`, 18시간) |
+| instance schedule | 매일 `07:00` 시작, 다음 날 `01:00` 종료 (`Asia/Seoul`, 18시간) — **평시 모드. 시연 기간은 아래 §운영 모드 참고** |
 | schedule period | `2026-08-27T00:00:00+09:00` ~ `2026-11-24T02:00:00+09:00` |
 | application root | `/srv/moneyworry` |
 
@@ -42,6 +42,38 @@ VM이 예약 종료된 동안 ephemeral external IPv4 주소 값은 사라질 �
 유지되어야 한다. 일반 preflight는 정확한 schedule이 연결되고 현재 시각이 `01:00` 이상
 `07:00` 미만이거나 schedule 만료 뒤인 경우에만 `TERMINATED`를 정상 상태로 허용하며, 새 VM
 생성 직후 postflight는 별도로 `RUNNING`을 요구한다.
+
+## 운영 모드 — `daily18h` 와 `always-on`
+
+VM 가동 방식은 두 가지이고, **어느 쪽이든 preflight 가 주장(assert)한다.** 둘 다 허용하는
+느슨한 검사로 두지 않는다 — 느슨하면 실수로 스케줄이 떨어져 나가도 통과해 버린다.
+
+| 모드 | 언제 | 정책 부착 | `TERMINATED` |
+| --- | --- | --- | --- |
+| `daily18h` (기본) | 평시 | **붙어 있어야** 한다 | off-hours(01:00~07:00)에만 정상 |
+| `always-on` | **시연·심사 기간** | **떼어져 있어야** 한다 | 언제든 비정상 |
+
+regional resource policy `moneyworry-18h-daily` **자체는 두 모드 모두에서 존재해야 한다.**
+지우지 말고 떼어만 둔다. 그래야 되돌리는 것이 한 줄이다.
+
+```bash
+# always-on 으로 전환 (시연 기간 시작)
+gcloud compute instances remove-resource-policies moneyworry-demo   --zone asia-northeast3-a --resource-policies moneyworry-18h-daily
+MW_SCHEDULE_MODE=always-on infra/gcp/preflight.sh --project sed-coamong --zone a
+```
+
+```bash
+# daily18h 로 복귀 (시연 종료)
+gcloud compute instances add-resource-policies moneyworry-demo   --zone asia-northeast3-a --resource-policies moneyworry-18h-daily
+infra/gcp/preflight.sh --project sed-coamong --zone a
+```
+
+전환하면 **비용이 하루 6시간만큼 늘어난다.** 예산 `moneyworry-90day`(KRW 350,000) 안에서
+감당되는지 먼저 확인하고 전환한다. 시연이 끝나면 반드시 되돌린다 — `always-on` 을 방치하면
+스케줄로 아끼려던 설계가 무의미해진다.
+
+> 2026-09-11: 발표일이 09-21 → 10-01 로 변경되면서 시연 기간 24시간 가동 필요가 생겨
+> 이 모드 구분을 도입했다. 그 전에는 18시간이 유일한 사양이었다.
 
 매일 사람이 start/stop하는 방식은 누락을 자동 검증할 수 없으므로 기본안으로 사용하지 않는다.
 regional instance schedule을 코드로 고정하면 시간대·cron·연결 여부를 preflight에서 재검증할 수
