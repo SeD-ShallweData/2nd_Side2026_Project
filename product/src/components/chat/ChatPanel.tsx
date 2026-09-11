@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useId, useRef, useState } from "react";
 import { DataSourceList } from "@/components/common/DataSourceList";
@@ -11,6 +12,7 @@ import type {
   LlmProviderId,
   ProviderComparisonResult,
 } from "@/domain/chatComparison";
+import { executionModeCopy, providerRunStatusLabel } from "@/components/chat/runLabels";
 import { readApiResponse } from "@/utils/clientApi";
 
 const COMPANY_QUESTIONS = [
@@ -79,14 +81,7 @@ function isLegacyProvider(
 }
 
 function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
-  const statusLabel =
-    result.status === "success"
-      ? "API 응답"
-      : result.status === "guardrail_replaced"
-        ? "정책 교체"
-        : result.status === "policy_short_circuit"
-          ? "긴급정책 즉시 응답"
-          : "정책 대체 응답";
+  const statusLabel = providerRunStatusLabel(result.status, result.trace.guardrail_hits);
 
   return (
     <article className={`provider-answer provider-answer-${result.provider}`}>
@@ -194,20 +189,7 @@ function ComparisonBlock({
         : comparison.execution_mode === "policy_short_circuit"
           ? "긴급 안내 우선"
           : "공식 근거 검색 연결 안 됨";
-  const modeCopy = comparison.execution_mode === "dual_api"
-    ? {
-        kicker: "동일 조건 병렬 비교",
-        summary: "두 모델이 같은 질문·사업장·공식 검색 결과·생성 설정을 사용했습니다.",
-      }
-    : comparison.execution_mode === "openai_responses"
-      ? {
-          kicker: "도구 연결형 단일 상담",
-          summary: "OpenAI Responses가 필요한 경우 허용된 검색·위험·법령 도구를 호출해 답변했습니다.",
-        }
-      : {
-          kicker: "긴급 안전정책 우선",
-          summary: "긴급 상황은 모델 응답을 기다리지 않고 공통 안전 안내를 즉시 표시합니다.",
-        };
+  const modeCopy = executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits);
   const feedbackResults = comparison.execution_mode === "dual_api"
     ? comparison.results.filter(isLegacyProvider)
     : [];
@@ -437,7 +419,7 @@ export function ChatPanel({
             />
           ) : (
             <div className={`chat-row chat-row-${message.role}`} key={message.id}>
-              {message.role === "assistant" ? <div className="chat-avatar" aria-hidden="true">돈</div> : null}
+              {message.role === "assistant" ? <Image className="chat-avatar" src="/brand/donworry-avatar.png" alt="" width={192} height={192} /> : null}
               {message.role === "user" ? (
                 <div className="user-message-wrap">
                   <button type="button" className="message-retry" onClick={() => void sendMessage(message.content)} disabled={loading} aria-label={`질문 다시 보내기: ${message.content}`}>

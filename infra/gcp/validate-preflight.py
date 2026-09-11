@@ -50,6 +50,20 @@ SCHEDULE_DAILY_START = time(7, 0)
 SCHEDULE_DAILY_STOP = time(1, 0)
 SCHEDULE_INITIATION = datetime(2026, 8, 26, 15, 0, tzinfo=timezone.utc)
 SCHEDULE_EXPIRATION = datetime(2026, 11, 23, 17, 0, tzinfo=timezone.utc)
+
+# VM 운영 모드는 두 가지다. 어느 쪽이든 **주장**해야 하며, 둘 다 허용하는 느슨한 검사로
+# 바꾸지 않는다. 느슨하게 두면 실수로 스케줄이 떨어져 나가도 preflight 가 통과한다.
+#
+#   daily18h   평시. 07:00~01:00 만 켠다. 정책이 VM 에 붙어 있어야 하고,
+#              off-hours 의 TERMINATED 를 정상으로 본다.
+#   always-on  시연·심사 기간. 정책을 **떼고** 24시간 돌린다. 붙어 있으면 drift 다.
+#              TERMINATED 는 어느 시각이든 비정상이다.
+#
+# 정책 리소스 자체(regional resource policy)는 두 모드 모두에서 존재해야 한다.
+# 지우지 않고 떼어 두어야 add-resource-policies 한 줄로 되돌릴 수 있다.
+SCHEDULE_MODE_DAILY = "daily18h"
+SCHEDULE_MODE_ALWAYS_ON = "always-on"
+SCHEDULE_MODES = (SCHEDULE_MODE_DAILY, SCHEDULE_MODE_ALWAYS_ON)
 COST_CEILING_USD = Decimal("250.00")
 BUDGET_AMOUNT = Decimal("350000")
 BUDGET_CURRENCY = "KRW"
@@ -759,9 +773,15 @@ def validate_schedule(item: dict[str, Any]) -> None:
         fail("instance schedule expiration time drift")
 
 
-def scheduled_termination_expected(now: datetime) -> bool:
+def scheduled_termination_expected(
+    now: datetime,
+    schedule_mode: str = SCHEDULE_MODE_DAILY,
+) -> bool:
     if now.tzinfo is None:
         fail("runtime validation clock must include a timezone")
+    # always-on 에서는 꺼져 있어도 되는 시간대가 없다. 언제 봐도 RUNNING 이어야 한다.
+    if schedule_mode == SCHEDULE_MODE_ALWAYS_ON:
+        return False
     utc_now = now.astimezone(timezone.utc)
     if utc_now < SCHEDULE_INITIATION:
         return False
@@ -777,6 +797,7 @@ def validate_instance(
     *,
     require_running: bool,
     allow_terminated: bool,
+    schedule_mode: str = SCHEDULE_MODE_DAILY,
 ) -> None:
     require_equal(basename(item.get("zone")), zone, "instance zone drift")
     require_equal(basename(item.get("machineType")), MACHINE_TYPE, "machine type drift")
@@ -794,12 +815,17 @@ def validate_instance(
     require_equal(item.get("deletionProtection"), True, "instance deletion protection drift")
     require_equal(item.get("canIpForward", False), False, "instance IP forwarding drift")
     resource_policies = item.get("resourcePolicies")
+    if resource_policies is None:
+        # gcloud 는 붙은 정책이 하나도 없으면 이 키를 통째로 생략한다.
+        # always-on 에서는 그게 정상이므로 빈 목록과 같게 본다.
+        resource_policies = []
     if not isinstance(resource_policies, list):
         fail("instance resource policy attachments are missing")
+    expected_policies = [SCHEDULE_NAME] if schedule_mode == SCHEDULE_MODE_DAILY else []
     require_equal(
         [basename(policy) for policy in resource_policies],
-        [SCHEDULE_NAME],
-        "instance schedule attachment drift",
+        expected_policies,
+        f"instance schedule attachment drift (mode={schedule_mode})",
     )
 
     tags = item.get("tags")
@@ -1102,7 +1128,10 @@ def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
         network_exists=network is not None,
         subnet_exists=subnet is not None,
     )
-    allow_terminated = scheduled_termination_expected(datetime.now(timezone.utc))
+    schedule_mode = getattr(args, "schedule_mode", SCHEDULE_MODE_DAILY)
+    allow_terminated = scheduled_termination_expected(
+        datetime.now(timezone.utc), schedule_mode
+    )
 
     states = {
         "image": "exact",
@@ -1124,6 +1153,7 @@ def validate_inventory(args: argparse.Namespace) -> dict[str, Any]:
                 full_zone,
                 require_running=args.require_running,
                 allow_terminated=allow_terminated,
+                schedule_mode=schedule_mode,
             ),
         ),
     }
@@ -1236,6 +1266,12 @@ def main() -> int:
     validate_parser.add_argument("--zone", choices=("a", "b", "c"), required=True)
     validate_parser.add_argument("--expected-monthly-usd", required=True)
     validate_parser.add_argument("--expected-90day-usd", required=True)
+    validate_parser.add_argument(
+        "--schedule-mode",
+        choices=SCHEDULE_MODES,
+        default=SCHEDULE_MODE_DAILY,
+        help="VM 운영 모드. always-on 은 스케줄 정책을 뗀 24시간 가동을 기대한다.",
+    )
     validate_parser.add_argument("--require-complete", action="store_true")
     validate_parser.add_argument("--require-running", action="store_true")
     validate_parser.add_argument("--pretty", action="store_true")

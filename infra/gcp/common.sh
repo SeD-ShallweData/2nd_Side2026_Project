@@ -27,6 +27,10 @@ readonly MW_SCHEDULE_STOP_CRON="0 1 * * *"
 readonly MW_SCHEDULE_TIMEZONE="Asia/Seoul"
 readonly MW_SCHEDULE_INITIATION="2026-08-27T00:00:00+09:00"
 readonly MW_SCHEDULE_EXPIRATION="2026-11-24T02:00:00+09:00"
+# VM 운영 모드. 평시 daily18h, 시연·심사 기간 always-on(정책을 떼고 24시간).
+# preflight.sh 가 --schedule-mode 로 검증기에 그대로 넘긴다.
+readonly MW_SCHEDULE_MODE_DEFAULT="daily18h"
+readonly MW_SCHEDULE_MODE_ALWAYS_ON="always-on"
 readonly MW_MOUNT_ROOT="/srv/moneyworry"
 readonly MW_CONFIRM_PREFIX="PROVISION"
 

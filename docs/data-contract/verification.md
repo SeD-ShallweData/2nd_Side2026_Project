@@ -1,9 +1,18 @@
 # 데이터 계약 실측 검증
 
-- 검증일: **2026-08-31 16:00 KST**
 - 대상 DB: 운영 PostgreSQL 16 (Path B 복원본)
-- 대조 대상: [`wage-risk.md`](wage-risk.md) · [`safety-risk.md`](safety-risk.md) · [`README.md`](README.md)
-- 결과: **수치 불일치 0건** · **표시 규칙 위반 1건** (9.3절 — 감독관 `reasons` 영문명 노출)
+- 대조 대상: [`wage-risk.md`](wage-risk.md) · [`safety-risk.md`](safety-risk.md) · [`README.md`](README.md) · [`aggregation-spec.md`](aggregation-spec.md)
+
+### 검증 회차
+
+| 회차 | 일시 (KST) | 범위 | 결과 |
+| --- | --- | --- | --- |
+| 1 | **2026-08-31 16:00** | 계약 수치 · API 표시 | 수치 불일치 0 · 표시 위반 1 (9.3절) |
+| 2 | **2026-09-03** | SHAP 피처 39종 대조 | 13절 |
+| 3 | **2026-09-06** | 판정 규칙 반례 검사 | 14절 |
+| 4 | **2026-09-09** | 피처 단위·스케일 · 집계 축 · `g5` 경계 | 15절 |
+
+> 2~12절은 **1회차(2026-08-31)** 기록이다. 이후 회차는 13절부터 이어 적는다.
 
 > 계약 문서에 적힌 수치가 실제 DB와 같은지(2~8절), 그리고 실제 API 응답이 계약대로
 > 표시되는지(9절) 확인한 기록이다.
@@ -355,3 +364,249 @@ select count(*) from pg_description d
 
 > 이 문서에는 **실존 사업장명·`firm_id` 를 싣지 않는다.** 저장소가 공개다.
 > 응답 형태는 [`samples/`](samples/) 의 `COMPANY_DEMO_*` 합성 식별자를 쓴다.
+
+---
+
+## 13. 2회차 (2026-09-03) — SHAP 피처 39종 대조
+
+### 13.1 피처 사전과 DB 컬럼이 일치한다
+
+```
+문서 §4.6.1 피처 사전            39종
+public.scored_active 컬럼        54개
+  = 비피처 15 + 피처 39
+문서에 있는데 DB에 없는 것        0건
+```
+
+**39종 전부 실재한다.** 재확인 2026-09-09.
+
+### 13.2 `reasons` 에 나오는 피처는 20종뿐이다
+
+`inspector_queue.reasons` 에 실제 등장한 피처는 20종이며, 그중 **11종이 영문 원본명**이다.
+나머지 19종은 아직 상위 3에 든 적이 없다. 모델이 고정돼 있어 39종 밖은 나오지 않는다.
+
+→ 위반 상세는 9.3절, 라벨화 요청은 `wage-risk.md` 11.6절.
+
+---
+
+## 14. 3회차 (2026-09-06) — 판정 규칙 반례 검사
+
+`wage-risk.md` 3.1.1절의 규칙 6단계가 실제 데이터와 맞는지 반례를 셌다.
+**모든 검사에서 반례 0건** [2026-09-06 · **2026-09-09 재확인**].
+
+| 규칙 | 검사 내용 | 반례 |
+| --- | --- | ---: |
+| 1 | `체불배제` 인데 판정이 `배제_임금체불공개` 가 아닌 곳 | **0** |
+| 2 | `체납배제`(체불 아님)인데 `배제_공개체납` 이 아닌 곳 | **0** |
+| 3 | `door1_ever > 0`(배제 아님)인데 `배제_4대보험체납` 이 아닌 곳 | **0** |
+| 4 | `안정신호` 인데 3조건을 다 만족하지 않는 곳 | **0** |
+| 5 | `유보` 인데 `n_months < 8` 인 곳 | **0** |
+
+### 14.1 규칙 우선순위 실증
+
+두 배제 플래그가 **모두 참인 곳이 정확히 1곳** 있다.
+
+```
+ 체불배제 | 체납배제 |       판정
+ t        | t        | 배제_임금체불공개
+```
+
+**규칙 1이 규칙 2보다 먼저 걸린다**는 것이 실제 데이터로 확인된다.
+
+### 14.2 `p10` 의 평가군 확정
+
+`wage-risk.md` 3.1.1절이 「평가군 하위 10%」라고만 적어 모집단이 모호했다.
+네 가지를 모두 재 보았다 [2026-09-09].
+
+| 모집단 | 곳 | `p10` |
+| --- | ---: | ---: |
+| 전체 채점군 | 503,887 | 0.085733 |
+| 배제 3종 제외 | 481,789 | 0.083720 |
+| **배제 제외 + `n_months ≥ 8`** | **464,259** | **0.082370** |
+| `안정신호` 의 실제 `risk_full` 상한 | 32,613 | **0.082370** |
+
+**평가군 = 464,259곳**으로 확정. 마지막 두 줄이 소수점 6자리까지 일치한다.
+
+### 14.3 🔴 감독관 큐 3,000곳에 `유보` 가 **0곳**이다
+
+```
+ 배제_4대보험체납(door1)   2,067
+ 유보_정보부족               829
+ 배제_공개체납                95
+ 배제_임금체불공개             9
+ ─────────────────────────────
+ 합계                      3,000
+
+ 유보                          0      ← 한 곳도 없다
+ 안정신호                      0
+```
+
+### 14.4 `유보` 의 위험등급 분포
+
+```
+ 일반       409,164   94.8%
+ 다소높음    22,397    5.2%
+ 높음            85    0.0%
+ 매우높음         0    0.0%
+```
+
+> 🔴 **`유보` 85.7% 는 「위험이 발견된 집단」이 아니다.**
+> 감독관 점검 대상 3,000곳에 한 곳도 들어가지 않았고, 위험등급도 94.8%가 `일반` 이다.
+> 화면 문구가 「안전 신호 미확인」·회색으로 정해진 근거다 (2026-09-08 결정 1번).
+
+---
+
+## 15. 4회차 (2026-09-09) — 단위·스케일 · 집계 축 · `g5`
+
+### 15.1 피처 값 단위·범위
+
+| 컬럼 | 실측 | 확인된 것 |
+| --- | --- | --- |
+| `door1_maxamt` | 소수부 0건 · 0 제외 최솟값 **1,000** · 중앙값 2,509 · 최대 1,201,620 | **단위 만원** (1,000만원 = 체납 공개 기준선) |
+| `log_emp_count` | 0.0000 ~ 11.7408 | `ln(x+1)` = `log1p` |
+| `nf_bill_maxdrop` · `nf_drawdown` | 0.0000 ~ 1.0000 | 소수 비율. 금액 아님 |
+| `emp_change_12m` | −1.0000 ~ **289.4** | 소수 비율이나 **상한 없음** |
+| `turnover_momentum` | 0.0000 ~ 401.5 | 배수 |
+| `imputed_ratio` | 역산 분모 11.98 ~ 12.05 | **분모 12** |
+| `door1_ever`·`door1_health`·`has_missing_recent_3m` | 2종 `0~1` | 0/1 |
+| `door1_n_insu` | 4종 `0~3` | 0~3 |
+
+### 15.2 ✅ 관측창 구조 확정 — 달력 13개 시점 · 계수기 상한 12
+
+**2026-09-10 모델 담당 재회신으로 확정**되었고, 실측이 이를 뒷받침한다.
+
+창 길이 `[t-18, t-6]` **13개 시점**은 세 출처가 일치한다
+(`migration 0003` · 계약 문서 §6.2 · 모델 담당 회신).
+
+계수기 상한이 12인 이유는 **컬럼마다 다르다.**
+
+| 컬럼 | 이유 | 실측 범위 |
+| --- | --- | --- |
+| `n_months` | **별도 창** — 최근 12개월 green 창 `[t-17, t-6]` | 1 ~ 12 |
+| `zero_emp_months` | 채점 대상은 마지막 달에 항상 활성 → 그 달은 0 불가 | 0 ~ 12 |
+| `imputed_months_count` | 같은 이유 + 채점 게이트 | 0 ~ **7** |
+| `salary_drop_consecutive` | 13개 시점의 인접 비교가 12번 | 0 ~ 12 |
+| 평균·비율류 | 계수기가 아님. 13개 값을 씀 | — |
+
+#### 실측이 구조를 뒷받침한다
+
+```
+n_months + imputed_months_count  =  12 (460,793곳)  또는  13 (43,094곳)
+                                     imputed 최소 0      imputed 최소 1
+```
+
+green 창 12 · risk 창 13이면 이 합은 **`12 + (t-18 이 결측인가)`** 여야 한다.
+**정확히 그대로다.** 어제 「일관되지 않다」고 적었던 현상이 구조로 설명된다.
+
+#### 🔴 채점 게이트는 `n_months` 가 아니다
+
+| 이전 이해 | 실제 |
+| --- | --- |
+| `n_months ≥ 6` 이면 채점 | **13개월 risk 창 관측 ≥ 6** 이면 채점 |
+
+**`n_months = 5` 인데 채점된 915곳** [실측]
+
+```
+915곳 전부 imputed_months_count = 7  →  risk 창 관측 = 13 − 7 = 6  →  게이트 통과
+그중 5개월만 green 창에 들어가 n_months = 5 로 찍힌 것
+예외 0건
+```
+
+게이트를 뒤집어 보면 **`imputed ≤ 7`** 이다. 실측이 맞물린다.
+
+```
+채점군    imputed 최대 7 · 7 초과 0건
+미채점    imputed 전부 NULL (보정 시도 자체가 없음)
+```
+
+### 15.3 🔴 `g5_업력3년` 경계는 38개월이다
+
+```
+ g5_업력3년 | 업력 최소 | 업력 최대 |   건수
+ false      |       0.0 |      37.0 |  77,311
+ true       |      38.0 |     461.0 | 426,576
+
+배치 as_of 2026-06 − 코드 고정 기준일 2023-04 = 38개월
+```
+
+굴러가는 3년이면 36이어야 한다. 상세는 `wage-risk.md` 11.7절.
+
+### 15.4 `n_green` 은 `g1~g6` 참 개수와 일치한다
+
+`n_green` 0~6 전 구간에서 `g1~g6` 참 개수의 최소·최대가 `n_green` 과 같았다. **예외 0건.**
+
+### 15.5 집계 축 검증 (`aggregation-spec.md` 근거)
+
+| 항목 | 실측 |
+| --- | --- |
+| 판정 모집단 | 503,887 |
+| 그 안의 `industry_category IS NULL` | **0건** |
+| 비업종 값(`BIZ_NO_MISSING`·`UNKNOWN`) | 83,727 (16.62%) |
+| `firms.sido` 결측 | 129곳 (0.026%) |
+| `firm_id` 조인 손실 | **0건** (553,598 → 553,598) |
+| 4단계 매핑 실패 | **0건** |
+| 지역 × 업종 칸 | 321칸 · 합계 503,887 (등식 일치) |
+| 사업장 30곳 미만 칸 | **64칸 · 649곳** (0.13%) — 낙인 위험 |
+
+`industry_category IS NULL` 49,711곳은 `risk_full IS NULL` 과 **차집합 양쪽 0인 동일 집합**이다.
+
+### 15.6 집계 뷰 SQL 실행 검증
+
+`aggregation-spec.md` §7.2 의 `CREATE OR REPLACE VIEW` 를 운영 DB에서 **그대로 실행**했다.
+
+```
+BEGIN → CREATE VIEW · COMMENT · GRANT → 조회 → ROLLBACK
+ 집계행수 |  합계  | 등식일치
+      321 | 503887 | t
+종료코드 0 · 롤백 후 pg_views 조회 0건 (운영 DB 무변경)
+```
+
+### 15.7 주석 SQL 드라이런
+
+`COMMENT ON COLUMN` 48문(피처 36 + 비피처 12)을 `COMMIT` → `ROLLBACK` 으로 바꿔 실행했다.
+**48문 전부 성공 · 종료코드 0 · 실행 후 주석 수 2건(변경 없음).**
+
+### 15.8 운영 DB 주석 현황
+
+```
+저장소 migration   51건  (0002~0008 = 49 · 0009 = 2 · 0010 = 0)
+운영 DB 현재        2건  (v_posts · v_comments — 0009 로 적용된 것)
+유실                49건  release dump 가 --no-comments
+```
+
+`scored_active` 는 **54컬럼 중 51개에 설명이 없다.**
+
+---
+
+## 16. 재현 명령 (2~4회차)
+
+```sql
+-- 판정 규칙 반례 (전부 0)
+with j as (select s.*, f.판정,
+       (select percentile_cont(0.10) within group (order by s2.risk_full)
+          from v_current_scored s2 join v_current_safe f2 using (firm_id,batch_id)
+         where s2.risk_full is not null and f2.판정 not like '배제%' and s2.n_months>=8) p10
+  from v_current_scored s join v_current_safe f using (firm_id,batch_id))
+select count(*) filter (where 체불배제 and 판정<>'배제_임금체불공개'),
+       count(*) filter (where 판정='안정신호' and not (n_green>=5 and risk_full<=p10 and n_months>=8)),
+       count(*) filter (where 판정='유보' and n_months<8) from j;
+
+-- 관측창 길이
+select n_months, count(*) from v_current_scored where imputed_months_count=0 group by 1;
+
+-- g5 경계
+select g5_업력3년, min(firm_age_months), max(firm_age_months) from v_current_scored
+ where firm_age_months is not null group by 1;
+
+-- 큐 3,000 판정 구성
+select f.판정, count(*) from public.inspector_queue q
+  left join v_current_safe f on f.firm_id=q.firm_id and f.batch_id=q.batch_id
+ where q.batch_id=(select max(batch_id) from public.inspector_queue) group by 1;
+
+-- 집계 축
+select count(*), count(*) filter (where s.industry_category is null),
+       count(*) filter (where s.industry_category in ('BIZ_NO_MISSING','UNKNOWN')),
+       count(*) filter (where f.sido is null or f.sido='')
+  from v_current_safe v join v_current_scored s using (firm_id,batch_id)
+  join public.firms f using (firm_id);
+```
