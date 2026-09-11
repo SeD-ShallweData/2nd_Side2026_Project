@@ -17,6 +17,10 @@
 #                    담당하며, 그쪽은 web 재시작과 무관하게 계속 살아 있다.
 #   --allow-dirty    작업 트리에 미커밋 변경이 있어도 진행한다(패치로 보존 후 stash).
 #   --skip-build     product/ 가 바뀌었어도 재빌드하지 않는다(운영자가 이미 빌드한 경우).
+#   --ack-guarded P  관문 경로 P 의 절차를 끝냈음을 승인한다. 여러 번 줄 수 있다.
+#                    예: --ack-guarded db/migrations/ --ack-guarded infra/systemd/
+#                    경로를 하나씩 적게 한 것은 일부러다 — 한 번에 전부 끄는 스위치를
+#                    두면 아무도 목록을 읽지 않는다.
 #
 # 실패하면 이전 커밋과 이전 빌드로 자동 롤백한다.
 #
@@ -75,6 +79,9 @@ GUARDED_PATHS=(
   'db/package-lock.json'
 )
 
+# --ack-guarded 로 승인된 경로. 승인한 것만 관문에서 빠진다.
+ACKED=()
+
 # ── 유틸 ─────────────────────────────────────────────────────────────
 log()  { printf '\033[1m[deploy]\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m[deploy] 경고:\033[0m %s\n' "$*" >&2; }
@@ -88,6 +95,7 @@ while (( $# > 0 )); do
     --cf-tunnel)   CF_TUNNEL=1; shift ;;
     --allow-dirty) ALLOW_DIRTY=1; shift ;;
     --skip-build)  SKIP_BUILD=1; shift ;;
+    --ack-guarded) ACKED+=("${2:?--ack-guarded 뒤에 경로가 필요합니다}"); shift 2 ;;
     -h|--help)     sed -n '2,30p' "$0"; exit 0 ;;
     *)             die "알 수 없는 인자: $1" ;;
   esac
@@ -163,11 +171,24 @@ log '변경 요약:'
 printf '%s\n' "$CHANGED" | cut -d/ -f1-2 | sort | uniq -c | sed 's/^/    /'
 
 HALT=''
+ACK_USED=''
 for p in "${GUARDED_PATHS[@]}"; do
-  if printf '%s\n' "$CHANGED" | grep -q "^${p}"; then
+  printf '%s\n' "$CHANGED" | grep -q "^${p}" || continue
+  acked=0
+  for a in ${ACKED+"${ACKED[@]}"}; do
+    [[ $a == "$p" ]] && acked=1 && break
+  done
+  if (( acked )); then
+    ACK_USED+="  - $p"$'\n'
+  else
     HALT+="  - $p"$'\n'
   fi
 done
+if [[ -n $ACK_USED ]]; then
+  # 승인은 기록으로 남긴다. 나중에 "왜 그날 그냥 넘어갔지" 를 답할 수 있어야 한다.
+  log '운영자가 절차 완료를 승인한 관문:'
+  printf '%s' "$ACK_USED"
+fi
 if [[ -n $HALT ]]; then
   printf '\n\033[33m[deploy] 사람에게 넘깁니다 — 아래 경로는 별도 승인 절차가 필요합니다:\033[0m\n%s\n' "$HALT" >&2
   cat >&2 <<'MSG'
@@ -177,8 +198,10 @@ if [[ -n $HALT ]]; then
   docker-compose.yml      → 빈 PG16 복원 리허설 + Path B 릴리스 게이트
   package-lock.json       → 공급망 변경. 사람이 diff 를 읽어야 한다.
 
-  코드만 먼저 배포하려면 위 변경이 없는 커밋을 고르거나,
-  각 항목의 절차를 끝낸 뒤 이 스크립트를 다시 실행하세요.
+  각 항목의 절차를 끝냈다면 그 경로를 --ack-guarded 로 하나씩 승인하세요.
+  예: --ack-guarded db/migrations/ --ack-guarded infra/systemd/
+  (그냥 다시 실행해도 같은 목록이 나옵니다 — 변경 목록은 두 커밋의 차이라
+   절차를 끝내도 줄어들지 않습니다.)
 MSG
   exit 3
 fi
