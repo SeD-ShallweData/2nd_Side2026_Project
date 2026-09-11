@@ -22,7 +22,23 @@
 #                    경로를 하나씩 적게 한 것은 일부러다 — 한 번에 전부 끄는 스위치를
 #                    두면 아무도 목록을 읽지 않는다.
 #
-# 실패하면 이전 커밋과 이전 빌드로 자동 롤백한다.
+# 종료 코드:
+#   0  성공 (--dry-run 정상 종료 포함)
+#   1  실패 — 체크아웃 이후였다면 이전 커밋·이전 빌드로 자동 롤백했다
+#   3  관문 정지 — 사람의 승인이 필요하다. 아무것도 바뀌지 않았다
+#   5  할 일 없음 — 이미 그 커밋이거나 두 커밋 사이에 변경이 없다
+#
+# 5 를 1 과 나눈 이유: 자동 배포 폴러에게 "할 일 없음"은 정상이다. 이것이 실패로
+# 보이면 10분마다 실패 알림이 나가고, 그 소음 때문에 진짜 실패를 아무도 안 본다.
+#
+# 실패하면 이전 커밋과 이전 빌드로 자동 롤백한다. 2026-09-11 이전에는 이 서술이
+# 거짓이었다 — ERR 트랩이라 빌드 실패만 롤백되고 ready 타임아웃·권한 검증 실패·
+# 유닛 비활성은 롤백 없이 그냥 종료됐다. 무인 배포에서 가장 흔한 실패가 ready
+# 타임아웃이므로 이 구멍이 가장 위험했다. 지금은 EXIT 트랩이다(6절 참고).
+#
+# 기계 판독: 진행 상황을 '##MW key=value' 한 줄씩 내보낸다. 배포 이력 래퍼
+# (moneyworry-deploy-run)는 그 줄만 읽는다. 아래 한국어 로그 문구는 마음대로
+# 고쳐도 되지만 key 이름을 바꾸면 이력이 조용히 깨진다.
 #
 # 설치: 이 파일은 저장소에 정본으로 두되, 실행은 트리 바깥의 사본으로 한다.
 #
@@ -71,7 +87,12 @@ GUARDED_PATHS=(
   'db/migrations/'                                   # migration 은 별도 단계
   'db/docker-compose.yml'                            # PG16 이미지 교체 = 복원 리허설 필요
   'infra/systemd/'                                   # unit 템플릿 = 설치기 재실행 필요
-  'infra/scripts/install-systemd-units.sh'
+  'infra/scripts/'                                   # 배포기·감시기·래퍼·폴러.
+                                                     # 실행은 /usr/local/sbin 사본으로 하므로
+                                                     # 배포만으로는 실행본이 갱신되지 않는다.
+                                                     # 사람이 install 을 다시 돌려야 저장소와
+                                                     # 서버가 같아진다. (2026-09-11: --ack-guarded
+                                                     # 를 모르는 구판이 돌고 있어 실제로 막혔다.)
   'product/integrations/rag-api/requirements.lock'   # 봉인 venv 재생성
   'product/integrations/contract-api/requirements.lock'
   'product/integrations/rag-api/config/'             # 봉인 자산 매니페스트
@@ -83,9 +104,25 @@ GUARDED_PATHS=(
 ACKED=()
 
 # ── 유틸 ─────────────────────────────────────────────────────────────
-log()  { printf '\033[1m[deploy]\033[0m %s\n' "$*"; }
-warn() { printf '\033[33m[deploy] 경고:\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[31m[deploy] 실패:\033[0m %s\n' "$*" >&2; exit 1; }
+# 색은 해당 스트림이 tty 일 때만 넣는다. 이 출력은 journal·/srv/moneyworry/deploy.log·
+# Discord 로도 흘러가는데, 거기 ANSI 이스케이프가 섞이면 사람이 읽기 어렵고
+# 기계 판독도 깨진다.
+if [[ -t 1 ]]; then C_BOLD=$'\033[1m'; C_OFF=$'\033[0m'; else C_BOLD=''; C_OFF=''; fi
+if [[ -t 2 ]]; then C_WARN=$'\033[33m'; C_ERR=$'\033[31m'; C_EOFF=$'\033[0m'
+else C_WARN=''; C_ERR=''; C_EOFF=''; fi
+
+log()  { printf '%s[deploy]%s %s\n' "$C_BOLD" "$C_OFF" "$*"; }
+warn() { printf '%s[deploy] 경고:%s %s\n' "$C_WARN" "$C_EOFF" "$*" >&2; }
+die()  { printf '%s[deploy] 실패:%s %s\n' "$C_ERR" "$C_EOFF" "$*" >&2; exit 1; }
+
+# 기계 판독용 한 줄. 래퍼가 읽는 값은 전부 이 형식으로만 내보낸다.
+mwfact() { printf '##MW %s=%s\n' "$1" "$2"; }
+
+# 목록을 한 줄에 담는다. 인자가 없으면 빈 문자열 — set -u 에서도 안전하다.
+join_csv() { local IFS=','; printf '%s' "$*"; }
+
+# 실패가 아니라 "할 일 없음". exit 5 로 die(1) 와 구분한다 — 헤더의 종료 코드 참고.
+noop() { printf '%s[deploy] 할 일 없음:%s %s\n' "$C_BOLD" "$C_OFF" "$*"; mwfact result noop; exit 5; }
 
 DRY_RUN=0; CF_TUNNEL=0; ALLOW_DIRTY=0; SKIP_BUILD=0; TARGET_SHA=''
 while (( $# > 0 )); do
@@ -96,13 +133,23 @@ while (( $# > 0 )); do
     --allow-dirty) ALLOW_DIRTY=1; shift ;;
     --skip-build)  SKIP_BUILD=1; shift ;;
     --ack-guarded) ACKED+=("${2:?--ack-guarded 뒤에 경로가 필요합니다}"); shift 2 ;;
-    -h|--help)     sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help)     awk 'NR>1 && /^#/ {print; next} NR>1 {exit}' "$0"; exit 0 ;;
     *)             die "알 수 없는 인자: $1" ;;
   esac
 done
 
 (( EUID == 0 )) || die 'root 로 실행해야 합니다 (프로젝트 트리와 systemd 가 root 소유)'
+
 [[ $TARGET_SHA =~ ^[0-9a-f]{40}$ ]] || die '--sha 는 40자리 소문자 hex 여야 합니다 (브랜치명 불가)'
+
+# 배포가 둘 이상 겹치면 체크아웃과 빌드가 서로를 덮어쓴다.
+# 래퍼(moneyworry-deploy-run)가 이미 락을 잡았다면 자기 자신과 경합하지 않도록
+# 환경변수로 넘겨받는다. 래퍼에만 두지 않고 **여기에도** 두는 이유는, 사람이 옛
+# 명령(moneyworry-deploy)을 그대로 타이핑해도 보호받아야 하기 때문이다.
+if [[ ${MW_DEPLOY_LOCK_HELD:-} != "$PPID" ]]; then
+  exec 9>/var/lock/moneyworry-deploy.lock
+  flock -n 9 || die '다른 배포가 진행 중입니다 (/var/lock/moneyworry-deploy.lock).'
+fi
 
 # ── 1. 실제 경로·계정을 systemd 에서 읽는다 (문서의 기본값을 믿지 않는다) ──
 # 설치 시 --project-root 를 무엇으로 줬는지는 현장마다 다르다. 실제로 이 VM 은
@@ -128,7 +175,10 @@ PREV_SHA="$(git rev-parse HEAD)"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 log "현재 HEAD: $PREV_SHA"
 log "배포 대상: $TARGET_SHA"
-[[ $PREV_SHA != "$TARGET_SHA" ]] || die '이미 그 커밋입니다. 할 일이 없습니다.'
+mwfact prev_sha "$PREV_SHA"
+mwfact target_sha "$TARGET_SHA"
+mwfact phase inspect
+[[ $PREV_SHA != "$TARGET_SHA" ]] || noop '이미 그 커밋입니다. 할 일이 없습니다.'
 
 install -d -m 0755 "$STATE_DIR" "$ROLLBACK_DIR"
 (( DRY_RUN )) || printf '%s\n' "$PREV_SHA" > "$STATE_DIR/previous-sha"
@@ -165,13 +215,15 @@ git cat-file -t "$TARGET_SHA" >/dev/null 2>&1 \
 
 # ── 5. 무엇이 바뀌는지 판단 ──────────────────────────────────────────
 CHANGED="$(git diff --name-only "$PREV_SHA" "$TARGET_SHA")"
-[[ -n $CHANGED ]] || die '두 커밋 사이에 변경이 없습니다.'
+[[ -n $CHANGED ]] || noop '두 커밋 사이에 변경이 없습니다.'
 
 log '변경 요약:'
 printf '%s\n' "$CHANGED" | cut -d/ -f1-2 | sort | uniq -c | sed 's/^/    /'
 
 HALT=''
 ACK_USED=''
+ACK_LIST=()
+HALT_LIST=()
 for p in "${GUARDED_PATHS[@]}"; do
   printf '%s\n' "$CHANGED" | grep -q "^${p}" || continue
   acked=0
@@ -180,10 +232,16 @@ for p in "${GUARDED_PATHS[@]}"; do
   done
   if (( acked )); then
     ACK_USED+="  - $p"$'\n'
+    ACK_LIST+=("$p")
   else
     HALT+="  - $p"$'\n'
+    HALT_LIST+=("$p")
   fi
 done
+# 승인 내역은 이력에 남아야 한다 — 팀에 그렇게 공지했다
+# (0911_주간회의_브리핑_배포자동화.md: "승인 내역은 배포 기록에 남습니다").
+mwfact ack "$(join_csv ${ACK_LIST+"${ACK_LIST[@]}"})"
+mwfact halt "$(join_csv ${HALT_LIST+"${HALT_LIST[@]}"})"
 if [[ -n $ACK_USED ]]; then
   # 승인은 기록으로 남긴다. 나중에 "왜 그날 그냥 넘어갔지" 를 답할 수 있어야 한다.
   log '운영자가 절차 완료를 승인한 관문:'
@@ -203,6 +261,7 @@ if [[ -n $HALT ]]; then
   (그냥 다시 실행해도 같은 목록이 나옵니다 — 변경 목록은 두 커밋의 차이라
    절차를 끝내도 줄어들지 않습니다.)
 MSG
+  mwfact result guarded-halt
   exit 3
 fi
 
@@ -214,35 +273,18 @@ NEED_RAG=0;      printf '%s\n' "$CHANGED" | grep -q '^product/integrations/rag-a
 log "계획: 빌드=$NEED_BUILD  contract재시작=$NEED_CONTRACT  rag재시작=$NEED_RAG  web재시작=1"
 if (( DRY_RUN )); then
   log 'dry-run 이므로 여기서 종료합니다. 아무것도 바뀌지 않았습니다.'
+  # success 가 아니라 dry-run 이다. 래퍼가 이것을 성공으로 기록하면 아무것도 하지
+  # 않은 실행이 이력에 성공으로 남고 감시기가 한 시간 눈을 감는다.
+  mwfact result dry-run
   exit 0
 fi
 
-# ── 6. 실패 시 롤백 ──────────────────────────────────────────────────
-ROLLED_BACK=0
-rollback() {
-  (( ROLLED_BACK )) && return
-  ROLLED_BACK=1
-  warn "롤백합니다 → $PREV_SHA"
-  cd "$PROJECT_ROOT"
-  git checkout --detach "$PREV_SHA" >/dev/null 2>&1 || warn '체크아웃 롤백 실패 — 수동 확인 필요'
-  if [[ -d "$ROLLBACK_DIR/next-$PREV_SHA" ]]; then
-    rm -rf product/.next
-    cp -a "$ROLLBACK_DIR/next-$PREV_SHA" product/.next
-  fi
-  fix_ownership || true
-  systemctl restart moneyworry-contract.service >/dev/null 2>&1 || true
-  systemctl restart moneyworry-web.service >/dev/null 2>&1 || true
-  warn '롤백 완료. journalctl 로 원인을 확인하세요.'
-}
-trap 'rc=$?; (( rc != 0 )) && rollback; exit $rc' ERR
-
-# ── 7. 체크아웃 ──────────────────────────────────────────────────────
-log "체크아웃: $TARGET_SHA"
-git checkout --detach "$TARGET_SHA"
-[[ "$(git rev-parse HEAD)" == "$TARGET_SHA" ]] || die '체크아웃 후 HEAD 가 일치하지 않습니다'
-[[ -z "$(git status --porcelain=v1)" ]] || die '체크아웃 후 작업 트리가 깨끗하지 않습니다'
-
-# ── 8. 소유·권한 복구 ────────────────────────────────────────────────
+# ── 6. 소유·권한 복구 함수 ──────────────────────────────────────────
+#
+# rollback() 이 fix_ownership 을 부르므로 **반드시 그보다 먼저 정의돼야 한다.**
+# bash 는 순차 실행이라, 정의 전에 롤백이 돌면 command not found(127) 가 나고
+# 체크아웃이 망가뜨린 그룹 소유가 복구되지 않는다. 예전 배치는 트랩 설치보다
+# 뒤였다 — || true 가 가려서 아무도 몰랐을 뿐이다.
 #
 #   ★ 여기가 이 스크립트에서 가장 중요한 부분이다 ★
 #
@@ -280,6 +322,88 @@ verify_access() {
   return $ok
 }
 
+# ── 7. 실패 시 롤백 ──────────────────────────────────────────────────
+ROLLED_BACK=0
+rollback() {
+  (( ROLLED_BACK )) && return
+  ROLLED_BACK=1
+  warn "롤백합니다 → $PREV_SHA"
+  cd "$PROJECT_ROOT"
+  git checkout --detach "$PREV_SHA" >/dev/null 2>&1 || warn '체크아웃 롤백 실패 — 수동 확인 필요'
+  if [[ -d "$ROLLBACK_DIR/next-$PREV_SHA" ]]; then
+    rm -rf product/.next
+    cp -a "$ROLLBACK_DIR/next-$PREV_SHA" product/.next
+  fi
+  fix_ownership || true
+  systemctl restart moneyworry-contract.service >/dev/null 2>&1 || true
+  systemctl restart moneyworry-web.service >/dev/null 2>&1 || true
+  warn '롤백 완료. journalctl 로 원인을 확인하세요.'
+}
+
+# 감시기(health-watch.sh)가 이 깃발을 보고 배포 중에는 판정을 건너뛴다.
+# 배포는 빌드 동안 web 을 의도적으로 내리는데(9절의 systemctl stop) 상호 배제가
+# 없으면 감시기가 3분째에 빌드 중인 .next 위로 web 을 재시작한다. ExecStartPre 의
+# BUILD_ID 읽기가 실패하고 Restart=always 가 폭주한 뒤 오탐 알림이 나간다.
+# (2026-09-11 확인. 두 스크립트 어디에도 flock·플래그·Conflicts= 가 없었다.)
+#
+# 깃발은 폴러가 아니라 **배포기가** 쓴다 — 사람이 moneyworry-deploy 를 직접
+# 타이핑해도 똑같이 보호받아야 하기 때문이다. flock 을 여기 둔 것과 같은 이유다.
+DEPLOY_FLAG_DIR='/run/moneyworry'    # 휘발 상태. 재부팅하면 지워지는 것이 맞다
+DEPLOY_FLAG="$DEPLOY_FLAG_DIR/deploy-in-progress"
+
+# 유효기간은 **최대 배포 소요보다 길어야** 한다. 빌드 25분 + ready 5분 +
+# rag 재시작 최대 15분 = 45분. 짧게 잡으면 빌드 한복판에서 억제가 풀려
+# 고치려던 오탐 재시작을 그대로 재현한다. 15분 여유를 둬 60분으로 잡는다.
+DEPLOY_FLAG_TTL=3600
+MW_RUN_ID="${MW_DEPLOY_RUN_ID:-manual-$STAMP-$$}"   # 래퍼가 있으면 그 run_id 를 잇는다
+
+set_deploy_flag() {
+  install -d -m 0755 "$DEPLOY_FLAG_DIR"
+  printf '%s %s\n' "$MW_RUN_ID" "$(( $(date +%s) + DEPLOY_FLAG_TTL ))" > "$DEPLOY_FLAG"
+}
+clear_deploy_flag() { rm -f "$DEPLOY_FLAG"; }
+
+# ERR 이 아니라 **EXIT** 트랩을 쓴다.
+#
+# bash 의 ERR 트랩은 (1) exit 빌트인과 (2) 'X || die' 리스트의 좌변 실패에 걸리지
+# 않는다. die() 는 exit 을 부르고, ready 타임아웃·권한 검증 실패·유닛 비활성
+# 판정은 전부 'X || die' 형태다. 그래서 예전에는 **빌드 실패만** 롤백되고
+# 무인 배포에서 가장 흔한 실패인 ready 타임아웃은 깨진 채 방치됐다.
+#
+#   재현: bash -c 'set -Eeuo pipefail; trap "echo ROLLBACK" ERR
+#                  die() { exit 1; }; [[ 1 == 2 ]] || die boom'
+#   → ROLLBACK 은 출력되지 않는다.
+#
+# 아래 표식 문자열은 지우지 말 것. 자동 배포 폴러가 /usr/local/sbin 실행본에서
+# 이것을 찾지 못하면 "롤백이 돌지 않는 구판"으로 보고 무장을 거부한다.
+MW_ROLLBACK_ON_EXIT_V2=1
+
+ARMED_FOR_ROLLBACK=0   # 체크아웃 직전에 켠다. 그 전 실패는 되돌릴 것이 없다
+DEPLOY_COMPLETE=0      # 13절 진입 시 켠다. 그 뒤 실패는 배포를 되돌릴 이유가 없다
+on_exit() {
+  local rc=$?
+  trap - EXIT
+  if (( rc != 0 && ARMED_FOR_ROLLBACK && ! DEPLOY_COMPLETE )); then
+    rollback
+  fi
+  clear_deploy_flag
+  mwfact rolled_back "$ROLLED_BACK"
+  if (( rc == 0 )); then mwfact result success; else mwfact result failed; fi
+  exit "$rc"
+}
+trap on_exit EXIT
+
+# ── 8. 체크아웃 ──────────────────────────────────────────────────────
+# 여기서부터 되돌릴 것이 생긴다. 앞의 세 종료(dry-run 0 / 관문 3 / 할 일 없음 5)는
+# 모두 이 줄보다 위라 롤백 대상이 아니다.
+ARMED_FOR_ROLLBACK=1
+set_deploy_flag
+mwfact phase checkout
+log "체크아웃: $TARGET_SHA"
+git checkout --detach "$TARGET_SHA"
+[[ "$(git rev-parse HEAD)" == "$TARGET_SHA" ]] || die '체크아웃 후 HEAD 가 일치하지 않습니다'
+[[ -z "$(git status --porcelain=v1)" ]] || die '체크아웃 후 작업 트리가 깨끗하지 않습니다'
+
 # ── 9. 빌드 ──────────────────────────────────────────────────────────
 if (( NEED_BUILD )); then
   NODE_WANT='v22.23.2'
@@ -287,10 +411,16 @@ if (( NEED_BUILD )); then
 
   if [[ -d product/.next ]]; then
     log "이전 빌드 백업 → $ROLLBACK_DIR/next-$PREV_SHA"
-    rm -rf "$ROLLBACK_DIR/next-$PREV_SHA"
-    cp -a product/.next "$ROLLBACK_DIR/next-$PREV_SHA"
+    # .partial 로 받은 뒤 mv 로 갈아끼운다. 여기는 트랩이 켜진 구간이라, 디스크가
+    # 차서 cp 가 반쯤 끝나면 rollback() 이 "디렉터리가 있다"는 이유로 **멀쩡한
+    # .next 를 지우고 잘린 사본을 복원**한다. mv 는 같은 파일시스템 안에서
+    # 원자적이므로 그 창이 없다.
+    rm -rf "$ROLLBACK_DIR/next-$PREV_SHA" "$ROLLBACK_DIR/next-$PREV_SHA.partial"
+    cp -a product/.next "$ROLLBACK_DIR/next-$PREV_SHA.partial"
+    mv "$ROLLBACK_DIR/next-$PREV_SHA.partial" "$ROLLBACK_DIR/next-$PREV_SHA"
   fi
 
+  mwfact phase build
   log 'web 을 내리고 빌드합니다 (실행 중 .next 를 덮어쓰지 않기 위해)'
   systemctl stop moneyworry-web.service || true
 
@@ -300,28 +430,37 @@ if (( NEED_BUILD )); then
   ( cd product && umask 022 && env -u NODE_ENV npm run build )
   [[ -r product/.next/BUILD_ID ]] || die '빌드 후 .next/BUILD_ID 가 없습니다'
 fi
+mwfact built "$NEED_BUILD"
 
+mwfact phase ownership
 fix_ownership
 verify_access || die '권한 검증 실패 — 위 경고를 보고 그룹 소유를 확인하세요'
 log '권한 검증 통과'
 
 # ── 10. 재시작 (db → rag·contract → web 순서) ────────────────────────
 # rag 는 TimeoutStartSec=15min 이다. 필요할 때만 건드린다.
+mwfact phase restart
+RESTARTED=()
 if (( NEED_RAG )); then
   log 'rag 재시작 (봉인 자산 재해싱 + 모델 워밍업으로 최대 15분)'
   systemctl restart moneyworry-rag.service
+  RESTARTED+=(moneyworry-rag)
 fi
 if (( NEED_CONTRACT )); then
   log 'contract 재시작'
   systemctl reset-failed moneyworry-contract.service 2>/dev/null || true
   systemctl restart moneyworry-contract.service
+  RESTARTED+=(moneyworry-contract)
 fi
 
 log 'web 시작'
 systemctl reset-failed moneyworry-web.service 2>/dev/null || true
 systemctl restart moneyworry-web.service
+RESTARTED+=(moneyworry-web)
+mwfact restarted "$(join_csv ${RESTARTED+"${RESTARTED[@]}"})"
 
 # ── 11. 헬스체크 ─────────────────────────────────────────────────────
+mwfact phase health
 log "ready 대기 (최대 ${READY_TIMEOUT}s)"
 deadline=$(( SECONDS + READY_TIMEOUT ))
 until [[ "$(curl -s -o /dev/null -w '%{http_code}' "$READY_URL" || true)" == '200' ]]; do
@@ -368,18 +507,24 @@ if (( CF_TUNNEL )) && systemctl list-unit-files "$TUNNEL_UNIT" >/dev/null 2>&1; 
 fi
 
 # ── 13. migration 은 보고만 하고 실행하지 않는다 ─────────────────────
-trap - ERR
+# 배포 자체는 여기서 끝났다. 아래 드리프트 검사는 읽기 전용 보고이므로,
+# 그것이 실패했다고 해서 방금 성공한 배포를 되돌릴 이유가 없다.
+DEPLOY_COMPLETE=1
+mwfact phase drift
 echo
 log 'migration 상태 (읽기 전용 — 이 스크립트는 절대 migrate 하지 않습니다)'
 if ( cd db && npm run --silent check:migration-drift -- --env-file /etc/moneyworry/db.env ); then
   log 'DB 정렬됨'
+  mwfact drift aligned
 else
   rc=$?
+  mwfact drift "exit$rc"
   warn "드리프트 검사 exit=$rc (2 = 적용 대기 있음)"
   warn '적용하려면: 덤프 → cd db && umask 022 && env -u NODE_ENV npm ci → npm run migrate'
   warn 'drizzle-kit 은 devDependency 라 npm ci 없이는 not found 가 납니다.'
 fi
 
 echo
+mwfact phase done
 log "배포 완료: $PREV_SHA → $TARGET_SHA"
 log "롤백하려면: $0 --sha $PREV_SHA --skip-build  (그리고 $ROLLBACK_DIR/next-$PREV_SHA 복원)"
