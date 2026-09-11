@@ -1,14 +1,21 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export function Brand() {
   return (
     <span className="brand" aria-label="Co끼리 홈">
-      <span className="brand-mark" aria-hidden="true">
-        C
-      </span>
+      {/* alt 를 비워 장식으로 표시한다 — 이름은 옆의 brand-word 가 읽어 준다. */}
+      <Image
+        className="brand-mark"
+        src="/brand/logo.png"
+        alt=""
+        width={192}
+        height={192}
+        priority
+      />
       <span className="brand-word">Co끼리</span>
     </span>
   );
@@ -41,7 +48,7 @@ export function SiteHeader() {
       </header>
       {!isInspector && pathname !== "/chat" ? (
         <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리와 상담 바로가기">
-          <span>AI</span> 돈워리와 상담
+          <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} /> 돈워리와 상담
         </Link>
       ) : null}
       <nav className="consumer-mobile-nav" aria-label="모바일 주요 메뉴">

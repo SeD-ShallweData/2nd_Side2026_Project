@@ -68,7 +68,7 @@ COMMENT ON COLUMN firms.firm_id IS
   'sha1(사업장명||''|''||사업자번호)[:16]. ⚠️ 불변이 아니다 — 사업장명이 바뀌면 달라진다(월 약 0.24%).';
 --> statement-breakpoint
 COMMENT ON COLUMN firms.biz_no IS
-  '마스킹된 6자리. ⚠️ 비고유 — 한 번호가 최대 950곳에 재사용된다. 단독으로 사업장을 식별할 수 없다.';
+  '마스킹된 6자리. ⚠️ 비고유 — 한 번호가 최대 788곳에 재사용된다. 단독으로 사업장을 식별할 수 없다.';
 --> statement-breakpoint
 COMMENT ON COLUMN firms.corp_key IS
   '표기 변형을 흡수한 정규화 키. 같은 법인의 여러 사업장을 묶는 용도이며 식별키가 아니다.';

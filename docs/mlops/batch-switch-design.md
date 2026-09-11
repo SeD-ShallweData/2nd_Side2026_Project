@@ -5,7 +5,7 @@
 | 작성 | 2026-09-02 · 조윤빈 |
 | 대상 | `SeD-ShallweData/2nd_Side2026_Project` `main` @ `fcbc948` (PR #19·#20 반영) |
 | 검증 방식 | 저장소 코드·마이그레이션·CI·infra 스크립트를 직접 읽어 확인. 추정은 **[추정]** 으로 표시 |
-| 검토자 | 한승석(ML·DB) · 조나연(migration·롤) · 정민규(인증) · 심수현(프론트) |
+| 검토자 | 한승석(ML·DB) · 권나연(migration·롤) · 정민규(인증) · 심수현(프론트) |
 | 관련 문서 | `ML-DB-데이터계약.md`(승석 검토 중) · `docs/data-contract/wage-risk.md` · `db/docs/MIGRATION_OPERATIONS.md` |
 
 > 용어는 처음 나올 때 괄호로 뜻을 적었다. 괄호 안은 음슴체다.

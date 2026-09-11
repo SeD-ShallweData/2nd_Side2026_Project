@@ -303,6 +303,138 @@ SELECT json_build_object(
         SELECT pg_get_viewdef(to_regclass('public.v_current_batch'), true) AS definition
       ) AS deterministic_current_batch_definition
     ), false)
+  ),
+  '0009_busy_puck', json_build_object(
+    'table:public.sessions', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='sessions' AND c.relkind IN ('r','p')
+    ),
+    'table:public.reports', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='reports' AND c.relkind IN ('r','p')
+    ),
+    'table:public.feedback', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='feedback' AND c.relkind IN ('r','p')
+    ),
+    'column:public.users.auth_role', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='users' AND column_name='auth_role'
+    ),
+    'column:public.posts.category', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='posts' AND column_name='category'
+    ),
+    'column:public.posts.status', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='posts' AND column_name='status'
+    ),
+    'index:public.users_email_lower_uq', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='users_email_lower_uq' AND c.relkind IN ('i','I')
+    ),
+    'index:public.sessions_token_hash_uq', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='sessions_token_hash_uq' AND c.relkind IN ('i','I')
+    ),
+    'index:public.reports_reporter_post_pending_uq', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='reports_reporter_post_pending_uq' AND c.relkind IN ('i','I')
+    ),
+    'index_absent:public.posts_created_idx', NOT EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='posts_created_idx' AND c.relkind IN ('i','I')
+    ),
+    'constraint_absent:public.users.users_email_unique', NOT EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='users' AND con.conname='users_email_unique'
+    ),
+    'constraint:public.users.users_auth_role_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='users' AND con.conname='users_auth_role_ck'
+    ),
+    'constraint:public.posts.posts_status_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='posts' AND con.conname='posts_status_ck'
+    ),
+    'view_column_absent:public.v_posts.author_role', NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_posts' AND column_name='author_role'
+    ),
+    'view_column_absent:public.v_comments.author_role', NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_comments' AND column_name='author_role'
+    ),
+    'view_definition:public.v_posts_filters_published', COALESCE((
+      SELECT definition ~* 'status[[:space:]]*=[[:space:]]*''published'''
+      FROM (
+        SELECT pg_get_viewdef(to_regclass('public.v_posts'), true) AS definition
+      ) AS v_posts_definition
+    ), false)
+  ),
+  '0010_crazy_talos', json_build_object(
+    'table:public.worksite_tips', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips' AND c.relkind IN ('r','p')
+    ),
+    'table:public.worksite_tip_attachments', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tip_attachments' AND c.relkind IN ('r','p')
+    ),
+    'index:public.worksite_tip_attachments_storage_key_uq', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tip_attachments_storage_key_uq' AND c.relkind IN ('i','I')
+    ),
+    'index:public.worksite_tips_submitted_idx', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips_submitted_idx' AND c.relkind IN ('i','I')
+    ),
+    'constraint:public.worksite_tips.worksite_tips_category_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips' AND con.conname='worksite_tips_category_ck'
+    ),
+    'constraint:public.worksite_tip_attachments.worksite_tip_attachments_size_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tip_attachments'
+        AND con.conname='worksite_tip_attachments_size_ck'
+    ),
+    'constraint:public.worksite_tips.worksite_tips_reporter_id_users_id_fk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips'
+        AND con.conname='worksite_tips_reporter_id_users_id_fk' AND con.contype='f'
+    )
+  ),
+  '0011_lumpy_proteus', json_build_object(
+    'column_absent:public.users.role', NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='users' AND column_name='role'
+    ),
+    'column_absent:public.users.firm_id', NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='users' AND column_name='firm_id'
+    ),
+    'constraint_absent:public.users.users_role_ck', NOT EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='users' AND con.conname='users_role_ck'
+    ),
+    'constraint_absent:public.users.users_firm_scope_ck', NOT EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='users' AND con.conname='users_firm_scope_ck'
+    ),
+    'constraint_absent:public.users.users_firm_id_firms_firm_id_fk', NOT EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='users'
+        AND con.conname='users_firm_id_firms_firm_id_fk'
+    )
   )
 )::text;
 COMMIT;

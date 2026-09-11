@@ -103,6 +103,31 @@ DB ledger: 6개 (일치 prefix 6개)
 다를 수 있기 때문이다. 운영 DB에서 `npm run migrate`를 먼저 시도해 오류를 관찰하는 방식도 사용하지
 않는다.
 
+## 적용된 migration 은 고치지 않는다
+
+migration 파일은 적용되는 순간 **바이트가 곧 신분증**이다. drizzle 이 파일 원본을 sha256 해서
+`drizzle.__drizzle_migrations` 에 남기고(`drizzle-orm/migrator.js`), `check-migration-drift` 가
+그 값을 현재 파일 해시와 대조한다. **주석 한 글자만 바뀌어도** 해시가 달라져 `ledger_diverged`
+가 나고 그 DB 는 배포 게이트를 통과하지 못한다.
+
+drizzle 자체는 `created_at` 으로 적용 여부를 판단하므로 재적용은 일어나지 않는다. 문제는
+**검사기가 막히는 것**이고, 그러면 진짜 드리프트와 구분할 수 없게 된다.
+
+| 고치려는 것 | 어디에 |
+| --- | --- |
+| 주석·문구 정정 | `db/schema.ts` 등 해시되지 않는 곳 |
+| 스키마 변경 | **새 migration** (후조건 등록도 같은 PR 에서) |
+| 아직 어디에도 적용 전 | 근거를 PR 에 적고 리뷰어 승인 |
+
+`db/scripts/check-migration-immutability.sh` 가 CI 에서 이것을 강제한다.
+원장 해시로 **되돌리는 복구**는 `db/migrations/.immutability-exceptions` 에 경로와
+**결과 해시**를 함께 적어 허용한다 — "이 파일은 마음대로 고쳐도 된다"가 아니라
+"정확히 이 내용으로만 바뀌어도 된다"가 되게 하기 위함이다.
+
+> 2026-09-11: PR #40 이 `0002`·`0006` 의 `COMMENT` 문구를 다듬었는데 둘 다 이미 운영 DB 에
+> 적용된 뒤였다. 고친 값 자체는 옳았지만(재사용 최다 788→950곳, 큐 경계 표기) 자리가 틀렸다.
+> 배포 직전 `--dry-run` 에서 발견해 되돌리고 이 검사를 넣었다.
+
 ## 새 migration 체크리스트
 
 - 적용된 과거 migration SQL은 수정하지 않고 새 번호를 추가한다.

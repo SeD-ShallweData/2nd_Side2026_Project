@@ -1,0 +1,14 @@
+[Unit]
+Description=MoneyWorry health watch every minute
+Documentation=file:///srv/moneyworry/repo/infra/OPERATIONS.md
+
+[Timer]
+# 부팅 2분 뒤부터. VM 이 07:00 에 켜질 때 web 이 뜨기 전에 찔러 놓고
+# "죽었다"고 알리는 일이 없게 유예를 둔다.
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Unit=moneyworry-health.service
+
+[Install]
+WantedBy=timers.target
