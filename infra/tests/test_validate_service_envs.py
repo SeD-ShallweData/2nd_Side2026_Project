@@ -37,6 +37,11 @@ SKT_API_KEY=WebSktValue_5nL8wC3zT6qP
 DEMO_BASIC_AUTH_USER=demo
 DEMO_BASIC_AUTH_PASSWORD=BasicValue_6vT2pN9xQ4mK
 SAVE_COMPARISON_FEEDBACK=false
+AUTH_DATA_MODE=real
+COMMUNITY_DATA_MODE=real
+WORKSITE_TIP_DATA_MODE=mock
+AUTH_DATABASE_URL=postgresql://wg_auth:AuthValue_8xM4qT7vP2nR9kL3sC6w@127.0.0.1:5433/wageguard?sslmode=disable
+COMMUNITY_DATABASE_URL=postgresql://wg_community:CommValue_3zK9wL5mQ8tN2xP7rV4s@127.0.0.1:5433/wageguard?sslmode=disable
 """,
             "rag": "RAG_DEVICE=cpu\nRAG_GUNICORN_THREADS=2\nRAG_INTERNAL_TOKEN=RagInternal_7pQ2mV9xR4tK8nC3sL6wF\n",
             "contract": """\
@@ -250,6 +255,78 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
         })
         self.assert_failed_without_secret(result)
         self.assertIn("must remain pinned to 0.42", result.stderr)
+
+
+    # ── 인증·커뮤니티·현장 제보 데이터 모드 (PR #40·#45) ─────────────────
+
+    def test_user_data_modes_must_be_explicit(self):
+        """생략하면 APP_DATA_MODE=real 을 따라가 조용히 503 이 된다."""
+        for key in ("AUTH_DATA_MODE", "COMMUNITY_DATA_MODE", "WORKSITE_TIP_DATA_MODE"):
+            web = "\n".join(
+                line for line in self.values["web"].splitlines() if not line.startswith(f"{key}=")
+            ) + "\n"
+            result = self.run_validator({"web": web})
+            self.assertNotEqual(result.returncode, 0, key)
+            self.assertIn(f"must define {key} explicitly", result.stderr)
+
+    def test_real_auth_requires_write_role_url(self):
+        web = "\n".join(
+            line for line in self.values["web"].splitlines()
+            if not line.startswith("AUTH_DATABASE_URL=")
+        ) + "\n"
+        result = self.run_validator({"web": web})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("AUTH_DATABASE_URL is required when AUTH_DATA_MODE=real", result.stderr)
+
+    def test_write_role_url_must_not_reuse_owner_or_bot(self):
+        """소유자·읽기전용으로 붙으면 롤 분리가 무의미해진다."""
+        for role in ("pathb_admin", "wg_bot"):
+            web = self.values["web"].replace(
+                "postgresql://wg_auth:", f"postgresql://{role}:"
+            )
+            result = self.run_validator({"web": web})
+            self.assertNotEqual(result.returncode, 0, role)
+            self.assertIn("must not reuse the owner or read-only role", result.stderr)
+
+    def test_write_role_url_must_be_pinned_loopback(self):
+        web = self.values["web"].replace(
+            "wg_auth:AuthValue_8xM4qT7vP2nR9kL3sC6w@127.0.0.1:5433/",
+            "wg_auth:AuthValue_8xM4qT7vP2nR9kL3sC6w@10.20.0.5:5433/",
+        )
+        result = self.run_validator({"web": web})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("is not a pinned loopback write-role URL", result.stderr)
+
+    def test_worksite_tip_must_stay_mock(self):
+        """real 어댑터가 아직 없다. ensureMockMode() 가 503 을 던진다."""
+        web = self.values["web"].replace("WORKSITE_TIP_DATA_MODE=mock", "WORKSITE_TIP_DATA_MODE=real")
+        result = self.run_validator({"web": web})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("WORKSITE_TIP_DATA_MODE must be mock", result.stderr)
+
+    def test_mock_auth_requires_mock_passwords(self):
+        web = self.values["web"].replace("AUTH_DATA_MODE=real", "AUTH_DATA_MODE=mock")
+        web = "\n".join(
+            line for line in web.splitlines() if not line.startswith("AUTH_DATABASE_URL=")
+        ) + "\n"
+        result = self.run_validator({"web": web})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("MOCK_AUTH_USER_PASSWORD is required", result.stderr)
+
+    def test_real_auth_rejects_leftover_mock_passwords(self):
+        """real 로 바꾸고도 mock 비밀번호를 남겨 두면 어느 쪽이 쓰이는지 헷갈린다."""
+        web = self.values["web"] + "MOCK_AUTH_USER_PASSWORD=LeftoverValue_9xQ4m\n"
+        result = self.run_validator({"web": web})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must not keep mock auth passwords in real mode", result.stderr)
+
+    def test_mock_auth_rejects_database_url(self):
+        web = self.values["web"].replace("AUTH_DATA_MODE=real", "AUTH_DATA_MODE=mock")
+        for key in ("MOCK_AUTH_USER_PASSWORD", "MOCK_AUTH_ADMIN_PASSWORD", "MOCK_AUTH_INSPECTOR_PASSWORD"):
+            web += f"{key}=MockValue_7pQ2mV9xR4tK\n"
+        result = self.run_validator({"web": web})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("AUTH_DATABASE_URL must be absent when AUTH_DATA_MODE=mock", result.stderr)
 
 
 if __name__ == "__main__":
