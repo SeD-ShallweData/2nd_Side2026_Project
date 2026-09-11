@@ -240,18 +240,13 @@ summary:focus-visible {
   gap: 10px;
 }
 
+/* 로고 이미지 자체가 외곽선과 크림색 링을 가지고 있다. 여기에 테두리·배경을
+   덧대면 테두리가 이중으로 보이므로 크기만 잡고 나머지는 이미지에 맡긴다. */
 .brand-mark {
-  display: inline-flex;
+  display: inline-block;
   width: 36px;
   height: 36px;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--ink);
-  border-radius: 11px 11px 11px 4px;
-  background: var(--brand);
-  font-size: 0.9rem;
-  font-weight: 950;
-  box-shadow: 3px 3px 0 var(--ink);
+  object-fit: contain;
 }
 
 .brand-word {
@@ -696,11 +691,9 @@ summary:focus-visible {
   padding: 54px 0;
 }
 
-.site-footer .brand-mark {
-  border-color: var(--white);
-  color: var(--ink);
-  box-shadow: 3px 3px 0 var(--white);
-}
+/* 배지였을 때 어두운 푸터에서 형태를 살리려고 흰 테두리·흰 오프셋 그림자를
+   덧댔던 규칙이다. 이제는 로고 이미지가 자기 외곽선을 가지고 있어서, 그림자만
+   오른쪽·아래로 흰 막대 두 개처럼 삐져나온다. 규칙 자체를 걷어낸다. */
 
 .footer-grid {
   display: grid;
@@ -1960,18 +1953,14 @@ summary:focus-visible {
   opacity: .35;
 }
 
+/* 돈워리(상담 챗봇) 아바타. 원형으로 잘라 말풍선 옆에 놓는다. */
 .chat-avatar {
-  display: flex;
+  display: block;
   width: 34px;
   height: 34px;
   flex: 0 0 34px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--ink);
-  border-radius: 11px 11px 11px 4px;
-  background: var(--brand);
-  font-size: 0.65rem;
-  font-weight: 950;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .chat-message {
@@ -3570,11 +3559,10 @@ summary:focus-visible {
 .consumer-mode-switch:hover { border-color: var(--ink); background: var(--surface); color: var(--ink); }
 
 .consumer-floating-chat { position: fixed; right: 28px; bottom: 26px; z-index: 90; display: flex; align-items: center; gap: 10px; border: 3px solid var(--ink); border-radius: 999px; background: var(--brand); box-shadow: 0 9px 0 rgb(29 29 26 / 12%); padding: 8px 15px 8px 8px; font-size: .8rem; font-weight: 900; }
-.consumer-floating-chat span { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 50%; background: var(--ink); color: var(--brand); font-size: .62rem; }
+.consumer-floating-chat img { display: block; width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
 .consumer-mobile-nav { display: none; }
 
 .consumer-footer { border-top: 1px solid #323944; background: #171d26; color: #fff; padding: 48px 0 34px; }
-.consumer-footer .brand-mark { border-color: var(--brand); color: var(--ink); }
 .consumer-footer-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 25px 70px; }
 .consumer-footer-grid > div > p { max-width: 480px; margin: 16px 0 0; color: rgb(255 255 255 / 56%); font-size: .79rem; }
 .consumer-footer nav { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 24px; align-content: start; font-size: .78rem; font-weight: 750; }
