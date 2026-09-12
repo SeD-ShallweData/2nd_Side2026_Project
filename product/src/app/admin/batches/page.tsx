@@ -185,6 +185,9 @@ export default function MLBatchDashboard() {
           <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '16px', textAlign: 'center' }}>
             두 배치는 분모·시간 단위·등급 체계가 달라 항상 별도 카드로 표시하고 합산하지 않습니다.
           </p>
+          <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '8px', textAlign: 'center' }}>
+            * 드리프트 검사 시 as_of의 실제 의미 일치 여부 등은 파일 밖 정보이므로 검사 대상에서 제외됩니다 (⚪ 미검사).
+          </p>
         </>
       )}
     </div>
