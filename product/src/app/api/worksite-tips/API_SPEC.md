@@ -7,8 +7,8 @@
 
 - API 리소스명: `worksite-tips`
 - 고정 분류값: `worksite_tip`
-- 현재 저장소: 용량이 제한된 프로세스 메모리 Mock, 서버 재시작 시 초기화
-- 실제 저장소: 별도 DB 테이블과 비공개 파일 저장소 설계 후 연결
+- 개발 저장소: 용량이 제한된 프로세스 메모리 Mock, 서버 재시작 시 초기화
+- 운영 저장소: PostgreSQL 메타데이터와 VM 영구 디스크의 비공개 원본·감독관용 사본
 - 프론트에서 분류값을 보내지 않고 서버가 고정한다.
 
 ## 2. 역할과 공개 범위
@@ -31,7 +31,7 @@
 | `POST /api/worksite-tips` | `user` | 글·사진 현장 제보 접수 |
 | `GET /api/worksite-tips` | `inspector` | 최신순 제보 목록 |
 | `GET /api/worksite-tips/{tipId}` | `inspector` | 제보 본문·사진 메타데이터 상세 |
-| `GET /api/worksite-tips/{tipId}/attachments/{attachmentId}` | `inspector` | 인증된 사진 원본 조회 |
+| `GET /api/worksite-tips/{tipId}/attachments/{attachmentId}` | `inspector` | 개인정보 메타데이터가 제거된 사진 사본 조회 |
 
 모든 응답은 `Cache-Control: no-store`를 사용한다. 사진 응답은 추가로
 `X-Content-Type-Options: nosniff`를 사용한다.
@@ -44,13 +44,14 @@
 | --- | --- | --- |
 | `title` | 필수 | 공백 제거 후 2~120자 |
 | `body` | 선택 | 공백 제거 후 최대 5,000자 |
-| `company_id` | 선택 | 최대 64자, Mock 사업장 기준 검증 |
+| `company_id` | 선택 | 최대 64자, 선택된 저장소의 사업장 기준 검증 |
 | `photos` | 선택·복수 | JPEG·PNG·WebP, 최대 3장 |
 
 본문과 사진 중 하나 이상은 반드시 있어야 한다. 사진은 장당 최대 5MiB, 전체 합계 최대 10MiB다.
 브라우저가 선언한 MIME 타입과 실제 디코딩 결과가 일치해야 한다. 서버는 이미지 전체를 디코딩해 손상 여부를
 확인하며, 한 변 10,000px 또는 전체 25MP를 넘는 이미지와 다중 프레임 이미지를 거부한다. SVG·HTML·PDF와
 빈 파일은 받지 않는다. 한 요청에 첨부한 모든 사진의 픽셀 합계는 최대 40MP다.
+감독관용 사본은 원본과 같은 이미지 형식으로 재인코딩하며, 재인코딩 결과가 장당 10MiB를 넘으면 거부한다.
 
 접수 성공은 `201`이며 다음 값만 반환한다.
 
@@ -73,6 +74,10 @@
 - `size_bytes`
 - 인증이 필요한 `content_url`
 
+`size_bytes`는 증거 원본의 업로드 크기다. 사진 URL 응답의 `Content-Length`는 메타데이터를 제거해 재인코딩한
+감독관용 사본의 실제 크기이므로 서로 다를 수 있다. 원본은 API로 제공하지 않으며 서비스 계정만 읽을 수 있는
+별도 경로에 보존한다. 감독관용 사본에는 EXIF 위치·촬영시각·기기정보와 XMP·IPTC를 포함하지 않는다.
+
 사진 URL도 세션의 `inspector` 권한을 다시 확인한다. URL의 제보 ID와 사진 ID가 실제 부모·자식 관계가
 아니면 `404`를 반환한다.
 
@@ -81,27 +86,30 @@
 | 상태 | 주요 코드 | 의미 |
 | --- | --- | --- |
 | `400` | `VALIDATION_ERROR`, `INVALID_MULTIPART`, `INVALID_IMAGE_FILE` | 입력·파일 형식 오류 |
-| `401` | `AUTHENTICATION_REQUIRED` | 로그인 필요 |
-| `403` | `FORBIDDEN`, `CROSS_SITE_REQUEST_REJECTED` | 역할 또는 요청 출처 오류 |
+| `401` | `AUTHENTICATION_REQUIRED` | 비로그인 사용자의 제보 접수 |
+| `403` | `FORBIDDEN`, `CROSS_SITE_REQUEST_REJECTED` | 감독관 외 조회, 역할 또는 요청 출처 오류 |
 | `404` | `COMPANY_NOT_FOUND`, `WORKSITE_TIP_NOT_FOUND`, `WORKSITE_TIP_ATTACHMENT_NOT_FOUND` | 대상 없음 |
-| `413` | `REQUEST_BODY_TOO_LARGE` | 사진 또는 요청 크기 초과 |
+| `413` | `REQUEST_BODY_TOO_LARGE`, `SANITIZED_IMAGE_TOO_LARGE` | 사진·요청 또는 정제 사본 크기 초과 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | multipart가 아니거나 지원하지 않는 사진 형식 |
-| `503` | `WORKSITE_TIP_PROVIDER_UNAVAILABLE` | 실제 저장소 미연결 |
+| `503` | `WORKSITE_TIP_DATABASE_NOT_CONFIGURED`, `WORKSITE_TIP_STORAGE_NOT_CONFIGURED`, `DATABASE_UNAVAILABLE`, `DATABASE_COMMIT_OUTCOME_UNKNOWN`, `WORKSITE_TIP_FILE_UNAVAILABLE` | 실제 DB·파일 저장소 설정·접근 오류 또는 저장 결과 확인 불가 |
 | `507` | `MOCK_STORAGE_LIMIT_REACHED` | 로컬 Mock 저장 한도 도달 |
 
 ## 7. Mock·Real 전환
 
 - `WORKSITE_TIP_DATA_MODE=mock`: 메모리 Mock 저장소 사용
+- `WORKSITE_TIP_DATA_MODE=real`: `wg_tip` DB 연결과 비공개 파일 저장소 사용
 - 값이 없으면 `APP_DATA_MODE`를 따른다.
-- Real 모드에서 실제 provider가 없으면 Mock 성공으로 대체하지 않고 `503`을 반환한다.
+- Real 모드에서 `TIP_DATABASE_URL` 또는 절대 경로 `WORKSITE_TIP_STORAGE_ROOT`가 없으면 Mock 성공으로
+  대체하지 않고 `503`을 반환한다. GCP 운영 경로는 `/srv/moneyworry/worksite-tip-media`로 고정한다.
 
-Mock 저장소는 프로세스 전체 100건, 제보자당 25건, 사진 원본 전체 50MiB, 제보자당 20MiB로 제한한다.
+Mock 저장소는 프로세스 전체 100건, 제보자당 25건, 사진 저장량 전체 50MiB, 제보자당 20MiB로 제한한다.
+사진 저장량은 원본 크기와 감독관용 사본 크기 중 큰 값을 기준으로 계산한다.
 한도에 도달하면 기존 제보를 몰래 삭제하지 않고 `507`로 거부한다. 이는 로컬 개발 중 메모리 고갈을 막기 위한
 정책이며 운영 저장·보존 정책으로 사용하지 않는다.
 
-`0009` migration에는 현장 제보와 사진 테이블이 없다. 기존 migration을 수정하지 않고 나연 검토를 거친
-새 forward migration과 비공개 파일 저장소가 준비된 후 Real adapter를 연결한다.
+`0010` migration이 `worksite_tips`와 `worksite_tip_attachments`를 만든다. DB에는 사진의 `storage_key`,
+원본 크기, MIME 형식, 원본 SHA-256만 저장한다. 파일은 `WORKSITE_TIP_STORAGE_ROOT` 아래 `original`과
+`inspector` 경로로 분리되며 저장소 루트는 서비스 계정 전용 `0700`, 파일은 `0600`이어야 한다.
 
-현재 Mock은 증거 원본 확인을 위해 업로드된 사진 바이트를 그대로 보관하므로 EXIF의 촬영 위치·시각·기기정보가
-감독관에게 전달될 수 있다. 실제 저장소 연결 전 원본 증거 보존과 제보자 개인정보 보호 정책을 확정하고,
-필요하면 접근 통제된 원본과 메타데이터를 제거한 표시용 사본을 분리한다.
+Mock도 운영과 같은 조회 계약을 검증하기 위해 감독관에게 정제 사본만 전달한다. Real 저장은 서버 재시작 후
+새 repository 인스턴스가 DB 메타데이터와 영구 디스크 파일을 다시 읽으므로 유지된다.

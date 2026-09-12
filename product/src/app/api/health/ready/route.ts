@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { isContractHealthReady } from "@/server/contractHealth";
 import { isDatabaseReady } from "@/server/postgres";
 import { isRagHealthReady } from "@/server/ragHealth";
+import { getWorksiteTipRepository } from "@/services/userDataProviders";
 
 export const dynamic = "force-dynamic";
 const READINESS_CACHE_MS = 10_000;
@@ -11,6 +12,7 @@ type ReadinessChecks = {
   database: boolean;
   rag: boolean;
   contract_analysis: boolean;
+  worksite_tip: boolean;
 };
 
 let cached: { expiresAt: number; checks: ReadinessChecks } | undefined;
@@ -35,7 +37,7 @@ async function probe(
 }
 
 async function evaluateReadiness(): Promise<ReadinessChecks> {
-  const [database, rag, contractAnalysis] = await Promise.all([
+  const [database, rag, contractAnalysis, worksiteTip] = await Promise.all([
     isDatabaseReady(),
     probe(process.env.RAG_API_URL, process.env.RAG_INTERNAL_TOKEN, isRagHealthReady),
     probe(
@@ -43,8 +45,14 @@ async function evaluateReadiness(): Promise<ReadinessChecks> {
       process.env.CONTRACT_INTERNAL_TOKEN,
       isContractHealthReady,
     ),
+    getWorksiteTipRepository().isReady(),
   ]);
-  return { database, rag, contract_analysis: contractAnalysis };
+  return {
+    database,
+    rag,
+    contract_analysis: contractAnalysis,
+    worksite_tip: worksiteTip,
+  };
 }
 
 async function getReadinessChecks(): Promise<ReadinessChecks> {
@@ -70,7 +78,10 @@ export function resetReadinessCacheForTests(): void {
 
 export async function GET(): Promise<NextResponse> {
   const checks = await getReadinessChecks();
-  const ready = checks.database && checks.rag && checks.contract_analysis;
+  const ready = checks.database
+    && checks.rag
+    && checks.contract_analysis
+    && checks.worksite_tip;
 
   return NextResponse.json(
     {

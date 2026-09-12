@@ -12,6 +12,8 @@ vi.mock("@/server/databaseConfig", () => ({
   getAuthDatabaseConnectionString: () => "postgresql://wg_auth:secret@db.test/wageguard",
   getCommunityDatabaseConnectionString: () =>
     "postgresql://wg_community:secret@db.test/wageguard",
+  getTipDatabaseConnectionString: () =>
+    "postgresql://wg_tip:secret@db.test/wageguard",
 }));
 
 vi.mock("pg", () => ({
@@ -101,17 +103,20 @@ describe("쓰기 문장 경계", () => {
 });
 
 describe("롤별 연결", () => {
-  it("인증과 커뮤니티가 서로 다른 접속 문자열과 이름으로 붙는다", async () => {
+  it("인증·커뮤니티·제보가 서로 다른 접속 문자열과 이름으로 붙는다", async () => {
     pg.query.mockResolvedValue({ rows: [] });
 
     await queryWrite("auth", "SELECT 1");
     await queryWrite("community", "SELECT 1");
+    await queryWrite("tip", "SELECT 1");
 
-    expect(pg.constructed).toHaveLength(2);
+    expect(pg.constructed).toHaveLength(3);
     expect(pg.constructed[0]?.connectionString).toContain("wg_auth");
     expect(pg.constructed[0]?.application_name).toBe("donworry-product-auth");
     expect(pg.constructed[1]?.connectionString).toContain("wg_community");
     expect(pg.constructed[1]?.application_name).toBe("donworry-product-community");
+    expect(pg.constructed[2]?.connectionString).toContain("wg_tip");
+    expect(pg.constructed[2]?.application_name).toBe("donworry-product-worksite-tip");
   });
 
   /*
@@ -139,6 +144,7 @@ describe("롤별 연결", () => {
   it("설정 여부를 롤별로 알려준다", () => {
     expect(isWriteDatabaseConfigured("auth")).toBe(true);
     expect(isWriteDatabaseConfigured("community")).toBe(true);
+    expect(isWriteDatabaseConfigured("tip")).toBe(true);
   });
 });
 
@@ -200,6 +206,39 @@ describe("트랜잭션", () => {
     expect(pg.clientQuery.mock.calls.map((call) => String(call[0]))).toContain("ROLLBACK");
     expect(pg.release).toHaveBeenCalledTimes(1);
   });
+
+  it("COMMIT 응답이 유실되면 저장 결과 불명확 오류로 구분한다", async () => {
+    pg.clientQuery.mockImplementation(async (sql: string) => {
+      if (sql === "COMMIT") throw new Error("socket closed before response");
+      return { rows: [] };
+    });
+
+    await expect(
+      withWriteTransaction("tip", async (transaction) => {
+        await transaction.query("INSERT INTO worksite_tips (id) VALUES ($1)", ["tip-1"]);
+      }),
+    ).rejects.toMatchObject({
+      code: "DATABASE_COMMIT_OUTCOME_UNKNOWN",
+      status: 503,
+    });
+
+    expect(pg.clientQuery.mock.calls.map((call) => String(call[0]))).toContain("ROLLBACK");
+    expect(pg.release).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["08007", "40003"])(
+    "COMMIT의 결과 불명확 SQLSTATE %s도 별도 오류로 구분한다",
+    async (code) => {
+      pg.clientQuery.mockImplementation(async (sql: string) => {
+        if (sql === "COMMIT") throw sqlstateError(code);
+        return { rows: [] };
+      });
+
+      await expect(
+        withWriteTransaction("tip", async () => "done"),
+      ).rejects.toMatchObject({ code: "DATABASE_COMMIT_OUTCOME_UNKNOWN" });
+    },
+  );
 
   it("차단된 문장은 DB 장애로 둔갑하지 않고 그대로 드러난다", async () => {
     pg.clientQuery.mockResolvedValue({ rows: [] });

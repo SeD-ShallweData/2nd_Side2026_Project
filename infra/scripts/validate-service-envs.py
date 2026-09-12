@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]*")
 KEY = re.compile(r"[A-Z_][A-Z0-9_]*")
+WORKSITE_TIP_STORAGE_ROOT = "/srv/moneyworry/worksite-tip-media"
 
 
 def fail(message: str) -> None:
@@ -162,8 +163,13 @@ def validate_bot_url(candidate: str, db: dict[str, str]) -> None:
     require_secret(unquote(parsed.password or ""), "web.env bot password", 24)
 
 
-def validate_write_role_url(candidate: str, db: dict[str, str], label: str) -> None:
-    """인증·커뮤니티 쓰기 롤 연결 문자열.
+def validate_write_role_url(
+    candidate: str,
+    db: dict[str, str],
+    label: str,
+    expected_username: str | None = None,
+) -> None:
+    """인증·커뮤니티·현장 제보 쓰기 롤 연결 문자열.
 
     소유자(DB_USER)나 읽기 전용(BOT_USER)으로 붙는 것을 막는 것이 이 검사의 요점이다.
     앱이 조용히 전체 권한 계정으로 붙으면 롤을 분리한 이유가 통째로 사라진다.
@@ -190,6 +196,8 @@ def validate_write_role_url(candidate: str, db: dict[str, str], label: str) -> N
         fail(f"web.env {label} is not a pinned loopback write-role URL")
     if username in {db["DB_USER"], db["BOT_USER"]}:
         fail(f"web.env {label} must not reuse the owner or read-only role: {username}")
+    if expected_username is not None and username != expected_username:
+        fail(f"web.env {label} must use the dedicated {expected_username} role")
     require_secret(unquote(parsed.password or ""), f"web.env {label} password", 24)
 
 
@@ -204,26 +212,40 @@ def validate_user_data_modes(web: dict[str, str], db: dict[str, str]) -> None:
         if key not in web:
             fail(f"web.env must define {key} explicitly (it falls back to APP_DATA_MODE=real)")
 
-    for key in ("AUTH_DATA_MODE", "COMMUNITY_DATA_MODE"):
+    for key in ("AUTH_DATA_MODE", "COMMUNITY_DATA_MODE", "WORKSITE_TIP_DATA_MODE"):
         if web[key] not in {"real", "mock"}:
             fail(f"web.env {key} must be real or mock")
 
-    # 현장 제보에는 아직 real 어댑터가 없다. worksiteTipService.ensureMockMode() 가
-    # mock 이 아니면 503 을 던진다. 나연의 저장소 어댑터가 들어오면 이 검사를 푼다.
-    if web["WORKSITE_TIP_DATA_MODE"] != "mock":
-        fail("web.env WORKSITE_TIP_DATA_MODE must be mock until the real tip adapter ships")
+    if web["WORKSITE_TIP_DATA_MODE"] == "real" and web["AUTH_DATA_MODE"] != "real":
+        fail(
+            "web.env AUTH_DATA_MODE must be real when "
+            "WORKSITE_TIP_DATA_MODE=real (reporter_id references the real users table)"
+        )
 
     pairs = (
-        ("AUTH_DATA_MODE", "AUTH_DATABASE_URL"),
-        ("COMMUNITY_DATA_MODE", "COMMUNITY_DATABASE_URL"),
+        ("AUTH_DATA_MODE", "AUTH_DATABASE_URL", None),
+        ("COMMUNITY_DATA_MODE", "COMMUNITY_DATABASE_URL", None),
+        ("WORKSITE_TIP_DATA_MODE", "TIP_DATABASE_URL", "wg_tip"),
     )
-    for mode_key, url_key in pairs:
+    for mode_key, url_key, expected_username in pairs:
         if web[mode_key] == "real":
             if not web.get(url_key, "").strip():
                 fail(f"web.env {url_key} is required when {mode_key}=real")
-            validate_write_role_url(web[url_key], db, url_key)
+            validate_write_role_url(web[url_key], db, url_key, expected_username)
         elif web.get(url_key, "").strip():
             fail(f"web.env {url_key} must be absent when {mode_key}=mock")
+
+    if web["WORKSITE_TIP_DATA_MODE"] == "real":
+        if web.get("WORKSITE_TIP_STORAGE_ROOT") != WORKSITE_TIP_STORAGE_ROOT:
+            fail(
+                "web.env WORKSITE_TIP_STORAGE_ROOT must be exactly "
+                f"{WORKSITE_TIP_STORAGE_ROOT} when WORKSITE_TIP_DATA_MODE=real"
+            )
+    elif web.get("WORKSITE_TIP_STORAGE_ROOT", "").strip():
+        fail(
+            "web.env WORKSITE_TIP_STORAGE_ROOT must be absent when "
+            "WORKSITE_TIP_DATA_MODE=mock"
+        )
 
     mock_secrets = (
         "MOCK_AUTH_USER_PASSWORD",
@@ -341,6 +363,8 @@ def validate_web(web: dict[str, str], db: dict[str, str]) -> None:
             "WORKSITE_TIP_DATA_MODE",
             "AUTH_DATABASE_URL",
             "COMMUNITY_DATABASE_URL",
+            "TIP_DATABASE_URL",
+            "WORKSITE_TIP_STORAGE_ROOT",
             "MOCK_AUTH_USER_PASSWORD",
             "MOCK_AUTH_ADMIN_PASSWORD",
             "MOCK_AUTH_INSPECTOR_PASSWORD",

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getInspectorOverview } from "@/services/inspectorService";
+import { requireInspectorRequest } from "@/server/auth/inspectorAccess";
 import { errorPayload } from "@/utils/errors";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
+    await requireInspectorRequest(request);
     const url = new URL(request.url);
     const limitValue = url.searchParams.get("limit");
     const limit = limitValue === null ? 10 : Number(limitValue);

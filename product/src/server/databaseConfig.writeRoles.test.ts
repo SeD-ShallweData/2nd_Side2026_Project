@@ -3,8 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildAuthDatabaseUrl,
   buildCommunityDatabaseUrl,
+  buildTipDatabaseUrl,
   getAuthDatabaseConnectionString,
   getCommunityDatabaseConnectionString,
+  getTipDatabaseConnectionString,
   getDatabaseConnectionString,
 } from "@/server/databaseConfig";
 
@@ -13,7 +15,7 @@ afterEach(() => {
 });
 
 describe("쓰기 롤 접속 정보", () => {
-  it("공유 DB 파일 값으로 인증·커뮤니티 접속 문자열을 만든다", () => {
+  it("공유 DB 파일 값으로 인증·커뮤니티·제보 접속 문자열을 만든다", () => {
     const values = {
       DB_NAME: "wageguard",
       DB_HOST: "127.0.0.1",
@@ -22,6 +24,8 @@ describe("쓰기 롤 접속 정보", () => {
       AUTH_PASSWORD: "auth-secret",
       COMMUNITY_USER: "wg_community",
       COMMUNITY_PASSWORD: "community-secret",
+      TIP_USER: "wg_tip",
+      TIP_PASSWORD: "tip-secret",
     };
 
     expect(buildAuthDatabaseUrl(values)).toBe(
@@ -29,6 +33,9 @@ describe("쓰기 롤 접속 정보", () => {
     );
     expect(buildCommunityDatabaseUrl(values)).toBe(
       "postgresql://wg_community:community-secret@127.0.0.1:5433/wageguard",
+    );
+    expect(buildTipDatabaseUrl(values)).toBe(
+      "postgresql://wg_tip:tip-secret@127.0.0.1:5433/wageguard",
     );
   });
 
@@ -54,6 +61,7 @@ describe("쓰기 롤 접속 정보", () => {
 
     expect(getAuthDatabaseConnectionString()).toBeUndefined();
     expect(getCommunityDatabaseConnectionString()).toBeUndefined();
+    expect(getTipDatabaseConnectionString()).toBeUndefined();
   });
 
   it("설정이 없으면 읽기 전용 BOT_DATABASE_URL로도 대체하지 않는다", () => {
@@ -61,6 +69,7 @@ describe("쓰기 롤 접속 정보", () => {
 
     expect(getAuthDatabaseConnectionString()).toBeUndefined();
     expect(getCommunityDatabaseConnectionString()).toBeUndefined();
+    expect(getTipDatabaseConnectionString()).toBeUndefined();
   });
 
   it("인증과 커뮤니티는 서로의 접속 문자열을 쓰지 않는다", () => {
@@ -68,6 +77,7 @@ describe("쓰기 롤 접속 정보", () => {
 
     expect(getAuthDatabaseConnectionString()).toContain("wg_auth");
     expect(getCommunityDatabaseConnectionString()).toBeUndefined();
+    expect(getTipDatabaseConnectionString()).toBeUndefined();
   });
 
   it("읽기 전용 경로는 기존 동작을 유지한다", () => {
@@ -85,6 +95,8 @@ describe("쓰기 롤 접속 정보", () => {
 
     vi.stubEnv("COMMUNITY_DATABASE_URL", "wg_community@127.0.0.1:5433");
     expect(getCommunityDatabaseConnectionString()).toBeUndefined();
+    vi.stubEnv("TIP_DATABASE_URL", "postgresql://CHANGE_ME@127.0.0.1:5433/wageguard");
+    expect(getTipDatabaseConnectionString()).toBeUndefined();
   });
 
   it("사용자나 비밀번호가 비면 접속 문자열을 만들지 않는다", () => {
@@ -96,6 +108,9 @@ describe("쓰기 롤 접속 정보", () => {
     ).toBeUndefined();
     expect(
       buildAuthDatabaseUrl({ AUTH_USER: "wg_auth", AUTH_PASSWORD: "secret" }),
+    ).toBeUndefined();
+    expect(
+      buildTipDatabaseUrl({ DB_NAME: "wageguard", TIP_USER: "wg_tip" }),
     ).toBeUndefined();
   });
 });

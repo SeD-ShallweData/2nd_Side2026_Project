@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
 
 import type { SessionUserDto } from "@/app/api/auth/authApiContract";
@@ -11,37 +11,23 @@ import {
   WORKSITE_TIP_MAX_TOTAL_PHOTO_BYTES,
   WORKSITE_TIP_PHOTO_MEDIA_TYPES,
   type WorksiteTipAttachmentDto,
-  type WorksiteTipCompanyContextDto,
   type WorksiteTipDto,
   type WorksiteTipListItemDto,
   type WorksiteTipListResponse,
   type WorksiteTipPhotoMediaType,
   type WorksiteTipReceiptDto,
 } from "@/app/api/worksite-tips/worksiteTipApiContract";
-import { MOCK_COMPANIES } from "@/mocks/companies";
+import { WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER } from "@/adapters/mock/MockWorksiteTipRepository";
+import type {
+  NewWorksiteTipAttachment,
+  StoredWorksiteTip,
+} from "@/domain/worksiteTip";
 import { requireUserRole } from "@/server/auth/permissions";
+import {
+  getWorksiteTipRepository,
+  resetMockWorksiteTipsForTests as resetRepositoryForTests,
+} from "@/services/userDataProviders";
 import { ServiceError } from "@/utils/errors";
-
-interface StoredWorksiteTipAttachment {
-  attachment_id: string;
-  media_type: WorksiteTipPhotoMediaType;
-  size_bytes: number;
-  bytes: ArrayBuffer;
-}
-
-interface StoredWorksiteTip {
-  tip_id: string;
-  reporter_id: string;
-  title: string;
-  body: string | null;
-  company_context: WorksiteTipCompanyContextDto | null;
-  submitted_at: string;
-  attachments: StoredWorksiteTipAttachment[];
-}
-
-interface WorksiteTipMemoryState {
-  tips: Map<string, StoredWorksiteTip>;
-}
 
 interface WorksiteTipListOptions {
   page?: number;
@@ -49,7 +35,7 @@ interface WorksiteTipListOptions {
 }
 
 export interface WorksiteTipAttachmentContent {
-  bytes: ArrayBuffer;
+  bytes: Uint8Array;
   media_type: WorksiteTipPhotoMediaType;
   size_bytes: number;
 }
@@ -58,30 +44,8 @@ const MAX_MULTIPART_BODY_BYTES = 12 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 10_000;
 const MAX_IMAGE_PIXELS = 25_000_000;
 const MAX_TOTAL_IMAGE_PIXELS = 40_000_000;
-const MAX_MOCK_STORED_TIPS = 100;
-const MAX_MOCK_STORED_ATTACHMENT_BYTES = 50 * 1024 * 1024;
-const MAX_MOCK_REPORTER_ATTACHMENT_BYTES = 20 * 1024 * 1024;
-export const WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER = 25;
-const worksiteTipGlobal = globalThis as typeof globalThis & {
-  __donworryMockWorksiteTips?: WorksiteTipMemoryState;
-};
-
-const memoryState = worksiteTipGlobal.__donworryMockWorksiteTips ?? {
-  tips: new Map<string, StoredWorksiteTip>(),
-};
-worksiteTipGlobal.__donworryMockWorksiteTips = memoryState;
-
-function ensureMockMode(): void {
-  const mode = process.env.WORKSITE_TIP_DATA_MODE ?? process.env.APP_DATA_MODE ?? "real";
-  if (mode !== "mock") {
-    throw new ServiceError(
-      "WORKSITE_TIP_PROVIDER_UNAVAILABLE",
-      "현장 제보 저장소가 아직 연결되지 않았습니다.",
-      503,
-      true,
-    );
-  }
-}
+const MAX_INSPECTOR_PHOTO_BYTES = 10 * 1024 * 1024;
+export { WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER };
 
 function requireSubmitter(user: SessionUserDto): void {
   requireUserRole(user, ["user"]);
@@ -162,19 +126,6 @@ function parseCompanyId(value: FormDataEntryValue | null): string | null {
     );
   }
   return normalized;
-}
-
-function resolveMockCompanyContext(companyId: string | null): WorksiteTipCompanyContextDto | null {
-  if (!companyId) return null;
-  const company = MOCK_COMPANIES.find((candidate) => candidate.company_id === companyId);
-  if (!company) {
-    throw new ServiceError("COMPANY_NOT_FOUND", "선택한 사업장을 찾을 수 없습니다.", 404, false);
-  }
-  return {
-    company_id: company.company_id,
-    region: company.region,
-    industry: company.industry,
-  };
 }
 
 function asciiAt(bytes: Uint8Array, offset: number, expected: string): boolean {
@@ -341,10 +292,52 @@ async function assertValidImage(
   }
 }
 
+async function createInspectorCopy(
+  bytes: Uint8Array,
+  mediaType: WorksiteTipPhotoMediaType,
+): Promise<Uint8Array> {
+  try {
+    const image = sharp(Buffer.from(bytes), {
+      failOn: "warning",
+      limitInputChannels: 4,
+      limitInputPixels: MAX_IMAGE_PIXELS,
+      sequentialRead: true,
+    }).rotate();
+    const output = mediaType === "image/jpeg"
+      ? await image.jpeg({ quality: 90, mozjpeg: true }).toBuffer()
+      : mediaType === "image/png"
+        ? await image.png({ compressionLevel: 9, adaptiveFiltering: true }).toBuffer()
+        : await image.webp({ quality: 90 }).toBuffer();
+
+    if (output.byteLength > MAX_INSPECTOR_PHOTO_BYTES) {
+      throw new ServiceError(
+        "SANITIZED_IMAGE_TOO_LARGE",
+        "개인정보를 제거한 사진의 크기가 너무 큽니다.",
+        413,
+        false,
+        [{ field: "photos", reason: "해상도가 더 낮은 사진을 첨부해 주세요." }],
+      );
+    }
+
+    // Sharp는 명시적으로 metadata 보존을 요청하지 않으면 EXIF/XMP/IPTC를 제거한다.
+    return Uint8Array.from(output);
+  } catch (error) {
+    if (error instanceof ServiceError) throw error;
+    throw new ServiceError(
+      "INVALID_IMAGE_FILE",
+      "사진에서 개인정보를 제거하지 못했습니다.",
+      400,
+      false,
+      [{ field: "photos", reason: "다른 JPEG, PNG, WebP 사진을 첨부해 주세요." }],
+    );
+  }
+}
+
 async function parsePhotos(
   form: FormData,
-  reporterId: string,
-): Promise<StoredWorksiteTipAttachment[]> {
+  tipId: string,
+  submittedAt: string,
+): Promise<NewWorksiteTipAttachment[]> {
   const entries = form.getAll("photos");
   if (entries.some((entry) => typeof entry === "string")) {
     throw new ServiceError(
@@ -401,19 +394,26 @@ async function parsePhotos(
     }
     validatedFiles.push({ file, mediaType });
   }
-  assertMockAttachmentCapacity(reporterId, totalBytes);
-
   let remainingPixelBudget = MAX_TOTAL_IMAGE_PIXELS;
-  const attachments: StoredWorksiteTipAttachment[] = [];
+  const attachments: NewWorksiteTipAttachment[] = [];
+  const storageMonth = submittedAt.slice(0, 7).replace("-", "/");
   for (const { file, mediaType } of validatedFiles) {
-    const bytes = await file.arrayBuffer();
-    const pixelCount = await assertValidImage(bytes, mediaType, remainingPixelBudget);
+    const originalBytes = new Uint8Array(await file.arrayBuffer());
+    const pixelCount = await assertValidImage(
+      originalBytes.buffer,
+      mediaType,
+      remainingPixelBudget,
+    );
     remainingPixelBudget -= pixelCount;
+    const attachmentId = randomUUID();
     attachments.push({
-      attachment_id: randomUUID(),
+      attachment_id: attachmentId,
+      storage_key: `${storageMonth}/${tipId}/${attachmentId}`,
       media_type: mediaType,
       size_bytes: file.size,
-      bytes,
+      sha256: createHash("sha256").update(originalBytes).digest("hex"),
+      original_bytes: originalBytes,
+      inspector_bytes: await createInspectorCopy(originalBytes, mediaType),
     });
   }
   return attachments;
@@ -450,11 +450,15 @@ async function readBoundedMultipartBody(request: Request): Promise<Uint8Array> {
   return bytes;
 }
 
-async function parseSubmission(request: Request, reporterId: string): Promise<{
+async function parseSubmission(
+  request: Request,
+  tipId: string,
+  submittedAt: string,
+): Promise<{
   title: string;
   body: string | null;
-  company_context: WorksiteTipCompanyContextDto | null;
-  attachments: StoredWorksiteTipAttachment[];
+  company_id: string | null;
+  attachments: NewWorksiteTipAttachment[];
 }> {
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.toLocaleLowerCase("en-US").startsWith("multipart/form-data;")) {
@@ -482,7 +486,7 @@ async function parseSubmission(request: Request, reporterId: string): Promise<{
   }
   const title = parseRequiredText(form.get("title"), "title", 2, 120);
   const body = parseOptionalText(form.get("body"), "body", 5_000);
-  const attachments = await parsePhotos(form, reporterId);
+  const attachments = await parsePhotos(form, tipId, submittedAt);
   if (!body && attachments.length === 0) {
     throw new ServiceError(
       "VALIDATION_ERROR",
@@ -498,7 +502,7 @@ async function parseSubmission(request: Request, reporterId: string): Promise<{
   return {
     title,
     body,
-    company_context: resolveMockCompanyContext(parseCompanyId(form.get("company_id"))),
+    company_id: parseCompanyId(form.get("company_id")),
     attachments,
   };
 }
@@ -513,65 +517,18 @@ function parsePage(limitValue = 10, pageValue = 1): { limit: number; page: numbe
   return { limit: limitValue, page: pageValue };
 }
 
-function findTip(tipId: string): StoredWorksiteTip {
-  const normalizedId = tipId.trim();
-  if (!normalizedId || normalizedId.length > 100) {
+function normalizeIdentifier(value: string): string {
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 100) {
     throw new ServiceError("VALIDATION_ERROR", "제보 식별값을 확인해 주세요.", 400, false);
   }
-  const tip = memoryState.tips.get(normalizedId);
-  if (!tip) {
-    throw new ServiceError("WORKSITE_TIP_NOT_FOUND", "현장 제보를 찾을 수 없습니다.", 404, false);
-  }
-  return tip;
+  return normalized;
 }
 
-function mockStorageLimitError(): ServiceError {
-  return new ServiceError(
-    "MOCK_STORAGE_LIMIT_REACHED",
-    "로컬 제보 저장 한도에 도달했습니다. Mock 서버를 초기화한 뒤 다시 시도해 주세요.",
-    507,
-    false,
-  );
-}
-
-function assertMockTipCountCapacity(reporterId: string): void {
-  const storedTips = [...memoryState.tips.values()];
-  const reporterTips = storedTips.filter((tip) => tip.reporter_id === reporterId);
-  if (
-    storedTips.length >= MAX_MOCK_STORED_TIPS
-    || reporterTips.length >= WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER
-  ) {
-    throw mockStorageLimitError();
-  }
-}
-
-function assertMockAttachmentCapacity(reporterId: string, incomingAttachmentBytes: number): void {
-  const storedTips = [...memoryState.tips.values()];
-  const storedAttachmentBytes = storedTips.reduce(
-    (total, tip) => total + tip.attachments.reduce(
-      (tipTotal, attachment) => tipTotal + attachment.size_bytes,
-      0,
-    ),
-    0,
-  );
-  const reporterAttachmentBytes = storedTips
-    .filter((tip) => tip.reporter_id === reporterId)
-    .reduce(
-      (total, tip) => total + tip.attachments.reduce(
-        (tipTotal, attachment) => tipTotal + attachment.size_bytes,
-        0,
-      ),
-      0,
-    );
-  if (
-    storedAttachmentBytes + incomingAttachmentBytes > MAX_MOCK_STORED_ATTACHMENT_BYTES
-    || reporterAttachmentBytes + incomingAttachmentBytes > MAX_MOCK_REPORTER_ATTACHMENT_BYTES
-  ) {
-    throw mockStorageLimitError();
-  }
-}
-
-function attachmentMetadata(tipId: string, attachment: StoredWorksiteTipAttachment): WorksiteTipAttachmentDto {
+function attachmentMetadata(
+  tipId: string,
+  attachment: StoredWorksiteTip["attachments"][number],
+): WorksiteTipAttachmentDto {
   return {
     attachment_id: attachment.attachment_id,
     media_type: attachment.media_type,
@@ -580,9 +537,12 @@ function attachmentMetadata(tipId: string, attachment: StoredWorksiteTipAttachme
   };
 }
 
-function toInspectorDto(tip: StoredWorksiteTip): WorksiteTipDto {
+function toInspectorDto(
+  tip: StoredWorksiteTip,
+  source: WorksiteTipDto["source"],
+): WorksiteTipDto {
   return {
-    source: "mock_memory",
+    source,
     tip_id: tip.tip_id,
     category: WORKSITE_TIP_CATEGORY,
     title: tip.title,
@@ -593,12 +553,15 @@ function toInspectorDto(tip: StoredWorksiteTip): WorksiteTipDto {
   };
 }
 
-function toInspectorListItem(tip: StoredWorksiteTip): WorksiteTipListItemDto {
+function toInspectorListItem(
+  tip: StoredWorksiteTip,
+  source: WorksiteTipListItemDto["source"],
+): WorksiteTipListItemDto {
   const bodyPreview = tip.body && tip.body.length > 160
     ? `${tip.body.slice(0, 157)}...`
     : tip.body;
   return {
-    source: "mock_memory",
+    source,
     tip_id: tip.tip_id,
     category: WORKSITE_TIP_CATEGORY,
     title: tip.title,
@@ -614,28 +577,30 @@ export async function createWorksiteTip(
   user: SessionUserDto,
 ): Promise<WorksiteTipReceiptDto> {
   requireSubmitter(user);
-  ensureMockMode();
-  assertMockTipCountCapacity(user.user_id);
-  const submission = await parseSubmission(request, user.user_id);
-  const attachmentBytes = submission.attachments.reduce(
-    (total, attachment) => total + attachment.size_bytes,
-    0,
-  );
-  // 비동기 검증 중 다른 요청이 저장됐을 수 있으므로 실제 set 직전에 다시 검사한다.
-  assertMockTipCountCapacity(user.user_id);
-  assertMockAttachmentCapacity(user.user_id, attachmentBytes);
-  const tip: StoredWorksiteTip = {
-    tip_id: randomUUID(),
+  const repository = getWorksiteTipRepository();
+  repository.assertAvailable();
+
+  const tipId = randomUUID();
+  const submittedAt = new Date().toISOString();
+  const submission = await parseSubmission(request, tipId, submittedAt);
+  const companyContext = submission.company_id
+    ? await repository.findCompanyContext(submission.company_id)
+    : null;
+  if (submission.company_id && !companyContext) {
+    throw new ServiceError("COMPANY_NOT_FOUND", "선택한 사업장을 찾을 수 없습니다.", 404, false);
+  }
+
+  const tip = await repository.insertTip({
+    tip_id: tipId,
     reporter_id: user.user_id,
     title: submission.title,
     body: submission.body,
-    company_context: submission.company_context,
-    submitted_at: new Date().toISOString(),
+    company_context: companyContext,
+    submitted_at: submittedAt,
     attachments: submission.attachments,
-  };
-  memoryState.tips.set(tip.tip_id, tip);
+  });
   return {
-    source: "mock_memory",
+    source: repository.source,
     tip_id: tip.tip_id,
     category: WORKSITE_TIP_CATEGORY,
     title: tip.title,
@@ -644,21 +609,20 @@ export async function createWorksiteTip(
   };
 }
 
-export function listWorksiteTips(
+export async function listWorksiteTips(
   options: WorksiteTipListOptions,
   user: SessionUserDto,
-): WorksiteTipListResponse {
+): Promise<WorksiteTipListResponse> {
   requireInspector(user);
-  ensureMockMode();
+  const repository = getWorksiteTipRepository();
+  repository.assertAvailable();
   const { limit, page } = parsePage(options.limit, options.page);
-  const ordered = [...memoryState.tips.values()]
-    .sort((left, right) => right.submitted_at.localeCompare(left.submitted_at));
-  const total = ordered.length;
-  const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+  const result = await repository.listTips(limit, page);
+  const totalPages = result.total === 0 ? 0 : Math.ceil(result.total / limit);
   return {
-    source: "mock_memory",
-    items: ordered.slice((page - 1) * limit, page * limit).map(toInspectorListItem),
-    total,
+    source: repository.source,
+    items: result.items.map((tip) => toInspectorListItem(tip, repository.source)),
+    total: result.total,
     has_more: page < totalPages,
     page,
     page_size: limit,
@@ -666,23 +630,31 @@ export function listWorksiteTips(
   };
 }
 
-export function getWorksiteTip(tipId: string, user: SessionUserDto): WorksiteTipDto {
+export async function getWorksiteTip(
+  tipId: string,
+  user: SessionUserDto,
+): Promise<WorksiteTipDto> {
   requireInspector(user);
-  ensureMockMode();
-  return toInspectorDto(findTip(tipId));
+  const repository = getWorksiteTipRepository();
+  repository.assertAvailable();
+  const tip = await repository.findTipById(normalizeIdentifier(tipId));
+  if (!tip) {
+    throw new ServiceError("WORKSITE_TIP_NOT_FOUND", "현장 제보를 찾을 수 없습니다.", 404, false);
+  }
+  return toInspectorDto(tip, repository.source);
 }
 
-export function getWorksiteTipAttachment(
+export async function getWorksiteTipAttachment(
   tipId: string,
   attachmentId: string,
   user: SessionUserDto,
-): WorksiteTipAttachmentContent {
+): Promise<WorksiteTipAttachmentContent> {
   requireInspector(user);
-  ensureMockMode();
-  const tip = findTip(tipId);
-  const normalizedAttachmentId = attachmentId.trim();
-  const attachment = tip.attachments.find(
-    (candidate) => candidate.attachment_id === normalizedAttachmentId,
+  const repository = getWorksiteTipRepository();
+  repository.assertAvailable();
+  const attachment = await repository.readAttachment(
+    normalizeIdentifier(tipId),
+    normalizeIdentifier(attachmentId),
   );
   if (!attachment) {
     throw new ServiceError(
@@ -693,12 +665,12 @@ export function getWorksiteTipAttachment(
     );
   }
   return {
-    bytes: attachment.bytes.slice(0),
+    bytes: attachment.bytes.slice(),
     media_type: attachment.media_type,
-    size_bytes: attachment.size_bytes,
+    size_bytes: attachment.bytes.byteLength,
   };
 }
 
 export function resetMockWorksiteTipsForTests(): void {
-  memoryState.tips.clear();
+  resetRepositoryForTests();
 }
