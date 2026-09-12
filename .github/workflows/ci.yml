@@ -86,6 +86,7 @@ jobs:
       - run: bash -n infra/scripts/deploy-from-git.sh
       - run: bash -n infra/scripts/deploy-run.sh
       - run: bash -n infra/scripts/deploy-log.sh
+      - run: bash -n infra/scripts/autodeploy.sh
       - run: python -m unittest discover -s infra/tests -p 'test_*.py'
       - name: Validate GCP automation syntax
         run: |

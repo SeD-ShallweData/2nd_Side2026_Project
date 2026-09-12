@@ -304,6 +304,14 @@ fix_ownership() {
   for d in product/.next product/node_modules; do
     [[ -e $PROJECT_ROOT/$d ]] && chgrp -R "${SVC_GROUP[moneyworry-web]}" "$PROJECT_ROOT/$d"
   done
+
+  # web 이 런타임에 쓰는 **유일한** 경로. 유닛의 ReadWritePaths 와 짝이다.
+  # 빌드가 .next 를 새로 만들 때마다 사라지므로 배포마다 다시 만든다.
+  # setgid(2)를 주는 이유: web 이 만든 하위 파일도 그룹을 유지해야 다음 배포의
+  # chgrp 와 어긋나지 않는다. 그룹 쓰기(7)가 없으면 UMask=0027 아래에서
+  # web 이 아무것도 못 쓴다.
+  install -d -m 2775 -o root -g "${SVC_GROUP[moneyworry-web]}" \
+    "$PROJECT_ROOT/product/.next/cache"
   return 0
 }
 
@@ -345,6 +353,11 @@ verify_access() {
   if runuser -u "$(systemctl show -p User --value moneyworry-web.service)" -- test -w "$PROJECT_ROOT"; then
     warn 'web 계정이 프로젝트 루트에 쓸 수 있습니다 — 격리 모델이 깨졌습니다'; ok=1
   fi
+  # 그러나 캐시 한 칸에는 쓸 수 있어야 한다. 못 쓰면 ISR·fetch 캐시가
+  # ENOENT 로 죽는다(2026-09-11 이미지 최적화기 사고와 같은 원인).
+  runuser -u "$(systemctl show -p User --value moneyworry-web.service)" -- \
+    test -w "$PROJECT_ROOT/product/.next/cache" \
+    || { warn 'web 이 .next/cache 에 쓸 수 없습니다 — ISR·fetch 캐시가 깨집니다'; ok=1; }
   return $ok
 }
 
