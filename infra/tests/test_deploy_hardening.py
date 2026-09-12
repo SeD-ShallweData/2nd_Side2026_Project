@@ -113,6 +113,20 @@ class RollbackActuallyRunsTests(unittest.TestCase):
             _pos(DEPLOY_SRC, "npm run --silent check:migration-drift"),
         )
 
+    def test_signals_produce_an_exit_code_so_the_trap_rolls_back(self) -> None:
+        """systemd 는 타임아웃·stop 에서 SIGTERM 을 보낸다.
+
+        bash 는 그때 EXIT 트랩을 실행하지 않는다. 'trap on_exit EXIT TERM' 은
+        오답이다 — 신호 시점의 $? 가 보통 0 이라 rc != 0 조건에 걸리지 않는다.
+        핸들러가 종료 코드를 만들어 줘야 한다.
+        """
+        self.assertRegex(DEPLOY_CODE, r"(?m)^trap 'on_signal 15' TERM$")
+        self.assertRegex(DEPLOY_CODE, r"(?m)^trap 'on_signal 2'\s+INT$")
+        self.assertIn("exit $(( 128 + $1 ))", DEPLOY_CODE)
+        # 오답을 쓰지 않았는지: 같은 trap 줄에 EXIT 와 신호를 함께 얹지 않는다.
+        # (\s 는 개행도 먹으므로 같은 줄만 보도록 [ \t] 를 쓴다)
+        self.assertNotRegex(DEPLOY_CODE, r"(?m)^trap on_exit EXIT[ \t]+\w")
+
     def test_fix_ownership_is_defined_before_rollback_uses_it(self) -> None:
         """bash 는 순차 실행이다.
 

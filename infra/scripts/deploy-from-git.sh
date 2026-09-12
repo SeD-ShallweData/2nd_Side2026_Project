@@ -417,6 +417,28 @@ on_exit() {
   if (( rc == 0 )); then mwfact result success; else mwfact result failed; fi
   exit "$rc"
 }
+
+# systemd 는 TimeoutStartSec 초과와 systemctl stop 에서 SIGTERM 을 보낸다.
+# bash 는 그때 EXIT 트랩을 **실행하지 않는다.** 자동 배포는 이 스크립트를
+# systemd 유닛으로 돌리므로, 그대로 두면 타임아웃으로 죽은 배포가 새 코드를
+# 깨진 채 남긴다.
+#
+# 'trap on_exit EXIT TERM' 으로 고치는 것은 **오답이다.** 신호가 도착할 때 $? 는
+# 보통 0 이라 on_exit 의 'rc != 0' 조건에 걸리지 않아 롤백이 돌지 않는다.
+# (2026-09-12 컨테이너에서 세 가지를 실제로 돌려 확인했다.)
+# 신호 핸들러가 **종료 코드를 만들어** 주어야 EXIT 트랩이 제 일을 한다.
+#
+# 한계: bash 는 전경 명령이 끝날 때까지 트랩 처리를 미룬다. 20분짜리
+# npm run build 한가운데서 온 SIGTERM 은 빌드가 끝나야 처리된다. systemd 는
+# KillMode=control-group 이라 npm 도 함께 죽으므로 결국 되돌아가지만,
+# SIGKILL 에는 어떤 방법도 없다 — 그래서 배포 깃발에 만료 시각을 적고
+# 이력에 시도 '전에' start 를 쓴다.
+on_signal() {
+  warn "신호 $1 을 받았습니다 — 중단하고 되돌립니다"
+  exit $(( 128 + $1 ))
+}
+trap 'on_signal 15' TERM
+trap 'on_signal 2'  INT
 trap on_exit EXIT
 
 # ── 8. 체크아웃 ──────────────────────────────────────────────────────
