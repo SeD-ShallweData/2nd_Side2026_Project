@@ -32,6 +32,20 @@ DEPLOY_FLAG_NAME = "deploy-in-progress"
 MAX_DEPLOY_SECONDS = 45 * 60
 
 
+def _code_only(src: str) -> str:
+    """주석 줄을 걷어낸 본문.
+
+    이 파일은 "이렇게 쓰면 안 된다"를 주석에 그대로 인용한다. 안티패턴 검사가
+    그 인용문을 위반으로 잡으면, 다음 사람은 테스트를 통과시키려고 **경고 자체를
+    지운다.** 그게 더 나쁘다.
+    """
+    return "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("#"))
+
+
+DEPLOY_CODE = _code_only(DEPLOY_SRC)
+WATCH_CODE = _code_only(WATCH_SRC)
+
+
 def _pos(haystack: str, needle: str) -> int:
     """needle 의 위치. 없으면 -1 이 아니라 예외로 알린다(오탐 방지)."""
     idx = haystack.find(needle)
@@ -135,7 +149,7 @@ class MutualExclusionTests(unittest.TestCase):
 
         1분마다 그 창이 열려 사람 배포가 튕긴다. 검사가 아니라 보유로 구현한다.
         """
-        for src in (DEPLOY_SRC, WATCH_SRC):
+        for src in (DEPLOY_CODE, WATCH_CODE):
             with self.subTest():
                 self.assertNotRegex(src, r"flock\s+-n\s+[\"$][^|&;\n]*\btrue\b")
 
@@ -300,25 +314,47 @@ class AtomicBackupTests(unittest.TestCase):
         self.assertNotIn(".partial", rollback)
 
 
+class BackupRetentionTests(unittest.TestCase):
+    """롤백 백업은 1회당 약 237MB. 디스크가 차면 .partial 이 막으려는 상황이 온다."""
+
+    def test_old_backups_are_pruned(self) -> None:
+        self.assertIn("prune_rollback_backups", DEPLOY_SRC)
+        self.assertRegex(DEPLOY_SRC, r"(?m)^\s*local keep=2\b")
+
+    def test_pruning_runs_after_the_backup_is_complete(self) -> None:
+        self.assertLess(
+            _pos(DEPLOY_SRC, 'mv "$ROLLBACK_DIR/next-$PREV_SHA.partial"'),
+            _pos(DEPLOY_SRC, "    prune_rollback_backups"),
+        )
+
+    def test_pruning_never_deletes_this_deploys_rollback_point(self) -> None:
+        self.assertIn('$f != "$ROLLBACK_DIR/next-$PREV_SHA"', DEPLOY_SRC)
+
+    def test_pruning_passes_explicit_arguments_to_ls(self) -> None:
+        """글롭을 ls 에 그대로 넘기면 매칭이 없을 때 성공한 배포가 죽는다."""
+        self.assertIn('ls -1dt "${files[@]}"', DEPLOY_CODE)
+        self.assertNotRegex(DEPLOY_CODE, r'ls -1dt "\$ROLLBACK_DIR"/')
+
+
 class ShellFootgunTests(unittest.TestCase):
     """검토에서 실제로 재현된 함정들(설계서 6절). 베끼지 않았는지 확인한다."""
 
     def test_no_ls_pipeline_that_dies_on_empty_glob(self) -> None:
         """`ls -1dt "$DIR"/next-* | tail -n +3` 은 매칭이 없으면 non-zero →
         pipefail → set -e → 성공한 배포가 롤백되고 exit 1."""
-        for src in (DEPLOY_SRC, WATCH_SRC):
+        for src in (DEPLOY_CODE, WATCH_CODE):
             with self.subTest():
                 self.assertNotRegex(src, r"ls\s+-\S*\s*\"?\$\w+\"?/[^|\n]*\|\s*tail")
 
     def test_no_hyphen_stripping_translate(self) -> None:
         """`tr -d ' -'` 는 경로 안의 하이픈까지 지운다 (deploy-from-git.sh → deployfromgit.sh)."""
-        for src in (DEPLOY_SRC, WATCH_SRC):
+        for src in (DEPLOY_CODE, WATCH_CODE):
             with self.subTest():
                 self.assertNotIn("tr -d ' -'", src)
 
     def test_no_empty_notification_stub(self) -> None:
         """`notify() { :; }` 를 그대로 설치하면 모든 알림이 조용히 사라진다."""
-        for src in (DEPLOY_SRC, WATCH_SRC):
+        for src in (DEPLOY_CODE, WATCH_CODE):
             with self.subTest():
                 self.assertNotRegex(src, r"(?m)^\s*\w+\(\)\s*\{\s*:\s*;?\s*\}")
 

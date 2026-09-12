@@ -169,3 +169,7 @@ sudo /usr/local/sbin/moneyworry-deploy --sha "$MAIN_SHA" \
 - 배포 중에는 `/run/moneyworry/deploy-in-progress` 깃발이 서고, 감시기가 그것을 읽고
   비켜선다. 자세한 것은 [`infra/HEALTH_WATCH.md`](HEALTH_WATCH.md) 의
   「배포와의 상호 배제」.
+- 롤백 백업(`/srv/moneyworry/rollback/next-<sha>`)은 1회당 약 237MB 다.
+  **최근 2개만 남긴다** — 그냥 두면 배포할수록 디스크가 차고, 디스크가 차는 순간이
+  바로 백업 복사가 도중에 끊기는 상황이다. 이번 배포의 롤백 기준점은 정리 대상에서
+  언제나 제외한다.

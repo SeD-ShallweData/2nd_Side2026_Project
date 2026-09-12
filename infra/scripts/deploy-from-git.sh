@@ -307,6 +307,32 @@ fix_ownership() {
   return 0
 }
 
+# 롤백 백업은 1회당 약 237MB 다. 그냥 두면 배포할수록 디스크가 찬다 —
+# 그리고 디스크가 차는 순간이 바로 위 .partial 이 막으려는 상황이다.
+# 최근 2 개만 남긴다. 데이터 디스크라 지워도 서비스에 영향이 없다.
+prune_rollback_backups() {
+  local keep=2 files=() victims=() f
+  for f in "$ROLLBACK_DIR"/next-*; do
+    [[ -e $f ]] || continue          # 매칭이 없으면 글롭 문자열이 그대로 온다
+    [[ $f == *.partial ]] && continue # 완성되지 않은 사본은 백업이 아니다
+    files+=("$f")
+  done
+  (( ${#files[@]} > keep )) || return 0
+
+  # `ls -1dt "$ROLLBACK_DIR"/next-* | tail -n +3` 으로 쓰면 안 된다. 매칭이
+  # 없을 때 ls 가 non-zero 를 내고 pipefail + set -e 가 **성공한 배포를
+  # 롤백시키고 exit 1** 로 만든다. 위에서 배열이 비어 있지 않음을 확인했으므로
+  # 명시적 인자로 넘기는 이 형태는 안전하다.
+  mapfile -t victims < <(ls -1dt "${files[@]}" | tail -n "+$((keep + 1))")
+  for f in ${victims+"${victims[@]}"}; do
+    # 이번 배포의 롤백 기준점은 어떤 경우에도 지우지 않는다.
+    [[ -n $f && $f != "$ROLLBACK_DIR/next-$PREV_SHA" ]] || continue
+    log "오래된 롤백 백업 삭제: ${f##*/}"
+    rm -rf "$f"
+  done
+  return 0
+}
+
 verify_access() {
   local ok=0
   runuser -u "$(systemctl show -p User --value moneyworry-contract.service)" -- \
@@ -418,6 +444,7 @@ if (( NEED_BUILD )); then
     rm -rf "$ROLLBACK_DIR/next-$PREV_SHA" "$ROLLBACK_DIR/next-$PREV_SHA.partial"
     cp -a product/.next "$ROLLBACK_DIR/next-$PREV_SHA.partial"
     mv "$ROLLBACK_DIR/next-$PREV_SHA.partial" "$ROLLBACK_DIR/next-$PREV_SHA"
+    prune_rollback_backups
   fi
 
   mwfact phase build
