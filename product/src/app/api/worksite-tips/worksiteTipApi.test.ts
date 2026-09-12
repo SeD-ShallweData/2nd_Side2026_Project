@@ -74,6 +74,30 @@ async function generatedImageFile(format: "jpeg" | "webp"): Promise<File> {
   return new File([Uint8Array.from(bytes)], `evidence.${format}`, { type: `image/${format}` });
 }
 
+async function metadataRichJpegFile(): Promise<File> {
+  const bytes = await sharp({
+    create: {
+      width: 2,
+      height: 2,
+      channels: 3,
+      background: { r: 255, g: 0, b: 0 },
+    },
+  })
+    .jpeg()
+    .withExif({
+      IFD0: { Make: "TestCam", Model: "SecretDevice" },
+      IFD2: { DateTimeOriginal: "2026:09:12 12:34:56" },
+      IFD3: {
+        GPSLatitude: "37/1 34/1 0/1",
+        GPSLatitudeRef: "N",
+        GPSLongitude: "126/1 58/1 0/1",
+        GPSLongitudeRef: "E",
+      },
+    })
+    .toBuffer();
+  return new File([Uint8Array.from(bytes)], "local-secret-name.jpg", { type: "image/jpeg" });
+}
+
 function submissionRequest(options: {
   cookie?: string;
   title?: string;
@@ -184,9 +208,10 @@ describe("현장 제보 작성 계약", () => {
     });
   });
 
-  it("본문 없이 사진만 첨부한 제보를 받고 감독관에게 인증된 사진을 제공한다", async () => {
-    const photo = validImageFile("local-secret-name.png");
+  it("본문 없이 사진만 첨부하고 감독관에게 위치·시간·기기 정보가 제거된 사본을 제공한다", async () => {
+    const photo = await metadataRichJpegFile();
     const originalBytes = new Uint8Array(await photo.arrayBuffer());
+    expect((await sharp(originalBytes).metadata()).exif).toBeDefined();
     const createdResponse = await createTip(submissionRequest({
       cookie: await cookieFor(USER),
       title: "현장 사진 제보",
@@ -209,8 +234,8 @@ describe("현장 제보 작성 계약", () => {
     };
     expect(detail.body).toBeNull();
     expect(detail.attachments).toHaveLength(1);
-    expect(detail.attachments[0]).toMatchObject({ media_type: "image/png" });
-    expect(JSON.stringify(detail)).not.toContain("local-secret-name.png");
+    expect(detail.attachments[0]).toMatchObject({ media_type: "image/jpeg" });
+    expect(JSON.stringify(detail)).not.toContain("local-secret-name.jpg");
 
     const attachmentId = detail.attachments[0].attachment_id;
     const attachmentResponse = await getAttachment(
@@ -220,11 +245,17 @@ describe("현장 제보 작성 계약", () => {
       attachmentContext(receipt.tip_id, attachmentId),
     );
     expect(attachmentResponse.status).toBe(200);
-    expect(attachmentResponse.headers.get("content-type")).toBe("image/png");
+    expect(attachmentResponse.headers.get("content-type")).toBe("image/jpeg");
     expect(attachmentResponse.headers.get("cache-control")).toBe("private, no-store");
     expect(attachmentResponse.headers.get("x-content-type-options")).toBe("nosniff");
-    expect(attachmentResponse.headers.get("content-disposition")).not.toContain("local-secret-name.png");
-    expect(new Uint8Array(await attachmentResponse.arrayBuffer())).toEqual(originalBytes);
+    expect(attachmentResponse.headers.get("content-disposition")).not.toContain("local-secret-name.jpg");
+    const inspectorBytes = new Uint8Array(await attachmentResponse.arrayBuffer());
+    expect(inspectorBytes).not.toEqual(originalBytes);
+    expect(Number(attachmentResponse.headers.get("content-length"))).toBe(inspectorBytes.byteLength);
+    const inspectorMetadata = await sharp(inspectorBytes).metadata();
+    expect(inspectorMetadata.exif).toBeUndefined();
+    expect(inspectorMetadata.xmp).toBeUndefined();
+    expect(inspectorMetadata.iptc).toBeUndefined();
   });
 
   it("현장 제보를 일반 커뮤니티 게시글과 완전히 분리한다", async () => {
@@ -258,7 +289,7 @@ describe("현장 제보 작성 계약", () => {
     expect(inspectorCreate.status).toBe(403);
 
     const anonymousList = await listTips(new Request("http://localhost/api/worksite-tips"));
-    expect(anonymousList.status).toBe(401);
+    expect(anonymousList.status).toBe(403);
 
     const userList = await listTips(new Request("http://localhost/api/worksite-tips", {
       headers: { cookie: await cookieFor(USER) },
@@ -586,7 +617,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
     }));
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
-      error: { code: "WORKSITE_TIP_PROVIDER_UNAVAILABLE", retryable: true },
+      error: { code: "WORKSITE_TIP_DATABASE_NOT_CONFIGURED", retryable: true },
     });
   });
 });

@@ -1,19 +1,26 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import re
+import shutil
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
 INFRA = ROOT / "infra"
+BASH = (
+    r"C:\Program Files\Git\bin\bash.exe"
+    if os.name == "nt" and Path(r"C:\Program Files\Git\bin\bash.exe").is_file()
+    else shutil.which("bash") or "bash"
+)
 
 
 class SystemdPrivilegeBoundaryTests(unittest.TestCase):
     def test_installer_is_valid_bash_and_has_no_legacy_shared_variables(self) -> None:
         result = subprocess.run(
-            ["bash", "-n", str(INFRA / "scripts" / "install-systemd-units.sh")],
+            [BASH, "-n", str(INFRA / "scripts" / "install-systemd-units.sh")],
             capture_output=True,
             text=True,
             check=False,
@@ -67,7 +74,7 @@ class SystemdPrivilegeBoundaryTests(unittest.TestCase):
             "/run/user/1000/fnm/node",
         ):
             result = subprocess.run(
-                ["bash", "-c", harness, "node-gate", bad_path],
+                [BASH, "-c", harness, "node-gate", bad_path],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -75,7 +82,7 @@ class SystemdPrivilegeBoundaryTests(unittest.TestCase):
             self.assertEqual(result.returncode, 97, bad_path)
         for allowed_path in ("/usr/bin/node", "/usr/local/bin/node", "/opt/node/bin/node"):
             result = subprocess.run(
-                ["bash", "-c", harness, "node-gate", allowed_path],
+                [BASH, "-c", harness, "node-gate", allowed_path],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -180,6 +187,32 @@ class SystemdPrivilegeBoundaryTests(unittest.TestCase):
         self.assertIn("ReadWritePaths=/run/moneyworry-rag", rag)
         self.assertIn("Environment=RAG_DB_PATH=/run/moneyworry-rag/chroma", rag)
         self.assertIn("RuntimeDirectory=moneyworry-rag", rag)
+        web = (INFRA / "systemd" / "moneyworry-web.service.in").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "ReadWritePaths=/srv/moneyworry/worksite-tip-media",
+            web,
+        )
+
+    def test_installer_prepares_and_attests_private_persistent_tip_storage(self) -> None:
+        installer = (INFRA / "scripts" / "install-systemd-units.sh").read_text(
+            encoding="utf-8"
+        )
+        for token in (
+            'WORKSITE_TIP_STORAGE_ROOT="/srv/moneyworry/worksite-tip-media"',
+            'if [[ ! -e "$WORKSITE_TIP_STORAGE_ROOT" ]]; then',
+            'install -d -o "$WEB_SERVICE_USER" -g "$WEB_SERVICE_GROUP" -m 0700',
+            "worksite tip storage root must not be a nested mount",
+            "worksite tip storage root is not on the persistent data filesystem",
+            "worksite tip storage root must belong to the web service account",
+            "worksite tip storage root mode must be exactly 0700",
+            "can access private worksite tip storage",
+            'find -P "$WORKSITE_TIP_STORAGE_ROOT" -mindepth 1',
+            "worksite tip storage file mode must be exactly 0600",
+            'expected_read_write_paths="$WORKSITE_TIP_STORAGE_ROOT"',
+        ):
+            self.assertIn(token, installer)
 
     def test_rag_unit_pins_offline_assets_and_runs_integrity_preflight(self) -> None:
         rag = (INFRA / "systemd" / "moneyworry-rag.service.in").read_text(encoding="utf-8")

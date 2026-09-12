@@ -44,7 +44,7 @@ RAG unit의 시작 timeout은 cold hash/stage와 CPU model warmup을 포함해 1
 
 ```text
 /etc/moneyworry/db.env        DB compose/admin 값, DB 계정만 읽기 가능
-/etc/moneyworry/web.env       BOT_DATABASE_URL + 웹/LLM/Basic/internal Auth 값, root:root 0600
+/etc/moneyworry/web.env       bot·앱 전용 DB URL + 웹/LLM/Basic/internal Auth 값, root:root 0600
 /etc/moneyworry/rag.env       RAG 튜닝값 + RAG 전용 internal token, root:root 0600
 /etc/moneyworry/contract.env  계약 분석 API 키/튜닝값 + 전용 internal token, root:root 0600
 ```
@@ -53,7 +53,8 @@ RAG unit의 시작 timeout은 cold hash/stage와 CPU model warmup을 포함해 1
 
 `db.env`는 DB 계정 소유 `0600` 또는 `root:DB_GROUP 0640`이어야 한다. 나머지 세 파일은
 `root:root 0600`이어야 하며 systemd PID 1만 읽어서 각 프로세스에 전달한다. `web.env`에는
-`DATABASE_URL`, `DB_PASSWORD` 등 관리자 연결값을 넣지 않고 `BOT_DATABASE_URL`만 둔다.
+`DATABASE_URL`, `DB_PASSWORD` 등 관리자 연결값을 넣지 않고 `BOT_DATABASE_URL`과
+`AUTH_DATABASE_URL`·`COMMUNITY_DATABASE_URL`·`TIP_DATABASE_URL`처럼 권한이 제한된 앱 롤 URL만 둔다.
 `rag.env`에는 RAG 전용 internal token 외의 비밀번호·token·API key를 넣지 않는다. PostgreSQL이 부트 디스크의 Docker 기본
 volume으로 빠지지 않도록 `db.env`의 `POSTGRES_DATA_DIR`은 반드시
 `/srv/moneyworry/postgres`로 지정한다. 실제 secret 값은 명령행이나 저장소에 쓰지 않는다.
@@ -85,3 +86,8 @@ RAG는 추가로 sealed BGE-M3 snapshot과 Chroma 다섯 파일의 hash를 읽�
 size, SHA-256과 JSON/JSONL 구조를 검증하며, manifest digest가 Next readiness pin과 다르면 준비 상태로
 인정하지 않는다. 네 unit 모두 `LimitCORE=0`으로 provider key, internal token, 계약 원문이 core dump에
 남지 않게 한다.
+
+현장 제보 real 저장은 DB 행과 데이터 디스크의 사진 파일을 함께 사용한다. 파일 root는
+`/srv/moneyworry/worksite-tip-media`로 고정하고 웹 서비스 계정 소유 `0700`으로 둔다. installer가
+이 경로를 준비·검증하며, web unit의 쓰기 권한도 이 경로 하나로 제한한다. DB와 media를 같은 세대로
+백업하고 전환·복구하는 절차는 [`OPERATIONS.md`](OPERATIONS.md)의 현장 제보 전환 절을 따른다.

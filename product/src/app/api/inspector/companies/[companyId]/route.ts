@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getInspectorCompanyDetail } from "@/services/inspectorService";
+import { requireInspectorRequest } from "@/server/auth/inspectorAccess";
 import { errorPayload } from "@/utils/errors";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +9,9 @@ interface RouteContext {
   params: Promise<{ companyId: string }>;
 }
 
-export async function GET(_request: Request, context: RouteContext): Promise<NextResponse> {
+export async function GET(request: Request, context: RouteContext): Promise<NextResponse> {
   try {
+    await requireInspectorRequest(request);
     const { companyId } = await context.params;
     return NextResponse.json(await getInspectorCompanyDetail(decodeURIComponent(companyId)), {
       headers: { "Cache-Control": "no-store" },

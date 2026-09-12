@@ -28,6 +28,7 @@ PrivateTmp=yes
 ProtectHome=yes
 ProtectSystem=strict
 ReadOnlyPaths=@PROJECT_ROOT@
+ReadWritePaths=/srv/moneyworry/worksite-tip-media
 RestrictSUIDSGID=yes
 UMask=0027
 LimitNOFILE=65536
