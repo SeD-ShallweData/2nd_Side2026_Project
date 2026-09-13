@@ -58,7 +58,7 @@ export function RiskInformationCard(props: CardProps) {
           <span className="card-kicker">{kicker}</span>
           <h2>{title}</h2>
         </div>
-        <StatusBadge level={props.data.level} />
+        <StatusBadge level={props.data.level} verdict={isWage ? props.data.verdict : undefined} />
       </div>
 
       <p className={`risk-summary ${unknown ? "risk-summary-unknown" : ""}`}>{props.data.summary}</p>

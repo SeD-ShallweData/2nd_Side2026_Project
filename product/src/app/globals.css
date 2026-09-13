@@ -10,8 +10,8 @@
   --surface: #f7f6f1;
   --surface-warm: #fffdf5;
   --white: #ffffff;
-  --watch: #8b6300;
-  --watch-bg: #fff2c2;
+  --watch: #5f6872;
+  --watch-bg: #eef1f4;
   --normal: #256b45;
   --normal-bg: #e7f6ec;
   --review: #a6402e;
@@ -1523,6 +1523,14 @@ summary:focus-visible {
 }
 
 .status-review {
+  border-color: #ebb3a4;
+  background: var(--review-bg);
+  color: var(--review);
+}
+
+.status-review-wage,
+.status-review-tax,
+.status-review-insurance {
   border-color: #ebb3a4;
   background: var(--review-bg);
   color: var(--review);
