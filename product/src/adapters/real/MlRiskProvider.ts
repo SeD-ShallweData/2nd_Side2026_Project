@@ -103,6 +103,7 @@ export function toWageRiskPublic(row: WageRow): WageRiskPublic {
 
   return {
     availability: row.score_batch_id === null && row.verdict === null ? "no_data" : "ready",
+    verdict: row.verdict as WageRiskPublic["verdict"],
     level,
     summary: excluded
       ? "사용자용 공개 판정에서 우선 확인할 항목이 있습니다. 이를 체불 발생 확정이나 입사 판단으로 해석하지 마세요."
