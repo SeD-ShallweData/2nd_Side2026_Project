@@ -38,6 +38,7 @@ describe("상담 실행 라벨", () => {
 
   it("모델을 실제로 부른 실행 모드는 가드레일 표식과 무관하게 그대로 둔다", () => {
     // 긴급 표식이 섞여 들어와도 병렬 비교·도구 연결 문구를 바꾸면 안 된다.
+    expect(executionModeCopy("single_api", EMERGENCY).kicker).toBe("Upstage Solar 단일 상담");
     expect(executionModeCopy("dual_api", EMERGENCY).kicker).toBe("동일 조건 병렬 비교");
     expect(executionModeCopy("openai_responses", EMERGENCY).kicker).toBe("도구 연결형 단일 상담");
   });
