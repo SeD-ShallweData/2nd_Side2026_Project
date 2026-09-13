@@ -60,11 +60,21 @@
 | 요청 | `email: string`, `password: string` |
 | 성공 | `200`, `authenticated: true`, 사용자 정보, `expires_at` |
 | 부가 동작 | HttpOnly 세션 쿠키 발급, 같은 사용자의 이전 Mock 세션 폐기 |
-| 주요 오류 | `400 VALIDATION_ERROR`, `401 INVALID_CREDENTIALS`, `403 CROSS_SITE_REQUEST_REJECTED`, `413 REQUEST_BODY_TOO_LARGE`, `415 UNSUPPORTED_MEDIA_TYPE`, `503 AUTH_PROVIDER_UNAVAILABLE`, `503 MOCK_AUTH_NOT_CONFIGURED`, `503 MOCK_AUTH_PERIMETER_REQUIRED` |
+| 주요 오류 | `400 VALIDATION_ERROR`, `401 INVALID_CREDENTIALS`, `403 CROSS_SITE_REQUEST_REJECTED`, `413 REQUEST_BODY_TOO_LARGE`, `415 UNSUPPORTED_MEDIA_TYPE`, `429 LOGIN_TEMPORARILY_LOCKED`, `503 AUTH_PROVIDER_UNAVAILABLE`, `503 MOCK_AUTH_NOT_CONFIGURED`, `503 MOCK_AUTH_PERIMETER_REQUIRED` |
 
 이메일은 trim·소문자 정규화 후 비교한다. 비밀번호는 응답·로그·샘플 파일에 포함하지 않는다.
 이메일 입력은 최대 254자이며 비밀번호 입력은 1~256자다. Mock 환경변수의 세 역할 비밀번호는 각각
 12자 이상이며 서로 달라야 한다.
+
+같은 정규화 이메일에서 자격 증명 확인이 5회 연속 실패하면 15분 동안 로그인을 잠근다. 1~4회는
+기존과 같은 `401 INVALID_CREDENTIALS`, 5회째와 잠금 중 요청은 `429 LOGIN_TEMPORARILY_LOCKED`다.
+존재하지 않는 이메일도 똑같이 처리하고, 정상 로그인은 누적 실패 횟수를 초기화한다. 잠금 응답은
+남은 초를 올림한 `Retry-After` 헤더와 `Cache-Control: no-store`를 포함하며 잠금 중 요청이 종료 시각을
+연장하지 않는다. 잠기기 전의 실패 기록은 마지막 실패 후 15분 동안 추가 실패가 없으면 초기화된다.
+
+잠금 상태는 현재 단일 웹 프로세스의 메모리에만 있다. 배포·장애·수동 재시작·VM 재가동 때 초기화되며
+여러 프로세스나 인스턴스 사이에는 공유되지 않는다. 재시작 이후에도 잠금을 보장해야 하는 운영 단계에서는
+DB 또는 Redis 같은 공유 저장소로 이전해야 한다.
 
 ### `POST /api/auth/logout`
 
