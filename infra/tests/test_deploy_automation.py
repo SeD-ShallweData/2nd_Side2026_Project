@@ -6,7 +6,7 @@
 가장 중요한 둘:
 
   1. 로봇은 관문을 승인하지 못한다.
-  2. 자동 배포는 발표 당일(2026-10-01)에 살아 있을 수 없다.
+  2. 자동 배포는 합의된 최종일(2026-09-29 24:00 KST)을 넘겨 살아 있을 수 없다.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -29,13 +30,15 @@ POLLER_SRC = POLLER.read_text(encoding="utf-8")
 SERVICE_SRC = SERVICE.read_text(encoding="utf-8")
 TIMER_SRC = TIMER.read_text(encoding="utf-8")
 
-# 발표 2026-10-01. **그 전날까지만** 자동 배포가 살아 있을 수 있다.
-# 발표 중에 누가 오타 하나 고쳐 머지하면 그 순간 서비스가 끊긴다.
+# 2026-09-13 운영자 최종 확정: **2026-09-29 24:00 KST 까지.**
 #
-# 2026-09-13 에 09-28 → 09-30 으로 올렸다(운영자 결정, 시연 준비 기간 내내
-# 자동 배포 사용). 심사 09-29~10-01 중 앞 이틀과 겹치는 것은 알고 한 선택이다.
-# 이 상한이 지키는 것은 이제 **발표 당일** 하나다 — 그건 양보하지 않는다.
-LATEST_ALLOWED_EXPIRY = dt.date(2026, 9, 30)
+# 상한을 합의값과 **똑같이** 둔다. 이제 만료일을 하루라도 늘리려면 이 상수도
+# 함께 고쳐야 하고, 그건 리뷰에서 눈에 띈다 — "누가 슬쩍 늘렸다" 가 조용히
+# 지나가지 않는다.
+#
+# 지키는 것: 발표 당일(10-01)과 그 전날(09-30). 심사 첫날(09-29)은 자동 배포와
+# 겹치며, 그건 알고 한 선택이다.
+LATEST_ALLOWED_EXPIRY = dt.date(2026, 9, 29)
 
 # 최대 배포 소요: 빌드 25분 + ready 5분 + rag 재시작 15분.
 MAX_DEPLOY_MINUTES = 45
@@ -126,18 +129,29 @@ class ExpiringArmTests(unittest.TestCase):
     def test_expiry_is_a_valid_date(self) -> None:
         dt.date.fromisoformat(_const("ARM_EXPIRES"))
 
-    def test_expiry_never_reaches_the_presentation_day(self) -> None:
-        """발표 당일(10-01)에 자동 배포가 살아 있으면 안 된다."""
+    def test_expiry_does_not_exceed_the_agreed_date(self) -> None:
+        """운영자가 최종 확정한 날짜(2026-09-29 24:00 KST)를 넘기지 않는다."""
         expiry = dt.date.fromisoformat(_const("ARM_EXPIRES"))
         self.assertLessEqual(
             expiry, LATEST_ALLOWED_EXPIRY,
-            f"ARM_EXPIRES={expiry} 는 발표일(2026-10-01)을 침범합니다 "
-            f"(최대 {LATEST_ALLOWED_EXPIRY}).",
+            f"ARM_EXPIRES={expiry} 는 합의된 최종일을 넘깁니다 "
+            f"(최대 {LATEST_ALLOWED_EXPIRY}). 늘리려면 이 상수도 함께 고치세요 "
+            f"— 리뷰에서 보이게 하려는 것입니다.",
         )
 
     def test_expiry_is_documented_with_the_same_value(self) -> None:
-        """소스와 문서가 갈라지면 아무도 어느 쪽을 믿을지 모른다."""
-        self.assertIn(_const("ARM_EXPIRES"), DOC.read_text(encoding="utf-8"))
+        """소스와 문서가 갈라지면 아무도 어느 쪽을 믿을지 모른다.
+
+        "문서 어딘가에 그 날짜가 있다" 로는 부족하다. 문서에는 경계를 설명하려고
+        앞뒤 날짜(09-28·09-30)를 표로 적어 두었고, 그러면 만료일을 그 값 중
+        하나로 바꿔도 검사가 통과해 버린다. **선언 줄 자체**를 본다.
+        """
+        expiry = _const("ARM_EXPIRES")
+        self.assertRegex(
+            DOC.read_text(encoding="utf-8"),
+            rf"(?m)^\*\*`ARM_EXPIRES = {re.escape(expiry)}`\*\*",
+            f"AUTODEPLOY.md 의 만료일 선언이 소스({expiry})와 다릅니다",
+        )
 
     def test_poller_disarms_itself_when_expired(self) -> None:
         poll = POLLER_CODE[_pos(POLLER_CODE, "poll() {"):]
@@ -146,6 +160,43 @@ class ExpiringArmTests(unittest.TestCase):
         self.assertIn("disarm_file", block)
         self.assertIn("stop_timer", block)
         self.assertIn("notify", block)
+
+    def test_the_expiry_date_itself_is_still_armed(self) -> None:
+        """"09-29 24:00 까지" 를 동작으로 고정한다.
+
+        판정이 `>` 가 아니라 `>=` 로 바뀌면 만료일 **당일 아침부터** 꺼진다.
+        하루를 통째로 잃는데 문구는 그대로라 아무도 눈치채지 못한다.
+        폴러의 is_expired() 를 가짜 date 로 **실제 실행해서** 확인한다.
+        """
+        expiry = dt.date.fromisoformat(_const("ARM_EXPIRES"))
+        cases = [
+            (expiry - dt.timedelta(days=1), "ARMED", "만료 전날"),
+            (expiry, "ARMED", "만료일 당일 — 24:00 까지 살아 있어야 한다"),
+            (expiry + dt.timedelta(days=1), "EXPIRED", "다음 날 00:00 부터 만료"),
+        ]
+        body = re.search(r"(?m)^is_expired\(\).*$", POLLER_SRC)
+        self.assertIsNotNone(body, "is_expired() 정의를 찾지 못했습니다")
+        for today, want, why in cases:
+            with self.subTest(today=str(today), why=why):
+                with tempfile.TemporaryDirectory() as tmp:
+                    fake = Path(tmp) / "date"
+                    fake.write_text(
+                        '#!/bin/sh\n'
+                        f'[ "$1" = "+%F" ] && {{ echo "{today}"; exit 0; }}\n'
+                        'exec /bin/date "$@"\n',
+                        encoding="utf-8",
+                    )
+                    fake.chmod(0o755)
+                    script = (
+                        f'export TZ="Asia/Seoul"; PATH="{tmp}:$PATH"\n'
+                        f'ARM_EXPIRES="{expiry}"\n'
+                        f'{body.group(0)}\n'
+                        'is_expired && echo EXPIRED || echo ARMED\n'
+                    )
+                    out = subprocess.run(
+                        ["bash", "-c", script], capture_output=True, text=True, check=False
+                    )
+                    self.assertEqual(out.stdout.strip(), want, f"{why}\n{out.stderr}")
 
     def test_arming_after_expiry_is_refused(self) -> None:
         do_arm = POLLER_CODE[_pos(POLLER_CODE, "do_arm() {"):]
