@@ -20,6 +20,8 @@ export interface ChatRequest {
   conversation_id?: string;
   company_id?: string;
   resolved_query?: string;
+  /** 기본 false. true일 때만 Upstage와 SKT를 같은 조건으로 비교한다. */
+  compare?: boolean;
   chat_mode: ChatMode;
   recent_messages: RecentMessage[];
 }

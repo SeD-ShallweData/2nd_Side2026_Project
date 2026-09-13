@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   chatExecutionMode: "openai_responses" as "dual_api" | "openai_responses",
+  primaryLlm: "ready" as
+    | "ready"
+    | "configured_unreachable"
+    | "unavailable",
   dualLlm: "configured_unreachable" as
     | "ready"
     | "configured_unreachable"
@@ -18,7 +22,10 @@ vi.mock("@/server/llmConfig", () => ({
   getLlmProviderConfigs: () => [],
 }));
 vi.mock("@/server/llmHealth", () => ({
-  probeDualLlmStatus: async () => state.dualLlm,
+  probeChatLlmStatuses: async () => ({
+    primary: state.primaryLlm,
+    comparison: state.dualLlm,
+  }),
 }));
 vi.mock("@/server/postgres", () => ({
   isDatabaseConfigured: () => true,
@@ -39,6 +46,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   state.chatExecutionMode = "openai_responses";
+  state.primaryLlm = "ready";
   state.dualLlm = "configured_unreachable";
 });
 
@@ -52,6 +60,7 @@ describe("system status의 상담 실행 상태", () => {
     expect(body).toMatchObject({
       chat_execution_mode: "openai_responses",
       integrations: {
+        primary_llm: "ready",
         dual_llm: "configured_unreachable",
         openai_responses: "ready",
         active_chat_llm: "ready",
@@ -60,16 +69,18 @@ describe("system status의 상담 실행 상태", () => {
     expect(JSON.stringify(body)).not.toContain("must-not-appear");
   });
 
-  it("기본 dual mode에서는 기존 dual_llm 상태가 active 상태다", async () => {
+  it("기본 dual_api 계열에서는 Upstage 상태가 active 상태다", async () => {
     state.chatExecutionMode = "dual_api";
-    state.dualLlm = "ready";
+    state.primaryLlm = "ready";
+    state.dualLlm = "unavailable";
     vi.stubEnv("RAG_API_URL", "");
     vi.stubEnv("CONTRACT_ANALYSIS_URL", "");
 
     const body = await (await GET()).json();
 
     expect(body.integrations).toMatchObject({
-      dual_llm: "ready",
+      primary_llm: "ready",
+      dual_llm: "unavailable",
       openai_responses: "ready",
       active_chat_llm: "ready",
     });

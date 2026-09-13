@@ -218,6 +218,7 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
   async compare(context: ComparisonContext): Promise<ChatComparisonResponse> {
     const startedAt = new Date();
     const messages = buildMessages(context);
+    const isComparison = this.configs.length > 1;
     const runs = this.configs.map(async (config): Promise<ProviderComparisonResult> => {
       try {
         const completion = await this.client.complete(config, messages);
@@ -265,15 +266,15 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
     return {
       comparison_id: `cmp_${crypto.randomUUID()}`,
       conversation_id: context.policyBaseline.conversation_id,
-      execution_mode: "dual_api",
+      execution_mode: isComparison ? "dual_api" : "single_api",
       started_at: startedAt.toISOString(),
       completed_at: new Date().toISOString(),
       fair_comparison: {
-        concurrent: true,
-        same_context: true,
-        same_temperature: true,
-        same_max_tokens: true,
-        same_retrieval: true,
+        concurrent: isComparison,
+        same_context: isComparison,
+        same_temperature: isComparison,
+        same_max_tokens: isComparison,
+        same_retrieval: isComparison,
       },
       results,
     };

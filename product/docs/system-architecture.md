@@ -202,17 +202,20 @@ interface RiskProvider {
 
 ### Chat Provider
 
-현재 프로토타입은 `DualLlmChatProvider`가 Upstage Solar와 SKT A.X의 OpenAI 호환 Chat Completions API를 같은 조건으로 병렬 호출한다. `PolicyChatProvider`는 최종 사용자 답변 생성기가 아니라, 회사 선택·긴급상황·근거 부족·금지 표현에 대한 정책 기준과 fallback 문구를 제공한다.
+현재 일반 상담은 `DualLlmChatProvider`를 재사용하되 기본 요청에서는 Upstage Solar 하나만 호출한다.
+요청에 `compare=true`가 있을 때만 Upstage Solar와 SKT A.X의 OpenAI 호환 Chat Completions API를
+같은 조건으로 병렬 호출한다. `PolicyChatProvider`는 최종 사용자 답변 생성기가 아니라, 회사 선택·긴급상황·근거 부족·금지 표현에 대한 정책 기준과 fallback 문구를 제공한다.
 
 - 공유 키 파일은 서버에서만 읽고 클라이언트 번들에 포함하지 않는다.
-- 한 모델이 실패해도 다른 모델 결과는 유지한다.
+- 비교 요청에서는 한 모델이 실패해도 다른 모델 결과를 유지한다.
 - 모델 출력은 금지 표현 후처리를 거치며 위반 시 정책 기준 문구로 교체한다.
 - UI에는 지연시간·토큰·종료 사유·가드레일 상태를 표시하되 숨은 프롬프트와 API 키는 표시하지 않는다.
 - 비교 선택 로그에는 질문·답변 원문을 저장하지 않는다.
 
-일반 사용자 `/api/chat`은 `CHAT_EXECUTION_MODE` feature flag로 두 실행기를 선택한다. 기본 `dual_api`는
-위 동작을 그대로 보존한다. `openai_responses`는 기존 PolicyChatProvider의 긴급·fallback 기준을 유지한 채
-다음 서버 경계를 추가한다.
+일반 사용자 `/api/chat`은 `CHAT_EXECUTION_MODE` feature flag로 Chat Completions 경로와 Responses
+경로를 선택한다. 기본 `dual_api` 설정은 Upstage/SKT 연동 경로를 뜻하지만 실제 요청 기본값은 Upstage
+단일 호출이다. 요청의 `compare=true`만 두 공급자 비교를 활성화한다. `openai_responses`는 기존
+PolicyChatProvider의 긴급·fallback 기준을 유지한 채 다음 서버 경계를 추가한다.
 
 ```text
 ResponsesChatService
@@ -241,7 +244,8 @@ interface ChatProvider {
 ```
 
 - `PolicyChatProvider`: 긴급상황과 정책 위반 시 사용할 결정적 기준 안내 제공
-- `DualLlmChatProvider`: 서버 질의 재작성, RAG 검색 결과를 이용한 병렬 생성과 후처리 가드레일 수행
+- `DualLlmChatProvider`: 서버 질의 재작성과 RAG 검색 결과를 이용한 기본 Upstage 생성, 선택적 병렬 비교,
+  후처리 가드레일 수행
 - LLM 공급자 선택은 Provider 내부 설정이며 API 계약에는 노출하지 않음
 
 ### Contract Review Provider
