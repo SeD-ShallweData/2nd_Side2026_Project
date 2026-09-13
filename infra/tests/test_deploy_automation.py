@@ -337,6 +337,23 @@ class ObservabilityTests(unittest.TestCase):
         block = block[: block.index("\n  fi")]
         self.assertNotIn("notify", block)
 
+    def test_status_does_not_double_print_systemctl_results(self) -> None:
+        """`systemctl is-enabled` 는 'disabled' 를 **출력하면서 종료 코드 1** 을 낸다.
+
+        $( ... || printf '기본값' ) 로 쓰면 둘 다 찍혀 줄이 깨진다. 2026-09-13
+        서버에서 실제로 이렇게 나왔다:
+
+            타이머    disabled
+            not-installed / inactive
+            inactive
+        """
+        block = POLLER_CODE[_pos(POLLER_CODE, "show_status() {") :]
+        block = block[: block.index("\n}")]
+        self.assertNotRegex(
+            block, r"\$\(systemctl is-(enabled|active)[^)]*\|\|",
+            "종료 코드가 아니라 출력이 비었는지로 판단하세요",
+        )
+
     def test_a_daily_heartbeat_exists(self) -> None:
         """침묵하는 자동화는 사람이 직접 하는 것보다 나쁘다."""
         self.assertIn("notice_once_a_day", POLLER_CODE)
@@ -427,6 +444,33 @@ class WebCacheTests(unittest.TestCase):
         """빌드가 .next 를 새로 만들 때마다 사라지므로 배포마다 다시 만든다."""
         text = self.DEPLOY.read_text(encoding="utf-8")
         self.assertIn('install -d -m 2775 -o root -g "${SVC_GROUP[moneyworry-web]}"', text)
+
+    def test_installer_expectation_matches_the_template(self) -> None:
+        """설치기는 렌더한 파일이 아니라 **하드코딩된 봉인 기대값**과 대조한다.
+
+        그래서 템플릿만 고치면 install-systemd-units.sh 가 영원히
+        "effective systemd ReadWritePaths differ from the sealed unit" 으로
+        죽는다. 2026-09-13 에 4-F 가 정확히 그렇게 했다 — CI 는 설치기를
+        실행하지 않고 `bash -n` 만 돌려서 잡히지 않았다. 여기서 둘을 묶는다.
+        """
+        template = self.WEB.read_text(encoding="utf-8")
+        from_template = re.findall(r"(?m)^ReadWritePaths=(.+)$", template)
+
+        installer = (ROOT / "infra" / "scripts" / "install-systemd-units.sh").read_text(
+            encoding="utf-8"
+        )
+        block = installer[installer.index("    moneyworry-web)") :]
+        block = block[: block.index(";;")]
+        match = re.search(r'expected_read_write_paths="([^"]*)"', block)
+        self.assertIsNotNone(match, "설치기에서 web 의 기대값을 찾지 못했습니다")
+
+        # 설치기는 $PROJECT_ROOT, 템플릿은 @PROJECT_ROOT@ 를 쓴다. 그것만 맞춘다.
+        expected = match.group(1).replace("$PROJECT_ROOT", "@PROJECT_ROOT@")
+        self.assertEqual(
+            expected, " ".join(from_template),
+            "install-systemd-units.sh 의 봉인 기대값과 moneyworry-web.service.in 의 "
+            "ReadWritePaths 가 다릅니다. 설치기가 항상 실패합니다.",
+        )
 
     def test_isolation_invariant_still_holds(self) -> None:
         """캐시 한 칸을 연다고 "트리에 쓸 수 없다"가 깨지면 안 된다."""

@@ -269,4 +269,31 @@ describe("후조건 등록 자체의 무결성", () => {
         "미등록 migration은 드리프트 검사에서 조용히 빠집니다.",
     );
   });
+
+  it("0012의 부재 후조건은 뷰 존재와 함께 건다", () => {
+    // NOT EXISTS 만 쓰면 뷰 자체가 없을 때도 참이 되어, 아직 적용하지 않은
+    // migration이 "부분 적용"으로 보인다. 2026-09-13 운영 DB에서 실제로
+    // 0/11이어야 할 것이 3/11로 나와 멀쩡한 DB를 DEPLOY BLOCKED로 읽게 했다.
+    const source = readFileSync(
+      join(DB_DIR, "scripts", "check-migration-drift.mjs"),
+      "utf8",
+    );
+    const start = source.indexOf("'0012_v_region_industry_signal', json_build_object");
+    assert.ok(start > 0, "0012 SQL 블록을 찾지 못했습니다.");
+    const block = source.slice(start, source.indexOf(")::text;", start));
+
+    for (const key of POSTCONDITION_KEYS["0012_v_region_industry_signal"]) {
+      if (!key.startsWith("view_column_absent:")) continue;
+      const at = block.indexOf(`'${key}'`);
+      assert.ok(at > 0, `${key}의 SQL이 없습니다.`);
+      const clause = block.slice(at, block.indexOf("\n    ),", at));
+      assert.match(
+        clause,
+        /EXISTS \(\s*\n\s*SELECT 1 FROM pg_class/,
+        `${key}는 뷰 존재 확인 없이 NOT EXISTS만 겁니다 — ` +
+          "미적용 상태가 부분 적용으로 보입니다.",
+      );
+      assert.match(clause, /AND NOT EXISTS/, `${key}에 부재 확인이 없습니다.`);
+    }
+  });
 });

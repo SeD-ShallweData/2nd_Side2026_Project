@@ -43,6 +43,13 @@
 컬럼은 넣지 않음"* 이다. `CREATE OR REPLACE VIEW` 는 컬럼을 조용히 더할 수 있으므로,
 존재 확인만으로는 **개별 사업장 값이 새어 나오는 변경**을 잡지 못한다.
 
+> **부재 확인은 반드시 존재 확인과 함께 건다** (2026-09-13 정정).
+> `NOT EXISTS` 만 쓰면 **뷰 자체가 없을 때도 참**이 되어, 아직 적용하지 않은
+> migration 이 "부분 적용" 으로 보인다. 운영 DB 에서 실제로 0/11 이어야 할 것이
+> 3/11 로 나왔고, 멀쩡한 DB 를 `partial_schema_application — DEPLOY BLOCKED` 로
+> 읽게 만들었다. 후조건은 migration 이 **끝난 뒤의 상태**를 기술해야 한다.
+> `db/tests/migration-drift.test.mjs` 가 이 형태를 고정한다.
+
 **합계 54개 키** (0012 이전 43개). 2026-09-09 에 PostgreSQL 16 에 migration 12개를 순서대로 적용한 뒤
 `POSTCONDITIONS_SQL` 을 실행해 **43/43 통과**를 실측했다. 이어서 `users.role` 을 되살려
 `column_absent:public.users.role` 이 `false` 로 뒤집히는 것까지 확인했다 — 검사가 실제로

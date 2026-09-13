@@ -469,17 +469,37 @@ SELECT json_build_object(
       SELECT 1 FROM information_schema.columns
       WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='unknown_count'
     ),
-    'view_column_absent:public.v_region_industry_signal.firm_id', NOT EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='firm_id'
+    -- 부재 확인은 **뷰가 있을 때만** 의미가 있다.
+    -- NOT EXISTS 만 쓰면 뷰 자체가 없을 때도 참이 되어, 미적용(0/11)이
+    -- "부분 적용(3/11)"으로 보인다. 2026-09-13 운영 DB 에서 실제로 그렇게
+    -- 나왔고, 멀쩡한 DB 를 "부분 적용 — DEPLOY BLOCKED" 로 읽게 만들었다.
+    -- 후조건은 migration 이 끝난 뒤의 상태를 기술해야 하므로 존재를 함께 건다.
+    'view_column_absent:public.v_region_industry_signal.firm_id', (
+      EXISTS (
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname='v_region_industry_signal' AND c.relkind='v'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='firm_id'
+      )
     ),
-    'view_column_absent:public.v_region_industry_signal.risk_full', NOT EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='risk_full'
+    'view_column_absent:public.v_region_industry_signal.risk_full', (
+      EXISTS (
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname='v_region_industry_signal' AND c.relkind='v'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='risk_full'
+      )
     ),
-    'view_column_absent:public.v_region_industry_signal.rank', NOT EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='rank'
+    'view_column_absent:public.v_region_industry_signal.rank', (
+      EXISTS (
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname='v_region_industry_signal' AND c.relkind='v'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='rank'
+      )
     )
   )
 )::text;

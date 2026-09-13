@@ -254,7 +254,7 @@ preflight() {   # preflight <project_root> — 사람이 봐야 하는 문제면
 }
 
 show_status() {
-  local root now drift free deployed remote
+  local root now drift free deployed remote timer_enabled timer_active
   printf '%s\n' '── 돈워리 자동 배포 상태 ──'
   if is_armed; then
     if is_expired; then
@@ -271,9 +271,13 @@ show_status() {
   now="$(date +%H:%M)"
   printf '  시간창    %s–%s KST (지금 %s — %s)\n' "$WINDOW_OPEN" "$WINDOW_CLOSE" "$now" \
     "$(in_window && printf '안' || printf '밖')"
-  printf '  타이머    %s / %s\n' \
-    "$(systemctl is-enabled "$TIMER" 2>/dev/null || printf 'not-installed')" \
-    "$(systemctl is-active  "$TIMER" 2>/dev/null || printf 'inactive')"
+  # systemctl is-enabled 는 'disabled' 를 **출력하면서 종료 코드 1** 을 낸다.
+  # $( ... || printf '기본값' ) 로 쓰면 둘 다 찍혀 줄이 깨진다. 실제로 그랬다
+  # (2026-09-13 서버: "타이머  disabled\nnot-installed / inactive\ninactive").
+  # 값을 먼저 받아 두고, **비어 있을 때만** 기본값을 쓴다.
+  timer_enabled="$(systemctl is-enabled "$TIMER" 2>/dev/null)" || true
+  timer_active="$(systemctl is-active  "$TIMER" 2>/dev/null)" || true
+  printf '  타이머    %s / %s\n' "${timer_enabled:-not-installed}" "${timer_active:-inactive}"
 
   if [[ -x $DEPLOY_EXEC ]] && grep -q "$REQUIRED_MARKER" "$DEPLOY_EXEC"; then
     printf '  배포기    %s\n' "$REQUIRED_MARKER 있음 (롤백 동작)"
