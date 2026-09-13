@@ -105,6 +105,9 @@ systemd 배포에서는 이 목록을 하나의 공용 파일로 합치지 않�
 
 ### 5-1. VM 배포기(`moneyworry-deploy`) 계약
 
+> 실제 배포는 이력을 남기는 래퍼 `moneyworry-deploy-run` 으로 한다.
+> 아래는 그 래퍼가 감싸는 배포기 자체의 계약이다. [`DEPLOY_HISTORY.md`](DEPLOY_HISTORY.md) 참고.
+
 시연 VM 에서 코드를 반영하는 실제 명령이다. 정본은
 [`infra/scripts/deploy-from-git.sh`](scripts/deploy-from-git.sh) 이고,
 **실행은 트리 밖 사본**(`/usr/local/sbin/moneyworry-deploy`)으로 한다 —

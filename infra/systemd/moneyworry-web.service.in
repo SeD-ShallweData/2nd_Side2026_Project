@@ -28,6 +28,18 @@ PrivateTmp=yes
 ProtectHome=yes
 ProtectSystem=strict
 ReadOnlyPaths=@PROJECT_ROOT@
+# Next.js 는 ISR·fetch·이미지 최적화 캐시를 .next/cache 아래에 **런타임에** 쓴다.
+# 여기 말고는 ReadWritePaths 가 하나도 없어서, 2026-09-11 에 이미지 최적화기가
+# .next/cache/images 를 만들지 못해 ENOENT 가 났다. #55 로 최적화기를 껐지만
+# ISR·fetch 캐시를 쓰기 시작하면 그대로 다시 난다.
+#
+# ReadWritePaths 는 ReadOnlyPaths 하위 경로에서도 유효하다(2026-09-11 확인).
+# 트리 전체가 아니라 캐시 한 칸만 연다 — "서비스 계정은 프로젝트 트리에 쓸 수
+# 없다"는 불변식은 그대로다(deploy-from-git.sh 의 verify_access 가 매 배포마다 확인).
+#
+# '-' 접두사: 경로가 없어도 유닛이 기동에 실패하지 않게 한다. 첫 빌드 전이나
+# 손으로 .next 를 지운 직후가 그런 상태다. 디렉터리는 배포기가 만든다.
+ReadWritePaths=-@PROJECT_ROOT@/product/.next/cache
 RestrictSUIDSGID=yes
 UMask=0027
 LimitNOFILE=65536
