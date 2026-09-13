@@ -6,7 +6,7 @@
 가장 중요한 둘:
 
   1. 로봇은 관문을 승인하지 못한다.
-  2. 자동 배포는 심사 기간(2026-09-29~10-01)에 살아 있을 수 없다.
+  2. 자동 배포는 발표 당일(2026-10-01)에 살아 있을 수 없다.
 """
 
 from __future__ import annotations
@@ -29,9 +29,13 @@ POLLER_SRC = POLLER.read_text(encoding="utf-8")
 SERVICE_SRC = SERVICE.read_text(encoding="utf-8")
 TIMER_SRC = TIMER.read_text(encoding="utf-8")
 
-# 심사 2026-09-29~10-01. 그 전날까지만 자동 배포가 살아 있을 수 있다.
-# 심사위원이 보고 있을 때 누가 오타 하나 고쳐 머지하면 그 순간 서비스가 끊긴다.
-LATEST_ALLOWED_EXPIRY = dt.date(2026, 9, 28)
+# 발표 2026-10-01. **그 전날까지만** 자동 배포가 살아 있을 수 있다.
+# 발표 중에 누가 오타 하나 고쳐 머지하면 그 순간 서비스가 끊긴다.
+#
+# 2026-09-13 에 09-28 → 09-30 으로 올렸다(운영자 결정, 시연 준비 기간 내내
+# 자동 배포 사용). 심사 09-29~10-01 중 앞 이틀과 겹치는 것은 알고 한 선택이다.
+# 이 상한이 지키는 것은 이제 **발표 당일** 하나다 — 그건 양보하지 않는다.
+LATEST_ALLOWED_EXPIRY = dt.date(2026, 9, 30)
 
 # 최대 배포 소요: 빌드 25분 + ready 5분 + rag 재시작 15분.
 MAX_DEPLOY_MINUTES = 45
@@ -122,12 +126,12 @@ class ExpiringArmTests(unittest.TestCase):
     def test_expiry_is_a_valid_date(self) -> None:
         dt.date.fromisoformat(_const("ARM_EXPIRES"))
 
-    def test_expiry_never_reaches_the_judging_period(self) -> None:
-        """심사 기간(09-29~10-01)에 자동 배포가 살아 있으면 안 된다."""
+    def test_expiry_never_reaches_the_presentation_day(self) -> None:
+        """발표 당일(10-01)에 자동 배포가 살아 있으면 안 된다."""
         expiry = dt.date.fromisoformat(_const("ARM_EXPIRES"))
         self.assertLessEqual(
             expiry, LATEST_ALLOWED_EXPIRY,
-            f"ARM_EXPIRES={expiry} 는 심사 기간을 침범합니다 "
+            f"ARM_EXPIRES={expiry} 는 발표일(2026-10-01)을 침범합니다 "
             f"(최대 {LATEST_ALLOWED_EXPIRY}).",
         )
 
