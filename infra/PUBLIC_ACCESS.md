@@ -65,6 +65,35 @@ IAP 포트포워딩이든 동일하게 적용된다.
 면제 경로 덕분에 **자격증명 없이 외부에서 가용성을 감시할 수 있다.**
 `infra/scripts/deploy-from-git.sh`가 배포 직후 이 경로로 공개 경로를 검증한다.
 
+### Basic auth 가 앱 내부 요청도 막는다 — 이미지 최적화기 사례
+
+Basic auth 가 앱 계층에 있기 때문에, **앱이 스스로에게 넣는 요청도 똑같이 막힌다.**
+2026-09-11 배포에서 로고와 챗봇 아바타가 전부 깨진 원인이 이것이었다.
+
+`next/image` 는 `/_next/image` 로 최적화를 요청하고, 최적화기는 원본을 가져오려고
+**헤더 없는 내부 요청**을 만들어 자기 라우터 핸들러에 다시 넣는다
+(`next/dist/server/image-optimizer.js` 의 `fetchInternalImage` → `routerServerHandler`).
+그 요청에는 `Authorization` 이 없으므로 `proxy.ts` 가 401 과 안내문을 돌려주고,
+최적화기는 그 본문에서 이미지 타입을 못 읽어 400 을 낸다. 로그에 남는 문구는
+`The requested resource isn't a valid image for /brand/logo.png received null` 이다.
+
+브라우저가 직접 부르면 자격증명이 있어 200 이므로, **원본 경로만 보고 "정상"이라고
+판단하면 안 된다.** 진단할 때 두 경로를 따로 확인한다.
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -u "$U:$P" http://127.0.0.1:3111/brand/logo.png
+curl -s -o /dev/null -w '%{http_code}\n' -u "$U:$P" 'http://127.0.0.1:3111/_next/image?url=%2Fbrand%2Flogo.png&w=384&q=75'
+```
+
+조치로 `product/next.config.ts` 에서 `images.unoptimized` 를 켰다. 이유와 대안 비교는
+그 파일 주석에 적어 두었다. **최적화를 되켜려면 이 문제를 먼저 해결해야 한다** —
+`proxy.ts` 에서 정적 자산을 면제하거나(외곽 인증에 구멍이 생긴다),
+`ProtectSystem=strict` 인 web 유닛이 `.next/cache` 에 쓸 수 있게 해야 한다
+(그 경로는 현재 `ReadWritePaths` 에 없어 `mkdir` 이 `ENOENT` 로 실패한다).
+
+같은 함정은 **앱이 자기 자신을 부르는 모든 기능**에 적용된다. 새로 그런 기능을 넣을 때는
+면제 경로를 늘리기 전에 "브라우저가 직접 부르게 할 수 없는가"를 먼저 따져 본다.
+
 ## 접속되지 않는 경우 세 가지
 
 | 상황 | 시간대 / 조건 | 증상 |
