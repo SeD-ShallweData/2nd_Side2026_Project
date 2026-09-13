@@ -304,6 +304,40 @@ fix_ownership() {
   for d in product/.next product/node_modules; do
     [[ -e $PROJECT_ROOT/$d ]] && chgrp -R "${SVC_GROUP[moneyworry-web]}" "$PROJECT_ROOT/$d"
   done
+
+  # web 이 런타임에 쓰는 **유일한** 경로. 유닛의 ReadWritePaths 와 짝이다.
+  # 빌드가 .next 를 새로 만들 때마다 사라지므로 배포마다 다시 만든다.
+  # setgid(2)를 주는 이유: web 이 만든 하위 파일도 그룹을 유지해야 다음 배포의
+  # chgrp 와 어긋나지 않는다. 그룹 쓰기(7)가 없으면 UMask=0027 아래에서
+  # web 이 아무것도 못 쓴다.
+  install -d -m 2775 -o root -g "${SVC_GROUP[moneyworry-web]}" \
+    "$PROJECT_ROOT/product/.next/cache"
+  return 0
+}
+
+# 롤백 백업은 1회당 약 237MB 다. 그냥 두면 배포할수록 디스크가 찬다 —
+# 그리고 디스크가 차는 순간이 바로 위 .partial 이 막으려는 상황이다.
+# 최근 2 개만 남긴다. 데이터 디스크라 지워도 서비스에 영향이 없다.
+prune_rollback_backups() {
+  local keep=2 files=() victims=() f
+  for f in "$ROLLBACK_DIR"/next-*; do
+    [[ -e $f ]] || continue          # 매칭이 없으면 글롭 문자열이 그대로 온다
+    [[ $f == *.partial ]] && continue # 완성되지 않은 사본은 백업이 아니다
+    files+=("$f")
+  done
+  (( ${#files[@]} > keep )) || return 0
+
+  # `ls -1dt "$ROLLBACK_DIR"/next-* | tail -n +3` 으로 쓰면 안 된다. 매칭이
+  # 없을 때 ls 가 non-zero 를 내고 pipefail + set -e 가 **성공한 배포를
+  # 롤백시키고 exit 1** 로 만든다. 위에서 배열이 비어 있지 않음을 확인했으므로
+  # 명시적 인자로 넘기는 이 형태는 안전하다.
+  mapfile -t victims < <(ls -1dt "${files[@]}" | tail -n "+$((keep + 1))")
+  for f in ${victims+"${victims[@]}"}; do
+    # 이번 배포의 롤백 기준점은 어떤 경우에도 지우지 않는다.
+    [[ -n $f && $f != "$ROLLBACK_DIR/next-$PREV_SHA" ]] || continue
+    log "오래된 롤백 백업 삭제: ${f##*/}"
+    rm -rf "$f"
+  done
   return 0
 }
 
@@ -345,6 +379,11 @@ verify_access() {
   if runuser -u "$(systemctl show -p User --value moneyworry-web.service)" -- test -w "$PROJECT_ROOT"; then
     warn 'web 계정이 프로젝트 루트에 쓸 수 있습니다 — 격리 모델이 깨졌습니다'; ok=1
   fi
+  # 그러나 캐시 한 칸에는 쓸 수 있어야 한다. 못 쓰면 ISR·fetch 캐시가
+  # ENOENT 로 죽는다(2026-09-11 이미지 최적화기 사고와 같은 원인).
+  runuser -u "$(systemctl show -p User --value moneyworry-web.service)" -- \
+    test -w "$PROJECT_ROOT/product/.next/cache" \
+    || { warn 'web 이 .next/cache 에 쓸 수 없습니다 — ISR·fetch 캐시가 깨집니다'; ok=1; }
   return $ok
 }
 
