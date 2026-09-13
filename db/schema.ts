@@ -13,7 +13,9 @@
  * ⚠️ 반드시 지킬 것 (AGENT_GUIDE / DB_BUILD_PROMPT)
  *  1. `biz_no`·`sido_code`·`industry_category` 는 **TEXT**. 정수로 읽으면 앞자리 0 소실·
  *     마스킹 깨짐. 특히 sido_code 는 모델이 문자열('11')로 학습해서 타입이 어긋나면 성능이 붕괴한다.
- *  2. `사업자번호는 비고유` — 29,887개 번호가 501,843행에 재사용된다(번호당 평균 약 17곳).
+ *  2. `사업자번호는 비고유` — 29,887개 번호가 501,843행에 재사용된다(번호당 평균 약 17곳,
+ *     최다 재사용 **950곳**. 0002 의 COMMENT 에는 788곳으로 적혀 있는데 그때의 실측값이고,
+ *     적용된 migration 은 고치지 않는 것이 규칙이라 최신값은 여기에 둔다).
  *     번호 단독 키 금지. 식별은 `firm_id = sha1(사업장명||'|'||사업자번호)[:16]` — **원본 이름 그대로**.
  *     ⚠️ DB_BUILD_PROMPT §4 는 이름을 정규화(㈜/주식회사 제거)해 해싱하라고 하지만,
  *        그렇게 하면 서로 다른 **사업장**이 합쳐진다. 실측 결과 충돌 171건 중 168건이
@@ -233,7 +235,8 @@ export const inspectorQueue = pgTable(
     /** risk_full 내림차순 1~3000 */
     rank: integer().notNull(),
     /**
-     * 큐 top3000 안에서의 순위 기반 우선순위. 긴급(rank<100) / 우선(<500) / 주의(<1500) / 관찰.
+     * 큐 top3000 안에서의 순위 기반 우선순위. 긴급(1~100위) / 우선(<500) / 주의(<1500) / 관찰.
+     * `rank` 는 1부터 시작하므로 `rank<100` 은 99위까지만 뜻해 한 칸이 샌다. 실제 경계는 100위 포함이다.
      *
      * scored_active.risk_tier 와 혼동하지 말 것 — 그쪽은 전체 55만 곳의 백분위다.
      * 큐 3,000곳은 전부 전체 상위 0.6% 안에 들어서, 백분위 컷을 큐에 적용하면
@@ -311,27 +314,22 @@ export const safeRecommendation = pgTable(
 
 /* ── 사용자 생성 데이터 ──────────────────────────────────── */
 
-/* ── users: 페르소나(role)와 권한(auth_role) 분리 + 이메일 대소문자 무시 ──── */
+/* ── users: 권한(auth_role) + 이메일 대소문자 무시 ──── */
 export const users = pgTable(
   "users",
   {
     id: uuid().primaryKey().defaultRandom(),
     email: text().notNull(),
     name: text().notNull(),
-    /** 구직자/재직 근로자/기업·노무 담당자/사업주/감독관 — AI 상담 페르소나 겸 업무 역할 */
-    role: text().notNull(),
-    /** API 권한 등급. role과 별개 — 로그인·글쓰기·관리자 화면 접근을 이걸로 가른다 */
+    /** API 권한 등급 — 로그인·글쓰기·관리자 화면 접근을 이걸로 가른다 */
     authRole: text("auth_role").notNull().default("user"),
-    firmId: text("firm_id").references(() => firms.firmId, { onDelete: "set null" }),
     passwordHash: text("password_hash").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     // 대소문자 다른 같은 이메일 중복 가입 방지 (Test@test.com === test@test.com)
     uniqueIndex("users_email_lower_uq").on(sql`lower(${t.email})`),
-    check("users_role_ck", sql`${t.role} in ('구직자','재직 근로자','기업/노무 담당자','사업주','감독관')`),
     check("users_auth_role_ck", sql`${t.authRole} in ('user','admin','inspector')`),
-    check("users_firm_scope_ck", sql`${t.firmId} is null or ${t.role} in ('사업주','기업/노무 담당자')`),
   ],
 );
 
@@ -477,6 +475,47 @@ export const feedback = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("feedback_category_ck", sql`${t.category} in ('버그제보','기능제안','기타')`)],
+);
+
+/* ── 현장 제보 ────────────────────────────────────────────── */
+
+export const worksiteTips = pgTable(
+  "worksite_tips",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    reporterId: uuid("reporter_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    category: text().notNull().default("worksite_tip"),
+    title: text().notNull(),
+    body: text(),
+    firmId: text("firm_id").references(() => firms.firmId, { onDelete: "set null" }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("worksite_tips_reporter_idx").on(t.reporterId),
+    index("worksite_tips_firm_idx").on(t.firmId),
+    index("worksite_tips_submitted_idx").on(t.submittedAt.desc()),
+    check("worksite_tips_category_ck", sql`${t.category} = 'worksite_tip'`),
+  ],
+);
+
+export const worksiteTipAttachments = pgTable(
+  "worksite_tip_attachments",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    tipId: uuid("tip_id").notNull().references(() => worksiteTips.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    mediaType: text("media_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sha256: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("worksite_tip_attachments_storage_key_uq").on(t.storageKey),
+    index("worksite_tip_attachments_tip_idx").on(t.tipId),
+    check("worksite_tip_attachments_media_type_ck", sql`${t.mediaType} in ('image/jpeg','image/png','image/webp')`),
+    check("worksite_tip_attachments_size_ck", sql`${t.sizeBytes} > 0 and ${t.sizeBytes} <= 5242880`),
+    check("worksite_tip_attachments_sha256_ck", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
+  ],
 );
 
 /* ── 산업재해 ML 산출물 (별도 schema) ─────────────────────

@@ -1,0 +1,29 @@
+[Unit]
+Description=MoneyWorry health watch (probe, restart, notify)
+Documentation=file://@PROJECT_ROOT@/infra/OPERATIONS.md
+After=network-online.target moneyworry-web.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# systemctl restart 를 부르려면 root 여야 한다. 대신 나머지 권한은 최대한 깎는다.
+User=root
+ExecStart=/usr/local/sbin/moneyworry-health-watch
+TimeoutStartSec=90s
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+# 상태 파일만 쓴다. 그 밖에는 어디에도 못 쓴다.
+ReadWritePaths=/run/moneyworry
+RuntimeDirectory=moneyworry
+RuntimeDirectoryPreserve=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+UMask=0077
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moneyworry-health

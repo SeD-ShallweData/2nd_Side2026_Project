@@ -20,6 +20,47 @@ export const POSTCONDITION_KEYS = Object.freeze({
   "0008_deterministic_current_batch": Object.freeze([
     "view_definition:public.v_current_batch_uses_deterministic_tiebreakers",
   ]),
+  // 0009~0011 키는 db/scripts/sql/verify-uncovered-postconditions.sql 의 것을 그대로 옮겼다.
+  // 그 SQL 은 2026-09-07 운영 DB 에서 23/23 통과를 실측한 판본이다.
+  "0009_busy_puck": Object.freeze([
+    "table:public.sessions",
+    "table:public.reports",
+    "table:public.feedback",
+    "column:public.users.auth_role",
+    "column:public.posts.category",
+    "column:public.posts.status",
+    "index:public.users_email_lower_uq",
+    "index:public.sessions_token_hash_uq",
+    "index:public.reports_reporter_post_pending_uq",
+    // 0009 가 지운 것 — 되살아나면 재적용 흔적이므로 부재를 확인한다
+    "index_absent:public.posts_created_idx",
+    "constraint_absent:public.users.users_email_unique",
+    "constraint:public.users.users_auth_role_ck",
+    "constraint:public.posts.posts_status_ck",
+    // 0009 의 핵심 목적: 익명 글에서 작성자 역할이 새지 않고, 숨김·삭제 글이 안 보인다
+    "view_column_absent:public.v_posts.author_role",
+    "view_column_absent:public.v_comments.author_role",
+    "view_definition:public.v_posts_filters_published",
+  ]),
+  "0010_crazy_talos": Object.freeze([
+    "table:public.worksite_tips",
+    "table:public.worksite_tip_attachments",
+    "index:public.worksite_tip_attachments_storage_key_uq",
+    "index:public.worksite_tips_submitted_idx",
+    "constraint:public.worksite_tips.worksite_tips_category_ck",
+    "constraint:public.worksite_tip_attachments.worksite_tip_attachments_size_ck",
+    "constraint:public.worksite_tips.worksite_tips_reporter_id_users_id_fk",
+  ]),
+  // 0011 은 지우기만 하는 migration 이라 후조건이 전부 "없어야 한다" 이다.
+  // 컬럼 두 개와, 그 컬럼에 걸려 있던 제약 세 개가 대상이다.
+  // 덤프를 복원하면 이것들이 통째로 되살아나므로 부재 확인이 유일한 탐지 수단이다.
+  "0011_lumpy_proteus": Object.freeze([
+    "column_absent:public.users.role",
+    "column_absent:public.users.firm_id",
+    "constraint_absent:public.users.users_role_ck",
+    "constraint_absent:public.users.users_firm_scope_ck",
+    "constraint_absent:public.users.users_firm_id_firms_firm_id_fk",
+  ]),
 });
 
 function migrationLabel(migration) {

@@ -5,7 +5,7 @@ import type {
   GuardrailStatus,
   SuggestedAction,
 } from "@/domain/chat";
-import type { SourceReference } from "@/domain/risk";
+import type { CompanyRiskResult, SourceReference } from "@/domain/risk";
 import type { RagRetrievalResult } from "@/domain/rag";
 
 export type LlmProviderId = "upstage" | "skt";
@@ -96,7 +96,7 @@ export interface ComparisonContext {
     region: string | null;
     industry: string | null;
     size_label: string | null;
-    risk: unknown;
+    risk: CompanyRiskResult;
   };
   ragRetrieval: RagRetrievalResult;
 }

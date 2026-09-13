@@ -448,7 +448,11 @@ def term_months(contract: dict) -> float | None:
         return None
     ys, ms, ds = (int(x) for x in start.split("-"))
     ye, me, de = (int(x) for x in end.split("-"))
-    return round((ye - ys) * 12 + (me - ms) + (de - ds) / 30.0, 2)
+    # 계약기간은 종료일을 포함합니다. +1 을 빼면 실무에서 가장 흔한 표기인
+    # "3월 2일부터 이듬해 3월 1일까지"(= 1년)가 11.97개월이 되어, 적법한 수습
+    # 감액이 1년 미만 계약으로 오판됩니다. "1월 1일 ~ 12월 31일"은 12.00이 나와
+    # 같은 1년인데 표기에 따라 판정이 갈렸습니다.
+    return round((ye - ys) * 12 + (me - ms) + (de - ds + 1) / 30.0, 2)
 
 
 def weekly_hours(contract: dict) -> float | None:

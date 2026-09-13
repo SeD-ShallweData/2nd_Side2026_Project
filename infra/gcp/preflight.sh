@@ -12,6 +12,8 @@ EXPECTED_90DAY_USD=""
 JSON_OUTPUT=0
 REQUIRE_COMPLETE=0
 REQUIRE_RUNNING=0
+# 평시는 daily18h. 시연·심사 기간에는 스케줄을 떼고 always-on 으로 둔다.
+SCHEDULE_MODE="${MW_SCHEDULE_MODE:-daily18h}"
 GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
 
 usage() {
@@ -32,6 +34,12 @@ an API, creates a budget, changes IAM, or creates/updates a Compute resource.
 it is used by provision.sh for post-apply verification.
 --require-running also requires the scheduled VM to be RUNNING. Normal
 preflight accepts TERMINATED only during the exact daily schedule's off-hours.
+
+--schedule-mode selects which operating mode is asserted (default: daily18h;
+env MW_SCHEDULE_MODE). daily18h expects moneyworry-18h-daily attached to the VM
+and tolerates TERMINATED during off-hours. always-on expects the policy to be
+detached and requires RUNNING at every hour. The regional policy resource must
+exist in both modes so the switch back is a single add-resource-policies call.
 EOF
 }
 
@@ -63,6 +71,10 @@ while (( $# > 0 )); do
       ;;
     --require-complete)
       REQUIRE_COMPLETE=1
+      shift
+      ;;
+    --schedule-mode)
+      SCHEDULE_MODE="${2:?--schedule-mode needs a value}"
       shift
       ;;
     --require-running)
@@ -262,6 +274,7 @@ validator_args=(
   --zone "$ZONE_SUFFIX"
   --expected-monthly-usd "$EXPECTED_MONTHLY_USD"
   --expected-90day-usd "$EXPECTED_90DAY_USD"
+  --schedule-mode "$SCHEDULE_MODE"
 )
 (( REQUIRE_COMPLETE == 0 )) || validator_args+=(--require-complete)
 (( REQUIRE_RUNNING == 0 )) || validator_args+=(--require-running)
