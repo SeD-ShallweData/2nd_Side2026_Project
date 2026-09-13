@@ -102,3 +102,74 @@ systemd 배포에서는 이 목록을 하나의 공용 파일로 합치지 않�
 7. 장애 시 코드 rollback 전에 `CHAT_EXECUTION_MODE=dual_api`로 즉시 기존 흐름 복원
 
 배포와 migration은 분리한다. 앱 시작 명령에 자동 migration을 섞지 않고, drift가 있으면 배포를 중단한다.
+
+### 5-1. VM 배포기(`moneyworry-deploy`) 계약
+
+시연 VM 에서 코드를 반영하는 실제 명령이다. 정본은
+[`infra/scripts/deploy-from-git.sh`](scripts/deploy-from-git.sh) 이고,
+**실행은 트리 밖 사본**(`/usr/local/sbin/moneyworry-deploy`)으로 한다 —
+배포 스크립트가 실행 도중 `git checkout` 으로 자기가 들어 있는 트리를 갈아엎기 때문이다.
+
+```bash
+sudo systemctl stop moneyworry-health.timer
+sudo git -C /srv/moneyworry/repo fetch -q --prune origin
+MAIN_SHA=$(sudo git -C /srv/moneyworry/repo rev-parse origin/main)
+sudo /usr/local/sbin/moneyworry-deploy --sha "$MAIN_SHA"
+sudo systemctl start moneyworry-health.timer
+```
+
+`fetch` 를 빼면 안 된다. `rev-parse origin/main` 은 네트워크를 타지 않고 VM 에
+캐시된 ref 를 읽는다. 배포기도 내부에서 `fetch` 를 하지만 그건 `--sha` 를 받은
+*뒤*라, 낡은 SHA 로 「이미 그 커밋입니다」를 보게 된다.
+
+**종료 코드**
+
+| 코드 | 뜻 | 트리 상태 |
+| :---: | --- | --- |
+| `0` | 성공 (`--dry-run` 정상 종료 포함) | 새 커밋 |
+| `1` | 실패 | 체크아웃 이후였다면 **이전 커밋·이전 빌드로 자동 롤백됨** |
+| `3` | 관문 정지 — 사람의 승인이 필요하다 | 무변경 |
+| `5` | 할 일 없음 (이미 그 커밋 / 변경 없음) | 무변경 |
+
+`5` 를 `1` 과 나눈 이유는 자동 배포 폴러 때문이다. 폴러에게 「할 일 없음」은
+정상이며, 이것이 실패로 보이면 10분마다 실패 알림이 나가고 그 소음 때문에
+진짜 실패를 아무도 안 본다.
+
+**관문 경로**
+
+[`GUARDED_PATHS`](scripts/deploy-from-git.sh) 에 걸리는 변경은 `exit 3` 으로 멈춘다.
+절차를 끝낸 뒤 경로를 **하나씩** 승인한다. 비교는 **완전 일치**이므로 후행 슬래시를
+빼면(`db/migrations`) 매칭되지 않고 그대로 멈춘다.
+
+```bash
+sudo /usr/local/sbin/moneyworry-deploy --sha "$MAIN_SHA" \
+  --ack-guarded db/migrations/ --ack-guarded infra/systemd/
+```
+
+한 번에 전부 끄는 스위치는 **일부러 만들지 않았다** — 그런 스위치를 두면
+아무도 목록을 읽지 않는다.
+
+> **`infra/scripts/` 도 관문이다(2026-09-11 추가).** 배포기·감시기는
+> `/usr/local/sbin` 사본으로 실행되므로 **배포만으로는 실행본이 갱신되지 않는다.**
+> 그 경로가 바뀐 커밋을 배포했다면 승인과 함께 반드시 아래를 다시 돌린다.
+>
+> ```bash
+> sudo install -m 0755 -o root -g root \
+>   /srv/moneyworry/repo/infra/scripts/deploy-from-git.sh /usr/local/sbin/moneyworry-deploy
+> sudo install -m 0755 -o root -g root \
+>   /srv/moneyworry/repo/infra/scripts/health-watch.sh /usr/local/sbin/moneyworry-health-watch
+> ```
+>
+> 안 하면 저장소와 서버가 갈라진 채 낡은 배포기가 계속 돈다.
+> 2026-09-11 에 실제로 이 문제로 막혔다 — `--ack-guarded` 를 모르는 구판이 돌고 있었다.
+
+**동시 실행과 감시기**
+
+- 배포는 `/var/lock/moneyworry-deploy.lock` 을 잡는다. 겹쳐 실행하면 두 번째가 `exit 1`.
+- 배포 중에는 `/run/moneyworry/deploy-in-progress` 깃발이 서고, 감시기가 그것을 읽고
+  비켜선다. 자세한 것은 [`infra/HEALTH_WATCH.md`](HEALTH_WATCH.md) 의
+  「배포와의 상호 배제」.
+- 롤백 백업(`/srv/moneyworry/rollback/next-<sha>`)은 1회당 약 237MB 다.
+  **최근 2개만 남긴다** — 그냥 두면 배포할수록 디스크가 차고, 디스크가 차는 순간이
+  바로 백업 복사가 도중에 끊기는 상황이다. 이번 배포의 롤백 기준점은 정리 대상에서
+  언제나 제외한다.
