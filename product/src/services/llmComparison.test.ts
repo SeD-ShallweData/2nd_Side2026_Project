@@ -62,6 +62,34 @@ function payload(answer: string, model: string) {
 }
 
 describe("실제 LLM 비교 Provider", () => {
+  it("기본 단일 구성은 Upstage 결과 하나와 single_api 실행 모드를 반환한다", async () => {
+    const calls: string[] = [];
+    const fakeFetch = (async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return new Response(JSON.stringify(payload("업스테이지 단일 답변", "solar-live")), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const result = await new DualLlmChatProvider(
+      [CONFIGS[0]],
+      new OpenAICompatibleChatClient(fakeFetch, 5_000),
+    ).compare(CONTEXT);
+
+    expect(calls).toEqual(["https://upstage.test/chat"]);
+    expect(result.execution_mode).toBe("single_api");
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]).toMatchObject({ provider: "upstage", answer: "업스테이지 단일 답변" });
+    expect(result.fair_comparison).toEqual({
+      concurrent: false,
+      same_context: false,
+      same_temperature: false,
+      same_max_tokens: false,
+      same_retrieval: false,
+    });
+  });
+
   it("두 모델에 동일한 메시지와 생성 설정을 전달하고 상세 지표를 정규화한다", async () => {
     const bodies: unknown[] = [];
     const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -76,6 +104,7 @@ describe("실제 LLM 비교 Provider", () => {
     const provider = new DualLlmChatProvider(CONFIGS, new OpenAICompatibleChatClient(fakeFetch, 5_000));
     const result = await provider.compare(CONTEXT);
 
+    expect(result.execution_mode).toBe("dual_api");
     expect(result.results).toHaveLength(2);
     expect(result.results.map((item) => item.status)).toEqual(["success", "success"]);
     expect(result.results[0].metrics.usage).toMatchObject({ prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 });
