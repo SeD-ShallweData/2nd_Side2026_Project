@@ -435,6 +435,52 @@ SELECT json_build_object(
       WHERE n.nspname='public' AND c.relname='users'
         AND con.conname='users_firm_id_firms_firm_id_fk'
     )
+  ),
+  '0012_v_region_industry_signal', json_build_object(
+    'view:public.v_region_industry_signal', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='v_region_industry_signal' AND c.relkind='v'
+    ),
+    'column:public.v_region_industry_signal.sido', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='sido'
+    ),
+    'column:public.v_region_industry_signal.industry', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='industry'
+    ),
+    'column:public.v_region_industry_signal.firm_count', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='firm_count'
+    ),
+    'column:public.v_region_industry_signal.normal_count', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='normal_count'
+    ),
+    'column:public.v_region_industry_signal.watch_count', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='watch_count'
+    ),
+    'column:public.v_region_industry_signal.review_count', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='review_count'
+    ),
+    'column:public.v_region_industry_signal.unknown_count', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='unknown_count'
+    ),
+    'view_column_absent:public.v_region_industry_signal.firm_id', NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='firm_id'
+    ),
+    'view_column_absent:public.v_region_industry_signal.risk_full', NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='risk_full'
+    ),
+    'view_column_absent:public.v_region_industry_signal.rank', NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='rank'
+    )
   )
 )::text;
 COMMIT;

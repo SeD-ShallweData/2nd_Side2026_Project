@@ -125,6 +125,20 @@ END $$;
 
 COMMIT;
 
+-- ── 6. 관리자·감독관 테스트 계정 (로컬 전용) ──────────────────────
+-- 회원가입(POST /api/auth/signup)은 일반 사용자(auth_role='user')만 만들 수 있어
+-- 신고 승인·감독관 화면을 로컬에서 시험할 계정이 없었다. 여기서 직접 넣는다.
+--
+-- 비밀번호는 product/src/server/auth/passwordHash.ts 와 동일한 형식
+-- (scrypt$16384$8$1$<salt-base64>$<hash-base64>) 으로 미리 해시해 저장했다.
+-- 평문 비밀번호는 이 파일에 남기지 않는다 — 팀 채널로만 공유한다.
+INSERT INTO public.users (email, name, auth_role, password_hash)
+VALUES
+  ('admin.local@donworry.test', '관리자(로컬)', 'admin',
+   'scrypt$16384$8$1$TByBaAIbtS77ucMzQeC9xg==$Xr+Q2OytgFXseUJoMgfLpxxEV4zneJmLoTjC1+6Sn8I='),
+  ('inspector.local@donworry.test', '감독관(로컬)', 'inspector',
+   'scrypt$16384$8$1$FWhZ46XZXfQfAFDX3c/6hQ==$Q5MC8Pe/+YMOG2/GdqEoNJ3pVLoy0l10rm0nb/N0eac=')
+ON CONFLICT (lower(email)) DO NOTHING;
 -- ── 확인용 쿼리 (실행 후 눈으로 검증) ─────────────────────────
 -- SELECT count(*) FROM public.firms;
 -- SELECT count(*) FROM public.batches;
