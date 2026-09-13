@@ -4,7 +4,10 @@
 
 API 키와 실제 비밀번호는 커밋하지 않습니다. 재현 가능한 예제 설정만 추적합니다.
 
-- [서버 종료 전 보존·배포·운영 런북](OPERATIONS.md)
+- [서버 종료 전 보존·배포·운영 런북](OPERATIONS.md) — 배포기 계약(종료 코드·관문·실행본 재설치)
+- [배포 이력](DEPLOY_HISTORY.md) — `moneyworry-deploy-run` 과 `moneyworry-deploy-log`
+- [헬스 감시와 알림](HEALTH_WATCH.md) — 판정 규칙과 배포와의 상호 배제
+- [공개 경로와 Basic auth](PUBLIC_ACCESS.md)
 - 제품별 실행·feature flag: [`product/README.md`](../product/README.md)
 - DB migration 운영: [`db/docs/`](../db/docs/)
 

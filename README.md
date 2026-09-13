@@ -26,13 +26,14 @@ AI Rookie · 창의종합설계 경진대회 팀 프로젝트 저장소.
 | ML 결과를 DB에 넣는 규격·배치 운영 | [`docs/mlops/`](docs/mlops/) |
 | DB 변경(migration)·복구·드리프트 검사 | [`db/docs/MIGRATION_OPERATIONS.md`](db/docs/MIGRATION_OPERATIONS.md) · [`db/docs/DRIFT_CHECK_COVERAGE.md`](db/docs/DRIFT_CHECK_COVERAGE.md) |
 | 서버 배포·롤백·접속 | [`infra/OPERATIONS.md`](infra/OPERATIONS.md) · 공개 진입점 문서 |
+| 배포 이력·관문 승인 감사 | [`infra/DEPLOY_HISTORY.md`](infra/DEPLOY_HISTORY.md) |
 | QA 항목·페르소나·시연 대본 | [`docs/qa/`](docs/qa/) · [`docs/persona/`](docs/persona/) · [`docs/demo/`](docs/demo/) |
 
 ## 시연 서버
 
 - 주소: 팀 공유 문서 참조(Basic Auth). 매일 07:00~다음 날 01:00(KST) 가동.
 - 상태 확인: `/api/health/live`, `/api/health/ready`(인증 불필요), `/api/system/status`(인증 필요).
-- 배포는 [`infra/scripts/deploy-from-git.sh`](infra/scripts/) 로만. migration은 배포와 분리해 적용한다.
+- 배포는 [`infra/scripts/deploy-run.sh`](infra/scripts/) 로만(이력이 남는다). migration은 배포와 분리해 적용한다.
 
 ## 개발 흐름
 
