@@ -61,6 +61,24 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "constraint_absent:public.users.users_firm_scope_ck",
     "constraint_absent:public.users.users_firm_id_firms_firm_id_fk",
   ]),
+  // 0012 는 집계 뷰 하나를 만든다. 존재 확인만으로는 부족하다 —
+  // CREATE OR REPLACE 로 컬럼이 조용히 바뀔 수 있고, 무엇보다
+  // **개별 사업장 값이 새어 나오면 안 된다**(N6 과업 규격: "개별 기업 점수·
+  // 순위 컬럼은 넣지 않음"). 그래서 있어야 할 것과 없어야 할 것을 함께 적는다.
+  "0012_v_region_industry_signal": Object.freeze([
+    "view:public.v_region_industry_signal",
+    "column:public.v_region_industry_signal.sido",
+    "column:public.v_region_industry_signal.industry",
+    "column:public.v_region_industry_signal.firm_count",
+    "column:public.v_region_industry_signal.normal_count",
+    "column:public.v_region_industry_signal.watch_count",
+    "column:public.v_region_industry_signal.review_count",
+    "column:public.v_region_industry_signal.unknown_count",
+    // 개별 사업장 식별·점수·순위는 이 뷰에 절대 없어야 한다
+    "view_column_absent:public.v_region_industry_signal.firm_id",
+    "view_column_absent:public.v_region_industry_signal.risk_full",
+    "view_column_absent:public.v_region_industry_signal.rank",
+  ]),
 });
 
 function migrationLabel(migration) {
