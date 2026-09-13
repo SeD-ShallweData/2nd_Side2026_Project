@@ -27,6 +27,7 @@ AI Rookie · 창의종합설계 경진대회 팀 프로젝트 저장소.
 | DB 변경(migration)·복구·드리프트 검사 | [`db/docs/MIGRATION_OPERATIONS.md`](db/docs/MIGRATION_OPERATIONS.md) · [`db/docs/DRIFT_CHECK_COVERAGE.md`](db/docs/DRIFT_CHECK_COVERAGE.md) |
 | 서버 배포·롤백·접속 | [`infra/OPERATIONS.md`](infra/OPERATIONS.md) · 공개 진입점 문서 |
 | 배포 이력·관문 승인 감사 | [`infra/DEPLOY_HISTORY.md`](infra/DEPLOY_HISTORY.md) |
+| 자동 배포(pull 방식)·켜고 끄기 | [`infra/AUTODEPLOY.md`](infra/AUTODEPLOY.md) |
 | QA 항목·페르소나·시연 대본 | [`docs/qa/`](docs/qa/) · [`docs/persona/`](docs/persona/) · [`docs/demo/`](docs/demo/) |
 
 ## 시연 서버
