@@ -20,6 +20,12 @@ const MAX_MOCK_STORED_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 const MAX_MOCK_REPORTER_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 export const WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER = 25;
 
+const STATUS_PRIORITY = {
+  received: 0,
+  in_progress: 1,
+  completed: 2,
+} as const;
+
 interface MockStoredAttachment extends StoredWorksiteTipAttachment {
   inspector_bytes: Uint8Array;
 }
@@ -98,6 +104,8 @@ function attachmentMetadata(attachment: MockStoredAttachment): StoredWorksiteTip
 function cloneTip(tip: MockStoredTip): StoredWorksiteTip {
   return {
     tip_id: tip.tip_id,
+    category: tip.category,
+    status: tip.status,
     title: tip.title,
     body: tip.body,
     company_context: tip.company_context ? { ...tip.company_context } : null,
@@ -138,6 +146,8 @@ export class MockWorksiteTipRepository implements WorksiteTipRepository {
     const stored: MockStoredTip = {
       tip_id: input.tip_id,
       reporter_id: input.reporter_id,
+      category: input.category,
+      status: input.status,
       title: input.title,
       body: input.body,
       company_context: input.company_context ? { ...input.company_context } : null,
@@ -153,7 +163,11 @@ export class MockWorksiteTipRepository implements WorksiteTipRepository {
 
   async listTips(limit: number, page: number): Promise<WorksiteTipPage> {
     const ordered = [...memoryState.tips.values()]
-      .sort((left, right) => right.submitted_at.localeCompare(left.submitted_at));
+      .sort((left, right) => (
+        STATUS_PRIORITY[left.status] - STATUS_PRIORITY[right.status]
+        || right.submitted_at.localeCompare(left.submitted_at)
+        || right.tip_id.localeCompare(left.tip_id)
+      ));
     return {
       items: ordered.slice((page - 1) * limit, page * limit).map(cloneTip),
       total: ordered.length,

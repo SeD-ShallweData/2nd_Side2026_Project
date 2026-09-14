@@ -501,6 +501,51 @@ SELECT json_build_object(
         WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='rank'
       )
     )
+  ),
+  '0013_illegal_sir_ram', json_build_object(
+    'column:public.worksite_tips.status', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='worksite_tips' AND column_name='status'
+    ),
+    'index:public.worksite_tips_status_submitted_idx', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips_status_submitted_idx'
+        AND c.relkind IN ('i','I')
+    ),
+    'constraint:public.worksite_tips.worksite_tips_status_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips'
+        AND con.conname='worksite_tips_status_ck'
+    ),
+    'constraint_definition:public.worksite_tips.worksite_tips_category_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips'
+        AND con.conname='worksite_tips_category_ck'
+        AND pg_get_constraintdef(con.oid) ~* '''wage'''
+        AND pg_get_constraintdef(con.oid) ~* '''safety'''
+        AND pg_get_constraintdef(con.oid) !~* '''worksite_tip'''
+    ),
+    'constraint_definition:public.worksite_tips.worksite_tips_status_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips'
+        AND con.conname='worksite_tips_status_ck'
+        AND pg_get_constraintdef(con.oid) ~* '''received'''
+        AND pg_get_constraintdef(con.oid) ~* '''in_progress'''
+        AND pg_get_constraintdef(con.oid) ~* '''completed'''
+    ),
+    'column_default:public.worksite_tips.status_received', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='worksite_tips' AND column_name='status'
+        AND column_default ~* '''received''::text'
+    ),
+    'column_default_absent:public.worksite_tips.category', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='worksite_tips' AND column_name='category'
+        AND column_default IS NULL
+    )
   )
 )::text;
 COMMIT;
