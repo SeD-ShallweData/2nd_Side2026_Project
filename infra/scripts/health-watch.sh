@@ -18,6 +18,10 @@
 #   sudo /usr/local/sbin/moneyworry-health-watch --status   # 현재 상태 출력
 #
 # 웹훅 주소는 저장소에 넣지 않는다. /etc/moneyworry/alert.env 에 root 만 읽게 둔다.
+#
+# 배포 중에는 판정을 건너뛴다. deploy-from-git.sh 가 /run/moneyworry/deploy-in-progress
+# 에 '<run_id> <만료epoch>' 를 써 두고, 이 스크립트가 그것을 읽고 비켜선다.
+# --status 와 --test 는 깃발과 무관하게 언제나 동작한다(사람이 상황을 봐야 하므로).
 set -euo pipefail
 
 LIVE_URL='http://127.0.0.1:3111/api/health/live'
@@ -28,7 +32,13 @@ STATE_DIR='/run/moneyworry'
 STATE_FILE="$STATE_DIR/health-watch.state"
 
 # 몇 번 연속 실패하면 움직일지. 1분 간격이므로 3 = 약 3분.
-# 배포 중 재시작(ready 까지 최대 300초)을 알림으로 오인하지 않을 만큼은 길어야 한다.
+#
+# 예전 주석은 이 값의 근거를 "배포 중 재시작(ready 까지 최대 300초)을 장애로
+# 오인하지 않기 위함"이라고 적었지만 **180초 < 300초라 근거 자체가 틀렸다.**
+# 게다가 배포는 빌드 동안 web 을 10~25분 내려 둔다 — 임계값을 아무리 올려도
+# 그 시간을 덮을 수 없고, 올리면 진짜 장애 대응만 느려진다.
+# 배포와의 충돌은 아래 deploy-in-progress 깃발로 막는다. 이 값은 "사람이 보기에
+# 얼마나 기다렸다가 움직일 것인가"만 정한다. (2026-09-11 정정)
 FAIL_THRESHOLD=3
 PROBE_TIMEOUT=10
 
@@ -105,6 +115,29 @@ case "${1:-}" in
   '') ;;
   *) log "모르는 인자입니다: $1"; exit 2 ;;
 esac
+
+# ── 배포 중에는 비켜선다 ─────────────────────────────────────────────
+# 배포는 빌드 동안 web 을 의도적으로 내린다(deploy-from-git.sh 9절). 상호 배제가
+# 없으면 3분째에 감시기가 **빌드 중인 .next 위로 web 을 재시작**하고,
+# ExecStartPre 의 BUILD_ID 읽기가 실패해 Restart=always 가 폭주한 뒤
+# 💀 오탐 알림이 나간다. (2026-09-11 확인)
+#
+# 이 블록을 case 문 **뒤**에 둔 이유: --status 와 --test 는 배포 중에도 사람이
+# 써야 하는 명령이다. 앞에 두면 배포 중 상태 조회가 막힌다.
+DEPLOY_FLAG="$STATE_DIR/deploy-in-progress"
+if [[ -r $DEPLOY_FLAG ]]; then
+  dep_run=''; dep_deadline=''
+  read -r dep_run dep_deadline < "$DEPLOY_FLAG" || true
+  if [[ ${dep_deadline:-} =~ ^[0-9]+$ ]] && (( $(date +%s) < dep_deadline )); then
+    log "배포 중($dep_run) — 이번 주기는 건너뜁니다"
+    # 상태 파일은 건드리지 않는다. 배포 전부터 아팠다면 그 사실이 남아야 한다.
+    exit 0
+  fi
+  # 깃발이 만료됐거나 깨졌다 — 배포가 SIGKILL 이나 VM 정지로 끊긴 경우다.
+  # 언제까지나 눈을 감고 있을 수는 없으므로 치우고 감시를 재개한다.
+  log "배포 깃발 만료($dep_run) — 감시를 재개합니다"
+  rm -f "$DEPLOY_FLAG"
+fi
 
 read -r state fails restarted <<<"$(read_state)"
 live_code="$(probe "$LIVE_URL")"

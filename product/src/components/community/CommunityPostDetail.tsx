@@ -65,24 +65,24 @@ export function CommunityPostDetail({ postId }: { postId: string }) {
                 {post.updated_at === post.created_at ? "" : ` · ${relativeTimeLabel(post.updated_at)} 수정됨`}
               </small>
             </div>
-            <h2>{post.title}</h2><p>{post.body}</p>
+            <h2>{post.title}</h2><p className="community-post-body">{post.body}</p>
             <strong>{post.like_count === null ? null : `공감 ${post.like_count}　`}댓글 {post.comment_count}</strong>
           </article>
           <p className="field-help">댓글과 공감은 아직 제공하지 않습니다. 위 숫자는 현재 표시용 값입니다.</p>
-          {post.viewer_permissions.can_edit ? (
-            <p className="field-help">
+          <div className="community-post-actions">
+            {post.viewer_permissions.can_edit ? (
               <Link href={`/community/${encodeURIComponent(post.post_id)}/edit`} className="button button-outline button-small">
                 게시글 수정
               </Link>
-            </p>
-          ) : null}
-          {post.viewer_permissions.can_delete ? (
-            <CommunityPostDeleteButton key={post.post_id} postId={post.post_id} />
-          ) : null}
-          {post.capabilities.reports && post.viewer_permissions.can_report ? (
-            <CommunityReportForm key={post.post_id} postId={post.post_id} />
-          ) : null}
-          <Link href="/community" className="button button-outline">목록으로</Link>
+            ) : null}
+            {post.viewer_permissions.can_delete ? (
+              <CommunityPostDeleteButton key={post.post_id} postId={post.post_id} />
+            ) : null}
+            {post.capabilities.reports && post.viewer_permissions.can_report ? (
+              <CommunityReportForm key={post.post_id} postId={post.post_id} />
+            ) : null}
+            <Link href="/community" className="button button-outline">목록으로</Link>
+          </div>
         </>
       ) : null}
     </section>

@@ -27,12 +27,12 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
           <span className="eyebrow">AI 노동 상담</span>
           <h1>
             {executionMode === "dual_api"
-              ? "같은 질문, 두 관점으로 확인하세요"
+              ? "공식 근거로 먼저 확인하세요"
               : "필요한 근거를 도구로 확인하세요"}
           </h1>
           <p>
             {executionMode === "dual_api"
-              ? "답변보다 공식 근거와 다음 행동을 먼저 볼 수 있게 구성했습니다."
+              ? "기본 Upstage Solar 답변을 받고, 필요할 때만 SKT A.X 비교를 선택할 수 있습니다."
               : "질문에 필요한 공식 정보 도구를 선택적으로 연결해 한 답변을 만듭니다."}{" "}
             법률 판단이나 전문가 상담을 대신하지 않습니다.
           </p>

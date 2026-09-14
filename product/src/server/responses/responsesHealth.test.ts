@@ -62,7 +62,7 @@ describe("OpenAI Responses 준비 상태", () => {
 
   it("실행 모드가 선택한 공급자의 상태만 active 상태로 사용한다", () => {
     const statuses = {
-      dualLlm: "configured_unreachable" as const,
+      primaryLlm: "configured_unreachable" as const,
       openAIResponses: "ready" as const,
     };
 

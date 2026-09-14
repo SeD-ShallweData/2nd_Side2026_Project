@@ -45,7 +45,9 @@ describe("실제 ML DB 공개 경계", () => {
     ["배제_공개체납", "review"],
     ["배제_임금체불공개", "review"],
   ] as const)("실제 판정 %s를 사용자 상태 %s로 변환한다", (verdict, level) => {
-    expect(toWageRiskPublic({ ...baseRow, verdict }).level).toBe(level);
+    const result = toWageRiskPublic({ ...baseRow, verdict });
+    expect(result.level).toBe(level);
+    expect(result.verdict).toBe(verdict);
   });
 
   it("원시 점수나 모델 배치일 없이 공식 명단 상태와 확인 근거만 반환한다", () => {

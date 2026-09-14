@@ -1,11 +1,12 @@
 # 드리프트 검사기 후조건 커버리지
 
 > **한 줄 요약**
-> `npm run check:migration-drift` 는 이제 **0006~0011 을 모두 검사한다.**
-> 2026-09-09 에 0009·0010·0011 키 28개를 등록해 공백을 메웠다.
+> `npm run check:migration-drift` 는 이제 **0006~0012 를 모두 검사한다.**
+> 2026-09-09 에 0009·0010·0011 키 28개를 등록해 공백을 메웠고,
+> 2026-09-13 에 0012 키 11개를 같은 PR 에서 등록했다.
 > `0000`~`0005` 는 여전히 후조건이 없다 — 그 구간은 [수동 검증](#수동-검증-절차) 범위 밖이다.
 
-기록 시점: 2026-09-07 · **갱신 2026-09-09** · 대상 `db/scripts/check-migration-drift.mjs`,
+기록 시점: 2026-09-07 · **갱신 2026-09-13** · 대상 `db/scripts/check-migration-drift.mjs`,
 `db/scripts/migration-drift-core.mjs`
 
 ## 검사기가 비교하는 세 가지
@@ -36,8 +37,20 @@
 | `0009_busy_puck` | ✓ | **16개 키** — sessions·reports·feedback, users.auth_role, v_posts 재정의, 0009 가 지운 것들의 부재 |
 | `0010_crazy_talos` | ✓ | **7개 키** — worksite_tips, worksite_tip_attachments |
 | `0011_lumpy_proteus` | ✓ | **5개 키** — 전부 부재 확인(users.role·firm_id 와 그 제약 3종) |
+| `0012_v_region_industry_signal` | ✓ | **11개 키** — 뷰 + 집계 컬럼 7종 존재, 개별 사업장 값(firm_id·risk_full·rank) **부재** |
 
-**합계 43개 키.** 2026-09-09 에 PostgreSQL 16 에 migration 12개를 순서대로 적용한 뒤
+0012 에 부재 확인을 함께 넣은 이유: 이 뷰의 규격(N6)이 *"개별 기업 점수·순위
+컬럼은 넣지 않음"* 이다. `CREATE OR REPLACE VIEW` 는 컬럼을 조용히 더할 수 있으므로,
+존재 확인만으로는 **개별 사업장 값이 새어 나오는 변경**을 잡지 못한다.
+
+> **부재 확인은 반드시 존재 확인과 함께 건다** (2026-09-13 정정).
+> `NOT EXISTS` 만 쓰면 **뷰 자체가 없을 때도 참**이 되어, 아직 적용하지 않은
+> migration 이 "부분 적용" 으로 보인다. 운영 DB 에서 실제로 0/11 이어야 할 것이
+> 3/11 로 나왔고, 멀쩡한 DB 를 `partial_schema_application — DEPLOY BLOCKED` 로
+> 읽게 만들었다. 후조건은 migration 이 **끝난 뒤의 상태**를 기술해야 한다.
+> `db/tests/migration-drift.test.mjs` 가 이 형태를 고정한다.
+
+**합계 54개 키** (0012 이전 43개). 2026-09-09 에 PostgreSQL 16 에 migration 12개를 순서대로 적용한 뒤
 `POSTCONDITIONS_SQL` 을 실행해 **43/43 통과**를 실측했다. 이어서 `users.role` 을 되살려
 `column_absent:public.users.role` 이 `false` 로 뒤집히는 것까지 확인했다 — 검사가 실제로
 드리프트를 잡는다는 뜻이다.

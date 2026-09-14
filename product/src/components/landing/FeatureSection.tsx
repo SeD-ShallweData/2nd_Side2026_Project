@@ -37,7 +37,7 @@ export function RiskPreviewSection() {
         <div className="refresh-section-row"><div><span className="eyebrow">사업장 확인</span><h2 id="risk-preview-title">두 가지 위험카드로 나눠 확인하세요</h2><p>사업장 단위 임금 정보와 지역·업종 단위 산업안전 정보를 섞지 않습니다.</p></div><Link href="/companies" className="button button-outline">사업장 검색하기 →</Link></div>
         <div className="refresh-risk-preview" aria-label="위험카드 화면 예시">
           <article className="refresh-risk-card is-watch">
-            <header><div><small>사업장 단위 확인 정보</small><h3>임금 지급 관련 정보</h3></div><strong>추가 확인 권장</strong></header>
+            <header><div><small>사업장 단위 확인 정보</small><h3>임금 지급 관련 정보</h3></div><strong>안전 신호 미확인</strong></header>
             <p className="refresh-status-copy"><strong>공식 명단 1개 확인 예시</strong><span>추가 공개 지표 3개 분석 예시</span></p>
             <dl>{WAGE_PREVIEW_ITEMS.map(([item, value]) => <div key={item}><dt>{item}</dt><dd>{value}</dd></div>)}</dl>
             <small className="refresh-preview-note">DEMO 예시 · 실제 결과는 선택한 사업장 데이터로 표시됩니다.</small>

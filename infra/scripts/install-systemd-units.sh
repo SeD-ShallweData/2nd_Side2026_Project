@@ -791,7 +791,16 @@ for unit_name in "${UNIT_NAMES[@]}"; do
       expected_group="$WEB_SERVICE_GROUP"
       expected_env_file="$WEB_ENV_FILE"
       expected_read_only_paths="$PROJECT_ROOT"
-      expected_read_write_paths="$WORKSITE_TIP_STORAGE_ROOT"
+      # web 은 Next.js 캐시와 현장 제보 영구 저장소에만 쓴다. 이 값은
+      # moneyworry-web.service.in 의
+      # ReadWritePaths 와 **글자 그대로** 같아야 한다 — systemctl show 는 '-'
+      # 접두사도 그대로 돌려주므로 여기에도 있어야 한다.
+      #
+      # 2026-09-13: 4-F 가 템플릿만 고치고 이 기대값을 빼먹어 설치기가 항상
+      # "effective systemd ReadWritePaths differ from the sealed unit" 으로
+      # 죽었다. CI 는 install-systemd-units.sh 를 실행하지 않고 bash -n 만
+      # 돌려서 잡히지 않았다. 이제 테스트가 둘을 묶는다.
+      expected_read_write_paths="-$PROJECT_ROOT/product/.next/cache $WORKSITE_TIP_STORAGE_ROOT"
       ;;
     moneyworry-rag)
       expected_user="$RAG_SERVICE_USER"

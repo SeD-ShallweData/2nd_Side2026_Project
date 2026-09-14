@@ -4,7 +4,16 @@ import type { LlmProviderConfig } from "@/server/llmConfig";
 
 export type LlmIntegrationStatus = "ready" | "configured_unreachable" | "unavailable";
 
-let cached: { expiresAt: number; status: LlmIntegrationStatus } | null = null;
+export interface ChatLlmStatuses {
+  primary: LlmIntegrationStatus;
+  comparison: LlmIntegrationStatus;
+}
+
+let cached: {
+  expiresAt: number;
+  signature: string;
+  statuses: ChatLlmStatuses;
+} | null = null;
 
 function healthTimeoutMs(): number {
   const parsed = Number(process.env.LLM_HEALTH_TIMEOUT_MS ?? 8_000);
@@ -40,18 +49,63 @@ async function probeProvider(config: LlmProviderConfig, fetchFn: typeof fetch): 
   }
 }
 
+function statusFor(
+  configs: LlmProviderConfig[],
+  results: Map<LlmProviderConfig["id"], boolean>,
+): LlmIntegrationStatus {
+  if (configs.length === 0 || configs.some((config) => !config.apiKey)) {
+    return "unavailable";
+  }
+  return configs.every((config) => results.get(config.id))
+    ? "ready"
+    : "configured_unreachable";
+}
+
+export async function probeChatLlmStatuses(
+  configs: LlmProviderConfig[],
+  fetchFn: typeof fetch = fetch,
+): Promise<ChatLlmStatuses> {
+  const useCache = fetchFn === fetch;
+  const now = Date.now();
+  const signature = configs
+    .map((config) => `${config.id}:${config.apiUrl}:${config.model}:${Boolean(config.apiKey)}`)
+    .join("|");
+  if (
+    useCache
+    && cached
+    && cached.expiresAt > now
+    && cached.signature === signature
+  ) {
+    return cached.statuses;
+  }
+
+  const upstage = configs.filter((config) => config.id === "upstage");
+  const configuredConfigs = configs.length > 1 && configs.every((config) => config.apiKey)
+    ? configs
+    : upstage.filter((config) => config.apiKey);
+  const probeResults = await Promise.all(
+    configuredConfigs.map(async (config) => [
+      config.id,
+      await probeProvider(config, fetchFn),
+    ] as const),
+  );
+  const results = new Map(probeResults);
+  const statuses: ChatLlmStatuses = {
+    primary: statusFor(upstage, results),
+    comparison: configs.length > 1
+      ? statusFor(configs, results)
+      : "unavailable",
+  };
+
+  if (useCache) {
+    cached = { statuses, signature, expiresAt: now + 60_000 };
+  }
+  return statuses;
+}
+
 export async function probeDualLlmStatus(
   configs: LlmProviderConfig[],
   fetchFn: typeof fetch = fetch,
 ): Promise<LlmIntegrationStatus> {
-  if (configs.some((config) => !config.apiKey)) return "unavailable";
-
-  const useCache = fetchFn === fetch;
-  const now = Date.now();
-  if (useCache && cached && cached.expiresAt > now) return cached.status;
-
-  const results = await Promise.all(configs.map((config) => probeProvider(config, fetchFn)));
-  const status: LlmIntegrationStatus = results.every(Boolean) ? "ready" : "configured_unreachable";
-  if (useCache) cached = { status, expiresAt: now + 60_000 };
-  return status;
+  return (await probeChatLlmStatuses(configs, fetchFn)).comparison;
 }
