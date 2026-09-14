@@ -11,6 +11,7 @@
 | 2 | **2026-09-03** | SHAP 피처 39종 대조 | 13절 |
 | 3 | **2026-09-06** | 판정 규칙 반례 검사 | 14절 |
 | 4 | **2026-09-09** | 피처 단위·스케일 · 집계 축 · `g5` 경계 | 15절 |
+| 5 | **2026-09-14** | 운영 DB 주석 재실측 · `HEADER MATCH` 동작 실증 | 17절 |
 
 > 2~12절은 **1회차(2026-08-31)** 기록이다. 이후 회차는 13절부터 이어 적는다.
 
@@ -618,3 +619,49 @@ select count(*), count(*) filter (where s.industry_category is null),
   from v_current_safe v join v_current_scored s using (firm_id,batch_id)
   join public.firms f using (firm_id);
 ```
+
+---
+
+## 17. 5회차 (2026-09-14) — 주석 재실측 · `HEADER MATCH` 실증
+
+### 17.1 운영 DB 주석 — 3건
+
+`0012` 적용(2026-09-13) 이후 개수를 다시 셌다.
+
+```
+pg_description (public + industrial_safety)          3건
+
+  public.v_posts                    (VIEW)   ← 0009 로 적용 (2026-09-06)
+  public.v_comments                 (VIEW)   ← 0009 로 적용
+  public.v_region_industry_signal   (VIEW)   ← 0012 로 적용 (2026-09-13)
+```
+
+**컬럼 주석은 여전히 0건이다.** `scored_active` 54컬럼을 포함해 `0002`~`0008` 의 49건은
+복원 때 유실된 상태 그대로이며, 재적용 SQL(51건)은 작성·전달됐으나 **아직 실행 전**이다.
+
+| 시점 | 개수 | 비고 |
+| --- | ---: | --- |
+| 2026-08-31 (1회차) | 0 | 7절 |
+| 2026-09-09 (4회차) | 2 | `0009` 적용분 · 15.8절 |
+| **2026-09-14 (이번)** | **3** | `0012` 뷰 주석 추가 |
+
+### 17.2 `HEADER MATCH` 가 무엇을 잡는지 — 실증
+
+`ingest.sh:297` 주석이 *"컬럼명이 staging 과 **순서·이름 모두** 같아야"* 라고 규정하는데,
+실제 동작을 확인한 적은 없었다. 임시 테이블에 네 가지 CSV 를 적재해 봤다
+(`BEGIN … ROLLBACK`, 운영 데이터 변경 없음).
+
+| 케이스 | 헤더 | 결과 |
+| --- | --- | --- |
+| 정상 | `a,b,c` | ✅ 통과 (1행 적재) |
+| 이름 오기 | `a,b,X` | ❌ `column name mismatch in header line field 3: got "X", expected "c"` |
+| **순서 뒤바꿈** | `b,a,c` | ❌ `column name mismatch in header line field 1: got "b", expected "a"` |
+| **UTF-8 BOM** | `<BOM>a,b,c` | ❌ `column name mismatch in header line field 1: got "﻿a", expected "a"` |
+
+**확인된 것**
+
+1. `HEADER MATCH` 는 이름뿐 아니라 **순서까지** 검사한다 — 주석 서술이 맞다.
+2. **BOM 이 붙으면 적재가 실패한다.** 에러 메시지가 `got "﻿a", expected "a"` 로 나와
+   **눈으로는 같은 `a` 인데 다르다고 말한다.** 원인을 모르면 진단이 매우 어렵다.
+   실제 제출물 3종에 전부 BOM 이 있으므로(4회차 후속 조사), **다음 배치를 그대로 내면
+   이 메시지와 함께 적재가 멈춘다.**
