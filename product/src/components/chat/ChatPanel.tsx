@@ -189,7 +189,9 @@ function ComparisonBlock({
         : comparison.execution_mode === "policy_short_circuit"
           ? "긴급 안내 우선"
           : "공식 근거 검색 연결 안 됨";
-  const modeCopy = executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits);
+  const modeCopy = comparison.execution_mode === "dual_api" && comparison.results.length === 1
+    ? { kicker: "단일 기본 상담", summary: "기본 모델 한 개의 답변을 표시합니다. 비교 토글을 켜면 두 모델을 함께 확인할 수 있습니다." }
+    : executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits);
   const feedbackResults = comparison.execution_mode === "dual_api"
     ? comparison.results.filter(isLegacyProvider)
     : [];
@@ -258,10 +260,10 @@ export function ChatPanel({
       role: "assistant",
       content: companyName
         ? executionMode === "dual_api"
-          ? `${companyName}의 공개 컨텍스트를 두 실제 LLM에 동일하게 전달해 비교합니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
+          ? `${companyName}의 공개 컨텍스트를 기본 모델로 안내합니다. 필요하면 두 모델 비교를 켤 수 있습니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
           : `${companyName}을 선택했습니다. 필요한 경우 허용된 사업장·위험·법령 조회 도구를 사용해 답변합니다.`
         : executionMode === "dual_api"
-          ? "Upstage Solar와 SKT A.X에 같은 노동 상담 질문을 동시에 보내 답변과 성능 지표를 비교합니다."
+          ? "기본 모델 한 개로 노동 상담 답변을 제공합니다. 필요하면 두 모델 비교를 켤 수 있습니다."
           : "OpenAI Responses가 질문에 필요한 공식 정보 도구만 선택적으로 호출해 노동 상담 답변을 만듭니다.",
     },
   ]);
@@ -270,6 +272,7 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<Record<string, LlmProviderId | "tie">>({});
+  const [compareModels, setCompareModels] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -305,6 +308,7 @@ export function ChatPanel({
         form.append("file", submittedContractFile, submittedContractFile.name);
         form.append("message", message);
         form.append("chat_mode", chatMode);
+        form.append("compare", String(compareModels));
         form.append("recent_messages", JSON.stringify(recentMessages));
         if (conversationId) form.append("conversation_id", conversationId);
         if (companyId) form.append("company_id", companyId);
@@ -316,6 +320,7 @@ export function ChatPanel({
           conversation_id: conversationId,
           company_id: companyId,
           chat_mode: chatMode,
+          compare: compareModels,
           recent_messages: recentMessages,
         });
       }
@@ -431,7 +436,7 @@ export function ChatPanel({
             </div>
           )
         ))}
-        {loading ? executionMode === "dual_api" ? (
+        {loading ? executionMode === "dual_api" && compareModels ? (
           <div className="dual-loading" role="status">
             <strong>두 모델에 같은 요청을 동시에 보냈습니다</strong>
             <div>
@@ -461,6 +466,17 @@ export function ChatPanel({
       {error ? <p className="chat-error" role="alert">{error}</p> : null}
 
       <form className="chat-form" onSubmit={handleSubmit}>
+        {executionMode === "dual_api" ? (
+          <label className="chat-compare-toggle">
+            <input
+              type="checkbox"
+              checked={compareModels}
+              onChange={(event) => setCompareModels(event.target.checked)}
+              disabled={loading}
+            />
+            <span>두 모델 비교</span>
+          </label>
+        ) : null}
         {executionMode === "openai_responses" && chatMode === "contract" ? (
           <div className="chat-contract-upload">
             <label className="button button-outline" htmlFor={contractFileInputId}>
@@ -497,7 +513,9 @@ export function ChatPanel({
       </form>
       <p className="dual-api-note">
         {executionMode === "dual_api"
-          ? "동일 질문을 실제 Upstage Solar·SKT A.X API에 병렬 전송합니다."
+          ? compareModels
+            ? "두 모델 비교를 켜면 동일 질문을 실제 Upstage Solar·SKT A.X API에 병렬 전송합니다."
+            : "기본 모델 한 개의 답변을 표시합니다. 필요하면 두 모델 비교를 켤 수 있습니다."
           : "질문에 따라 허용된 도구만 서버에서 실행하며, 단일 OpenAI Responses 답변을 표시합니다."}{" "}
         API 키와 숨은 프롬프트는 브라우저로 전송하지 않습니다.
       </p>

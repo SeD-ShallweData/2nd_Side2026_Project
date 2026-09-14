@@ -61,6 +61,7 @@ async function parseMultipart(request: Request): Promise<ParsedChatHttpRequest> 
       message:
         optionalString(form.get("message")) ??
         "현재 업로드한 근로계약서를 검토하고 확인할 항목을 알려주세요.",
+      compare: form.get("compare") === "true",
       conversation_id: optionalString(form.get("conversation_id")),
       company_id: optionalString(form.get("company_id")),
       chat_mode: optionalString(form.get("chat_mode")) ?? "contract",

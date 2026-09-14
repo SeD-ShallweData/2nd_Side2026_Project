@@ -218,7 +218,8 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
   async compare(context: ComparisonContext): Promise<ChatComparisonResponse> {
     const startedAt = new Date();
     const messages = buildMessages(context);
-    const runs = this.configs.map(async (config): Promise<ProviderComparisonResult> => {
+    const configs = context.request.compare ? this.configs : this.configs.slice(0, 1);
+    const runs = configs.map(async (config): Promise<ProviderComparisonResult> => {
       try {
         const completion = await this.client.complete(config, messages);
         const guardrailHits = scanGuardrails(completion.answer, context);

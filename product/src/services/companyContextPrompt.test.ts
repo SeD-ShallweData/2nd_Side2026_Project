@@ -93,6 +93,7 @@ function contextWithCompany(): ComparisonContext {
   return {
     request: {
       message: "이 회사 어떤가요?",
+      compare: true,
       chat_mode: "general",
       company_id: "firm_0001",
       recent_messages: [],

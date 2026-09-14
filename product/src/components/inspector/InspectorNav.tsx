@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export function InspectorNav({ current }: { current: "dashboard" | "chat" }) {
+export function InspectorNav({ current }: { current: "dashboard" | "chat" | "batches" | "ml-dashboard" }) {
   return (
     <div className="inspector-nav-wrap">
       <div className="shell inspector-nav">
@@ -17,6 +17,12 @@ export function InspectorNav({ current }: { current: "dashboard" | "chat" }) {
           </Link>
           <Link href="/inspector/chat" aria-current={current === "chat" ? "page" : undefined}>
             AI 점검 보조
+          </Link>
+          <Link href="/inspector/batches" aria-current={current === "batches" ? "page" : undefined}>
+            배치 현황
+          </Link>
+          <Link href="/inspector/ml-dashboard" aria-current={current === "ml-dashboard" ? "page" : undefined}>
+            ML 대시보드
           </Link>
         </nav>
         <span className="inspector-private-badge">내부 전용 · READ ONLY</span>

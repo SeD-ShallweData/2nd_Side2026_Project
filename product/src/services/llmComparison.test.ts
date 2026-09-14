@@ -27,6 +27,7 @@ const BASELINE: ChatResponse = {
 const CONTEXT: ComparisonContext = {
   request: {
     message: "입사해도 될까요?",
+    compare: true,
     chat_mode: "general",
     recent_messages: [],
   },

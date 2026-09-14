@@ -54,7 +54,7 @@ function policyShortCircuitResponse({
       same_max_tokens: false,
       same_retrieval: true,
     },
-    results: configs.map((config) => ({
+    results: (request.compare ? configs : configs.slice(0, 1)).map((config) => ({
       provider: config.id,
       provider_label: config.label,
       model: config.model,

@@ -27,6 +27,7 @@ vi.mock("@/adapters/real/OpenAICompatibleChatClient", () => ({
 vi.mock("@/services/chatService", () => ({
   parseChatRequest: (value: Record<string, unknown>) => ({
     message: value.message,
+    compare: value.compare === true,
     company_id: value.company_id,
     chat_mode: value.chat_mode ?? "general",
     recent_messages: value.recent_messages ?? [],
@@ -102,7 +103,7 @@ describe("상담 비교 no_match 단락", () => {
 
     expect(mocks.compare).not.toHaveBeenCalled();
     expect(result.execution_mode).toBe("policy_short_circuit");
-    expect(result.results).toHaveLength(2);
+    expect(result.results).toHaveLength(1);
     expect(result.results.every((item) => item.status === "policy_short_circuit")).toBe(true);
     expect(result.results[0]).toMatchObject({
       answer: "정책 기준 안내입니다.",
@@ -119,6 +120,27 @@ describe("상담 비교 no_match 단락", () => {
     expect(result.results[0].limitations).toContain(
       "현재 공식 근거 검색 범위에는 노동조합 자료가 수록되어 있지 않습니다.",
     );
+  });
+
+  it("compare=true이면 정책 단락 응답도 두 모델 결과를 반환한다", async () => {
+    mocks.sendChatMessage.mockResolvedValue(baseline());
+    mocks.retrieveLaborLawContext.mockResolvedValue({
+      query: "노동조합을 만들려면 어떻게 하나요?",
+      status: "no_match",
+      reason: "out_of_scope",
+      topic: "노동조합",
+      threshold: 0.42,
+      documents: [],
+    });
+
+    const result = await sendComparedChatMessage({
+      message: "노동조합을 만들려면 어떻게 하나요?",
+      compare: true,
+      chat_mode: "general",
+      recent_messages: [],
+    });
+
+    expect(result.results).toHaveLength(2);
   });
 
   it("주제명이 없는 distance_threshold도 같은 방식으로 단락한다", async () => {

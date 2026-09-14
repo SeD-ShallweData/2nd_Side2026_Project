@@ -3,6 +3,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import type { SafetyContextPublic, SourceReference, WageRiskPublic } from "@/domain/risk";
 import {
   CONNECTED_WAGE_LISTING_LABEL,
+  GREEN_FLAG_DEFINITIONS,
   UNCONNECTED_WAGE_OBSERVATION_LABELS,
 } from "@/domain/riskPresentation";
 
@@ -50,6 +51,9 @@ export function RiskInformationCard(props: CardProps) {
   const question = isWage ? "왜 임금 관련 추가 확인이 필요한가요?" : "산업재해 정보는 무엇을 확인해야 하나요?";
   const unknown = props.data.level === "unknown";
   const unavailable = props.data.availability === "unavailable";
+  const greenFlags = isWage
+    ? props.data.green_flags ?? GREEN_FLAG_DEFINITIONS.map((flag) => ({ ...flag, confirmed: null }))
+    : [];
 
   return (
     <article className={`risk-card risk-card-${props.kind} risk-level-${props.data.level}`}>
@@ -108,6 +112,23 @@ export function RiskInformationCard(props: CardProps) {
           <strong>공식 명단 1개 확인</strong>
           <span>추가 공개 지표 3개 연동 준비 중</span>
         </div>
+      ) : null}
+
+      {isWage ? (
+        <section className="risk-section green-flag-section" aria-labelledby="green-flag-title">
+          <div className="observation-title-row">
+            <h3 id="green-flag-title">안정 신호</h3>
+            <span>확인된 항목만 표시</span>
+          </div>
+          <ul className="green-flag-list">
+            {greenFlags.map((flag) => (
+              <li key={flag.code} className={flag.confirmed === true ? "is-confirmed" : ""}>
+                <span aria-hidden="true">{flag.confirmed === true ? "✓" : ""}</span>
+                <strong>{flag.label}</strong>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       {isWage ? (

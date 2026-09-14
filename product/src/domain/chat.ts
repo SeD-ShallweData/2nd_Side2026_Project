@@ -17,6 +17,7 @@ export interface RecentMessage {
 
 export interface ChatRequest {
   message: string;
+  compare?: boolean;
   conversation_id?: string;
   company_id?: string;
   resolved_query?: string;

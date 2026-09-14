@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { RiskInformationCard } from "@/components/risk/RiskInformationCard";
-import { UNCONNECTED_WAGE_OBSERVATION_LABELS } from "@/domain/riskPresentation";
+import { GREEN_FLAG_DEFINITIONS, UNCONNECTED_WAGE_OBSERVATION_LABELS } from "@/domain/riskPresentation";
 
 describe("RiskInformationCard 임금 공개 경계", () => {
   it("공식 명단 1개와 미연결 추가 지표 3개만 표시한다", () => {
@@ -34,6 +34,9 @@ describe("RiskInformationCard 임금 공개 경계", () => {
     expect(html).toContain("데이터 기준일</dt><dd>2026-06-01");
     expect((html.match(/확인할 수 없음/g) ?? [])).toHaveLength(3);
     for (const label of UNCONNECTED_WAGE_OBSERVATION_LABELS) expect(html).toContain(label);
+    for (const { label } of GREEN_FLAG_DEFINITIONS) expect(html).toContain(label);
+    expect(html).toContain("안정 신호");
+    expect(html).not.toContain("/6");
     for (const removed of ["건강보험 체납 명단", "국민연금 가입자 (12개월)", "1인당 고지금액", "업종 폐업률"]) {
       expect(html).not.toContain(removed);
     }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpRagRetriever } from "@/adapters/real/HttpRagRetriever";
 import { RealContractReviewProvider } from "@/adapters/real/RealContractReviewProvider";
-import { toWageRiskPublic } from "@/adapters/real/MlRiskProvider";
+import { getNextBatchDueDate, toWageRiskPublic } from "@/adapters/real/MlRiskProvider";
 import { getCompanyDataMode, getContractDataMode } from "@/config/dataMode";
 import { buildBotDatabaseUrl, getDatabaseConnectionString } from "@/server/databaseConfig";
 import { queryReadOnly } from "@/server/postgres";
@@ -21,6 +21,19 @@ describe("기능별 데이터 모드", () => {
 });
 
 describe("실제 ML DB 공개 경계", () => {
+  it.each([
+    ["2026-08-31", "2026-09-30"],
+    ["2026-09-13", "2026-10-13"],
+  ])("배치 기준일 %s의 다음 월 갱신일을 %s로 계산한다", (asOfDate, expected) => {
+    expect(getNextBatchDueDate(asOfDate)).toBe(expected);
+  });
+
+  it("기준일이 없거나 날짜 형식이 아니면 갱신일을 만들지 않는다", () => {
+    expect(getNextBatchDueDate(null)).toBeNull();
+    expect(getNextBatchDueDate("2026-9-13")).toBeNull();
+    expect(getNextBatchDueDate("2026-02-31")).toBeNull();
+  });
+
   const baseRow = {
     firm_id: "firm-1",
     name: "테스트사업장",
@@ -34,6 +47,12 @@ describe("실제 ML DB 공개 경계", () => {
     ingested_at: "2026-08-11T00:00:00Z",
     n_months: 12,
     n_green: 4,
+    g1_employment_stable: true,
+    g2_payment_faithful: true,
+    g3_payroll_stable: false,
+    g4_workforce_kept: true,
+    g5_age_3y: null,
+    g6_low_volatility: false,
     excluded_wage: false,
   };
 
@@ -48,6 +67,14 @@ describe("실제 ML DB 공개 경계", () => {
     const result = toWageRiskPublic({ ...baseRow, verdict });
     expect(result.level).toBe(level);
     expect(result.verdict).toBe(verdict);
+    expect(result.green_flags).toEqual([
+      { code: "G1", label: "고용안정", confirmed: true },
+      { code: "G2", label: "성실납부", confirmed: true },
+      { code: "G3", label: "인건비안정", confirmed: false },
+      { code: "G4", label: "인력유지", confirmed: true },
+      { code: "G5", label: "업력3년", confirmed: null },
+      { code: "G6", label: "낮은변동성", confirmed: false },
+    ]);
   });
 
   it("원시 점수나 모델 배치일 없이 공식 명단 상태와 확인 근거만 반환한다", () => {

@@ -2,6 +2,7 @@ import type {
   CompanyRiskResult,
   Confidence,
   EvidenceItem,
+  GreenFlagPublic,
   SafetyContextPublic,
   SignalLevel,
   WageRiskPublic,
@@ -22,6 +23,12 @@ interface WageRow {
   ingested_at: string | Date | null;
   n_months: number | null;
   n_green: number | null;
+  g1_employment_stable: boolean | null;
+  g2_payment_faithful: boolean | null;
+  g3_payroll_stable: boolean | null;
+  g4_workforce_kept: boolean | null;
+  g5_age_3y: boolean | null;
+  g6_low_volatility: boolean | null;
   verdict: string | null;
   excluded_wage: boolean | null;
 }
@@ -74,6 +81,23 @@ const VERDICT_META: Record<string, { level: SignalLevel; summary: string; code: 
   },
 };
 
+const GREEN_FLAG_DEFINITIONS: Array<Pick<GreenFlagPublic, "code" | "label"> & { field: keyof WageRow }> = [
+  { code: "G1", label: "고용안정", field: "g1_employment_stable" },
+  { code: "G2", label: "성실납부", field: "g2_payment_faithful" },
+  { code: "G3", label: "인건비안정", field: "g3_payroll_stable" },
+  { code: "G4", label: "인력유지", field: "g4_workforce_kept" },
+  { code: "G5", label: "업력3년", field: "g5_age_3y" },
+  { code: "G6", label: "낮은변동성", field: "g6_low_volatility" },
+];
+
+function greenFlags(row: WageRow): GreenFlagPublic[] {
+  return GREEN_FLAG_DEFINITIONS.map(({ code, label, field }) => ({
+    code,
+    label,
+    confirmed: row[field] as boolean | null,
+  }));
+}
+
 export function toWageRiskPublic(row: WageRow): WageRiskPublic {
   const mapped = row.verdict ? VERDICT_META[row.verdict] : undefined;
   const excluded = row.verdict?.startsWith("배제_") ?? false;
@@ -104,6 +128,7 @@ export function toWageRiskPublic(row: WageRow): WageRiskPublic {
   return {
     availability: row.score_batch_id === null && row.verdict === null ? "no_data" : "ready",
     verdict: row.verdict as WageRiskPublic["verdict"],
+    green_flags: greenFlags(row),
     level,
     summary: excluded
       ? "사용자용 공개 판정에서 우선 확인할 항목이 있습니다. 이를 체불 발생 확정이나 입사 판단으로 해석하지 마세요."
@@ -192,6 +217,23 @@ function toIso(value: string | Date | null): string | null {
   return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString();
 }
 
+export function getNextBatchDueDate(asOfDate: string | null): string | null {
+  if (!asOfDate || !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) return null;
+  const [year, month, day] = asOfDate.split("-").map(Number);
+  const sourceDate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    sourceDate.getUTCFullYear() !== year ||
+    sourceDate.getUTCMonth() !== month - 1 ||
+    sourceDate.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  const nextMonth = new Date(Date.UTC(year, month + 1, 0));
+  const lastDay = nextMonth.getUTCDate();
+  const dueDate = new Date(Date.UTC(year, month, Math.min(day, lastDay)));
+  return dueDate.toISOString().slice(0, 10);
+}
+
 async function getSafety(company: WageRow): Promise<{ data: SafetyContextPublic; source?: CompanyRiskResult["sources"][number] }> {
   try {
     const rows = await queryReadOnly<SafetyRow>(
@@ -218,7 +260,7 @@ async function getSafety(company: WageRow): Promise<{ data: SafetyContextPublic;
       source: {
         name: "산업재해 공표 우선순위 안전 뷰",
         category: "safety",
-        organization: "돈워리 산업안전 데이터 파이프라인",
+        organization: "Co끼리 산업안전 데이터 파이프라인",
         as_of: toIso(rows[0].published_at) ?? rows[0].prediction_as_of,
         document_id: [rows[0].model_name, rows[0].model_version].filter(Boolean).join(":"),
       },
@@ -238,6 +280,7 @@ async function getSafety(company: WageRow): Promise<{ data: SafetyContextPublic;
 function unavailableWage(): WageRiskPublic {
   return {
     availability: "unavailable",
+    green_flags: GREEN_FLAG_DEFINITIONS.map(({ code, label }) => ({ code, label, confirmed: null })),
     level: "unknown",
     summary: "임금 지급 관련 정보를 현재 불러오지 못했습니다.",
     evidence_codes: [],
@@ -250,10 +293,16 @@ function unavailableWage(): WageRiskPublic {
 async function getWage(company: CompanyBatchRow): Promise<WageRiskPublic> {
   if (company.batch_id === null) return { ...unavailableWage(), availability: "no_data", summary: "분석 가능한 최신 임금 자료가 없습니다." };
   try {
-    const rows = await queryReadOnly<Pick<WageRow, "score_batch_id" | "n_months" | "n_green" | "verdict" | "excluded_wage">>(
+    const rows = await queryReadOnly<Pick<WageRow, "score_batch_id" | "n_months" | "n_green" | "verdict" | "excluded_wage" | "g1_employment_stable" | "g2_payment_faithful" | "g3_payroll_stable" | "g4_workforce_kept" | "g5_age_3y" | "g6_low_volatility">>(
       `SELECT s.batch_id AS score_batch_id,
               COALESCE(r.n_months, s.n_months) AS n_months,
               COALESCE(r.n_green, s.n_green) AS n_green,
+              s."g1_고용안정" AS g1_employment_stable,
+              s."g2_성실납부" AS g2_payment_faithful,
+              s."g3_인건비안정" AS g3_payroll_stable,
+              s."g4_인력유지" AS g4_workforce_kept,
+              s."g5_업력3년" AS g5_age_3y,
+              s."g6_낮은변동성" AS g6_low_volatility,
               r."판정" AS verdict,
               COALESCE(r."체불배제", s."체불배제") AS excluded_wage
          FROM (SELECT $1::text AS firm_id, $2::integer AS batch_id) AS target
@@ -270,6 +319,12 @@ async function getWage(company: CompanyBatchRow): Promise<WageRiskPublic> {
       score_batch_id: signal?.score_batch_id ?? null,
       n_months: signal?.n_months ?? null,
       n_green: signal?.n_green ?? null,
+      g1_employment_stable: signal?.g1_employment_stable ?? null,
+      g2_payment_faithful: signal?.g2_payment_faithful ?? null,
+      g3_payroll_stable: signal?.g3_payroll_stable ?? null,
+      g4_workforce_kept: signal?.g4_workforce_kept ?? null,
+      g5_age_3y: signal?.g5_age_3y ?? null,
+      g6_low_volatility: signal?.g6_low_volatility ?? null,
       verdict: signal?.verdict ?? null,
       excluded_wage: signal?.excluded_wage ?? null,
     });
@@ -311,6 +366,12 @@ export class MlRiskProvider {
         score_batch_id: null,
         n_months: null,
         n_green: null,
+        g1_employment_stable: null,
+        g2_payment_faithful: null,
+        g3_payroll_stable: null,
+        g4_workforce_kept: null,
+        g5_age_3y: null,
+        g6_low_volatility: null,
         verdict: null,
         excluded_wage: null,
       }),
@@ -321,7 +382,7 @@ export class MlRiskProvider {
       data_as_of: row.as_of_date,
       target_month: row.target_month,
       generated_at: toIso(row.ingested_at),
-      valid_until: null,
+      valid_until: getNextBatchDueDate(row.as_of_date),
       freshness: "unknown",
       wage_risk: wage,
       safety_context: safety.data,
@@ -329,7 +390,7 @@ export class MlRiskProvider {
         {
           name: "국민연금 사업장 자료 및 ML 공개 판정",
           category: "wage",
-          organization: "돈워리 임금체불 데이터 파이프라인",
+          organization: "Co끼리 임금체불 데이터 파이프라인",
           as_of: row.as_of_date ?? undefined,
           document_id:
             row.batch_id === null

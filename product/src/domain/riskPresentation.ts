@@ -1,4 +1,13 @@
-import type { SignalLevel, WageVerdict } from "@/domain/risk";
+import type { GreenFlagPublic, SignalLevel, WageVerdict } from "@/domain/risk";
+
+export const GREEN_FLAG_DEFINITIONS: Array<Pick<GreenFlagPublic, "code" | "label">> = [
+  { code: "G1", label: "고용안정" },
+  { code: "G2", label: "성실납부" },
+  { code: "G3", label: "인건비안정" },
+  { code: "G4", label: "인력유지" },
+  { code: "G5", label: "업력3년" },
+  { code: "G6", label: "낮은변동성" },
+];
 
 export const SIGNAL_STATUS_META: Record<SignalLevel, { label: string; className: string }> = {
   normal: { label: "뚜렷한 이상 신호 없음", className: "status-neutral" },

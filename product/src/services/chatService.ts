@@ -46,6 +46,7 @@ export function parseChatRequest(value: unknown): ChatRequest {
 
   return {
     message,
+    compare: input.compare === true,
     conversation_id: typeof input.conversation_id === "string" ? input.conversation_id : undefined,
     company_id: typeof input.company_id === "string" ? input.company_id : undefined,
     chat_mode: chatMode as ChatMode,
