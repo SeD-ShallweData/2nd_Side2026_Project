@@ -210,7 +210,7 @@ class SystemdPrivilegeBoundaryTests(unittest.TestCase):
             "can access private worksite tip storage",
             'find -P "$WORKSITE_TIP_STORAGE_ROOT" -mindepth 1',
             "worksite tip storage file mode must be exactly 0600",
-            'expected_read_write_paths="$WORKSITE_TIP_STORAGE_ROOT"',
+            'expected_read_write_paths="-$PROJECT_ROOT/product/.next/cache $WORKSITE_TIP_STORAGE_ROOT"',
         ):
             self.assertIn(token, installer)
 

@@ -1,4 +1,11 @@
 export type SignalLevel = "normal" | "watch" | "review" | "unknown";
+export type WageVerdict =
+  | "안정신호"
+  | "유보"
+  | "유보_정보부족"
+  | "배제_임금체불공개"
+  | "배제_공개체납"
+  | "배제_4대보험체납(door1)";
 export type Confidence = "sufficient" | "limited" | "unavailable";
 export type Freshness = "current" | "expired" | "unknown";
 export type SignalAvailability = "ready" | "no_data" | "unavailable";
@@ -29,6 +36,7 @@ export interface OfficialListingStatus {
 
 export interface WageRiskPublic {
   availability?: SignalAvailability;
+  verdict?: WageVerdict | null;
   level: SignalLevel;
   summary: string;
   evidence_codes: string[];
