@@ -163,8 +163,13 @@ def stream_csv(path):
 
     따옴표로 감싼 필드가 있으므로 반드시 csv 모듈을 쓴다 —
     industry_category 값에 쉼표가 들어 있어 split(',') 로는 컬럼이 밀린다.
-    scored 가 55만 행이라 list() 로 받으면 메모리가 GB 단위로 뛴다."""
-    with open(path, encoding="utf-8", newline="") as fh:
+    scored 가 55만 행이라 list() 로 받으면 메모리가 GB 단위로 뛴다.
+
+    인코딩은 utf-8-sig 다. 산출 측이 AGENT_GUIDE 지시대로 BOM 을 붙여 쓰고,
+    ingest.sh 도 2026-09-14 부터 BOM 을 벗기고 적재하므로, 이 도구도 같게 읽어야
+    한다. utf-8 로 읽으면 첫 컬럼명이 \ufeff사업장명 이 되어 C2 가 거짓으로 실패한다.
+    BOM 이 있다는 사실 자체는 F2 가 바이트를 직접 보고 경고한다."""
+    with open(path, encoding="utf-8-sig", newline="") as fh:
         reader = csv.reader(fh)
         header = next(reader, None)
         yield header
@@ -198,7 +203,7 @@ def check_files(outputs, rep):
         with open(path, "rb") as fh:
             head = fh.read(3)
         if head == b"\xef\xbb\xbf":
-            rep.error("F2", f"BOM 발견: {name} — UTF-8(BOM 없음)으로 저장하세요")
+            rep.warn("F2", f"BOM 발견: {name} — 적재는 BOM 을 제거하고 읽습니다(ingest.sh)")
         try:
             with open(path, encoding="utf-8") as fh:
                 fh.read(4096)

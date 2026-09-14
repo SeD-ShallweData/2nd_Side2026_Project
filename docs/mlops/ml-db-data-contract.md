@@ -102,8 +102,15 @@ for f in scored_active_full.csv 감독관_위험큐_full.csv safe_recommendation
 > **적용 완료 (2026-09-07)** — PostgreSQL 16의 `HEADER MATCH`로 전환했다. CSV 헤더 이름이
 > §4 컬럼명과 다르면 적재가 **즉시 실패**한다. 순서만 맞고 이름이 틀린 파일은 이제 통과하지 못한다.
 >
-> ⚠️ **BOM 주의** — UTF-8 BOM이 붙은 파일은 첫 컬럼명이 다른 것으로 판정되어 실패한다.
-> 2026-09-11 실물 대조에서 제출물 3종 **전부에 BOM이 있었다.** 제출 전에 제거한다(부록 A).
+> ⚠️ **BOM** — UTF-8 BOM 이 붙으면 첫 컬럼명이 다른 것으로 판정된다
+> (실측: `column name mismatch in header line field 1: got "﻿순위", expected "순위"`).
+> 제출물 3종에는 **전부 BOM 이 있다** — 산출 측이 `AGENT_GUIDE` 의 `utf-8-sig` 지시를
+> 따르기 때문이며, 그 편이 사람이 Excel 로 여는 파일의 한글을 지킨다.
+>
+> **2026-09-14 부터 `ingest.sh` 가 적재 직전에 BOM 만 벗긴 사본을 만들어 읽는다.**
+> 원본은 건드리지 않고 `batches.source` 프로버넌스도 원본 기준으로 유지된다.
+> **따라서 제출물에 BOM 이 있어도 된다.** 재현·실증은
+> `docs/data-contract/verification.md` 17.2.
 
 ### 규칙 2 — 불리언은 **숫자**로 쓴다
 
