@@ -22,8 +22,10 @@ import type {
 } from "@/domain/worksiteTip";
 import type {
   WorksiteTipApiSource,
+  WorksiteTipCategory,
   WorksiteTipCompanyContextDto,
   WorksiteTipPhotoMediaType,
+  WorksiteTipStatus,
 } from "@/app/api/worksite-tips/worksiteTipApiContract";
 import {
   isWriteDatabaseConfigured,
@@ -37,6 +39,8 @@ const STORAGE_KEY_PATTERN = /^\d{4}\/\d{2}\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i;
 
 interface TipRow {
   tip_id: string;
+  category: WorksiteTipCategory;
+  status: WorksiteTipStatus;
   title: string;
   body: string | null;
   firm_id: string | null;
@@ -139,6 +143,8 @@ function toAttachment(row: AttachmentRow): StoredWorksiteTipAttachment {
 function toTip(row: TipRow, attachments: StoredWorksiteTipAttachment[]): StoredWorksiteTip {
   return {
     tip_id: row.tip_id,
+    category: row.category,
+    status: row.status,
     title: row.title,
     body: row.body,
     company_context: row.firm_id
@@ -152,6 +158,8 @@ function toTip(row: TipRow, attachments: StoredWorksiteTipAttachment[]): StoredW
 const TIP_SELECT = `
   SELECT
     t.id::text AS tip_id,
+    t.category,
+    t.status,
     t.title,
     t.body,
     t.firm_id,
@@ -192,6 +200,38 @@ export class RealWorksiteTipRepository implements WorksiteTipRepository {
            current_user = 'wg_tip'
            AND to_regclass('public.worksite_tips') IS NOT NULL
            AND to_regclass('public.worksite_tip_attachments') IS NOT NULL
+           AND to_regclass('public.worksite_tips_status_submitted_idx') IS NOT NULL
+           AND EXISTS (
+             SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = 'worksite_tips'
+                AND column_name = 'status'
+                AND column_default ~* '''received''::text'
+           )
+           AND EXISTS (
+             SELECT 1
+               FROM pg_catalog.pg_constraint con
+               JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
+               JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname = 'public'
+                AND c.relname = 'worksite_tips'
+                AND con.conname = 'worksite_tips_category_ck'
+                AND pg_get_constraintdef(con.oid) ~* '''wage'''
+                AND pg_get_constraintdef(con.oid) ~* '''safety'''
+                AND pg_get_constraintdef(con.oid) !~* '''worksite_tip'''
+           )
+           AND EXISTS (
+             SELECT 1
+               FROM pg_catalog.pg_constraint con
+               JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
+               JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname = 'public'
+                AND c.relname = 'worksite_tips'
+                AND con.conname = 'worksite_tips_status_ck'
+                AND pg_get_constraintdef(con.oid) ~* '''received'''
+                AND pg_get_constraintdef(con.oid) ~* '''in_progress'''
+                AND pg_get_constraintdef(con.oid) ~* '''completed'''
+           )
            AND has_table_privilege(current_user, 'public.worksite_tips', 'SELECT')
            AND has_table_privilege(current_user, 'public.worksite_tips', 'INSERT')
            AND NOT has_table_privilege(current_user, 'public.worksite_tips', 'UPDATE')
@@ -287,14 +327,16 @@ export class RealWorksiteTipRepository implements WorksiteTipRepository {
       const created = await withWriteTransaction("tip", async (transaction) => {
         const tips = await transaction.query<TipRow>(
           `INSERT INTO worksite_tips (
-             id, reporter_id, category, title, body, firm_id, submitted_at
+             id, reporter_id, category, status, title, body, firm_id, submitted_at
            )
-           VALUES ($1::uuid, $2::uuid, 'worksite_tip', $3, $4, $5, $6::timestamptz)
-           RETURNING id::text AS tip_id, title, body, firm_id,
+           VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8::timestamptz)
+           RETURNING id::text AS tip_id, category, status, title, body, firm_id,
                      NULL::text AS sido, NULL::text AS industry, submitted_at`,
           [
             input.tip_id,
             input.reporter_id,
+            input.category,
+            input.status,
             input.title,
             input.body,
             input.company_context?.company_id ?? null,
@@ -351,7 +393,14 @@ export class RealWorksiteTipRepository implements WorksiteTipRepository {
     const rows = await queryWrite<TipRow>(
       "tip",
       `${TIP_SELECT}
-       ORDER BY t.submitted_at DESC, t.id DESC
+       ORDER BY CASE t.status
+                  WHEN 'received' THEN 0
+                  WHEN 'in_progress' THEN 1
+                  WHEN 'completed' THEN 2
+                  ELSE 3
+                END,
+                t.submitted_at DESC,
+                t.id DESC
        LIMIT $1 OFFSET $2`,
       [limit, (page - 1) * limit],
     );

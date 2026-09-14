@@ -79,6 +79,18 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "view_column_absent:public.v_region_industry_signal.risk_full",
     "view_column_absent:public.v_region_industry_signal.rank",
   ]),
+  // 0013 은 K5 현장 신고 정보설계의 분류·상태 계약을 고정한다.
+  // 컬럼/객체 존재뿐 아니라 허용값과 기본값까지 검사해야 예전 worksite_tip
+  // 고정 분류가 되살아난 상태를 aligned 로 오판하지 않는다.
+  "0013_illegal_sir_ram": Object.freeze([
+    "column:public.worksite_tips.status",
+    "index:public.worksite_tips_status_submitted_idx",
+    "constraint:public.worksite_tips.worksite_tips_status_ck",
+    "constraint_definition:public.worksite_tips.worksite_tips_category_ck",
+    "constraint_definition:public.worksite_tips.worksite_tips_status_ck",
+    "column_default:public.worksite_tips.status_received",
+    "column_default_absent:public.worksite_tips.category",
+  ]),
 });
 
 function migrationLabel(migration) {

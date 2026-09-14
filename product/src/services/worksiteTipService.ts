@@ -5,7 +5,8 @@ import sharp from "sharp";
 
 import type { SessionUserDto } from "@/app/api/auth/authApiContract";
 import {
-  WORKSITE_TIP_CATEGORY,
+  WORKSITE_TIP_CATEGORIES,
+  WORKSITE_TIP_INITIAL_STATUS,
   WORKSITE_TIP_MAX_PHOTO_BYTES,
   WORKSITE_TIP_MAX_PHOTO_COUNT,
   WORKSITE_TIP_MAX_TOTAL_PHOTO_BYTES,
@@ -16,6 +17,7 @@ import {
   type WorksiteTipListResponse,
   type WorksiteTipPhotoMediaType,
   type WorksiteTipReceiptDto,
+  type WorksiteTipCategory,
 } from "@/app/api/worksite-tips/worksiteTipApiContract";
 import { WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER } from "@/adapters/mock/MockWorksiteTipRepository";
 import type {
@@ -126,6 +128,20 @@ function parseCompanyId(value: FormDataEntryValue | null): string | null {
     );
   }
   return normalized;
+}
+
+function parseCategory(value: FormDataEntryValue | null): WorksiteTipCategory {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (!WORKSITE_TIP_CATEGORIES.includes(normalized as WorksiteTipCategory)) {
+    throw new ServiceError(
+      "VALIDATION_ERROR",
+      "제보 유형을 확인해 주세요.",
+      400,
+      false,
+      [{ field: "category", reason: "category는 wage 또는 safety여야 합니다." }],
+    );
+  }
+  return normalized as WorksiteTipCategory;
 }
 
 function asciiAt(bytes: Uint8Array, offset: number, expected: string): boolean {
@@ -455,6 +471,7 @@ async function parseSubmission(
   tipId: string,
   submittedAt: string,
 ): Promise<{
+  category: WorksiteTipCategory;
   title: string;
   body: string | null;
   company_id: string | null;
@@ -484,6 +501,7 @@ async function parseSubmission(
       false,
     );
   }
+  const category = parseCategory(form.get("category"));
   const title = parseRequiredText(form.get("title"), "title", 2, 120);
   const body = parseOptionalText(form.get("body"), "body", 5_000);
   const attachments = await parsePhotos(form, tipId, submittedAt);
@@ -500,6 +518,7 @@ async function parseSubmission(
     );
   }
   return {
+    category,
     title,
     body,
     company_id: parseCompanyId(form.get("company_id")),
@@ -544,7 +563,8 @@ function toInspectorDto(
   return {
     source,
     tip_id: tip.tip_id,
-    category: WORKSITE_TIP_CATEGORY,
+    category: tip.category,
+    status: tip.status,
     title: tip.title,
     body: tip.body,
     company_context: tip.company_context ? { ...tip.company_context } : null,
@@ -563,7 +583,8 @@ function toInspectorListItem(
   return {
     source,
     tip_id: tip.tip_id,
-    category: WORKSITE_TIP_CATEGORY,
+    category: tip.category,
+    status: tip.status,
     title: tip.title,
     body_preview: bodyPreview,
     company_context: tip.company_context ? { ...tip.company_context } : null,
@@ -593,6 +614,8 @@ export async function createWorksiteTip(
   const tip = await repository.insertTip({
     tip_id: tipId,
     reporter_id: user.user_id,
+    category: submission.category,
+    status: WORKSITE_TIP_INITIAL_STATUS,
     title: submission.title,
     body: submission.body,
     company_context: companyContext,
@@ -602,8 +625,10 @@ export async function createWorksiteTip(
   return {
     source: repository.source,
     tip_id: tip.tip_id,
-    category: WORKSITE_TIP_CATEGORY,
+    category: tip.category,
+    status: tip.status,
     title: tip.title,
+    body: tip.body,
     submitted_at: tip.submitted_at,
     attachment_count: tip.attachments.length,
   };

@@ -1,7 +1,9 @@
 import type {
   WorksiteTipApiSource,
+  WorksiteTipCategory,
   WorksiteTipCompanyContextDto,
   WorksiteTipPhotoMediaType,
+  WorksiteTipStatus,
 } from "@/app/api/worksite-tips/worksiteTipApiContract";
 
 export interface StoredWorksiteTipAttachment {
@@ -14,6 +16,8 @@ export interface StoredWorksiteTipAttachment {
 
 export interface StoredWorksiteTip {
   tip_id: string;
+  category: WorksiteTipCategory;
+  status: WorksiteTipStatus;
   title: string;
   body: string | null;
   company_context: WorksiteTipCompanyContextDto | null;
@@ -29,6 +33,8 @@ export interface NewWorksiteTipAttachment extends StoredWorksiteTipAttachment {
 export interface NewWorksiteTip {
   tip_id: string;
   reporter_id: string;
+  category: WorksiteTipCategory;
+  status: WorksiteTipStatus;
   title: string;
   body: string | null;
   company_context: WorksiteTipCompanyContextDto | null;

@@ -41,6 +41,8 @@ function input(): NewWorksiteTip {
   return {
     tip_id: TIP_ID,
     reporter_id: REPORTER_ID,
+    category: "safety",
+    status: "received",
     title: "안전모 미지급",
     body: "현장에 안전모가 부족합니다.",
     company_context: {
@@ -66,6 +68,8 @@ function input(): NewWorksiteTip {
 function tipRow() {
   return {
     tip_id: TIP_ID,
+    category: "safety" as const,
+    status: "received" as const,
     title: "안전모 미지급",
     body: "현장에 안전모가 부족합니다.",
     firm_id: "f0000000000000a2",
@@ -120,6 +124,10 @@ describe("현장 제보 실저장", () => {
     );
     expect(String(db.queryWrite.mock.calls[0]?.[1])).toContain("pg_catalog.pg_class");
     expect(String(db.queryWrite.mock.calls[0]?.[1])).toContain("'TRIGGER'");
+    expect(String(db.queryWrite.mock.calls[0]?.[1])).toContain(
+      "worksite_tips_status_submitted_idx",
+    );
+    expect(String(db.queryWrite.mock.calls[0]?.[1])).toContain("worksite_tips_status_ck");
 
     db.queryWrite.mockRejectedValueOnce(new Error("connection unavailable"));
     await expect(new RealWorksiteTipRepository().isReady()).resolves.toBe(false);
@@ -136,6 +144,16 @@ describe("현장 제보 실저장", () => {
     expect(String(db.transactionQuery.mock.calls[1]?.[0])).toContain(
       "INSERT INTO worksite_tip_attachments",
     );
+    expect(db.transactionQuery.mock.calls[0]?.[1]).toEqual([
+      TIP_ID,
+      REPORTER_ID,
+      "safety",
+      "received",
+      "안전모 미지급",
+      "현장에 안전모가 부족합니다.",
+      "f0000000000000a2",
+      SUBMITTED_AT,
+    ]);
     expect(db.transactionQuery.mock.calls[1]?.[1]).toEqual([
       ATTACHMENT_ID,
       TIP_ID,
@@ -185,6 +203,20 @@ describe("현장 제보 실저장", () => {
     );
     expect(attachment).toEqual({ bytes: inspectorBytes, media_type: "image/jpeg" });
     expect(attachment?.bytes).not.toEqual(originalBytes);
+  });
+
+  it("감독관 목록을 접수완료·처리중·처리완료 순으로 묶고 각 상태 안에서는 최신순으로 조회한다", async () => {
+    db.queryWrite
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ total: "0" }]);
+
+    await new RealWorksiteTipRepository().listTips(10, 1);
+
+    const sql = String(db.queryWrite.mock.calls[0]?.[1]);
+    expect(sql).toContain("WHEN 'received' THEN 0");
+    expect(sql).toContain("WHEN 'in_progress' THEN 1");
+    expect(sql).toContain("WHEN 'completed' THEN 2");
+    expect(sql).toMatch(/submitted_at DESC[\s\S]*t\.id DESC/);
   });
 
   it("확정된 DB 저장 실패 시 먼저 쓴 원본과 조사관 사본을 정리한다", async () => {
