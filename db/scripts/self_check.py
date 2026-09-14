@@ -344,7 +344,7 @@ def scan_file(name, header, rows, rep):
         if rf_not_number:
             rep.error("V6", f"risk_full 이 숫자가 아닙니다: {name} {rf_not_number[0]}행 '{rf_not_number[1]}'")
         elif rf_out_of_range:
-            rep.warn("V6", f"risk_full 범위 밖: {name} {Report.sample(rf_out_of_range)} — 0~1 이어야 합니다")
+            rep.error("V6", f"risk_full 범위 밖: {name} {Report.sample(rf_out_of_range)} — 0~1 이어야 합니다")
         else:
             rep.ok("V6")
 
