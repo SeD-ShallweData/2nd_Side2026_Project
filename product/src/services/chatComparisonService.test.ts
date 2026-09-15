@@ -112,7 +112,8 @@ describe("상담 비교 no_match 단락", () => {
     expect(result.results).toHaveLength(1);
     expect(result.results.every((item) => item.status === "policy_short_circuit")).toBe(true);
     expect(result.results[0]).toMatchObject({
-      answer: "정책 기준 안내입니다.",
+      answer: "이 질문은 노동·근로계약 상담 범위 밖의 노동조합 내용입니다. 고용노동부 고객상담센터 1350에서 확인해 주세요.",
+      answer_type: "clarification",
       sources: [],
       guardrail_status: "limited",
       trace: {
@@ -124,8 +125,52 @@ describe("상담 비교 no_match 단락", () => {
       },
     });
     expect(result.results[0].limitations).toContain(
-      "현재 공식 근거 검색 범위에는 노동조합 자료가 수록되어 있지 않습니다.",
+      "현재 공식 노동법 근거 검색 범위에는 노동조합 자료가 수록되어 있지 않습니다.",
     );
+    expect(result.results[0].suggested_actions).toEqual([
+      expect.objectContaining({ url: "https://1350.moel.go.kr/home/" }),
+    ]);
+  });
+
+  it.each([
+    ["부동산 시세가 어떻게 되나요?", "부동산", "국토교통부 실거래가 공개시스템", "https://rt.molit.go.kr/"],
+    ["종합소득세 신고는 어떻게 하나요?", "세금", "국세청 홈택스", "https://www.hometax.go.kr/"],
+    ["주식 투자 전망은 어떤가요?", "투자", "금융감독원", "https://www.fss.or.kr/"],
+    ["파이썬 코딩을 배우고 싶어요", "프로그래밍", "K-MOOC 강좌 검색", "https://www.kmooc.kr/view/course"],
+  ])("회사 선택 여부와 관계없이 %s 질문에 관련 안내만 반환한다", async (message, topic, label, url) => {
+    mocks.sendChatMessage.mockResolvedValue(baseline({
+      answer: "이 기업의 임금 위험과 산재 정보를 안내합니다.",
+      answer_type: "company_context",
+      sources: [{ name: "사업장 공개자료", category: "wage" }],
+    }));
+    mocks.retrieveLaborLawContext.mockResolvedValue({
+      query: message,
+      status: "no_match",
+      reason: "out_of_scope",
+      topic,
+      threshold: 0.42,
+      documents: [],
+    });
+
+    for (const company_id of [undefined, "COMPANY_DEMO_001"]) {
+      const result = await sendComparedChatMessage({
+        message,
+        company_id,
+        chat_mode: "general",
+        recent_messages: [],
+      });
+      const answer = result.results[0];
+      expect(answer.answer).toContain(`상담 범위 밖의 ${topic}`);
+      expect(answer.answer).toContain(label);
+      expect(answer.answer).not.toContain("임금 위험");
+      expect(answer.answer_type).toBe("clarification");
+      expect(answer.sources).toEqual([]);
+      expect(answer.suggested_actions).toEqual([expect.objectContaining({ url })]);
+      expect(answer.trace.company_context_attached).toBe(false);
+      expect(answer.trace.guardrail_hits).toEqual(["RAG_NO_MATCH", "RAG_OUT_OF_SCOPE"]);
+      expect(answer.trace.guardrail_hits).not.toContain("EMERGENCY_PRIORITY");
+    }
+    expect(mocks.compare).not.toHaveBeenCalled();
   });
 
   it("compare=true인 no_match 정책 응답은 두 공급자 자리를 유지한다", async () => {
