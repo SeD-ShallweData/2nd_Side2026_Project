@@ -28,7 +28,18 @@ StateDirectory=moneyworry-deploy
 RuntimeDirectory=moneyworry
 RuntimeDirectoryPreserve=yes
 
-NoNewPrivileges=yes
+# 배포기는 verify_access 에서 runuser 로 각 서비스 계정을 가장해 "이 계정이 제 파일을
+# 실제로 읽고 쓸 수 있는가" 를 확인한다. 모드 비트만 보면 ACL 을 놓치기 때문이다.
+# NoNewPrivileges=yes 는 단독으로는 무해하지만, 아래 마운트 네임스페이스 옵션들과
+# 함께 걸리면 runuser 의 setuid 가 EPERM 으로 막힌다. 2026-09-15 시연 VM 실측:
+#
+#   전부 적용                  runuser: cannot set user id: Operation not permitted
+#   NoNewPrivileges 만 제거    통과
+#   나머지를 하나씩 제거        여전히 실패
+#
+# 사람이 SSH 에서 돌리는 배포는 샌드박스 밖이라 통과했고 로봇만 죽었다. #74 와
+# 같은 자리에서 같은 방식으로 드러났다.
+NoNewPrivileges=no
 PrivateTmp=yes
 ProtectHome=yes
 ProtectSystem=strict
