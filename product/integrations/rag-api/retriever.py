@@ -198,6 +198,12 @@ OUT_OF_SCOPE_TOPICS = (
     },
 )
 
+NON_LABOR_TOPICS = frozenset(("부동산", "세금", "투자", "프로그래밍"))
+LABOR_INTENT_KEYWORDS = (
+    "임금", "급여", "월급", "체불", "근로", "노동", "계약서", "퇴직금",
+    "연차", "산재", "해고", "주휴", "근무", "직원", "사업장",
+)
+
 _lock = threading.Lock()
 _model = None
 _collection = None
@@ -506,6 +512,11 @@ def _out_of_scope_topic(query, top_distance):
         return None
     for topic in OUT_OF_SCOPE_TOPICS:
         if any(keyword in query for keyword in topic["keywords"]):
+            # A non-labor term alone must not reject a question about employment.
+            if topic["name"] in NON_LABOR_TOPICS and any(
+                keyword in query for keyword in LABOR_INTENT_KEYWORDS
+            ):
+                continue
             return topic["name"]
     return None
 

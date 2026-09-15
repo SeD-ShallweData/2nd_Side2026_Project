@@ -251,6 +251,40 @@ describe("상담 비교 no_match 단락", () => {
       rag_status: "no_match",
     });
   });
+
+  it.each(["오늘 저녁 메뉴 추천해 줘", "이 회사의 매출은 어때?"])(
+    "목록에 없는 무관한 질문 %s은 일반 no_match여도 회사 요약을 반환하지 않는다",
+    async (message) => {
+      mocks.sendChatMessage.mockResolvedValue(baseline({
+        answer: "이 기업의 임금 위험과 산재 정보를 안내합니다.",
+        answer_type: "company_context",
+        sources: [{ name: "사업장 공개자료", category: "wage" }],
+      }));
+      mocks.retrieveLaborLawContext.mockResolvedValue({
+        query: message,
+        status: "no_match",
+        reason: "distance_threshold",
+        topic: null,
+        threshold: 0.42,
+        documents: [],
+      });
+
+      const result = await sendComparedChatMessage({
+        message,
+        company_id: "COMPANY_DEMO_001",
+        chat_mode: "general",
+        recent_messages: [],
+      });
+
+      expect(result.results[0].answer).toContain("직접 관련된 공식 노동법 근거를 찾지 못했습니다");
+      expect(result.results[0].answer).not.toContain("임금 위험");
+      expect(result.results[0].sources).toEqual([]);
+      expect(result.results[0].suggested_actions).toEqual([]);
+      expect(result.results[0].trace.company_context_attached).toBe(false);
+      expect(result.results[0].trace.guardrail_hits).toEqual(["RAG_NO_MATCH"]);
+      expect(mocks.compare).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("상담 공급자 선택", () => {

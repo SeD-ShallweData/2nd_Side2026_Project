@@ -62,6 +62,25 @@ function outOfScopeResponse(policyBaseline: ChatResponse, topic: string): ChatRe
   };
 }
 
+function isCompanyLaborQuestion(query: string): boolean {
+  const companyReference = /회사|사업장|기업|업체|직장|이곳|여기/;
+  const laborQuestion = /임금|급여|월급|체불|산재|산업재해|안전|근로|노동|계약|퇴직|연차|휴가|해고|채용|입사|지표|위험|보험|수당|근무/;
+  const genericCompanyEvaluation = /^(?:이\s*)?(?:회사|기업|사업장|업체)(?:는|가|은)?\s*(?:어때|괜찮)/;
+  return (companyReference.test(query) && laborQuestion.test(query)) || genericCompanyEvaluation.test(query);
+}
+
+function noMatchWithoutCompanySummary(policyBaseline: ChatResponse): ChatResponse {
+  return {
+    ...policyBaseline,
+    answer: "이 질문에 직접 관련된 공식 노동법 근거를 찾지 못했습니다. 노동·근로계약이나 선택한 사업장의 임금·안전 정보에 관한 질문이라면 확인하려는 상황을 조금 더 구체적으로 알려주세요.",
+    answer_type: "insufficient_evidence",
+    sources: [],
+    suggested_actions: [],
+    limitations: ["현재 검색 결과로는 질문의 주제와 사실관계를 확인할 수 없습니다."],
+    guardrail_status: "limited",
+  };
+}
+
 function policyShortCircuitResponse({
   request,
   policyBaseline,
@@ -176,6 +195,16 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
         ragRetrieval,
         guardrailStatus: "limited",
         guardrailHits: ["RAG_NO_MATCH", "RAG_OUT_OF_SCOPE"],
+      });
+    }
+    if (policyBaseline.answer_type === "company_context" && !isCompanyLaborQuestion(rewrite.query)) {
+      return policyShortCircuitResponse({
+        request,
+        policyBaseline: noMatchWithoutCompanySummary(policyBaseline),
+        configs,
+        ragRetrieval,
+        guardrailStatus: "limited",
+        guardrailHits: ["RAG_NO_MATCH"],
       });
     }
     // 사업장 답변은 법령 RAG가 아니라 사업장 DB 결과를 근거로 하므로 출처를 보존한다.

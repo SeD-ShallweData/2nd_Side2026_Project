@@ -80,6 +80,14 @@ class RetrievalPolicyTest(unittest.TestCase):
             with self.subTest(query=query):
                 self.assertIsNone(retriever._out_of_scope_topic(query, 0.41))
 
+        for query in (
+            "부동산 시세를 묻는 직원의 임금체불 상담",
+            "주식 투자 회사의 근로계약서 문제",
+            "파이썬 코딩을 하는 직원의 연차",
+        ):
+            with self.subTest(query=query):
+                self.assertIsNone(retriever._out_of_scope_topic(query, 0.41))
+
     def test_filters_every_vector_candidate_by_the_distance_threshold(self):
         candidates = [
             candidate("근로기준법", "제17조", "근로조건의 명시", distance=0.20),
