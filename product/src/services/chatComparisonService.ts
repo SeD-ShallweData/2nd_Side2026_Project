@@ -34,6 +34,53 @@ const EMPTY_USAGE = {
   reasoning_tokens: null,
 };
 
+const OUT_OF_SCOPE_REFERRALS: Record<string, { label: string; url: string }> = {
+  부동산: { label: "국토교통부 실거래가 공개시스템", url: "https://rt.molit.go.kr/" },
+  세금: { label: "국세청 홈택스", url: "https://www.hometax.go.kr/" },
+  투자: { label: "금융감독원", url: "https://www.fss.or.kr/" },
+  프로그래밍: { label: "K-MOOC 강좌 검색", url: "https://www.kmooc.kr/view/course" },
+};
+
+function outOfScopeResponse(policyBaseline: ChatResponse, topic: string): ChatResponse {
+  const referral = OUT_OF_SCOPE_REFERRALS[topic] ?? {
+    label: "고용노동부 고객상담센터 1350",
+    url: "https://1350.moel.go.kr/home/",
+  };
+  return {
+    ...policyBaseline,
+    answer: `이 질문은 노동·근로계약 상담 범위 밖의 ${topic} 내용입니다. ${referral.label}에서 확인해 주세요.`,
+    answer_type: "clarification",
+    sources: [],
+    suggested_actions: [{
+      code: "OUT_OF_SCOPE_REFERRAL",
+      label: referral.label,
+      url: referral.url,
+      priority: "next",
+    }],
+    limitations: [`현재 공식 노동법 근거 검색 범위에는 ${topic} 자료가 수록되어 있지 않습니다.`],
+    guardrail_status: "limited",
+  };
+}
+
+function isCompanyLaborQuestion(query: string): boolean {
+  const companyReference = /회사|사업장|기업|업체|직장|이곳|여기/;
+  const laborQuestion = /임금|급여|월급|체불|산재|산업재해|안전|근로|노동|계약|퇴직|연차|휴가|해고|채용|입사|지표|위험|보험|수당|근무/;
+  const genericCompanyEvaluation = /^(?:이\s*)?(?:회사|기업|사업장|업체)(?:는|가|은)?\s*(?:어때|괜찮)/;
+  return (companyReference.test(query) && laborQuestion.test(query)) || genericCompanyEvaluation.test(query);
+}
+
+function noMatchWithoutCompanySummary(policyBaseline: ChatResponse): ChatResponse {
+  return {
+    ...policyBaseline,
+    answer: "이 질문에 직접 관련된 공식 노동법 근거를 찾지 못했습니다. 노동·근로계약이나 선택한 사업장의 임금·안전 정보에 관한 질문이라면 확인하려는 상황을 조금 더 구체적으로 알려주세요.",
+    answer_type: "insufficient_evidence",
+    sources: [],
+    suggested_actions: [],
+    limitations: ["현재 검색 결과로는 질문의 주제와 사실관계를 확인할 수 없습니다."],
+    guardrail_status: "limited",
+  };
+}
+
 function policyShortCircuitResponse({
   request,
   policyBaseline,
@@ -90,7 +137,7 @@ function policyShortCircuitResponse({
         prompt_policy_version: CHAT_POLICY_VERSION,
         query_transform: rewritten ? "llm_rewrite" : "none",
         context_mode: request.company_id ? "company" : "general",
-        company_context_attached: Boolean(request.company_id),
+        company_context_attached: Boolean(request.company_id && policyBaseline.answer_type === "company_context"),
         recent_message_count: request.recent_messages.slice(-6).length,
         guardrail_action: "short_circuit",
         guardrail_hits: guardrailHits,
@@ -140,13 +187,31 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
   if (ragRetrieval.status === "matched") {
     policyBaseline.sources = ragRetrieval.documents.map((document) => document.source);
   } else if (ragRetrieval.status === "no_match") {
+    if (ragRetrieval.reason === "out_of_scope" && ragRetrieval.topic) {
+      return policyShortCircuitResponse({
+        request,
+        policyBaseline: outOfScopeResponse(policyBaseline, ragRetrieval.topic),
+        configs,
+        ragRetrieval,
+        guardrailStatus: "limited",
+        guardrailHits: ["RAG_NO_MATCH", "RAG_OUT_OF_SCOPE"],
+      });
+    }
+    if (policyBaseline.answer_type === "company_context" && !isCompanyLaborQuestion(rewrite.query)) {
+      return policyShortCircuitResponse({
+        request,
+        policyBaseline: noMatchWithoutCompanySummary(policyBaseline),
+        configs,
+        ragRetrieval,
+        guardrailStatus: "limited",
+        guardrailHits: ["RAG_NO_MATCH"],
+      });
+    }
     // 사업장 답변은 법령 RAG가 아니라 사업장 DB 결과를 근거로 하므로 출처를 보존한다.
     if (policyBaseline.answer_type !== "company_context") policyBaseline.sources = [];
     policyBaseline.limitations = [
       ...policyBaseline.limitations,
-      ragRetrieval.reason === "out_of_scope" && ragRetrieval.topic
-        ? `현재 공식 근거 검색 범위에는 ${ragRetrieval.topic} 자료가 수록되어 있지 않습니다.`
-        : "연결된 공식 노동법 검색 범위에서 직접 관련된 근거를 찾지 못했습니다.",
+      "연결된 공식 노동법 검색 범위에서 직접 관련된 근거를 찾지 못했습니다.",
     ];
     return policyShortCircuitResponse({
       request,
