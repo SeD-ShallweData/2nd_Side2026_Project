@@ -89,6 +89,15 @@ function publicSignalForPrompt(risk: CompanyRiskResult) {
   return {
     data_as_of: risk.data_as_of,
     wage_signal: {
+      positive_signals: risk.wage_risk.positive_signals
+        ? {
+            availability: risk.wage_risk.positive_signals.availability,
+            confirmed_count: risk.wage_risk.positive_signals.confirmed_count,
+            confirmed_items: risk.wage_risk.positive_signals.items
+              .filter((item) => item.status === "confirmed")
+              .map((item) => item.label),
+          }
+        : null,
       summary: stripBandLabel(risk.wage_risk.summary),
       official_listing: {
         status: risk.wage_risk.official_listing.status,
