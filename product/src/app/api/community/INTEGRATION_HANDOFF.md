@@ -88,6 +88,7 @@ Mock 이메일은 각각 `user@mock.donworry.local`, `admin@mock.donworry.local`
 - `409 DUPLICATE_REPORT`, `SELF_REPORT_NOT_ALLOWED`, `COMMUNITY_POST_NOT_EDITABLE`,
   `COMMUNITY_POST_NOT_REPORTABLE`, `COMMUNITY_REPORT_ALREADY_REVIEWED`: 상태 충돌
 - `413 REQUEST_BODY_TOO_LARGE`, `415 UNSUPPORTED_MEDIA_TYPE`
+- `429 LOGIN_TEMPORARILY_LOCKED`: 로그인 5회 실패로 인한 15분 잠금, `Retry-After` 확인
 - `500 INTERNAL_ERROR`: 예상하지 못한 서버 오류
 - `503 AUTH_PROVIDER_UNAVAILABLE`, `COMMUNITY_PROVIDER_UNAVAILABLE`, `MOCK_AUTH_NOT_CONFIGURED`,
   `MOCK_AUTH_PERIMETER_REQUIRED`: 저장소 또는 Mock 보안 설정 미연결
@@ -111,7 +112,8 @@ Mock 이메일은 각각 `user@mock.donworry.local`, `admin@mock.donworry.local`
 - 첫 진입 때 `GET /api/auth/session`으로 로그인 상태를 복원한다.
 - `source=mock_memory`이면 현재 DEMO 배너를 유지한다.
 - `capabilities`는 현재 로그인 사용자가 쓸 수 있는 기능을 나타낸다. `moderation=true`일 때만 관리 HUD를 노출한다.
-- 로딩, 빈 목록, `401`, `403`, `404`, `409`, `500/503` 화면을 구분한다.
+- 로딩, 빈 목록, `401`, `403`, `404`, `409`, `429`, `500/503` 화면을 구분한다. 로그인 `429`는
+  `Retry-After`의 남은 시간 동안 재시도를 안내한다.
 - 로그인·로그아웃 후 세션과 게시글 목록을 다시 조회한다.
 - 공개 DTO에 없는 `author_id`, 이메일 또는 역할을 추정하거나 저장하지 않는다.
 

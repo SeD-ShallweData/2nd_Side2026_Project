@@ -3,7 +3,6 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import type { SafetyContextPublic, SourceReference, WageRiskPublic } from "@/domain/risk";
 import {
   CONNECTED_WAGE_LISTING_LABEL,
-  GREEN_FLAG_DEFINITIONS,
   UNCONNECTED_WAGE_OBSERVATION_LABELS,
 } from "@/domain/riskPresentation";
 
@@ -51,9 +50,6 @@ export function RiskInformationCard(props: CardProps) {
   const question = isWage ? "왜 임금 관련 추가 확인이 필요한가요?" : "산업재해 정보는 무엇을 확인해야 하나요?";
   const unknown = props.data.level === "unknown";
   const unavailable = props.data.availability === "unavailable";
-  const greenFlags = isWage
-    ? props.data.green_flags ?? GREEN_FLAG_DEFINITIONS.map((flag) => ({ ...flag, confirmed: null }))
-    : [];
 
   return (
     <article className={`risk-card risk-card-${props.kind} risk-level-${props.data.level}`}>
@@ -108,27 +104,32 @@ export function RiskInformationCard(props: CardProps) {
       )}
 
       {isWage ? (
+        props.data.positive_signals ? (
+          <section className="risk-section" aria-label="긍정 신호 확인 항목">
+            <h3>긍정 신호 확인 항목</h3>
+            {props.data.positive_signals.availability === "ready" && !unknown && !unavailable ? (
+              <>
+                <p>확인된 긍정 신호 {props.data.positive_signals.confirmed_count}개</p>
+                <ul className="evidence-list">
+                  {props.data.positive_signals.items.map((item) => (
+                    <li key={item.label}>
+                      <span aria-hidden="true">{item.status === "confirmed" ? "✓" : "—"}</span>
+                      <div><strong>{item.label}</strong><p>{item.status === "confirmed" ? "확인" : "미확인"}</p></div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : <p>항목별 긍정 신호를 현재 확인할 수 없습니다.</p>}
+            <p className="observation-note">긍정 신호가 확인되지 않았다는 것은 이 기업에 문제가 있다는 뜻은 아닙니다. 확인 개수는 안전 점수나 입사 권고가 아니며, 공식 명단 등재 여부는 별도로 확인하세요.</p>
+          </section>
+        ) : null
+      ) : null}
+
+      {isWage ? (
         <div className="wage-indicator-coverage" role="status">
           <strong>공식 명단 1개 확인</strong>
           <span>추가 공개 지표 3개 연동 준비 중</span>
         </div>
-      ) : null}
-
-      {isWage ? (
-        <section className="risk-section green-flag-section" aria-labelledby="green-flag-title">
-          <div className="observation-title-row">
-            <h3 id="green-flag-title">안정 신호</h3>
-            <span>확인된 항목만 표시</span>
-          </div>
-          <ul className="green-flag-list">
-            {greenFlags.map((flag) => (
-              <li key={flag.code} className={flag.confirmed === true ? "is-confirmed" : ""}>
-                <span aria-hidden="true">{flag.confirmed === true ? "✓" : ""}</span>
-                <strong>{flag.label}</strong>
-              </li>
-            ))}
-          </ul>
-        </section>
       ) : null}
 
       {isWage ? (

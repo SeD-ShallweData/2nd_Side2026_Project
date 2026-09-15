@@ -484,7 +484,10 @@ export const worksiteTips = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     reporterId: uuid("reporter_id").notNull().references(() => users.id, { onDelete: "restrict" }),
-    category: text().notNull().default("worksite_tip"),
+    /** K5 현장 신고 분류: 임금 / 산재 */
+    category: text().notNull(),
+    /** 접수 상태는 읽기 전용이며 이번 범위에는 변경 API가 없다. */
+    status: text().notNull().default("received"),
     title: text().notNull(),
     body: text(),
     firmId: text("firm_id").references(() => firms.firmId, { onDelete: "set null" }),
@@ -494,7 +497,9 @@ export const worksiteTips = pgTable(
     index("worksite_tips_reporter_idx").on(t.reporterId),
     index("worksite_tips_firm_idx").on(t.firmId),
     index("worksite_tips_submitted_idx").on(t.submittedAt.desc()),
-    check("worksite_tips_category_ck", sql`${t.category} = 'worksite_tip'`),
+    index("worksite_tips_status_submitted_idx").on(t.status, t.submittedAt.desc()),
+    check("worksite_tips_category_ck", sql`${t.category} in ('wage','safety')`),
+    check("worksite_tips_status_ck", sql`${t.status} in ('received','in_progress','completed')`),
   ],
 );
 

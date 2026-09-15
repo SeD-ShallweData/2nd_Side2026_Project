@@ -1,0 +1,17 @@
+[Unit]
+Description=MoneyWorry auto deploy poll (every 10 minutes)
+Documentation=file:///srv/moneyworry/repo/infra/AUTODEPLOY.md
+
+[Timer]
+# VM 이 07:00 에 켜진다. 부팅 직후에는 네 서비스가 아직 다 뜨지 않았을 수 있어
+# 유예를 둔다. 실제 시간창(08:00–22:30 KST) 판정은 폴러가 다시 하므로 여기서는
+# "너무 이르게 찌르지 않는다" 정도면 된다.
+OnBootSec=5min
+OnUnitActiveSec=10min
+# 10분 주기에 초 단위 정확도는 의미가 없다. 느슨하게 두면 커널이 다른 타이머와
+# 묶어 깨워 VM 이 덜 바쁘다.
+AccuracySec=30s
+Unit=moneyworry-autodeploy.service
+
+[Install]
+WantedBy=timers.target

@@ -1,15 +1,15 @@
 # 돈워리 통합 제품 기준본
 
-AI Rookie 및 창의종합설계 경진대회를 위한 구직자·근로자용 노동 정보 서비스입니다. 기본 실행은 명시된 데모 데이터이며, Real 모드에서는 읽기 전용 PostgreSQL·공식 노동법 RAG·계약서 분석 서비스를 Next.js 통합 API 뒤에 연결합니다. 상담 답변은 Upstage Solar와 SKT A.X API를 동시에 호출해 비교합니다.
+AI Rookie 및 창의종합설계 경진대회를 위한 구직자·근로자용 노동 정보 서비스입니다. 기본 실행은 명시된 데모 데이터이며, Real 모드에서는 읽기 전용 PostgreSQL·공식 노동법 RAG·계약서 분석 서비스를 Next.js 통합 API 뒤에 연결합니다. 상담은 Upstage Solar를 기본으로 호출하고, 사용자가 비교를 선택한 요청에서만 SKT A.X를 함께 호출합니다.
 
-이 디렉터리는 `jcu_branch`의 통합 프로토타입을 초기 기준으로 만든 팀 공용 제품 작업 공간입니다. 상담은 기본적으로 기존 Upstage·SKT 비교를 유지하고, feature flag로 OpenAI Responses의 허용 도구 실행 흐름을 선택할 수 있습니다. 기준 정보와 이후 개발 원칙은 [PRODUCT.md](PRODUCT.md)를 참고하세요.
+이 디렉터리는 `jcu_branch`의 통합 프로토타입을 초기 기준으로 만든 팀 공용 제품 작업 공간입니다. 상담은 기본적으로 Upstage 단일 답변을 제공하고 요청별로 Upstage·SKT 비교를 선택하며, feature flag로 OpenAI Responses의 허용 도구 실행 흐름을 선택할 수 있습니다. 기준 정보와 이후 개발 원칙은 [PRODUCT.md](PRODUCT.md)를 참고하세요.
 
 ## 지금 시연할 수 있는 흐름
 
 1. 사업장명 일부 또는 한 글자로 검색
 2. 같은 이름의 여러 사업장을 주소·업종으로 구분
 3. 임금 공개 판정과 산업안전 공표 우선순위를 별도 카드로 확인
-4. 같은 공식 RAG 근거를 사용한 Upstage·SKT 상담 답변과 성능 지표 비교
+4. 같은 공식 RAG 근거를 사용한 Upstage 기본 상담과 선택적 SKT 비교
 5. 계약서 파일 형식·크기 검사 후 실제 분석 또는 명시된 데모 검토 결과 확인
 6. 담당 개발본 통합 전 커뮤니티 UI 범위 확인
 
@@ -20,7 +20,7 @@ AI Rookie 및 창의종합설계 경진대회를 위한 구직자·근로자용 
 - Node.js 22
 - Next.js 16 / React 19 / TypeScript
 - 데이터 모드: `mock`(기본값) 또는 `real`, 사업장·계약서 기능별 독립 전환 가능
-- 상담 실행 모드: `dual_api`(기본 Upstage+SKT 병렬 비교) 또는 `openai_responses`(허용 도구 연결형 단일 답변)
+- 상담 실행 모드: `dual_api`(기본 Upstage 단일, 요청별 Upstage+SKT 비교) 또는 `openai_responses`(허용 도구 연결형 단일 답변)
 
 ### 전체 기능 실행 방법
 
@@ -82,7 +82,8 @@ OPENAI_API_KEY=<배포 secret에 등록>
 사용 가능한 도구는 `search_company`, `get_company_risk`, `retrieve_labor_law`, `review_contract` 네 개뿐입니다.
 도구명과 JSON 인자는 strict schema와 서버 런타임 검증을 모두 통과해야 합니다. `review_contract`는
 `multipart/form-data`로 파일이 함께 온 요청에서만 모델에 노출되며 경로·base64·원문을 모델 인자로 받지
-않습니다. 기본 `CHAT_EXECUTION_MODE=dual_api`에서는 기존 Upstage/SKT 코드와 비교 UI가 그대로 동작합니다.
+않습니다. 기본 `CHAT_EXECUTION_MODE=dual_api`에서는 Upstage 단일 답변을 제공하고, 사용자가 비교를 켠
+요청에서만 Upstage/SKT 비교 UI가 동작합니다.
 
 이어서 같은 설치 터미널에서 RAG와 계약서 분석용 Python 가상환경을 각각 준비합니다.
 
@@ -180,6 +181,7 @@ npm run dev
     "database": "ready",
     "rag": "ready",
     "contract_analysis": "ready",
+    "primary_llm": "ready",
     "dual_llm": "ready",
     "openai_responses": "unavailable",
     "active_chat_llm": "ready"
@@ -188,11 +190,13 @@ npm run dev
 ```
 
 `ready`는 실제 상태 확인이 성공했다는 뜻입니다. 주소나 DB 설정은 있지만 프로세스에 연결하지 못하면
-`configured_unreachable`, 설정 자체가 없으면 `unavailable`로 표시됩니다. `dual_llm`은 키 문자열만
-확인하지 않고 Upstage와 SKT에 최소 실제 요청을 보내므로, 키가 만료·차단됐거나 공급자가 요청을 거절하면
+`configured_unreachable`, 설정 자체가 없으면 `unavailable`로 표시됩니다. `primary_llm`은 기본 Upstage
+단일 상담 상태이고, `dual_llm`은 비교 모드에 필요한 Upstage와 SKT의 상태입니다. 키 문자열만
+확인하지 않고 대상 공급자에 최소 실제 요청을 보내므로, 키가 만료·차단됐거나 공급자가 요청을 거절하면
 `ready`가 아닌 `configured_unreachable`로 표시됩니다. 이 확인 결과는 60초 동안 재사용합니다.
 `openai_responses`는 상태 조회 비용을 만들지 않기 위해 키·모델·URL 구성 준비 여부만 검사합니다. 실제 키와
-네트워크 성공은 배포 smoke test로 확인하며, `active_chat_llm`은 현재 feature flag가 선택한 경로의 상태입니다.
+네트워크 성공은 배포 smoke test로 확인하며, `active_chat_llm`은 기본 요청 경로의 상태입니다. 따라서
+`dual_api` 계열에서는 `primary_llm`, `openai_responses` 계열에서는 `openai_responses`와 같습니다.
 
 DB·ML은 사업장 검색 화면에서 실제 회사명을 검색한 뒤 상세 페이지를 열어 확인합니다. 정상이라면
 상단에 `READ ONLY DB`, 상세 화면에 `DB 연결 사업장`이 표시되고, 임금 공개 판정과 산업안전 공표
@@ -219,10 +223,11 @@ DB·ML은 사업장 검색 화면에서 실제 회사명을 검색한 뒤 상세
 임금이 체불됐을 때 체불임금 확인서는 어떻게 발급받나요? 공식 법령 근거와 함께 알려주세요.
 ```
 
-정상이라면 비교 결과에 `공식 근거 N개 연결`, 두 모델의 동일한 국가법령정보센터 출처가 표시되고,
+정상이라면 결과에 `공식 근거 N개 연결`과 국가법령정보센터 출처가 표시됩니다. 비교를 켜면 두 모델에
+동일한 출처가 표시되고,
 RAG 터미널에는 `POST /api/retrieve ... 200` 로그가 남습니다. 응답 상세의 `공식 근거 검색`도
-`matched`로 표시됩니다. RAG는 상담 데이터 모드와 무관하게 한 번 검색한 같은 근거를 두 LLM에
-전달합니다.
+`matched`로 표시됩니다. RAG는 상담 데이터 모드와 무관하게 한 번 검색한 근거를 기본 Upstage에 전달하고,
+비교 요청에서는 같은 근거를 두 LLM에 전달합니다.
 
 계약서 검토는 계약서 분석 터미널과 통합 웹을 모두 실행하고 `.env.local`의
 `CONTRACT_DATA_MODE=real`을 확인한 뒤, 계약서 화면에서 PDF·PNG·JPG 파일을 올려 확인합니다. 정상이라면
@@ -309,7 +314,7 @@ npm run test:e2e:openai-live
 - `오류확인사업장`: 상세 Risk 공급자 장애와 다시 시도 화면 시연
 - 검색어 `error`: 검색 API 장애 화면 시연
 
-사업장 상세 상담에서 “이 회사 안전해?”, “입사해도 돼?”처럼 결론을 요구하면 단정하지 않고 확인 기준과 행동 순서를 안내합니다. 두 모델에는 동일한 질문·컨텍스트·temperature·max token 설정을 적용합니다.
+사업장 상세 상담에서 “이 회사 안전해?”, “입사해도 돼?”처럼 결론을 요구하면 단정하지 않고 확인 기준과 행동 순서를 안내합니다. 비교를 켠 경우 두 모델에는 동일한 질문·컨텍스트·temperature·max token 설정을 적용합니다.
 
 각 답변 카드에서 다음 비교 정보를 확인할 수 있습니다.
 
@@ -338,7 +343,7 @@ API 키와 숨은 시스템 프롬프트는 브라우저로 전송하지 않습�
 
 - `RealCompanyRepository.ts`: DB 사업장 검색
 - `MlRiskProvider.ts`: 임금 모델 및 산업안전 참고정보 변환
-- `DualLlmChatProvider.ts`: Upstage·SKT 실제 병렬 상담 및 가드레일
+- `DualLlmChatProvider.ts`: Upstage 기본 상담, 선택적 Upstage·SKT 병렬 비교 및 가드레일
 - `HttpRagRetriever.ts`: 제품 내부 RAG 검색 서비스 연결
 - `RealContractReviewProvider.ts`: 계약서 분석
 - `inspectorService.ts`: 감독관 위험큐·사업장 내부 지표 읽기 및 감독관용 듀얼 LLM 경계

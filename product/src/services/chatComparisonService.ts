@@ -14,6 +14,18 @@ import {
   type LlmProviderConfig,
 } from "@/server/llmConfig";
 
+function selectProviderConfigs(
+  configs: LlmProviderConfig[],
+  compare: boolean,
+): LlmProviderConfig[] {
+  if (compare) return configs;
+  const upstage = configs.find((config) => config.id === "upstage");
+  if (!upstage) {
+    throw new Error("Upstage provider configuration is missing.");
+  }
+  return [upstage];
+}
+
 const EMPTY_USAGE = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -38,6 +50,7 @@ function policyShortCircuitResponse({
   guardrailHits: string[];
 }): ChatComparisonResponse {
   const now = new Date().toISOString();
+  const isComparison = configs.length > 1;
   const rewritten = Boolean(
     request.resolved_query && request.resolved_query !== request.message,
   );
@@ -49,12 +62,12 @@ function policyShortCircuitResponse({
     completed_at: now,
     fair_comparison: {
       concurrent: false,
-      same_context: true,
+      same_context: isComparison,
       same_temperature: false,
       same_max_tokens: false,
-      same_retrieval: true,
+      same_retrieval: isComparison,
     },
-    results: (request.compare ? configs : configs.slice(0, 1)).map((config) => ({
+    results: configs.map((config) => ({
       provider: config.id,
       provider_label: config.label,
       model: config.model,
@@ -94,7 +107,10 @@ function policyShortCircuitResponse({
 export async function sendComparedChatMessage(value: unknown): Promise<ChatComparisonResponse> {
   const parsedRequest = parseChatRequest(value);
   const policyBaseline = await sendChatMessage(parsedRequest);
-  const configs = getLlmProviderConfigs();
+  const configs = selectProviderConfigs(
+    getLlmProviderConfigs(),
+    parsedRequest.compare === true,
+  );
 
   if (policyBaseline.answer_type === "emergency_guidance") {
     const ragRetrieval = {

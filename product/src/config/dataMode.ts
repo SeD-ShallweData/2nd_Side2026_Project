@@ -25,6 +25,10 @@ export function getCommunityDataMode(): DataMode {
   return parseDataMode(process.env.COMMUNITY_DATA_MODE) ?? getDataMode();
 }
 
+export function getWorksiteTipDataMode(): DataMode {
+  return parseDataMode(process.env.WORKSITE_TIP_DATA_MODE) ?? getDataMode();
+}
+
 export function getMockDelayMs(): number {
   const parsed = Number(process.env.MOCK_DELAY_MS ?? 250);
   if (!Number.isFinite(parsed)) return 250;

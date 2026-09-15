@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -39,9 +40,11 @@ DEMO_BASIC_AUTH_PASSWORD=BasicValue_6vT2pN9xQ4mK
 SAVE_COMPARISON_FEEDBACK=false
 AUTH_DATA_MODE=real
 COMMUNITY_DATA_MODE=real
-WORKSITE_TIP_DATA_MODE=mock
+WORKSITE_TIP_DATA_MODE=real
 AUTH_DATABASE_URL=postgresql://wg_auth:AuthValue_8xM4qT7vP2nR9kL3sC6w@127.0.0.1:5433/wageguard?sslmode=disable
 COMMUNITY_DATABASE_URL=postgresql://wg_community:CommValue_3zK9wL5mQ8tN2xP7rV4s@127.0.0.1:5433/wageguard?sslmode=disable
+TIP_DATABASE_URL=postgresql://wg_tip:TipValue_6mR3xP8vN2qK7tL5wC9s@127.0.0.1:5433/wageguard?sslmode=disable
+WORKSITE_TIP_STORAGE_ROOT=/srv/moneyworry/worksite-tip-media
 """,
             "rag": "RAG_DEVICE=cpu\nRAG_GUNICORN_THREADS=2\nRAG_INTERNAL_TOKEN=RagInternal_7pQ2mV9xR4tK8nC3sL6wF\n",
             "contract": """\
@@ -65,7 +68,7 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
             paths[name] = path
         return subprocess.run(
             [
-                "python3",
+                sys.executable,
                 str(VALIDATOR),
                 "--db-env",
                 str(paths["db"]),
@@ -88,6 +91,7 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
             "AdminValue_8eQ2pR7xT4mN9kLs",
             "BotValue_3qW8nM5vR2zK7pTx",
             "BasicValue_6vT2pN9xQ4mK",
+            "TipValue_6mR3xP8vN2qK7tL5wC9s",
         ):
             self.assertNotIn(marker, combined)
 
@@ -297,17 +301,91 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("is not a pinned loopback write-role URL", result.stderr)
 
-    def test_worksite_tip_must_stay_mock(self):
-        """real 어댑터가 아직 없다. ensureMockMode() 가 503 을 던진다."""
-        web = self.values["web"].replace("WORKSITE_TIP_DATA_MODE=mock", "WORKSITE_TIP_DATA_MODE=real")
+    def test_real_worksite_tip_requires_dedicated_url_and_storage_root(self):
+        for key in ("TIP_DATABASE_URL", "WORKSITE_TIP_STORAGE_ROOT"):
+            web = "\n".join(
+                line for line in self.values["web"].splitlines()
+                if not line.startswith(f"{key}=")
+            ) + "\n"
+            result = self.run_validator({"web": web})
+            self.assert_failed_without_secret(result)
+            self.assertIn(key, result.stderr)
+
+    def test_real_worksite_tip_requires_real_auth_reporters(self):
+        web = self.values["web"].replace("AUTH_DATA_MODE=real", "AUTH_DATA_MODE=mock")
         result = self.run_validator({"web": web})
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("WORKSITE_TIP_DATA_MODE must be mock", result.stderr)
+        self.assert_failed_without_secret(result)
+        self.assertIn(
+            "AUTH_DATA_MODE must be real when WORKSITE_TIP_DATA_MODE=real",
+            result.stderr,
+        )
+
+    def test_tip_url_requires_exact_dedicated_role(self):
+        for role in ("pathb_admin", "wg_bot", "wg_community"):
+            web = self.values["web"].replace(
+                "postgresql://wg_tip:", f"postgresql://{role}:"
+            )
+            result = self.run_validator({"web": web})
+            self.assert_failed_without_secret(result)
+            if role in {"pathb_admin", "wg_bot"}:
+                self.assertIn("must not reuse the owner or read-only role", result.stderr)
+            else:
+                self.assertIn("must use the dedicated wg_tip role", result.stderr)
+
+    def test_tip_url_must_be_pinned_loopback(self):
+        web = self.values["web"].replace(
+            "wg_tip:TipValue_6mR3xP8vN2qK7tL5wC9s@127.0.0.1:5433/",
+            "wg_tip:TipValue_6mR3xP8vN2qK7tL5wC9s@10.20.0.5:5433/",
+        )
+        result = self.run_validator({"web": web})
+        self.assert_failed_without_secret(result)
+        self.assertIn("TIP_DATABASE_URL is not a pinned loopback write-role URL", result.stderr)
+
+    def test_real_worksite_tip_requires_exact_storage_path(self):
+        web = self.values["web"].replace(
+            "WORKSITE_TIP_STORAGE_ROOT=/srv/moneyworry/worksite-tip-media",
+            "WORKSITE_TIP_STORAGE_ROOT=/tmp/worksite-tip-media",
+        )
+        result = self.run_validator({"web": web})
+        self.assert_failed_without_secret(result)
+        self.assertIn("WORKSITE_TIP_STORAGE_ROOT must be exactly", result.stderr)
+
+    def test_mock_worksite_tip_rejects_real_storage_configuration(self):
+        web = self.values["web"].replace(
+            "WORKSITE_TIP_DATA_MODE=real", "WORKSITE_TIP_DATA_MODE=mock"
+        )
+        result = self.run_validator({"web": web})
+        self.assert_failed_without_secret(result)
+        self.assertIn("TIP_DATABASE_URL must be absent", result.stderr)
+
+        web = "\n".join(
+            line for line in web.splitlines()
+            if not line.startswith("TIP_DATABASE_URL=")
+        ) + "\n"
+        result = self.run_validator({"web": web})
+        self.assert_failed_without_secret(result)
+        self.assertIn("WORKSITE_TIP_STORAGE_ROOT must be absent", result.stderr)
+
+    def test_mock_worksite_tip_without_real_configuration_is_valid(self):
+        web = self.values["web"].replace(
+            "WORKSITE_TIP_DATA_MODE=real", "WORKSITE_TIP_DATA_MODE=mock"
+        )
+        web = "\n".join(
+            line for line in web.splitlines()
+            if not line.startswith(("TIP_DATABASE_URL=", "WORKSITE_TIP_STORAGE_ROOT="))
+        ) + "\n"
+        result = self.run_validator({"web": web})
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_mock_auth_requires_mock_passwords(self):
         web = self.values["web"].replace("AUTH_DATA_MODE=real", "AUTH_DATA_MODE=mock")
+        web = web.replace("WORKSITE_TIP_DATA_MODE=real", "WORKSITE_TIP_DATA_MODE=mock")
         web = "\n".join(
             line for line in web.splitlines() if not line.startswith("AUTH_DATABASE_URL=")
+        ) + "\n"
+        web = "\n".join(
+            line for line in web.splitlines()
+            if not line.startswith(("TIP_DATABASE_URL=", "WORKSITE_TIP_STORAGE_ROOT="))
         ) + "\n"
         result = self.run_validator({"web": web})
         self.assertNotEqual(result.returncode, 0)
@@ -322,6 +400,11 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
 
     def test_mock_auth_rejects_database_url(self):
         web = self.values["web"].replace("AUTH_DATA_MODE=real", "AUTH_DATA_MODE=mock")
+        web = web.replace("WORKSITE_TIP_DATA_MODE=real", "WORKSITE_TIP_DATA_MODE=mock")
+        web = "\n".join(
+            line for line in web.splitlines()
+            if not line.startswith(("TIP_DATABASE_URL=", "WORKSITE_TIP_STORAGE_ROOT="))
+        ) + "\n"
         for key in ("MOCK_AUTH_USER_PASSWORD", "MOCK_AUTH_ADMIN_PASSWORD", "MOCK_AUTH_INSPECTOR_PASSWORD"):
             web += f"{key}=MockValue_7pQ2mV9xR4tK\n"
         result = self.run_validator({"web": web})

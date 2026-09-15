@@ -15,9 +15,9 @@ describe("상담 비교 토글", () => {
   it("기본 상태에서는 두 모델 비교가 꺼져 있다", () => {
     const html = renderToStaticMarkup(createElement(ChatPanel, { executionMode: "dual_api" }));
 
-    expect(html).toContain("두 모델 비교");
+    expect(html).toContain("SKT A.X 답변도 함께 비교");
     expect(html).toContain('type="checkbox"');
     expect(html).not.toContain('type="checkbox" checked=""');
-    expect(html).toContain("기본 모델 한 개로 노동 상담 답변을 제공합니다.");
+    expect(html).toContain("기본적으로 Upstage Solar 하나에 질문을 보내고");
   });
 });

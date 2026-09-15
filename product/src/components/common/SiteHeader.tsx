@@ -3,6 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import type { SessionResponse } from "@/app/api/auth/authApiContract";
+import { AuthApiError, getSession, logout } from "@/services/authClient";
+
+type SessionState =
+  | { status: "loading" }
+  | { status: "ready"; session: SessionResponse };
 
 export function Brand() {
   return (
@@ -24,6 +32,62 @@ export function Brand() {
 export function SiteHeader() {
   const pathname = usePathname();
   const isInspector = pathname.startsWith("/inspector");
+  const [sessionState, setSessionState] = useState<SessionState>({ status: "loading" });
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 민규님의 공통 auth-change 이벤트가 아직 없어, 경로가 바뀔 때마다
+    // 로컬에서 다시 세션을 조회한다. 로그인/회원가입 성공 후 /community로
+    // 이동하는 시점에 헤더가 새 세션을 반영하도록 하기 위한 임시 처리다.
+    let ignore = false;
+    const controller = new AbortController();
+    getSession({ signal: controller.signal })
+      .then((session) => {
+        if (ignore) return;
+        setSessionState({ status: "ready", session });
+        setLogoutError(null);
+      })
+      .catch(() => {
+        if (!ignore) {
+          setSessionState({
+            status: "ready",
+            session: { authenticated: false, user: null, expires_at: null },
+          });
+        }
+      });
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
+  }, [pathname]);
+
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError(null);
+    try {
+      await logout();
+      // 공통 세션 갱신 구조가 아직 없어, 로그아웃 후에는 커뮤니티 글쓰기 권한 등
+      // 다른 컴포넌트가 이전 로그인 상태를 들고 있지 않도록 전체 페이지를 다시 불러온다.
+      // 같은 origin의 protocol-relative URL을 써서 next/next의
+      // no-location-assign-relative-destination 규칙(상대 경로 전체 이동 금지)을
+      // 우회 없이 만족시키면서도 동일한 하드 리로드 동작을 유지한다.
+      window.location.assign(`//${window.location.host}/community`);
+    } catch (error) {
+      setLoggingOut(false);
+      setLogoutError(
+        error instanceof AuthApiError
+          ? "로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요."
+          : "네트워크 문제로 로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      );
+    }
+  }
+
+  const user =
+    sessionState.status === "ready" && sessionState.session.authenticated
+      ? sessionState.session.user
+      : null;
 
   return (
     <>
@@ -40,13 +104,36 @@ export function SiteHeader() {
             <Link href="/worksite-tips">현장 신고</Link>
             <Link href="/chat" className="consumer-ai-link">AI 노동 상담</Link>
           </nav>
-          {!isInspector ? (
-            <Link href="/inspector" className="consumer-mode-switch" aria-label="일반 사용자 모드에서 근로감독관 모드로 전환">
-              근로감독관 모드 <span aria-hidden="true">↗</span>
-            </Link>
-          ) : null}
+          <div className="consumer-header-side" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {!isInspector ? (
+              <Link href="/inspector" className="consumer-mode-switch" aria-label="일반 사용자 모드에서 근로감독관 모드로 전환">
+                근로감독관 모드 <span aria-hidden="true">↗</span>
+              </Link>
+            ) : null}
+            {sessionState.status === "loading" ? null : user ? (
+              <div className="consumer-header-account" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="muted-text">{(user.display_name || "사용자").trim() || "사용자"}님</span>
+                {user.role === "admin" ? (
+                  <Link href="/admin" className="button button-outline button-small">신고 관리</Link>
+                ) : null}
+                <button
+                  type="button"
+                  className="button button-outline button-small"
+                  disabled={loggingOut}
+                  onClick={handleLogout}
+                >
+                  {loggingOut ? "로그아웃 중" : "로그아웃"}
+                </button>
+              </div>
+            ) : (
+              <Link href="/login" className="button button-dark button-small">로그인</Link>
+            )}
+          </div>
         </div>
       </header>
+      {logoutError ? (
+        <p className="shell field-error" role="alert">{logoutError}</p>
+      ) : null}
       {!isInspector && pathname !== "/chat" ? (
         <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리와 상담 바로가기">
           <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} /> 돈워리와 상담

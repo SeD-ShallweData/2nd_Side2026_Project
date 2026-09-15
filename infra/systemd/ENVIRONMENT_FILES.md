@@ -27,6 +27,13 @@ CONTRACT_ANALYSIS_URL=http://127.0.0.1:8000
 RAG_INTERNAL_TOKEN=<RAG_INTERNAL_SECRET>
 CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 APP_DATA_MODE=real
+AUTH_DATA_MODE=real
+COMMUNITY_DATA_MODE=real
+WORKSITE_TIP_DATA_MODE=real
+AUTH_DATABASE_URL=postgresql://wg_auth:<URL_ENCODED_AUTH_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
+COMMUNITY_DATABASE_URL=postgresql://wg_community:<URL_ENCODED_COMMUNITY_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
+TIP_DATABASE_URL=postgresql://wg_tip:<URL_ENCODED_TIP_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
+WORKSITE_TIP_STORAGE_ROOT=/srv/moneyworry/worksite-tip-media
 CHAT_EXECUTION_MODE=dual_api
 UPSTAGE_API_KEY=<UPSTAGE_SECRET>
 SKT_API_KEY=<SKT_SECRET>
@@ -74,7 +81,7 @@ CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 금지된다. 전용 token은 `web.env`의 같은 이름 값과 일치하고 RAG token과 달라야 한다. 위 목록 외의 endpoint override도 거부한다. production unit이 두 file fallback을
 `/dev/null`로 고정하며 로그·계약서 캐시는 비활성화한다.
 
-## 인증·커뮤니티·현장 제보 (2026-09-11 추가)
+## 인증·커뮤니티·현장 제보
 
 PR #40·#45 로 `web.env` 에 키가 늘었다. **세 모드 키는 생략할 수 없다** —
 생략하면 `APP_DATA_MODE=real` 을 따라가는데, 연결 문자열 없이 real 이 되면
@@ -84,13 +91,26 @@ PR #40·#45 로 `web.env` 에 키가 늘었다. **세 모드 키는 생략할 �
 | --- | --- | --- |
 | `AUTH_DATA_MODE` | `real` 또는 `mock` | real 이면 `AUTH_DATABASE_URL` 필수 |
 | `COMMUNITY_DATA_MODE` | `real` 또는 `mock` | real 이면 `COMMUNITY_DATABASE_URL` 필수 |
-| `WORKSITE_TIP_DATA_MODE` | **`mock` 고정** | real 어댑터가 아직 없다. `worksiteTipService.ensureMockMode()` 가 503 을 던진다 |
+| `WORKSITE_TIP_DATA_MODE` | `real` 또는 `mock` | real 이면 `TIP_DATABASE_URL`과 고정 저장 경로 필수 |
 | `AUTH_DATABASE_URL` | `postgresql://wg_auth:…@127.0.0.1:5433/wageguard?sslmode=disable` | mock 일 때는 **두면 안 된다** |
 | `COMMUNITY_DATABASE_URL` | `postgresql://wg_community:…@127.0.0.1:5433/wageguard?sslmode=disable` | 〃 |
+| `TIP_DATABASE_URL` | `postgresql://wg_tip:…@127.0.0.1:5433/wageguard?sslmode=disable` | 〃 |
+| `WORKSITE_TIP_STORAGE_ROOT` | `/srv/moneyworry/worksite-tip-media` | 현장 제보 real 일 때만 사용하며 다른 경로는 거부 |
 | `MOCK_AUTH_*_PASSWORD` 3종 | mock 일 때만 | real 로 바꾸면 **지워야 한다** |
+
+현장 제보 real 저장의 `reporter_id`는 실제 `users` 행을 참조하므로
+`WORKSITE_TIP_DATA_MODE=real`이면 `AUTH_DATA_MODE`도 반드시 `real`이어야 한다.
 
 쓰기 롤 URL 은 **소유자(`DB_USER`)나 읽기 전용(`BOT_USER`)을 쓸 수 없다.** 검증기가 막는다.
 앱이 조용히 전체 권한 계정으로 붙으면 롤을 분리한 이유가 사라지기 때문이고,
 `product/src/server/databaseConfig.ts` 도 같은 이유로 소유자 URL 대체를 거부한다.
 
-비밀번호는 `db/.env.local` 의 `AUTH_PASSWORD`·`COMMUNITY_PASSWORD` 다.
+비밀번호 원본은 운영 secret 전달 경로에서 받아 URL component로 percent-encode한다. 저장소나
+명령행에는 넣지 않는다. 현장 제보 DB 롤은 `wg_tip`으로 고정되며 다른 쓰기 롤을 대신 넣어도
+검증기가 거부한다.
+
+현장 제보 저장소는 PostgreSQL 행과 파일을 함께 사용한다. DB에는 제보·첨부 메타데이터와
+`storage_key`, SHA-256을 저장하고, 사진 원본과 EXIF를 제거한 검사관용 사본은 데이터 디스크의
+`/srv/moneyworry/worksite-tip-media` 아래에 저장한다. systemd는 웹 프로세스에 이 경로만 추가로
+쓰기 허용한다. 설치기는 경로를 웹 서비스 계정 소유 `0700`으로 만들고, 하위 디렉터리 `0700`,
+파일 `0600`, symlink·특수 파일 없음, 다른 세 서비스 계정의 접근 불가를 시작 전에 확인한다.

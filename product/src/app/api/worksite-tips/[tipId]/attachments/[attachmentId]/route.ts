@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { getOptionalSessionUser } from "@/services/authService";
 import { getWorksiteTipAttachment } from "@/services/worksiteTipService";
 import { noStoreError } from "@/server/auth/http";
-import { requireAuthenticatedUser } from "@/server/auth/permissions";
-import { getSessionTokenFromRequest } from "@/server/auth/sessionCookie";
+import { requireInspectorRequest } from "@/server/auth/inspectorAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +12,9 @@ interface RouteContext {
 
 export async function GET(request: Request, context: RouteContext): Promise<NextResponse> {
   try {
-    const user = requireAuthenticatedUser(
-      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
-    );
+    const user = await requireInspectorRequest(request);
     const { tipId, attachmentId } = await context.params;
-    const attachment = getWorksiteTipAttachment(tipId, attachmentId, user);
+    const attachment = await getWorksiteTipAttachment(tipId, attachmentId, user);
     return new NextResponse(attachment.bytes, {
       status: 200,
       headers: {

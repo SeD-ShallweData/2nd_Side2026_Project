@@ -36,7 +36,6 @@ describe("chat HTTP 입력 계약", () => {
 
     expect(parsed.body).toEqual({
       message: "이 계약서를 검토해 주세요.",
-      compare: false,
       conversation_id: undefined,
       company_id: undefined,
       chat_mode: "contract",

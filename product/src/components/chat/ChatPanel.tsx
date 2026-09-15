@@ -189,9 +189,7 @@ function ComparisonBlock({
         : comparison.execution_mode === "policy_short_circuit"
           ? "긴급 안내 우선"
           : "공식 근거 검색 연결 안 됨";
-  const modeCopy = comparison.execution_mode === "dual_api" && comparison.results.length === 1
-    ? { kicker: "단일 기본 상담", summary: "기본 모델 한 개의 답변을 표시합니다. 비교 토글을 켜면 두 모델을 함께 확인할 수 있습니다." }
-    : executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits);
+  const modeCopy = executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits);
   const feedbackResults = comparison.execution_mode === "dual_api"
     ? comparison.results.filter(isLegacyProvider)
     : [];
@@ -260,10 +258,10 @@ export function ChatPanel({
       role: "assistant",
       content: companyName
         ? executionMode === "dual_api"
-          ? `${companyName}의 공개 컨텍스트를 기본 모델로 안내합니다. 필요하면 두 모델 비교를 켤 수 있습니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
+          ? `${companyName}의 공개 컨텍스트와 공식 근거를 Upstage Solar에 전달해 답변합니다. 필요할 때만 SKT A.X 비교를 켤 수 있습니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
           : `${companyName}을 선택했습니다. 필요한 경우 허용된 사업장·위험·법령 조회 도구를 사용해 답변합니다.`
         : executionMode === "dual_api"
-          ? "기본 모델 한 개로 노동 상담 답변을 제공합니다. 필요하면 두 모델 비교를 켤 수 있습니다."
+          ? "기본적으로 Upstage Solar 하나에 질문을 보내고, 비교를 켠 질문에만 SKT A.X 답변을 함께 표시합니다."
           : "OpenAI Responses가 질문에 필요한 공식 정보 도구만 선택적으로 호출해 노동 상담 답변을 만듭니다.",
     },
   ]);
@@ -272,7 +270,7 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<Record<string, LlmProviderId | "tie">>({});
-  const [compareModels, setCompareModels] = useState(false);
+  const [compare, setCompare] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -282,6 +280,7 @@ export function ChatPanel({
     const message = value.trim();
     if (!message || loading) return;
     const submittedContractFile = contractFile;
+    const requestedComparison = executionMode === "dual_api" && compare;
 
     const recentMessages: RecentMessage[] = messages
       .filter((item) => item.id !== "welcome")
@@ -308,7 +307,6 @@ export function ChatPanel({
         form.append("file", submittedContractFile, submittedContractFile.name);
         form.append("message", message);
         form.append("chat_mode", chatMode);
-        form.append("compare", String(compareModels));
         form.append("recent_messages", JSON.stringify(recentMessages));
         if (conversationId) form.append("conversation_id", conversationId);
         if (companyId) form.append("company_id", companyId);
@@ -319,8 +317,8 @@ export function ChatPanel({
           message,
           conversation_id: conversationId,
           company_id: companyId,
+          compare: requestedComparison,
           chat_mode: chatMode,
-          compare: compareModels,
           recent_messages: recentMessages,
         });
       }
@@ -347,6 +345,7 @@ export function ChatPanel({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "상담 답변을 불러오지 못했습니다.");
     } finally {
+      if (requestedComparison) setCompare(false);
       setLoading(false);
     }
   }
@@ -409,7 +408,7 @@ export function ChatPanel({
     <div className="chat-experience-layout">
       <div className="chat-panel comparison-chat-panel">
       <div className="chat-topbar">
-        <div><span className="online-dot" aria-hidden="true" /><strong>{executionMode === "dual_api" ? "실제 LLM 동시 비교" : "OpenAI 도구 연결 상담"}</strong></div>
+        <div><span className="online-dot" aria-hidden="true" /><strong>{executionMode === "dual_api" ? compare ? "Upstage·SKT 답변 비교" : "Upstage Solar 단일 상담" : "OpenAI 도구 연결 상담"}</strong></div>
         <span>{companyName ? `${companyName} 컨텍스트 연결됨` : chatMode === "contract" ? "계약서 후속 상담" : "일반 노동 상담"}</span>
       </div>
 
@@ -436,7 +435,7 @@ export function ChatPanel({
             </div>
           )
         ))}
-        {loading ? executionMode === "dual_api" && compareModels ? (
+        {loading ? executionMode === "dual_api" && compare ? (
           <div className="dual-loading" role="status">
             <strong>두 모델에 같은 요청을 동시에 보냈습니다</strong>
             <div>
@@ -444,6 +443,14 @@ export function ChatPanel({
               <span><i className="provider-dot provider-dot-skt" />SKT A.X 응답 대기</span>
             </div>
             <small>한쪽이 실패해도 다른 모델의 결과는 유지합니다. 최대 45초까지 기다릴 수 있습니다.</small>
+          </div>
+        ) : executionMode === "dual_api" ? (
+          <div className="dual-loading" role="status">
+            <strong>Upstage Solar에 공식 근거와 함께 질문을 보냈습니다</strong>
+            <div>
+              <span><i className="provider-dot provider-dot-upstage" />Upstage Solar 응답 대기</span>
+            </div>
+            <small>기본 단일 모델 호출이며, SKT A.X는 비교를 켠 질문에서만 호출합니다.</small>
           </div>
         ) : (
           <div className="dual-loading" role="status">
@@ -463,20 +470,24 @@ export function ChatPanel({
         ))}
       </div>
 
+      {executionMode === "dual_api" ? (
+        <label className="chat-compare-toggle">
+          <input
+            type="checkbox"
+            checked={compare}
+            onChange={(event) => setCompare(event.target.checked)}
+            disabled={loading}
+          />
+          <span>
+            <strong>SKT A.X 답변도 함께 비교</strong>
+            <small>켜면 다음 질문만 두 모델에 같은 조건으로 병렬 전송합니다.</small>
+          </span>
+        </label>
+      ) : null}
+
       {error ? <p className="chat-error" role="alert">{error}</p> : null}
 
       <form className="chat-form" onSubmit={handleSubmit}>
-        {executionMode === "dual_api" ? (
-          <label className="chat-compare-toggle">
-            <input
-              type="checkbox"
-              checked={compareModels}
-              onChange={(event) => setCompareModels(event.target.checked)}
-              disabled={loading}
-            />
-            <span>두 모델 비교</span>
-          </label>
-        ) : null}
         {executionMode === "openai_responses" && chatMode === "contract" ? (
           <div className="chat-contract-upload">
             <label className="button button-outline" htmlFor={contractFileInputId}>
@@ -513,9 +524,9 @@ export function ChatPanel({
       </form>
       <p className="dual-api-note">
         {executionMode === "dual_api"
-          ? compareModels
-            ? "두 모델 비교를 켜면 동일 질문을 실제 Upstage Solar·SKT A.X API에 병렬 전송합니다."
-            : "기본 모델 한 개의 답변을 표시합니다. 필요하면 두 모델 비교를 켤 수 있습니다."
+          ? compare
+            ? "비교를 켠 질문은 실제 Upstage Solar·SKT A.X API에 병렬 전송합니다."
+            : "기본 질문은 Upstage Solar API에만 전송합니다."
           : "질문에 따라 허용된 도구만 서버에서 실행하며, 단일 OpenAI Responses 답변을 표시합니다."}{" "}
         API 키와 숨은 프롬프트는 브라우저로 전송하지 않습니다.
       </p>

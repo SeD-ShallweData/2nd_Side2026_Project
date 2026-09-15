@@ -93,7 +93,6 @@ function contextWithCompany(): ComparisonContext {
   return {
     request: {
       message: "이 회사 어떤가요?",
-      compare: true,
       chat_mode: "general",
       company_id: "firm_0001",
       recent_messages: [],
@@ -143,6 +142,23 @@ async function systemPrompts(context: ComparisonContext): Promise<string[]> {
 }
 
 describe("사업장 컨텍스트 주입", () => {
+  it("공개 개수와 확인된 항목만 두 모델에 전달한다", async () => {
+    const context = contextWithCompany();
+    context.companyContext = { ...context.companyContext!, risk: {
+      ...RISK, wage_risk: { ...RISK.wage_risk, positive_signals: {
+        availability: "ready", confirmed_count: 1,
+        items: [{ label: "고용 안정", status: "confirmed" }, { label: "미확인 테스트 항목", status: "unconfirmed" }],
+      } },
+    } };
+    const prompts = await systemPrompts(context);
+    expect(prompts).toHaveLength(2);
+    for (const prompt of prompts) {
+      expect(prompt).toContain('"confirmed_count":1');
+      expect(prompt).toContain('"confirmed_items":["고용 안정"]');
+      expect(prompt).not.toContain("미확인 테스트 항목");
+      expect(prompt).not.toContain("positive_flags");
+    }
+  });
   it("사업장을 선택한 상담은 회사 정보가 시스템 프롬프트에 들어간다", async () => {
     const [prompt] = await systemPrompts(contextWithCompany());
 

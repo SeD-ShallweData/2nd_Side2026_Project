@@ -89,6 +89,15 @@ function publicSignalForPrompt(risk: CompanyRiskResult) {
   return {
     data_as_of: risk.data_as_of,
     wage_signal: {
+      positive_signals: risk.wage_risk.positive_signals
+        ? {
+            availability: risk.wage_risk.positive_signals.availability,
+            confirmed_count: risk.wage_risk.positive_signals.confirmed_count,
+            confirmed_items: risk.wage_risk.positive_signals.items
+              .filter((item) => item.status === "confirmed")
+              .map((item) => item.label),
+          }
+        : null,
       summary: stripBandLabel(risk.wage_risk.summary),
       official_listing: {
         status: risk.wage_risk.official_listing.status,
@@ -218,8 +227,8 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
   async compare(context: ComparisonContext): Promise<ChatComparisonResponse> {
     const startedAt = new Date();
     const messages = buildMessages(context);
-    const configs = context.request.compare ? this.configs : this.configs.slice(0, 1);
-    const runs = configs.map(async (config): Promise<ProviderComparisonResult> => {
+    const isComparison = this.configs.length > 1;
+    const runs = this.configs.map(async (config): Promise<ProviderComparisonResult> => {
       try {
         const completion = await this.client.complete(config, messages);
         const guardrailHits = scanGuardrails(completion.answer, context);
@@ -266,15 +275,15 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
     return {
       comparison_id: `cmp_${crypto.randomUUID()}`,
       conversation_id: context.policyBaseline.conversation_id,
-      execution_mode: "dual_api",
+      execution_mode: isComparison ? "dual_api" : "single_api",
       started_at: startedAt.toISOString(),
       completed_at: new Date().toISOString(),
       fair_comparison: {
-        concurrent: true,
-        same_context: true,
-        same_temperature: true,
-        same_max_tokens: true,
-        same_retrieval: true,
+        concurrent: isComparison,
+        same_context: isComparison,
+        same_temperature: isComparison,
+        same_max_tokens: isComparison,
+        same_retrieval: isComparison,
       },
       results,
     };

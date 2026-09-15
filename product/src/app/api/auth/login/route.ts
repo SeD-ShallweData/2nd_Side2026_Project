@@ -1,5 +1,6 @@
 import type { NextResponse } from "next/server";
 
+import { LoginTemporarilyLockedError } from "@/server/auth/loginAttemptTracker";
 import { loginUser } from "@/services/authService";
 import { assertSameOriginRequest, noStoreError, noStoreJson, readJsonBody } from "@/server/auth/http";
 import { setSessionCookie } from "@/server/auth/sessionCookie";
@@ -14,6 +15,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     setSessionCookie(response, result.session.token, result.session.expires_at);
     return response;
   } catch (error) {
-    return noStoreError(error);
+    const response = noStoreError(error);
+    if (error instanceof LoginTemporarilyLockedError) {
+      response.headers.set("Retry-After", String(error.retryAfterSeconds));
+    }
+    return response;
   }
 }

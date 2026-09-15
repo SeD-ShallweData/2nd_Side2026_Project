@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 
 const mocks = vi.hoisted(() => ({
   compare: vi.fn(),
+  providerConfigs: [] as Array<{ id: string }>,
   getCompanyById: vi.fn(),
   getCompanyRisk: vi.fn(),
   retrieveLaborLawContext: vi.fn(),
@@ -14,6 +15,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/adapters/real/DualLlmChatProvider", () => ({
   CHAT_POLICY_VERSION: "test-policy",
   DualLlmChatProvider: class {
+    constructor(configs: Array<{ id: string }>) {
+      mocks.providerConfigs = configs;
+    }
+
     compare(context: unknown) {
       return mocks.compare(context);
     }
@@ -27,8 +32,8 @@ vi.mock("@/adapters/real/OpenAICompatibleChatClient", () => ({
 vi.mock("@/services/chatService", () => ({
   parseChatRequest: (value: Record<string, unknown>) => ({
     message: value.message,
-    compare: value.compare === true,
     company_id: value.company_id,
+    compare: value.compare === true,
     chat_mode: value.chat_mode ?? "general",
     recent_messages: value.recent_messages ?? [],
   }),
@@ -78,6 +83,7 @@ function baseline(overrides: Partial<ChatResponse> = {}): ChatResponse {
 describe("상담 비교 no_match 단락", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.providerConfigs = [];
     mocks.rewriteFollowupQuery.mockImplementation(async (request: { message: string }) => ({
       query: request.message,
       changed: false,
@@ -122,7 +128,7 @@ describe("상담 비교 no_match 단락", () => {
     );
   });
 
-  it("compare=true이면 정책 단락 응답도 두 모델 결과를 반환한다", async () => {
+  it("compare=true인 no_match 정책 응답은 두 공급자 자리를 유지한다", async () => {
     mocks.sendChatMessage.mockResolvedValue(baseline());
     mocks.retrieveLaborLawContext.mockResolvedValue({
       query: "노동조합을 만들려면 어떻게 하나요?",
@@ -140,7 +146,9 @@ describe("상담 비교 no_match 단락", () => {
       recent_messages: [],
     });
 
+    expect(mocks.compare).not.toHaveBeenCalled();
     expect(result.results).toHaveLength(2);
+    expect(result.results.map((item) => item.provider)).toEqual(["upstage", "skt"]);
   });
 
   it("주제명이 없는 distance_threshold도 같은 방식으로 단락한다", async () => {
@@ -197,5 +205,58 @@ describe("상담 비교 no_match 단락", () => {
       company_context_attached: true,
       rag_status: "no_match",
     });
+  });
+});
+
+describe("상담 공급자 선택", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.providerConfigs = [];
+    mocks.sendChatMessage.mockResolvedValue(baseline());
+    mocks.rewriteFollowupQuery.mockImplementation(async (request: { message: string }) => ({
+      query: request.message,
+      changed: false,
+    }));
+    mocks.retrieveLaborLawContext.mockResolvedValue({
+      query: "연차는 어떻게 쓰나요?",
+      status: "matched",
+      threshold: 0.42,
+      documents: [{
+        content: "연차 유급휴가 안내",
+        citation: "근로기준법 제60조",
+        distance: 0.2,
+        source: { name: "근로기준법 제60조", organization: "국가법령정보센터" },
+      }],
+    });
+    mocks.compare.mockResolvedValue({ execution_mode: "single_api", results: [] });
+  });
+
+  it("compare를 생략하면 Upstage 구성만 생성 Provider에 전달한다", async () => {
+    await sendComparedChatMessage({
+      message: "연차는 어떻게 쓰나요?",
+      chat_mode: "general",
+      recent_messages: [],
+    });
+
+    expect(mocks.providerConfigs.map((config) => config.id)).toEqual(["upstage"]);
+    expect(mocks.rewriteFollowupQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ compare: false }),
+      [expect.objectContaining({ id: "upstage" })],
+    );
+  });
+
+  it("compare=true이면 Upstage와 SKT 구성을 모두 전달한다", async () => {
+    await sendComparedChatMessage({
+      message: "연차는 어떻게 쓰나요?",
+      compare: true,
+      chat_mode: "general",
+      recent_messages: [],
+    });
+
+    expect(mocks.providerConfigs.map((config) => config.id)).toEqual(["upstage", "skt"]);
+    expect(mocks.rewriteFollowupQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ compare: true }),
+      [expect.objectContaining({ id: "upstage" }), expect.objectContaining({ id: "skt" })],
+    );
   });
 });

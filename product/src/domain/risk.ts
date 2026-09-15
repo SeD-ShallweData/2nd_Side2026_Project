@@ -34,16 +34,14 @@ export interface OfficialListingStatus {
   source_name?: string;
 }
 
-export interface GreenFlagPublic {
-  code: "G1" | "G2" | "G3" | "G4" | "G5" | "G6";
-  label: string;
-  confirmed: boolean | null;
-}
-
 export interface WageRiskPublic {
+  positive_signals?: {
+    availability: "ready" | "unavailable";
+    confirmed_count: number | null;
+    items: { label: string; status: "confirmed" | "unconfirmed" }[];
+  };
   availability?: SignalAvailability;
   verdict?: WageVerdict | null;
-  green_flags?: GreenFlagPublic[];
   level: SignalLevel;
   summary: string;
   evidence_codes: string[];

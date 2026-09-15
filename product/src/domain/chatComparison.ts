@@ -11,7 +11,7 @@ import type { RagRetrievalResult } from "@/domain/rag";
 export type LlmProviderId = "upstage" | "skt";
 export type ChatResultProviderId = LlmProviderId | "openai";
 export type ConfiguredChatExecutionMode = "dual_api" | "openai_responses";
-export type ChatExecutionMode = ConfiguredChatExecutionMode | "policy_short_circuit";
+export type ChatExecutionMode = ConfiguredChatExecutionMode | "single_api" | "policy_short_circuit";
 export type ProviderRunStatus = "success" | "guardrail_replaced" | "fallback" | "policy_short_circuit";
 
 export interface TokenUsage {

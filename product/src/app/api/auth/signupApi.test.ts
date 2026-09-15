@@ -5,7 +5,9 @@ vi.mock("server-only", () => ({}));
 import { POST as login } from "@/app/api/auth/login/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
 import { GET as getCurrentUser } from "@/app/api/users/me/route";
-import { resetMockSessions } from "@/adapters/mock/MockAuthRepository";
+import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
+import { resetLoginAttemptsForTests } from "@/server/auth/loginAttemptTracker";
+import { loginUser, registerUser } from "@/services/authService";
 
 const VALID = {
   email: "new.worker@example.com",
@@ -37,10 +39,13 @@ beforeEach(() => {
   vi.stubEnv("MOCK_AUTH_ADMIN_PASSWORD", "local-admin-password");
   vi.stubEnv("MOCK_AUTH_INSPECTOR_PASSWORD", "local-inspector-password");
   resetMockSessions();
+  resetLoginAttemptsForTests();
 });
 
 afterEach(() => {
   resetMockSessions();
+  resetLoginAttemptsForTests();
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
 });
 
@@ -51,6 +56,70 @@ describe("회원가입", () => {
     expect(response.status).toBe(201);
     expect(body).toMatchObject({ authenticated: true });
     expect(response.headers.get("set-cookie")).toContain("donworry_session=");
+  });
+
+  it("가입 전 존재하지 않던 이메일의 로그인 실패 기록을 초기화한다", async () => {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      await login(jsonRequest("http://localhost/api/auth/login", {
+        email: VALID.email,
+        password: "wrong-password",
+      }));
+    }
+
+    expect((await post(VALID)).response.status).toBe(201);
+    const signedIn = await login(jsonRequest("http://localhost/api/auth/login", {
+      email: VALID.email,
+      password: VALID.password,
+    }));
+    expect(signedIn.status).toBe(200);
+  });
+
+  it("가입과 직전 로그인이 겹쳐도 가입 전 실패 기록을 남기지 않는다", async () => {
+    const originalAuthenticate = MockAuthRepository.prototype.authenticate;
+    let signalAuthenticationStarted!: () => void;
+    let releaseAuthentication!: () => void;
+    const authenticationStarted = new Promise<void>((resolve) => {
+      signalAuthenticationStarted = resolve;
+    });
+    const authenticationGate = new Promise<void>((resolve) => {
+      releaseAuthentication = resolve;
+    });
+    const authenticateSpy = vi.spyOn(MockAuthRepository.prototype, "authenticate")
+      .mockImplementationOnce(async function authenticateAfterGate(
+        this: MockAuthRepository,
+        email,
+        password,
+      ) {
+        signalAuthenticationStarted();
+        await authenticationGate;
+        return originalAuthenticate.call(this, email, password);
+      });
+    const registerSpy = vi.spyOn(MockAuthRepository.prototype, "register");
+
+    const loginBeforeSignup = loginUser({
+      email: VALID.email,
+      password: "wrong-password",
+    });
+    await authenticationStarted;
+    const signupDuringLogin = registerUser(VALID);
+
+    /* 같은 이메일의 선행 로그인이 끝날 때까지 실제 가입 저장을 시작하지 않는다. */
+    const registrationStartedBeforeLoginFinished = registerSpy.mock.calls.length > 0;
+    releaseAuthentication();
+
+    await expect(loginBeforeSignup).rejects.toMatchObject({ code: "INVALID_CREDENTIALS" });
+    expect((await signupDuringLogin).response.authenticated).toBe(true);
+    expect(registrationStartedBeforeLoginFinished).toBe(false);
+    authenticateSpy.mockRestore();
+    registerSpy.mockRestore();
+
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      const failed = await login(jsonRequest("http://localhost/api/auth/login", {
+        email: VALID.email,
+        password: "wrong-password",
+      }));
+      expect(failed.status).toBe(401);
+    }
   });
 
   it("가입한 계정으로 다시 로그인할 수 있다", async () => {
