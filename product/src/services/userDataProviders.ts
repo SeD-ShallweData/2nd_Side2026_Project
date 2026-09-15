@@ -2,14 +2,21 @@ import "server-only";
 
 import { MockAuthRepository } from "@/adapters/mock/MockAuthRepository";
 import { MockCommunityRepository } from "@/adapters/mock/MockCommunityRepository";
+import { MockWorksiteTipRepository } from "@/adapters/mock/MockWorksiteTipRepository";
 import { RealAuthRepository } from "@/adapters/real/RealAuthRepository";
 import { RealCommunityRepository } from "@/adapters/real/RealCommunityRepository";
-import { getAuthDataMode, getCommunityDataMode } from "@/config/dataMode";
+import { RealWorksiteTipRepository } from "@/adapters/real/RealWorksiteTipRepository";
+import {
+  getAuthDataMode,
+  getCommunityDataMode,
+  getWorksiteTipDataMode,
+} from "@/config/dataMode";
 import type { AuthRepository } from "@/domain/auth";
 import type { CommunityRepository } from "@/domain/community";
+import type { WorksiteTipRepository } from "@/domain/worksiteTip";
 
 /*
- * 사용자 데이터(회원·세션·게시글·신고) 저장소 선택.
+ * 사용자 데이터(회원·세션·게시글·신고·현장 제보) 저장소 선택.
  *
  * services/providers.ts 와 나눠 둔 이유가 있다. 그쪽은 사업장·위험도·상담처럼
  * 화면 어디서나 쓰는 공용 조회 어댑터를 모아 두는 곳이고, 이 파일이 다루는
@@ -21,6 +28,8 @@ const mockAuthRepository = new MockAuthRepository();
 const realAuthRepository = new RealAuthRepository();
 const realCommunityRepository = new RealCommunityRepository();
 const mockCommunityRepository = new MockCommunityRepository();
+const mockWorksiteTipRepository = new MockWorksiteTipRepository();
+const realWorksiteTipRepository = new RealWorksiteTipRepository();
 
 export function getAuthRepository(): AuthRepository {
   return getAuthDataMode() === "real" ? realAuthRepository : mockAuthRepository;
@@ -28,4 +37,14 @@ export function getAuthRepository(): AuthRepository {
 
 export function getCommunityRepository(): CommunityRepository {
   return getCommunityDataMode() === "real" ? realCommunityRepository : mockCommunityRepository;
+}
+
+export function getWorksiteTipRepository(): WorksiteTipRepository {
+  return getWorksiteTipDataMode() === "real"
+    ? realWorksiteTipRepository
+    : mockWorksiteTipRepository;
+}
+
+export function resetMockWorksiteTipsForTests(): void {
+  mockWorksiteTipRepository.resetForTests();
 }

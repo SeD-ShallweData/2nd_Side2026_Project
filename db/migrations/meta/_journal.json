@@ -92,6 +92,13 @@
       "when": 1789282482950,
       "tag": "0012_v_region_industry_signal",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789378735634,
+      "tag": "0013_illegal_sir_ram",
+      "breakpoints": true
     }
   ]
 }

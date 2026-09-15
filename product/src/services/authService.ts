@@ -9,6 +9,12 @@ import {
   type SignupResponse,
 } from "@/app/api/auth/authApiContract";
 import type { IssuedSession } from "@/domain/auth";
+import {
+  assertLoginAttemptAllowed,
+  clearLoginFailures,
+  recordLoginFailure,
+  withLoginAttemptLock,
+} from "@/server/auth/loginAttemptTracker";
 import { getAuthRepository } from "@/services/userDataProviders";
 import { ServiceError } from "@/utils/errors";
 
@@ -140,21 +146,25 @@ export async function registerUser(
   const repository = getAuthRepository();
   repository.assertAvailable();
 
-  const user = await repository.register({
-    email: request.email,
-    password: request.password,
-    name: request.name,
-  });
-  const session = await repository.issueSession(user);
+  return withLoginAttemptLock(request.email, async () => {
+    const user = await repository.register({
+      email: request.email,
+      password: request.password,
+      name: request.name,
+    });
+    /* 가입 전에 존재하지 않던 이메일로 쌓인 실패 기록이 새 계정을 막지 않게 한다. */
+    clearLoginFailures(request.email);
+    const session = await repository.issueSession(user);
 
-  return {
-    session,
-    response: {
-      authenticated: true,
-      user: session.user,
-      expires_at: session.expires_at,
-    },
-  };
+    return {
+      session,
+      response: {
+        authenticated: true,
+        user: session.user,
+        expires_at: session.expires_at,
+      },
+    };
+  });
 }
 
 export async function loginUser(
@@ -164,16 +174,31 @@ export async function loginUser(
   const repository = getAuthRepository();
   repository.assertAvailable();
 
-  const user = await repository.authenticate(request.email, request.password);
-  const session = await repository.issueSession(user);
-  return {
-    session,
-    response: {
-      authenticated: true,
-      user: session.user,
-      expires_at: session.expires_at,
-    },
-  };
+  return withLoginAttemptLock(request.email, async () => {
+    assertLoginAttemptAllowed(request.email);
+
+    let user: SessionUserDto;
+    try {
+      user = await repository.authenticate(request.email, request.password);
+    } catch (error) {
+      /* DB·설정 장애가 아니라 실제 자격 증명 실패만 잠금 횟수에 포함한다. */
+      if (error instanceof ServiceError && error.code === "INVALID_CREDENTIALS") {
+        recordLoginFailure(request.email);
+      }
+      throw error;
+    }
+
+    clearLoginFailures(request.email);
+    const session = await repository.issueSession(user);
+    return {
+      session,
+      response: {
+        authenticated: true,
+        user: session.user,
+        expires_at: session.expires_at,
+      },
+    };
+  });
 }
 
 export async function getSessionResponse(token: string | null): Promise<SessionResponse> {

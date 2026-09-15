@@ -40,6 +40,8 @@ ReadOnlyPaths=@PROJECT_ROOT@
 # '-' 접두사: 경로가 없어도 유닛이 기동에 실패하지 않게 한다. 첫 빌드 전이나
 # 손으로 .next 를 지운 직후가 그런 상태다. 디렉터리는 배포기가 만든다.
 ReadWritePaths=-@PROJECT_ROOT@/product/.next/cache
+# 현장 제보 원본과 개인정보를 제거한 감독관용 사본은 영구 데이터 디스크에 쓴다.
+ReadWritePaths=/srv/moneyworry/worksite-tip-media
 RestrictSUIDSGID=yes
 UMask=0027
 LimitNOFILE=65536

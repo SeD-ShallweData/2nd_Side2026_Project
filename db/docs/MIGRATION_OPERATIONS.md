@@ -6,10 +6,11 @@
 영수증이 어긋난 상태에서 `drizzle-kit migrate`를 실행하면 이미 존재하는 컬럼을 다시 바꾸거나 view를
 재생성하려 할 수 있다.
 
-## 현재 상태 (2026-09-11 기준)
+## 현재 상태 (2026-09-14 기준)
 
-- 로컬 journal: `0000`~`0011`, 12개
-- 운영 DB ledger: `0000`~`0011`, 12개 — `aligned`
+- 로컬 journal: `0000`~`0013`, 14개
+- 마지막으로 확인된 운영 DB ledger: `0000`~`0011`, 12개. `0012`·`0013`의 실제 적용 여부는
+  배포 직전 읽기 전용 drift 검사로 다시 확인한다.
 - DB 계정 4종: `wg_bot`(AI 상담용, Path B 계약 대상) · `wg_auth`(회원·세션) ·
   `wg_community`(게시글·신고·사업장·`v_posts`·댓글 조회·피드백) · `wg_tip`(현장 제보, 신규)
 - 위 계정은 모두 DB 소유자 계정(`wageguard`)과 별개의 애플리케이션 전용 계정이다.
@@ -43,7 +44,7 @@ npm run migrate
 **이미 스키마를 먼저 적용해버린 경우**: 롤을 만든 뒤 `0009`의 권한 블록만 다시 실행해도 된다.
 `DO $$ ... END $$` 블록은 재실행해도 안전하다(멱등).
 
-`0010`, `0011`에는 이런 조건부 권한 부여가 없다 — `wg_tip` 권한은 `create-tip-role.sh` 스크립트
+`0010`~`0013`에는 이런 조건부 권한 부여가 없다 — `wg_tip` 권한은 `create-tip-role.sh` 스크립트
 자체가 부여하므로 이 순서 의존성이 없다.
 
 ## 배포 전 읽기 전용 검사
@@ -101,12 +102,12 @@ npm run check:migration-drift -- --env-file /path/to/env --json
 
 ## 정상 `aligned` 결과 예시
 
-`0000`~`0011`이 모두 적용되고 각 migration의 후조건(테이블·컬럼·view·index)이 전부 충족되면
+`0000`~`0013`이 모두 적용되고 각 migration의 후조건(테이블·컬럼·view·index)이 전부 충족되면
 다음과 같은 결과가 정상이다.
 
 ```text
 상태: aligned
-DB ledger: 12개 (일치 prefix 12개)
+DB ledger: 14개 (일치 prefix 14개)
 적용 대기: 없음
 로컬 migration journal과 DB ledger 및 알려진 schema 후조건이 일치합니다.
 ```

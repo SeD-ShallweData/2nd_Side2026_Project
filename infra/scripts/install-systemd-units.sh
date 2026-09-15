@@ -7,6 +7,7 @@ SYSTEMD_DIR="/etc/systemd/system"
 DATA_MOUNT_ROOT="/srv/moneyworry"
 DATA_DISK_BY_ID="/dev/disk/by-id/google-moneyworry-data"
 DATA_DISK_BYTES="85899345920"
+WORKSITE_TIP_STORAGE_ROOT="/srv/moneyworry/worksite-tip-media"
 SYSTEMD_DROPIN_ROOTS=(
   /etc/systemd/system
   /run/systemd/system
@@ -563,6 +564,61 @@ if ! python3 "$SCRIPT_DIR/validate-service-envs.py" \
   die "split environment contract validation failed"
 fi
 
+# The web process stores originals and metadata-stripped inspector copies below
+# one private directory on the persistent data disk. Create only the fixed path;
+# never follow or repair a symlink, nested mount, or unexpected existing entry.
+if [[ -L "$WORKSITE_TIP_STORAGE_ROOT" \
+  || ( -e "$WORKSITE_TIP_STORAGE_ROOT" && ! -d "$WORKSITE_TIP_STORAGE_ROOT" ) ]]; then
+  die "worksite tip storage root must be a real directory: $WORKSITE_TIP_STORAGE_ROOT"
+fi
+if [[ ! -e "$WORKSITE_TIP_STORAGE_ROOT" ]]; then
+  install -d -o "$WEB_SERVICE_USER" -g "$WEB_SERVICE_GROUP" -m 0700 \
+    -- "$WORKSITE_TIP_STORAGE_ROOT"
+fi
+[[ "$(realpath -e -- "$WORKSITE_TIP_STORAGE_ROOT")" == "$WORKSITE_TIP_STORAGE_ROOT" ]] \
+  || die "worksite tip storage root or an ancestor is a symlink"
+if mountpoint -q "$WORKSITE_TIP_STORAGE_ROOT"; then
+  die "worksite tip storage root must not be a nested mount"
+fi
+[[ "$(stat -c '%d' -- "$WORKSITE_TIP_STORAGE_ROOT")" \
+  == "$(stat -c '%d' -- "$DATA_MOUNT_ROOT")" ]] \
+  || die "worksite tip storage root is not on the persistent data filesystem"
+[[ "$(stat -c '%u:%g' -- "$WORKSITE_TIP_STORAGE_ROOT")" \
+  == "$(id -u "$WEB_SERVICE_USER"):$(id -g "$WEB_SERVICE_USER")" ]] \
+  || die "worksite tip storage root must belong to the web service account"
+[[ "$(stat -c '%a' -- "$WORKSITE_TIP_STORAGE_ROOT")" == "700" ]] \
+  || die "worksite tip storage root mode must be exactly 0700"
+for access_mode in -r -w -x; do
+  runuser -u "$WEB_SERVICE_USER" -- test "$access_mode" "$WORKSITE_TIP_STORAGE_ROOT" \
+    || die "web service account lacks $access_mode access to worksite tip storage"
+done
+for service_user in "$DB_SERVICE_USER" "$RAG_SERVICE_USER" "$CONTRACT_SERVICE_USER"; do
+  for access_mode in -r -w -x; do
+    if runuser -u "$service_user" -- test "$access_mode" "$WORKSITE_TIP_STORAGE_ROOT"; then
+      die "$service_user can access private worksite tip storage ($access_mode)"
+    fi
+  done
+done
+
+tip_storage_finding="$(find -P "$WORKSITE_TIP_STORAGE_ROOT" -mindepth 1 \
+  \( ! -user "$WEB_SERVICE_USER" -o ! -group "$WEB_SERVICE_GROUP" \) -print -quit)" \
+  || die "could not inspect worksite tip storage ownership"
+[[ -z "$tip_storage_finding" ]] \
+  || die "worksite tip storage contains an entry owned by another account: $tip_storage_finding"
+tip_storage_finding="$(find -P "$WORKSITE_TIP_STORAGE_ROOT" -mindepth 1 \
+  ! -type f ! -type d -print -quit)" \
+  || die "could not inspect worksite tip storage entry types"
+[[ -z "$tip_storage_finding" ]] \
+  || die "worksite tip storage contains a forbidden special entry: $tip_storage_finding"
+tip_storage_finding="$(find -P "$WORKSITE_TIP_STORAGE_ROOT" -type d ! -perm 0700 -print -quit)" \
+  || die "could not inspect worksite tip storage directory modes"
+[[ -z "$tip_storage_finding" ]] \
+  || die "worksite tip storage directory mode must be exactly 0700: $tip_storage_finding"
+tip_storage_finding="$(find -P "$WORKSITE_TIP_STORAGE_ROOT" -type f ! -perm 0600 -print -quit)" \
+  || die "could not inspect worksite tip storage file modes"
+[[ -z "$tip_storage_finding" ]] \
+  || die "worksite tip storage file mode must be exactly 0600: $tip_storage_finding"
+
 # Run the verifier itself with the trusted host interpreter in isolated mode.
 # Starting it with the target venv would execute a malicious .pth or
 # sitecustomize hook before that same environment could be inspected.
@@ -735,7 +791,8 @@ for unit_name in "${UNIT_NAMES[@]}"; do
       expected_group="$WEB_SERVICE_GROUP"
       expected_env_file="$WEB_ENV_FILE"
       expected_read_only_paths="$PROJECT_ROOT"
-      # web 은 Next.js 캐시 한 칸에만 쓴다. 이 값은 moneyworry-web.service.in 의
+      # web 은 Next.js 캐시와 현장 제보 영구 저장소에만 쓴다. 이 값은
+      # moneyworry-web.service.in 의
       # ReadWritePaths 와 **글자 그대로** 같아야 한다 — systemctl show 는 '-'
       # 접두사도 그대로 돌려주므로 여기에도 있어야 한다.
       #
@@ -743,7 +800,7 @@ for unit_name in "${UNIT_NAMES[@]}"; do
       # "effective systemd ReadWritePaths differ from the sealed unit" 으로
       # 죽었다. CI 는 install-systemd-units.sh 를 실행하지 않고 bash -n 만
       # 돌려서 잡히지 않았다. 이제 테스트가 둘을 묶는다.
-      expected_read_write_paths="-$PROJECT_ROOT/product/.next/cache"
+      expected_read_write_paths="-$PROJECT_ROOT/product/.next/cache $WORKSITE_TIP_STORAGE_ROOT"
       ;;
     moneyworry-rag)
       expected_user="$RAG_SERVICE_USER"

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { sendInspectorChatMessage } from "@/services/inspectorService";
+import { requireInspectorRequest } from "@/server/auth/inspectorAccess";
 import { errorPayload } from "@/utils/errors";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
+    await requireInspectorRequest(request);
     const body: unknown = await request.json();
     return NextResponse.json(await sendInspectorChatMessage(body), {
       headers: { "Cache-Control": "no-store" },

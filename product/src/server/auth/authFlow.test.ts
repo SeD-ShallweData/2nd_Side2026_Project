@@ -7,6 +7,7 @@ import { POST as logout } from "@/app/api/auth/logout/route";
 import { GET as getSession } from "@/app/api/auth/session/route";
 import { GET as getCurrentUser } from "@/app/api/users/me/route";
 import { resetMockSessions } from "@/adapters/mock/MockAuthRepository";
+import { resetLoginAttemptsForTests } from "@/server/auth/loginAttemptTracker";
 
 const MOCK_PASSWORDS = {
   user: "local-user-password",
@@ -49,10 +50,13 @@ beforeEach(() => {
   vi.stubEnv("DEMO_BASIC_AUTH_USER", "");
   vi.stubEnv("DEMO_BASIC_AUTH_PASSWORD", "");
   resetMockSessions();
+  resetLoginAttemptsForTests();
 });
 
 afterEach(() => {
   resetMockSessions();
+  resetLoginAttemptsForTests();
+  vi.useRealTimers();
   vi.unstubAllEnvs();
 });
 
@@ -118,6 +122,94 @@ describe("Mock 사용자 인증 API", () => {
     const admin = await loginAs("admin@mock.donworry.local", MOCK_PASSWORDS.admin);
     expect(admin.response.status).toBe(200);
     expect(admin.body).toMatchObject({ user: { role: "admin" } });
+  });
+
+  it("같은 이메일의 5번째 로그인 실패부터 15분 동안 잠근다", async () => {
+    const emailVariants = [
+      "USER@MOCK.DONWORRY.LOCAL",
+      " user@mock.donworry.local ",
+      "User@Mock.Donworry.Local",
+      "user@mock.donworry.local",
+    ];
+
+    for (const email of emailVariants) {
+      const failed = await loginAs(email, "wrong-password");
+      expect(failed.response.status).toBe(401);
+      expect(failed.body).toMatchObject({ error: { code: "INVALID_CREDENTIALS" } });
+    }
+
+    const fifth = await loginAs("user@mock.donworry.local", "wrong-password");
+    expect(fifth.response.status).toBe(429);
+    expect(fifth.response.headers.get("retry-after")).toBe("900");
+    expect(fifth.response.headers.get("cache-control")).toBe("no-store");
+    expect(fifth.response.headers.get("set-cookie")).toBeNull();
+    expect(fifth.body).toMatchObject({
+      error: { code: "LOGIN_TEMPORARILY_LOCKED", retryable: true },
+    });
+
+    const correctButLocked = await loginAs("user@mock.donworry.local", MOCK_PASSWORDS.user);
+    expect(correctButLocked.response.status).toBe(429);
+    expect(correctButLocked.body).toMatchObject({ error: { code: "LOGIN_TEMPORARILY_LOCKED" } });
+  });
+
+  it("잠금 요청으로 종료 시각을 연장하지 않고 15분 뒤 로그인을 허용한다", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-13T00:00:00.000Z"));
+
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      await loginAs("admin@mock.donworry.local", "wrong-password");
+    }
+
+    vi.advanceTimersByTime(60_000);
+    const stillLocked = await loginAs("admin@mock.donworry.local", MOCK_PASSWORDS.admin);
+    expect(stillLocked.response.status).toBe(429);
+    expect(stillLocked.response.headers.get("retry-after")).toBe("840");
+
+    vi.advanceTimersByTime(14 * 60_000);
+    const unlocked = await loginAs("admin@mock.donworry.local", MOCK_PASSWORDS.admin);
+    expect(unlocked.response.status).toBe(200);
+    expect(unlocked.body).toMatchObject({ authenticated: true, user: { role: "admin" } });
+  });
+
+  it("정상 로그인은 누적 실패 횟수를 초기화한다", async () => {
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      expect((await loginAs("inspector@mock.donworry.local", "wrong-password")).response.status).toBe(401);
+    }
+
+    expect((await loginAs(
+      "inspector@mock.donworry.local",
+      MOCK_PASSWORDS.inspector,
+    )).response.status).toBe(200);
+
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      expect((await loginAs("inspector@mock.donworry.local", "wrong-password")).response.status).toBe(401);
+    }
+  });
+
+  it("존재하지 않는 이메일도 같은 횟수와 응답으로 잠근다", async () => {
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      const failed = await loginAs("missing@example.com", "wrong-password");
+      expect(failed.response.status).toBe(401);
+      expect(failed.body).toMatchObject({ error: { code: "INVALID_CREDENTIALS" } });
+    }
+
+    const locked = await loginAs("missing@example.com", "wrong-password");
+    expect(locked.response.status).toBe(429);
+    expect(locked.body).toMatchObject({ error: { code: "LOGIN_TEMPORARILY_LOCKED" } });
+  });
+
+  it("동시에 몰린 로그인도 네 번만 대조하고 나머지는 잠금으로 거부한다", async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 10 }, () => loginAs("user@mock.donworry.local", "wrong-password")),
+    );
+    const statuses = responses.map(({ response }) => response.status);
+
+    expect(statuses.filter((status) => status === 401)).toHaveLength(4);
+    expect(statuses.filter((status) => status === 429)).toHaveLength(6);
+    expect((await loginAs(
+      "user@mock.donworry.local",
+      MOCK_PASSWORDS.user,
+    )).response.status).toBe(429);
   });
 
   it("짧거나 서로 같은 Mock 비밀번호 설정을 거부한다", async () => {
