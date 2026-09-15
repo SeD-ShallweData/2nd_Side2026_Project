@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import type { SessionResponse } from "@/app/api/auth/authApiContract";
 import type {
+  WorksiteTipCategory,
   WorksiteTipDto,
   WorksiteTipListItemDto,
   WorksiteTipReceiptDto,
@@ -40,7 +41,8 @@ function SessionGate({ session, onRetry }: { session: SessionResponse; onRetry: 
   );
 }
 
-function WorksiteTipForm() {
+export function WorksiteTipForm() {
+  const [category, setCategory] = useState<WorksiteTipCategory | "">("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
@@ -67,6 +69,10 @@ function WorksiteTipForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!category) {
+      setError("제보 유형을 임금과 산재 중에서 골라 주세요.");
+      return;
+    }
     if (!title.trim() || (!body.trim() && photos.length === 0)) {
       setError("제목을 입력하고 본문 또는 사진을 하나 이상 첨부해 주세요.");
       return;
@@ -75,10 +81,12 @@ function WorksiteTipForm() {
     setError(null);
     try {
       const form = new FormData();
+      form.append("category", category);
       form.append("title", title);
       if (body.trim()) form.append("body", body);
       photos.forEach((photo) => form.append("photos", photo, photo.name));
       setReceipt(await submitWorksiteTip(form));
+      setCategory("");
       setTitle("");
       setBody("");
       setPhotos([]);
@@ -109,6 +117,11 @@ function WorksiteTipForm() {
         <div><span className="eyebrow">비공개 접수</span><h2>현장의 문제를 알려주세요</h2></div>
         <p>임금·안전·근로조건과 관련된 현장 상황을 글이나 사진으로 전달할 수 있습니다.</p>
       </div>
+      <label>제보 유형<select value={category} onChange={(event) => setCategory(event.target.value as WorksiteTipCategory | "")} required>
+        <option value="">선택해 주세요</option>
+        <option value="wage">임금 — 체불·미지급</option>
+        <option value="safety">산재 — 안전·사고 위험</option>
+      </select></label>
       <label>제보 제목<input value={title} onChange={(event) => setTitle(event.target.value)} minLength={2} maxLength={120} placeholder="예: 안전교육 없이 위험 작업을 지시받았습니다" required /></label>
       <label>상세 내용 <span className="field-optional">선택</span><textarea value={body} onChange={(event) => setBody(event.target.value)} maxLength={5000} rows={8} placeholder="언제, 어디서, 어떤 일이 있었는지 사실 그대로 적어 주세요." /></label>
       <div className="worksite-upload-field">
