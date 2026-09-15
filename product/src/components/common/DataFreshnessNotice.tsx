@@ -15,7 +15,7 @@ export function DataFreshnessNotice({
   if (freshness === "unknown" || !validUntil) {
     return (
       <div className="freshness freshness-unknown" role="status">
-        <strong>DB 기준 정보를 확인하세요.</strong>
+        <strong>갱신 확인 필요</strong>
         <span>{[dataLabel, targetMonth && `예측 대상 ${targetMonth}`].filter(Boolean).join(" · ")}</span>
       </div>
     );
