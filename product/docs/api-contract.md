@@ -172,6 +172,7 @@ interface ChatRequest {
   message: string;                 // 1..2000자
   conversation_id?: string;
   company_id?: string;
+  compare?: boolean;               // 기본 false. true일 때만 Upstage + SKT 비교
   chat_mode: "general" | "wage" | "safety" | "contract";
   recent_messages: Array<{ role: "user" | "assistant"; content: string }>;
 }
@@ -181,8 +182,10 @@ Next 서버는 회사 컨텍스트를 `company_id`로 다시 조회한다. 클�
 클라이언트는 `resolved_query`를 지정할 수 없다. `CHAT_EXECUTION_MODE`에 따라 응답 wrapper는 유지하면서
 내부 실행만 달라진다.
 
-- `dual_api`(기본): 후속 질문을 독립 질문으로 바꾸고 HB 검색 근거를 한 번 조회해 Upstage와 SKT에
-  동일하게 병렬 전달한다. 결과는 2개다.
+- `CHAT_EXECUTION_MODE=dual_api`(기본): 후속 질문을 독립 질문으로 바꾸고 HB 검색 근거를 한 번 조회한다.
+  요청에서 `compare`를 생략하거나 `false`로 보내면 Upstage 결과 하나와 `execution_mode=single_api`를
+  반환한다. `compare=true`일 때만 같은 컨텍스트를 Upstage와 SKT에 병렬 전달하고 결과 2개와
+  `execution_mode=dual_api`를 반환한다.
 - `openai_responses`: OpenAI Responses가 허용된 function tool만 필요에 따라 순차 호출한다. 결과는
   `provider=openai` 한 개다. Upstage/SKT 장애 우회는 하지 않고 실패 시 정책 baseline으로 대체한다.
 
@@ -307,10 +310,11 @@ interface ContractReviewResponse {
 
 비밀값 없이 계약 버전, 전체 및 기능별 `mock | real`과 통합 상태만 반환한다.
 DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`로 표시한다. 응답에는
-`chat_execution_mode`, 기존 `dual_llm`, 구성 기반 `openai_responses`, 현재 선택 경로인 `active_chat_llm`이
+`chat_execution_mode`, 기본 Upstage 상태인 `primary_llm`, 비교 모드 상태인 `dual_llm`, 구성 기반
+`openai_responses`, 현재 기본 요청 경로인 `active_chat_llm`이
 함께 들어간다. DB의 `ready`는
-읽기 전용 연결에서 `SELECT 1`이 성공했다는 뜻이다. LLM의 `ready`는 키 문자열 존재 여부가 아니라 두
-공급자에 대한 최소 실제 요청이 모두 성공했다는 뜻이며 결과는 60초 캐시한다. OpenAI Responses의
+읽기 전용 연결에서 `SELECT 1`이 성공했다는 뜻이다. LLM의 `ready`는 키 문자열 존재 여부가 아니라 대상
+공급자에 대한 최소 실제 요청이 성공했다는 뜻이며 결과는 60초 캐시한다. OpenAI Responses의
 `ready`는 상태 조회 비용 없이 키·모델·URL 구성이 존재한다는 뜻이며 실제 credential 성공은 smoke test에서
 확인한다. 이 상태 API는 비밀값이나 질문·답변 원문을 반환하지 않는다.
 

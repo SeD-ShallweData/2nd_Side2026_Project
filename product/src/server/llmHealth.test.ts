@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import type { LlmProviderConfig } from "@/server/llmConfig";
-import { probeDualLlmStatus } from "@/server/llmHealth";
+import {
+  probeChatLlmStatuses,
+  probeDualLlmStatus,
+} from "@/server/llmHealth";
 
 const CONFIGS: LlmProviderConfig[] = [
   { id: "upstage", label: "Upstage", apiKey: "up-key", apiUrl: "https://up.test/chat", model: "solar" },
@@ -34,5 +37,27 @@ describe("dual LLM health probe", () => {
       { status: 200, headers: { "Content-Type": "application/json" } },
     )) as typeof fetch;
     expect(await probeDualLlmStatus(CONFIGS, fakeFetch)).toBe("ready");
+  });
+
+  it("기본 Upstage와 두 모델 비교 상태를 한 번의 공급자 점검으로 구분한다", async () => {
+    const fakeFetch = vi.fn(async () => new Response(
+      JSON.stringify({ choices: [{ message: { content: "OK" } }] }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )) as unknown as typeof fetch;
+
+    const statuses = await probeChatLlmStatuses(
+      [CONFIGS[0], { ...CONFIGS[1], apiKey: undefined }],
+      fakeFetch,
+    );
+
+    expect(statuses).toEqual({
+      primary: "ready",
+      comparison: "unavailable",
+    });
+    expect(fakeFetch).toHaveBeenCalledTimes(1);
+    expect(fakeFetch).toHaveBeenCalledWith(
+      "https://up.test/chat",
+      expect.any(Object),
+    );
   });
 });

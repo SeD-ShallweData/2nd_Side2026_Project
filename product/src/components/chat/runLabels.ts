@@ -48,6 +48,13 @@ export function executionModeCopy(
   executionMode: ChatExecutionMode,
   guardrailHits: readonly string[] | undefined | null,
 ): ExecutionModeCopy {
+  if (executionMode === "single_api") {
+    return {
+      kicker: "Upstage Solar 단일 상담",
+      summary: "기본 모델 하나가 같은 공식 근거와 정책 기준으로 답변했습니다.",
+    };
+  }
+
   if (executionMode === "dual_api") {
     return {
       kicker: "동일 조건 병렬 비교",
