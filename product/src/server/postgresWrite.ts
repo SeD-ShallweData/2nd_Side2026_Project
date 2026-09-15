@@ -2,24 +2,25 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import {
   getAuthDatabaseConnectionString,
   getCommunityDatabaseConnectionString,
+  getTipDatabaseConnectionString,
 } from "@/server/databaseConfig";
 import { ServiceError } from "@/utils/errors";
 
 /*
- * 사용자 데이터(회원·세션·게시글·신고)를 쓰는 연결 계층.
+ * 사용자 데이터(회원·세션·게시글·신고·현장 제보)를 쓰는 연결 계층.
  *
  * server/postgres.ts 와 절대 섞지 않는다. 그쪽은 ML 산출물을 읽는
  * 읽기 전용 경로이고, 연결 자체가 default_transaction_read_only 로 잠겨 있다.
  * 여기는 쓰기가 목적이므로 그 잠금이 없다. 한 모듈에서 둘을 다루면
  * 실수로 읽기 전용 잠금이 풀린 연결로 ML 데이터를 건드릴 수 있다.
  *
- * 롤도 둘로 나뉜다. wg_auth 는 회원·세션만, wg_community 는 게시글·신고만
- * 볼 수 있고 서로의 테이블에는 접근 권한이 없다. 그래서 게시글 작성 한 건이
+ * 롤도 기능별로 나뉜다. wg_auth 는 회원·세션, wg_community 는 게시글·신고,
+ * wg_tip 은 현장 제보만 볼 수 있고 서로의 테이블에는 접근 권한이 없다. 그래서 게시글 작성 한 건이
  * "인증 연결로 세션 확인 → 커뮤니티 연결로 저장" 두 단계로 나뉘며,
  * 두 단계를 한 트랜잭션으로 묶을 수 없다.
  */
 
-export type WriteRole = "auth" | "community";
+export type WriteRole = "auth" | "community" | "tip";
 
 interface RoleSpec {
   getConnectionString: () => string | undefined;
@@ -40,6 +41,12 @@ const ROLE_SPECS: Record<WriteRole, RoleSpec> = {
     applicationName: "donworry-product-community",
     notConfiguredCode: "COMMUNITY_DATABASE_NOT_CONFIGURED",
     notConfiguredMessage: "커뮤니티 데이터베이스 연결 정보가 설정되지 않았습니다.",
+  },
+  tip: {
+    getConnectionString: getTipDatabaseConnectionString,
+    applicationName: "donworry-product-worksite-tip",
+    notConfiguredCode: "WORKSITE_TIP_DATABASE_NOT_CONFIGURED",
+    notConfiguredMessage: "현장 제보 데이터베이스 연결 정보가 설정되지 않았습니다.",
   },
 };
 
@@ -121,14 +128,36 @@ export function assertWriteStatementAllowed(sql: string): void {
 }
 
 function unavailable(role: WriteRole): ServiceError {
+  const message = role === "auth"
+    ? "사용자 인증 데이터베이스에 접근하지 못했습니다."
+    : role === "community"
+      ? "커뮤니티 데이터베이스에 접근하지 못했습니다."
+      : "현장 제보 데이터베이스에 접근하지 못했습니다.";
   return new ServiceError(
     "DATABASE_UNAVAILABLE",
-    role === "auth"
-      ? "사용자 인증 데이터베이스에 접근하지 못했습니다."
-      : "커뮤니티 데이터베이스에 접근하지 못했습니다.",
+    message,
     503,
     true,
   );
+}
+
+function commitOutcomeUnknown(role: WriteRole): ServiceError {
+  const target = role === "auth"
+    ? "사용자 인증"
+    : role === "community"
+      ? "커뮤니티"
+      : "현장 제보";
+  return new ServiceError(
+    "DATABASE_COMMIT_OUTCOME_UNKNOWN",
+    `${target} 데이터베이스의 저장 결과를 확인하지 못했습니다.`,
+    503,
+    true,
+  );
+}
+
+function isCommitOutcomeUncertain(error: unknown): boolean {
+  if (!isDatabaseError(error)) return true;
+  return error.code.startsWith("08") || error.code === "40003";
 }
 
 /*
@@ -192,7 +221,15 @@ export async function withWriteTransaction<T>(
   try {
     await client.query("BEGIN");
     const result = await run(transaction);
-    await client.query("COMMIT");
+    try {
+      await client.query("COMMIT");
+    } catch (error) {
+      // 연결 예외(08xxx), statement_completion_unknown(40003), 응답 없는 전송
+      // 실패는 실제 반영 여부를 단정할 수 없다. 제약 위반처럼 나머지 SQLSTATE는
+      // 서버가 COMMIT 실패를 확정해 돌려준 것이므로 원문을 유지한다.
+      if (!isCommitOutcomeUncertain(error)) throw error;
+      throw commitOutcomeUnknown(role);
+    }
     return result;
   } catch (error) {
     try {

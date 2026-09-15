@@ -56,6 +56,13 @@ export function buildCommunityDatabaseUrl(values: Record<string, string>): strin
   );
 }
 
+export function buildTipDatabaseUrl(values: Record<string, string>): string | undefined {
+  return (
+    validDirectUrl(values.TIP_DATABASE_URL) ??
+    buildRoleUrl(values, values.TIP_USER, values.TIP_PASSWORD)
+  );
+}
+
 export function getDatabaseConnectionString(): string | undefined {
   return (
     validDirectUrl(process.env.BOT_DATABASE_URL) ??
@@ -66,7 +73,7 @@ export function getDatabaseConnectionString(): string | undefined {
 
 /*
  * 쓰기 롤은 DATABASE_URL(소유자 계정)로 절대 대체하지 않는다.
- * 대체를 허용하면 wg_auth·wg_community 설정을 빠뜨린 환경에서 앱이 조용히
+ * 대체를 허용하면 wg_auth·wg_community·wg_tip 설정을 빠뜨린 환경에서 앱이 조용히
  * 전체 권한 계정으로 붙어, 나연이 롤을 분리한 이유가 통째로 사라진다.
  * 설정이 없으면 연결하지 않고 실패하는 편이 안전하다.
  */
@@ -79,4 +86,8 @@ export function getCommunityDatabaseConnectionString(): string | undefined {
     validDirectUrl(process.env.COMMUNITY_DATABASE_URL) ??
     buildCommunityDatabaseUrl(readDatabaseValues())
   );
+}
+
+export function getTipDatabaseConnectionString(): string | undefined {
+  return validDirectUrl(process.env.TIP_DATABASE_URL) ?? buildTipDatabaseUrl(readDatabaseValues());
 }

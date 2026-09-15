@@ -425,16 +425,22 @@ class UnitTests(unittest.TestCase):
         self.assertIn("StateDirectory=moneyworry-deploy", SERVICE_SRC)
 
 
-class WebCacheTests(unittest.TestCase):
-    """4-F: web 유닛이 프로젝트 트리에 아무것도 쓸 수 없었다."""
+class WebWritablePathsTests(unittest.TestCase):
+    """web 유닛은 캐시와 현장 제보 영구 저장소에만 쓴다."""
 
     WEB = ROOT / "infra" / "systemd" / "moneyworry-web.service.in"
     DEPLOY = ROOT / "infra" / "scripts" / "deploy-from-git.sh"
 
-    def test_only_the_cache_directory_is_writable(self) -> None:
+    def test_only_the_required_runtime_paths_are_writable(self) -> None:
         text = self.WEB.read_text(encoding="utf-8")
         opened = re.findall(r"(?m)^ReadWritePaths=(.+)$", text)
-        self.assertEqual(opened, ["-@PROJECT_ROOT@/product/.next/cache"])
+        self.assertEqual(
+            opened,
+            [
+                "-@PROJECT_ROOT@/product/.next/cache",
+                "/srv/moneyworry/worksite-tip-media",
+            ],
+        )
 
     def test_missing_cache_directory_does_not_break_startup(self) -> None:
         """첫 빌드 전에는 .next 가 없다. '-' 접두사가 그때 유닛을 살린다."""
@@ -465,7 +471,11 @@ class WebCacheTests(unittest.TestCase):
         self.assertIsNotNone(match, "설치기에서 web 의 기대값을 찾지 못했습니다")
 
         # 설치기는 $PROJECT_ROOT, 템플릿은 @PROJECT_ROOT@ 를 쓴다. 그것만 맞춘다.
-        expected = match.group(1).replace("$PROJECT_ROOT", "@PROJECT_ROOT@")
+        expected = (
+            match.group(1)
+            .replace("$PROJECT_ROOT", "@PROJECT_ROOT@")
+            .replace("$WORKSITE_TIP_STORAGE_ROOT", "/srv/moneyworry/worksite-tip-media")
+        )
         self.assertEqual(
             expected, " ".join(from_template),
             "install-systemd-units.sh 의 봉인 기대값과 moneyworry-web.service.in 의 "

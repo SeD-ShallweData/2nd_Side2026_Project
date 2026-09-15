@@ -23,6 +23,8 @@ const ALL_TAGS = [
   "0009_busy_puck",
   "0010_crazy_talos",
   "0011_lumpy_proteus",
+  "0012_v_region_industry_signal",
+  "0013_illegal_sir_ram",
 ];
 
 function migrations(count = ALL_TAGS.length) {
@@ -84,6 +86,8 @@ describe("migration drift predeploy 판정", () => {
       "0009_busy_puck",
       "0010_crazy_talos",
       "0011_lumpy_proteus",
+      "0012_v_region_industry_signal",
+      "0013_illegal_sir_ram",
     ]);
     assert.equal(result.blocked, true);
   });
@@ -210,6 +214,23 @@ describe("migration drift predeploy 판정", () => {
     assert.deepEqual(result.appliedSchemaMismatch[0].failed, [
       "column_absent:public.users.role",
     ]);
+    assert.equal(result.blocked, true);
+  });
+
+  it("0013의 K5 분류 제약이 예전 고정값으로 돌아가면 차단한다", () => {
+    const local = migrations();
+    const broken = checkValues("0013_illegal_sir_ram", true);
+    broken["constraint_definition:public.worksite_tips.worksite_tips_category_ck"] = false;
+
+    const result = analyzeMigrationState({
+      localMigrations: local,
+      ledgerExists: true,
+      ledgerRows: ledger(local),
+      postconditions: { ...postconditions(true), "0013_illegal_sir_ram": broken },
+    });
+
+    assert.equal(result.status, "applied_schema_mismatch");
+    assert.equal(result.appliedSchemaMismatch[0].tag, "0013_illegal_sir_ram");
     assert.equal(result.blocked, true);
   });
 });
