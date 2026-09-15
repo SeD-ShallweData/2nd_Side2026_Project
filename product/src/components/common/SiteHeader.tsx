@@ -101,6 +101,7 @@ export function SiteHeader() {
             <Link href="/companies">사업장 확인</Link>
             <Link href="/contracts">계약서 진단</Link>
             <Link href="/community">커뮤니티</Link>
+            <Link href="/worksite-tips">현장 신고</Link>
             <Link href="/chat" className="consumer-ai-link">AI 노동 상담</Link>
           </nav>
           <div className="consumer-header-side" style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -141,6 +142,7 @@ export function SiteHeader() {
       <nav className="consumer-mobile-nav" aria-label="모바일 주요 메뉴">
         <Link href="/">소개</Link><Link href="/companies">사업장</Link>
         <Link href="/contracts">계약서</Link><Link href="/community">커뮤니티</Link>
+        <Link href="/worksite-tips">현장 신고</Link>
         <Link href="/chat">AI 상담</Link>
       </nav>
     </>

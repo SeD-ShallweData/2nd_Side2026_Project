@@ -75,6 +75,23 @@ const VERDICT_META: Record<string, { level: SignalLevel; summary: string; code: 
   },
 };
 
+export function getNextBatchDueDate(asOfDate: string | null): string | null {
+  if (!asOfDate || !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) return null;
+  const [year, month, day] = asOfDate.split("-").map(Number);
+  const sourceDate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    sourceDate.getUTCFullYear() !== year ||
+    sourceDate.getUTCMonth() !== month - 1 ||
+    sourceDate.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  const nextMonth = new Date(Date.UTC(year, month + 1, 0));
+  const lastDay = nextMonth.getUTCDate();
+  const dueDate = new Date(Date.UTC(year, month, Math.min(day, lastDay)));
+  return dueDate.toISOString().slice(0, 10);
+}
+
 export function toWageRiskPublic(row: WageRow): WageRiskPublic {
   const mapped = row.verdict ? VERDICT_META[row.verdict] : undefined;
   const excluded = row.verdict?.startsWith("배제_") ?? false;
@@ -233,7 +250,7 @@ async function getSafety(company: WageRow): Promise<{ data: SafetyContextPublic;
       source: {
         name: "산업재해 공표 우선순위 안전 뷰",
         category: "safety",
-        organization: "돈워리 산업안전 데이터 파이프라인",
+        organization: "Co끼리 산업안전 데이터 파이프라인",
         as_of: toIso(rows[0].published_at) ?? rows[0].prediction_as_of,
         document_id: [rows[0].model_name, rows[0].model_version].filter(Boolean).join(":"),
       },
@@ -339,7 +356,7 @@ export class MlRiskProvider {
       data_as_of: row.as_of_date,
       target_month: row.target_month,
       generated_at: toIso(row.ingested_at),
-      valid_until: null,
+      valid_until: getNextBatchDueDate(row.as_of_date),
       freshness: "unknown",
       wage_risk: wage,
       safety_context: safety.data,
@@ -347,7 +364,7 @@ export class MlRiskProvider {
         {
           name: "국민연금 사업장 자료 및 ML 공개 판정",
           category: "wage",
-          organization: "돈워리 임금체불 데이터 파이프라인",
+          organization: "Co끼리 임금체불 데이터 파이프라인",
           as_of: row.as_of_date ?? undefined,
           document_id:
             row.batch_id === null
