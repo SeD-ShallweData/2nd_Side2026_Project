@@ -238,11 +238,21 @@ function successResult(
   run: ResponsesRunResult,
 ): ProviderComparisonResult {
   const guardrailHits = outputGuardrailHits(run);
-  const failedTool = run.toolCalls.find((call) => !call.ok);
+  const hasSuccessfulContractReview = run.toolCalls.some(
+    (call) => call.name === "review_contract" && call.ok,
+  );
+  // A separate law lookup failure must not discard a completed contract review.
+  const failedTool = run.toolCalls.find(
+    (call) => !call.ok &&
+      !(hasSuccessfulContractReview && call.name === "retrieve_labor_law"),
+  );
+  const partialRetrievalFailure = hasSuccessfulContractReview && run.toolCalls.some(
+    (call) => call.name === "retrieve_labor_law" && !call.ok,
+  );
   const toolFailed = Boolean(failedTool);
   const contractReviewSucceeded =
     !toolFailed &&
-    run.toolCalls.some((call) => call.name === "review_contract" && call.ok);
+    hasSuccessfulContractReview;
   const metadata = contractReviewSucceeded ? CONTRACT_REVIEW_METADATA : baseline;
   const replaced = guardrailHits.length > 0;
   const answer = toolFailed || replaced ? baseline.answer : run.answer;
@@ -259,6 +269,9 @@ function successResult(
     limitations: [
       ...metadata.limitations,
       ...retrievalLimitations(run),
+      ...(partialRetrievalFailure && !toolFailed && !replaced
+        ? ["별도 법령 검색 도구 일부가 실패했습니다. 계약서 검토 결과를 활용하되 추가 법령 확인에는 제한이 있습니다."]
+        : []),
       ...(replaced
         ? ["모델 답변이 서비스 정책에 맞지 않아 안전한 안내로 교체했습니다."]
         : []),
