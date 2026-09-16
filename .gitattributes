@@ -1,0 +1,2 @@
+# The RAG runtime pins this manifest's exact SHA-256 byte sequence.
+product/integrations/rag-api/config/rag_assets.v1.json -text
