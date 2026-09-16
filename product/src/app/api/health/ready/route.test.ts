@@ -41,7 +41,7 @@ const readyRagHealth = {
 const readyContractHealth = {
   asset_integrity: true,
   asset_contract: "donworry.contract.assets.v1",
-  asset_manifest_sha256: "1df5825a76b24c961f8a8f49f72c07d0e1f70a06c6f3e0912c265f91e7af4a1a",
+  asset_manifest_sha256: "f5db5e6e358df956755b530265aaa7799290247a5f25efdc3306bbb2fd566e64",
   asset_files_verified: 26,
   asset_persona_count: 4,
   asset_system_blocks: 7,

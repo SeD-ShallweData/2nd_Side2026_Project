@@ -37,6 +37,38 @@ describe("실제 ML DB 공개 경계", () => {
     excluded_wage: false,
   };
 
+  it("긍정 개수와 항목을 같은 배치의 확인값으로 공개한다", () => {
+    const result = toWageRiskPublic({ ...baseRow, verdict: "유보", n_green: 2,
+      positive_flags: [true, false, false, false, true, false] });
+    expect(result.positive_signals?.confirmed_count).toBe(2);
+    expect(result.positive_signals?.items.filter(x => x.status === "confirmed").map(x => x.label))
+      .toEqual(["고용 안정", "업력 약 3년 이상"]);
+    expect(result.level).toBe("watch");
+    expect(result.evidence_items[0].description).toContain("부정적인 기업으로 판단할 수 없습니다");
+    expect(JSON.stringify(result)).not.toMatch(/positive_flags|g1_|g5_|n_green|risk_full/);
+  });
+
+  it.each([
+    { verdict: "유보_정보부족", positive_flags: [true, true, true, true, false, false] },
+    { positive_flags: [true, true, true, null, false, false] },
+    { positive_flags: [true, true, true, true, false, false], n_green: 5 },
+    { positive_flags: [true, true, true, true, false, false], score_batch_id: 3 },
+    { positive_flags: undefined },
+  ])("자료 부족·불일치에서 개수나 체크를 확정하지 않는다: %j", (override) => {
+    const result = toWageRiskPublic({ ...baseRow, verdict: "유보", ...override });
+    expect(result.positive_signals?.availability).toBe("unavailable");
+    expect(result.positive_signals?.confirmed_count).toBeNull();
+    expect(result.positive_signals?.items.some(x => x.status === "confirmed")).toBe(false);
+  });
+
+  it("확인된 0개는 자료 없음과 구분하고 명단 등재는 그대로 유지한다", () => {
+    const result = toWageRiskPublic({ ...baseRow, verdict: "배제_임금체불공개", excluded_wage: true,
+      n_green: 0, positive_flags: [false, false, false, false, false, false] });
+    expect(result.positive_signals).toMatchObject({ availability: "ready", confirmed_count: 0 });
+    expect(result.official_listing.status).toBe("listed");
+    expect(result.level).toBe("review");
+  });
+
   it.each([
     ["안정신호", "normal"],
     ["유보", "watch"],

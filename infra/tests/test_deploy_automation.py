@@ -398,8 +398,8 @@ class UnitTests(unittest.TestCase):
 
     def test_service_is_hardened_fail_closed(self) -> None:
         for directive in (
-            "NoNewPrivileges=yes", "PrivateTmp=yes", "ProtectHome=yes",
-            "ProtectSystem=strict", "RestrictSUIDSGID=yes", "LockPersonality=yes",
+            "PrivateTmp=yes", "ProtectHome=yes",
+            "ProtectSystem=strict", "LockPersonality=yes",
             "UMask=", "StandardOutput=journal",
             "SyslogIdentifier=moneyworry-autodeploy",
         ):
@@ -407,6 +407,85 @@ class UnitTests(unittest.TestCase):
                 # 주석을 걷어낸 본문을 본다. 설명 주석이 지시어 이름을 그대로
                 # 인용하므로 파일 전체를 보면 지시어를 지워도 통과한다.
                 self.assertRegex(SERVICE_CODE, rf"(?m)^{re.escape(directive)}")
+
+    def test_setgid_is_allowed_because_the_deployer_must_create_one(self) -> None:
+        """RestrictSUIDSGID 와 배포기의 setgid 디렉터리는 함께 움직여야 한다.
+
+        2026-09-13 22:25 ~ 09-15 09:31 사이 자동 배포가 세 번 실패했다. 세 번 다
+        같은 줄이었다 — 롤백 백업의 ``cp -a`` 가 ``.next/cache`` 를 2775 로
+        재생성하려다 seccomp 에 EPERM 으로 막혔다. ``fix_ownership`` 의
+        ``install -d -m 2775`` 도 같은 이유로 막힌다.
+
+        사람이 SSH 에서 돌리면 샌드박스 밖이라 통과했고 로봇만 죽어서, 저장소·CI·
+        테스트 어디서도 잡히지 않았다. 이 테스트가 그 구멍이다 — 둘 중 하나만
+        바꾸면 여기서 걸린다.
+        """
+        deployer = (ROOT / "infra" / "scripts" / "deploy-from-git.sh").read_text(encoding="utf-8")
+        needs_setgid = re.search(r"(?m)^\s*install -d -m 2[0-7]{3}\b", deployer)
+        if needs_setgid is None:
+            self.fail(
+                "배포기가 더 이상 setgid 디렉터리를 만들지 않는다면, 유닛을 "
+                "RestrictSUIDSGID=yes 로 되돌리고 이 테스트를 지워도 된다"
+            )
+        self.assertNotRegex(
+            SERVICE_CODE,
+            r"(?m)^RestrictSUIDSGID=yes",
+            "배포기가 setgid 디렉터리를 만드는 한 이 유닛은 yes 일 수 없다 (2026-09-15)",
+        )
+        self.assertRegex(SERVICE_CODE, r"(?m)^RestrictSUIDSGID=no")
+
+    def test_runuser_is_allowed_because_the_deployer_must_impersonate(self) -> None:
+        """NoNewPrivileges 와 배포기의 runuser 는 함께 움직여야 한다.
+
+        2026-09-15 15:25 자동 배포가 ownership 단계에서 죽었다. verify_access 가
+        ``runuser -u <서비스계정> -- test ...`` 로 각 계정의 실제 접근 권한을
+        확인하는데, 이 유닛 아래에서는 runuser 의 setuid 가 EPERM 으로 막힌다.
+
+        NoNewPrivileges=yes 단독은 무해하다. 마운트 네임스페이스 옵션
+        (PrivateTmp·ProtectHome·ProtectSystem) 과 함께 걸릴 때만 깨진다. 그래서
+        지시어 하나만 따로 재보면 재현되지 않는다 — 실측으로 확인했다.
+
+        #74 의 setgid 와 같은 자리, 같은 방식이다. 사람이 SSH 에서 돌리면
+        샌드박스 밖이라 통과하고 로봇만 죽어서 CI·테스트가 잡지 못한다.
+        """
+        deployer = (ROOT / "infra" / "scripts" / "deploy-from-git.sh").read_text(encoding="utf-8")
+        if not re.search(r"(?m)^\s*(if )?runuser -u ", deployer):
+            self.fail(
+                "배포기가 더 이상 runuser 로 서비스 계정을 가장하지 않는다면, 유닛을 "
+                "NoNewPrivileges=yes 로 되돌리고 이 테스트를 지워도 된다"
+            )
+        self.assertNotRegex(
+            SERVICE_CODE,
+            r"(?m)^NoNewPrivileges=yes",
+            "배포기가 runuser 를 쓰는 한 이 유닛은 yes 일 수 없다 (2026-09-15)",
+        )
+        self.assertRegex(SERVICE_CODE, r"(?m)^NoNewPrivileges=no")
+
+    def test_only_the_autodeploy_unit_relaxes_no_new_privileges(self) -> None:
+        """완화는 배포기를 실행하는 유닛 하나에만 적용된다."""
+        systemd_dir = ROOT / "infra" / "systemd"
+        for unit in sorted(systemd_dir.glob("moneyworry-*.service*")):
+            if unit.name == SERVICE.name:
+                continue
+            with self.subTest(unit=unit.name):
+                self.assertRegex(
+                    _code_only(unit.read_text(encoding="utf-8")),
+                    r"(?m)^NoNewPrivileges=yes",
+                    f"{unit.name} 은 다른 계정을 가장할 이유가 없다",
+                )
+
+    def test_only_the_autodeploy_unit_relaxes_setgid(self) -> None:
+        """완화는 배포기를 실행하는 유닛 하나에만 적용된다."""
+        systemd_dir = ROOT / "infra" / "systemd"
+        for unit in sorted(systemd_dir.glob("moneyworry-*.service*")):
+            if unit.name == SERVICE.name:
+                continue
+            with self.subTest(unit=unit.name):
+                self.assertRegex(
+                    _code_only(unit.read_text(encoding="utf-8")),
+                    r"(?m)^RestrictSUIDSGID=yes",
+                    f"{unit.name} 은 setgid 를 만들 이유가 없다",
+                )
 
     def test_npm_cache_is_writable_under_protect_home(self) -> None:
         """ProtectHome=yes 아래에서는 ~/.npm 을 못 쓴다.

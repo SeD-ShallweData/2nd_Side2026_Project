@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { RiskPreviewSection } from "@/components/landing/FeatureSection";
+import { ContractPreviewSection, RiskPreviewSection } from "@/components/landing/FeatureSection";
 import { UNCONNECTED_WAGE_OBSERVATION_LABELS } from "@/domain/riskPresentation";
 
 describe("랜딩 위험카드 예시", () => {
@@ -15,9 +15,18 @@ describe("랜딩 위험카드 예시", () => {
     for (const value of ["18%", "완만한 증가", "높음 · 12/12개월"]) expect(html).toContain(value);
     expect(html).not.toContain("확인할 수 없음");
     expect(html).toContain("DEMO 예시");
+    expect(html).toContain('href="/companies"');
+    expect(html).toContain("사업장 검색하기");
     for (const label of UNCONNECTED_WAGE_OBSERVATION_LABELS) expect(html).toContain(label);
     for (const removed of ["건강보험 체납 명단", "국민연금 가입자 (12개월)", "1인당 고지금액", "업종 폐업률"]) {
       expect(html).not.toContain(removed);
     }
+  });
+
+  it("계약서 CTA가 계약서 진단 화면으로 연결된다", () => {
+    const html = renderToStaticMarkup(createElement(ContractPreviewSection));
+
+    expect(html).toContain('href="/contracts"');
+    expect(html).toContain("계약서 진단하기");
   });
 });

@@ -27,6 +27,8 @@ function inspectorHits(answer: string): string[] {
 describe("단정 표현 차단", () => {
   it.each([
     ["안전한 회사입니다.", "SAFE_COMPANY_CERTAINTY"],
+    ["이 회사는 안전합니다.", "SAFE_COMPANY_CERTAINTY"],
+    ["이 기업은 안전해요.", "SAFE_COMPANY_CERTAINTY"],
     ["위험한 사업장입니다.", "DANGEROUS_COMPANY_CERTAINTY"],
     ["이것은 위법입니다.", "LEGAL_CERTAINTY"],
     ["임금체불이 발생할 것입니다.", "WAGE_FUTURE_CERTAINTY"],
@@ -38,6 +40,7 @@ describe("단정 표현 차단", () => {
 
   it("같은 표현을 부정하는 문장은 통과시킨다", () => {
     expect(chatHits("안전한 회사입니다라고 단정할 수 없습니다.")).toEqual([]);
+    expect(chatHits("이 회사는 안전합니다라고 단정할 수 없습니다.")).toEqual([]);
     expect(chatHits("입사하지 마세요라고 말씀드릴 수 없습니다.")).toEqual([]);
   });
 
