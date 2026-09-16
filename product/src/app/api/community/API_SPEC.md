@@ -5,11 +5,11 @@
 | 항목 | 내용 |
 | --- | --- |
 | 담당 | 정민규 — 커뮤니티 백엔드·인증·권한 API |
-| 구현 단계 | 플랫폼 승인 전 Mock 구현 |
-| 브랜치 | `task/auth-community-api` |
-| 데이터 저장 | 프로세스 메모리, 서버 재시작 시 초기화 |
-| 실제 DB | 나연 migration·권한 설정 이후 연결 예정 |
-| 프론트 연결 | 지유 담당, 현재 `CommunityBoard`는 정적 데이터 사용 |
+| 구현 단계 | Mock·실제 DB 전환 지원 |
+| 기준 | `main`에 병합된 인증·커뮤니티 구현 |
+| 데이터 저장 | 명시된 데이터 모드에 따라 프로세스 메모리 또는 PostgreSQL |
+| 실제 DB | `wg_auth`·`wg_community` 최소권한 계정으로 연결 |
+| 프론트 연결 | 로그인·회원가입·로그아웃과 커뮤니티 화면 연결 완료 |
 
 이 명세의 타입 기준본은 `authApiContract.ts`와 `communityApiContract.ts`다. 실제 응답 예시는
 `sample-responses.json`에서 확인한다.
@@ -37,7 +37,7 @@
 | 타인 글 수정·삭제 | 불가 | 불가 | 불가 |
 | 타인 공개 글 신고 | 가능 | 가능 | 가능 |
 | 신고 목록·승인·기각 | 불가 | 가능 | 불가 |
-| `/api/inspector/*` 접근 | 별도 정책 | 별도 정책 | 이 Mock 역할만으로는 불가 |
+| `/api/inspector/*` 접근 | 불가 | 불가 | 가능 |
 
 ### 주요 enum
 
@@ -51,6 +51,28 @@
 | 신고 결정 | `accept`, `dismiss` |
 
 ## 3. 인증 API
+
+### `POST /api/auth/signup`
+
+| 항목 | 내용 |
+| --- | --- |
+| 인증 | 불필요 |
+| 요청 | `email: string`, `password: string`, `name: string` |
+| 성공 | `201`, `authenticated: true`, 일반 사용자 정보, `expires_at` |
+| 부가 동작 | `user` 권한으로 가입, HttpOnly 세션 쿠키 발급 |
+| 주요 오류 | `400 VALIDATION_ERROR`, `403 CROSS_SITE_REQUEST_REJECTED`, `409 EMAIL_ALREADY_REGISTERED`, `413 REQUEST_BODY_TOO_LARGE`, `415 UNSUPPORTED_MEDIA_TYPE`, `503 AUTH_PROVIDER_UNAVAILABLE` |
+
+이메일은 trim·소문자 정규화 후 저장하고 대소문자만 다른 주소도 같은 계정으로 본다. 비밀번호는
+8~30자의 공백 없는 영문·숫자·특수문자만 허용하며, 이름은 1~40자다. 가입 요청에서 권한을 받지 않고
+항상 일반 사용자로 생성한다. 가입 성공 시 별도 로그인 요청 없이 바로 로그인 상태가 된다.
+
+이미 등록된 이메일이면 `409 EMAIL_ALREADY_REGISTERED`와 “이미 가입된 이메일입니다.” 안내를 반환한다.
+이는 가입할 수 없는 이유와 기존 계정의 로그인 경로를 명확히 안내하기 위한 의도된 정책이다.
+따라서 회원가입에서는 계정 존재 여부가 드러난다. 반면 로그인은 존재하지 않는 계정과 잘못된 비밀번호를
+동일한 `401 INVALID_CREDENTIALS`로 처리해 계정 존재 여부를 구분할 수 없게 유지한다.
+
+`409` 응답에는 이메일 외의 회원 정보나 가입 시각을 포함하지 않는다. 공개 운영에서 계정 열거 시도를
+추가로 제한해야 한다면 회원가입 요청 단위 rate limit을 별도 과업으로 도입한다.
 
 ### `POST /api/auth/login`
 
@@ -263,16 +285,14 @@ Mock 모드의 `company_id`는 기존 `MOCK_COMPANIES` 기준으로 검증하고
 
 ## 7. 현재 제외 범위
 
-- 회원가입, 이메일 인증, 비밀번호 변경·재설정
+- 이메일 인증, 비밀번호 변경·재설정
 - 댓글 작성·수정·삭제
 - 공감·반응 처리
 - 리뷰·별점
-- 실제 사용자·세션·게시글·신고 DB adapter
 - 운영 rate limit, 영구 감사 로그, 최종 CSRF 정책
 
-`source=database` 타입은 실제 adapter 연결을 위한 예약값이다. 현재 Real 모드는 데이터를 반환하지 않고
-`503`만 반환한다. 세션 쿠키가 없는 `GET /api/auth/session`은 Real provider 미연결 상태에서도 익명 `200`을
-반환할 수 있지만, 기존 쿠키가 남아 있으면 provider 검증 과정에서 `503`이 될 수 있다.
+Mock은 명시적인 개발 모드에서만 사용한다. Real 모드에서 전용 DB 연결이 누락되거나 사용할 수 없으면
+Mock 성공으로 대체하지 않고 `503`을 반환한다.
 
 ## 8. 관련 파일
 
