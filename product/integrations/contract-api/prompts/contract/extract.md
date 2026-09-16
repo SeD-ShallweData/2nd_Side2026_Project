@@ -93,6 +93,7 @@
 | `wage_offset` | 손해액·대여금을 임금에서 공제·상계한다는 조항 |
 | `forced_saving` | 급여 일부를 회사가 적립·관리한다는 조항 |
 | `severance_waived` | 퇴직금을 주지 않거나 월급에 포함한다는 조항 |
+| `overtime_premium_waived` | 연장·야간·휴일근로 가산수당을 **명시적으로 지급하지 않는다**는 조항. 수당 포함·산정방식 불명은 이 코드가 아니다 |
 | `at_will_dismissal` | 회사 판단으로 언제든 해고할 수 있다는 조항 |
 | `marriage_retirement` | 혼인·임신·출산 시 퇴직을 예정한 조항 |
 | `no_annual_leave` | 연차를 부여하지 않는다는 조항 |
@@ -116,6 +117,7 @@
 |---|---|
 | `penalty_predetermined` | 배상·위약 + **금액** |
 | `severance_waived` | 퇴직금·퇴직급여 + 안 준다는 말 |
+| `overtime_premium_waived` | 연장·야간·휴일근로 수당 또는 가산수당 + 안 준다는 말 |
 | `at_will_dismissal` | 해고·해지 + 언제든·예고 없이 |
 | `marriage_retirement` | 혼인·임신·출산 |
 | `no_annual_leave` | 연차 + 안 준다는 말 |

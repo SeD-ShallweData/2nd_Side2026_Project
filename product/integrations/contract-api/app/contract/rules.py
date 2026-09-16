@@ -388,26 +388,51 @@ def rule_holiday(contract: dict, ctx: Context) -> list[Finding]:
 
 
 # ── ⑥ 퇴직금 ──────────────────────────────────────────────────────────
+def _qualify_severance(finding: Finding, ctx: Context) -> Finding:
+    """A contract term is not proof of the worker's actual continuous service."""
+    reasons = []
+    if ctx.term_months is None:
+        reasons.append("계약기간과 실제 계속근로기간을 확인할 수 없습니다")
+    elif ctx.term_months < standards.SEVERANCE_MIN_MONTHS:
+        reasons.append(
+            f"계약기간이 {ctx.term_months:g}개월로 12개월 미만입니다. "
+            "이전 근무나 계약 갱신으로 계속근로 1년을 넘었는지 확인해야 합니다"
+        )
+    if ctx.weekly_hours is None:
+        reasons.append("4주 평균 주 소정근로시간 15시간 요건을 확인할 수 없습니다")
+    elif ctx.weekly_hours < standards.SEVERANCE_MIN_WEEKLY_HOURS:
+        reasons.append(
+            f"계약서의 주 소정근로시간이 {ctx.weekly_hours:g}시간입니다. "
+            "실제 4주 평균이 15시간 이상인지 확인해야 합니다"
+        )
+    if reasons:
+        finding.level = CHECK
+        finding.message += " 지급 요건은 이 계약서만으로 확정할 수 없어 적용 여부를 확인해야 합니다."
+        finding.detail = ((finding.detail + "\n") if finding.detail else "") + " / ".join(reasons)
+        finding.fix = "이전 계약·갱신 여부와 실제 계속근로기간, 4주 평균 소정근로시간을 먼저 확인하세요."
+    return finding
+
+
 def rule_severance(contract: dict, ctx: Context) -> list[Finding]:
     sev = contract["severance"]
     out: list[Finding] = []
 
     if sev["included_in_wage"] is True:
-        out.append(Finding(
+        out.append(_qualify_severance(Finding(
             "severance_in_wage", VIOLATION, "퇴직금 분할약정",
             "퇴직금을 매월 급여에 포함해 지급한다고 적혀 있습니다. 이런 분할약정은 무효입니다.",
             law="퇴직급여법 제8조",
             detail="퇴직금은 퇴직할 때 발생하는 것이라 미리 나누어 지급할 수 없습니다. "
                    "이미 나누어 받았더라도 퇴직금을 지급한 것으로 인정되지 않습니다.",
-            fix="퇴직 후 14일 이내에 퇴직금을 청구할 수 있습니다. 시효는 3년입니다."))
+            fix="퇴직 후 14일 이내에 퇴직금을 청구할 수 있습니다. 시효는 3년입니다."), ctx))
     elif sev["provided"] is False:
-        out.append(Finding(
+        out.append(_qualify_severance(Finding(
             "severance_waived", VIOLATION, "퇴직금 미지급 약정",
             "퇴직금을 지급하지 않는다고 적혀 있습니다.",
             law="퇴직급여법 제4조",
             detail="계속근로 1년 이상, 4주 평균 주 15시간 이상이면 사업장 규모와 무관하게 "
                    "퇴직급여를 설정해야 합니다. 5인 미만 사업장도 마찬가지입니다.",
-            fix="근로자가 동의했더라도 이 약정은 무효입니다."))
+            fix="근로자가 동의했더라도 이 약정은 무효입니다."), ctx))
     elif sev["provided"] is True:
         out.append(Finding("severance", OK, "퇴직금",
                            "퇴직금(퇴직급여) 조항이 있습니다.", law="퇴직급여법 제4조"))
@@ -427,23 +452,71 @@ def rule_severance(contract: dict, ctx: Context) -> list[Finding]:
 
 # ── ⑦ 제17조 서면 명시·교부 ───────────────────────────────────────────
 def rule_required_items(contract: dict, ctx: Context) -> list[Finding]:
-    missing = [label for key, label in schema.REQUIRED_ITEMS.items()
-               if contract["required_items"].get(key) is False]
-    unknown = [label for key, label in schema.REQUIRED_ITEMS.items()
-               if contract["required_items"].get(key) is None]
+    required = contract["required_items"]
+    missing = [key for key in schema.REQUIRED_ITEMS if required.get(key) is False]
+    unknown = [key for key in schema.REQUIRED_ITEMS if required.get(key) is None]
+
+    # 제17조의 서면교부 항목과 시행령의 명시 항목은 다릅니다. 기간제에는
+    # 별도의 취업장소·업무 서면명시 의무가 있지만, 무기계약의 서면에서
+    # 빠졌다는 사실만으로 명시 의무 위반을 단정하지 않습니다.
+    strict_missing = [key for key in missing if key != "work_place_and_duty"
+                      and (key != "annual_leave" or ctx.small is False)]
+    fixed_term_location_missing = (contract["contract_type"] == "fixed_term"
+                                   and "work_place_and_duty" in missing)
+    needs_context = [key for key in missing if key not in strict_missing
+                     and not (key == "work_place_and_duty" and fixed_term_location_missing)]
 
     out: list[Finding] = []
-    if missing:
+    if strict_missing:
+        labels = [schema.REQUIRED_ITEMS[key] for key in strict_missing]
         out.append(Finding(
             "missing_required", VIOLATION, "서면 명시 항목 누락",
-            f"서면에 반드시 적어야 하는 항목 {len(missing)}개가 빠져 있습니다 — {', '.join(missing)}",
+            f"서면 명시 대상 항목 {len(labels)}개가 빠져 있습니다 — {', '.join(labels)}",
             law="근기법 제17조",
-            detail="임금의 구성항목·계산방법·지급방법, 소정근로시간, 주휴일, "
-                   "연차유급휴가, 취업장소와 업무는 서면 명시 의무 항목입니다.",
+            detail="임금의 구성항목·계산방법·지급방법, 소정근로시간, 휴일, "
+                   "적용되는 연차휴가가 서면교부 대상입니다. 기간제 계약의 "
+                   "취업장소와 업무는 별도 서면명시 의무가 적용됩니다.",
             fix="빠진 항목을 적은 계약서를 다시 요구하세요. 미교부·미명시는 별도 벌칙 대상입니다."))
-    elif not unknown:
-        out.append(Finding("required_items", OK, "서면 명시 항목",
-                           "제17조가 요구하는 항목이 모두 적혀 있습니다.", law="근기법 제17조"))
+    if fixed_term_location_missing:
+        out.append(Finding(
+            "fixed_term_location_missing", VIOLATION, "기간제 서면 명시 항목 누락",
+            "기간제 계약서에 취업장소와 업무가 적혀 있지 않습니다.",
+            law="기간제법 제17조",
+            fix="취업장소와 업무가 명시된 근로계약서를 요청하세요."))
+    if needs_context:
+        labels = [schema.REQUIRED_ITEMS[key] for key in needs_context]
+        out.append(Finding(
+            "required_scope", CHECK, "명시 항목 적용 범위",
+            f"{', '.join(labels)}이 서면에서 확인되지 않습니다. 계약 유형과 사업장 조건을 확인해야 합니다.",
+            law="근기법 제17조",
+            fix="적용되는 근로조건과 별도 서면명시 의무를 확인하세요."))
+    if unknown:
+        labels = [schema.REQUIRED_ITEMS[key] for key in unknown]
+        out.append(Finding(
+            "required_unknown", CHECK, "명시 항목 추출 불명",
+            f"{', '.join(labels)}의 기재 여부를 읽어내지 못했습니다.",
+            fix="원본 계약서에서 해당 항목의 기재 여부를 직접 확인하세요."))
+
+    if not missing and not unknown:
+        concerns = []
+        wage = contract["wage"]
+        if wage["components_itemized"] is not True:
+            concerns.append("임금 구성항목별 기재 내용")
+        if not wage["pay_day"] or not wage["pay_method"]:
+            concerns.append("임금 지급일·방법")
+        if ctx.weekly_hours is None:
+            concerns.append("소정근로시간의 구체적 내용")
+        if contract["holiday"]["annual_leave_granted"] is False:
+            concerns.append("연차휴가 배제 조항의 적용 여부")
+        if not contract["work_place"] or not contract["job_title"]:
+            concerns.append("취업장소·업무의 구체적 내용")
+        detail = ("추출된 내용에서 추가 확인할 부분: " + ", ".join(concerns)
+                  if concerns else "기재 사실과 각 조항의 내용 적정성은 별도 판정입니다.")
+        out.append(Finding(
+            "required_items", CHECK, "서면 명시 항목 — 내용 확인",
+            "7개 항목의 기재는 확인됐지만, 적힌 내용만으로 적법성까지 확정할 수 없습니다.",
+            law="근기법 제17조", detail=detail,
+            fix="각 항목의 원문과 적용 조건을 확인하세요. 기재 확인을 적법 판정으로 해석하지 마세요."))
 
     if contract["copy_given"] is False:
         out.append(Finding(
@@ -580,6 +653,11 @@ CLAUSE_RULES: dict[str, dict] = {
         "message": "퇴직금을 지급하지 않거나 월급에 포함한다는 조항이 있습니다.",
         "fix": "근로자가 동의했더라도 무효입니다. 퇴직 후 3년 이내에 청구할 수 있습니다.",
     },
+    "overtime_premium_waived": {
+        "level": VIOLATION, "law": "근기법 제56조", "title": "가산수당 지급 배제",
+        "message": "연장·야간·휴일근로 가산수당을 지급하지 않는다는 조항이 있습니다.",
+        "fix": "상시 근로자 수와 실제 근로시간, 법정 가산수당 적용 여부를 확인하세요.",
+    },
     "at_will_dismissal": {
         "level": VIOLATION, "law": "근기법 제23조", "title": "임의 해고",
         "message": "회사가 필요하다고 판단하면 언제든 해고할 수 있다는 조항이 있습니다.",
@@ -640,7 +718,7 @@ def rule_clauses(contract: dict, ctx: Context) -> list[Finding]:
             continue
         seen.add(key)
 
-        out.append(_scale(ctx, Finding(
+        finding = Finding(
             code=clause["code"],
             level=spec["level"],
             title=spec["title"],
@@ -649,7 +727,10 @@ def rule_clauses(contract: dict, ctx: Context) -> list[Finding]:
             detail=clause.get("note"),
             evidence=clause["quote"],
             fix=spec["fix"],
-        )))
+        )
+        if finding.code == "severance_waived":
+            finding = _qualify_severance(finding, ctx)
+        out.append(_scale(ctx, finding))
     return out
 
 
