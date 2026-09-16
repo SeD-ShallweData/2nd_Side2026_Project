@@ -162,6 +162,22 @@ NARROW_RULES = (
 
 OUT_OF_SCOPE_TOPICS = (
     {
+        "name": "부동산",
+        "keywords": ("부동산 시세", "아파트 시세", "집값", "매매가", "실거래가", "전세 시세"),
+    },
+    {
+        "name": "세금",
+        "keywords": ("종합소득세", "양도소득세", "상속세", "증여세", "부가가치세 신고"),
+    },
+    {
+        "name": "투자",
+        "keywords": ("주식 투자", "주가 전망", "주식 매수", "코인 투자", "가상자산 투자"),
+    },
+    {
+        "name": "프로그래밍",
+        "keywords": ("파이썬 코딩", "파이썬 코드", "파이썬 프로그램", "파이썬 배우", "Python 코드", "Python programming"),
+    },
+    {
         "name": "산업재해·산업안전",
         "keywords": (
             "산재보험", "산업재해보상", "근로복지공단", "산업안전보건", "중대재해",
@@ -180,6 +196,12 @@ OUT_OF_SCOPE_TOPICS = (
         "name": "파견·기간제",
         "keywords": ("파견근로", "파견직", "파견업체", "기간제", "정규직 전환"),
     },
+)
+
+NON_LABOR_TOPICS = frozenset(("부동산", "세금", "투자", "프로그래밍"))
+LABOR_INTENT_KEYWORDS = (
+    "임금", "급여", "월급", "체불", "근로", "노동", "계약서", "퇴직금",
+    "연차", "산재", "해고", "주휴", "근무", "직원", "사업장",
 )
 
 _lock = threading.Lock()
@@ -490,6 +512,11 @@ def _out_of_scope_topic(query, top_distance):
         return None
     for topic in OUT_OF_SCOPE_TOPICS:
         if any(keyword in query for keyword in topic["keywords"]):
+            # A non-labor term alone must not reject a question about employment.
+            if topic["name"] in NON_LABOR_TOPICS and any(
+                keyword in query for keyword in LABOR_INTENT_KEYWORDS
+            ):
+                continue
             return topic["name"]
     return None
 
