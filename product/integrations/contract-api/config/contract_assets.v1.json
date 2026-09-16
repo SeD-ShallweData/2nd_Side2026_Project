@@ -16,8 +16,8 @@
     {
       "path": "prompts/contract/extract.md",
       "kind": "contract_extract",
-      "size": 10764,
-      "sha256": "7b1ba1254cc1a75b2470cc10c4fe8c40e7092e6aa9a4a0e05540f94b17cf9714"
+      "size": 11065,
+      "sha256": "4d8c89b59ce96ef1dd1f63f4ac7045007724c0203796c35288d8a3ce4d0756f8"
     },
     {
       "path": "prompts/few_shot/general.jsonl",
