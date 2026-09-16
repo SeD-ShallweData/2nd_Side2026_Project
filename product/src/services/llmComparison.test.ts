@@ -90,6 +90,20 @@ describe("실제 LLM 비교 Provider", () => {
     });
   });
 
+  it.each(CONFIGS)("$id 단독 호출에서도 프롬프트와 가드레일이 유지된다", async (config) => {
+    const bodies: Array<{ messages: { role: string; content: string }[] }> = [];
+    const fakeFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify(payload("이 회사는 안전한 회사입니다.", config.model)), { status: 200 });
+    }) as unknown as typeof fetch;
+    const result = await new DualLlmChatProvider([config], new OpenAICompatibleChatClient(fakeFetch)).compare(CONTEXT);
+    expect(fakeFetch).toHaveBeenCalledOnce();
+    expect(result.results).toHaveLength(1);
+    expect(bodies[0].messages[0].content).toContain("돈워리");
+    expect(result.results[0].status).toBe("guardrail_replaced");
+    expect(result.results[0].answer).toBe(BASELINE.answer);
+  });
+
   it("두 모델에 동일한 메시지와 생성 설정을 전달하고 상세 지표를 정규화한다", async () => {
     const bodies: unknown[] = [];
     const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {

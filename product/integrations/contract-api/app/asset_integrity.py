@@ -19,7 +19,7 @@ from typing import Any
 
 
 CONTRACT = "donworry.contract.assets.v1"
-PINNED_MANIFEST_SHA256 = "1df5825a76b24c961f8a8f49f72c07d0e1f70a06c6f3e0912c265f91e7af4a1a"
+PINNED_MANIFEST_SHA256 = "f5db5e6e358df956755b530265aaa7799290247a5f25efdc3306bbb2fd566e64"
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = SERVICE_ROOT / "config" / "contract_assets.v1.json"
 

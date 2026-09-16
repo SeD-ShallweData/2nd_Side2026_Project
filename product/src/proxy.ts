@@ -42,7 +42,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  return new NextResponse("돈워리 팀 시연 페이지입니다. 전달받은 계정으로 로그인해 주세요.", {
+  return new NextResponse("Co끼리 팀 시연 페이지입니다. 전달받은 계정으로 로그인해 주세요.", {
     status: 401,
     headers: {
       ...NO_STORE_HEADERS,

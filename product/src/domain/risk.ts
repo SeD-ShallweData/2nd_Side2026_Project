@@ -35,6 +35,11 @@ export interface OfficialListingStatus {
 }
 
 export interface WageRiskPublic {
+  positive_signals?: {
+    availability: "ready" | "unavailable";
+    confirmed_count: number | null;
+    items: { label: string; status: "confirmed" | "unconfirmed" }[];
+  };
   availability?: SignalAvailability;
   verdict?: WageVerdict | null;
   level: SignalLevel;

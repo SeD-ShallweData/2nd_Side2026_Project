@@ -240,6 +240,55 @@ sudo rm -f /usr/local/sbin/moneyworry-autodeploy /var/lib/moneyworry-deploy/auto
 sudo systemctl daemon-reload
 ```
 
+## 샌드박스와 setgid — 2026-09-15 사건
+
+이 유닛만 `RestrictSUIDSGID=no` 다. 나머지 다섯은 전부 `yes` 다.
+
+배포기는 web 이 런타임에 쓰는 `product/.next/cache` 를 **setgid(2775)** 로 만든다.
+`RestrictSUIDSGID=yes` 는 mode 에 setgid 가 있는 `mkdir`·`chmod` 를 seccomp 로 막으므로,
+이 유닛 아래에서 배포기가 두 곳에서 `EPERM` 으로 즉사했다.
+
+| 죽은 곳 | 무엇 |
+| --- | --- |
+| 롤백 백업 | `cp -a product/.next …` 가 `cache` 를 2775 로 재생성 |
+| `fix_ownership` | `install -d -m 2775 …/.next/cache` |
+
+**사람이 SSH 에서 돌리는 배포는 샌드박스 밖이라 멀쩡했고, 로봇만 죽었다.** 그래서
+CI·테스트·수동 배포 어디서도 잡히지 않았다. 09-13 22:25 · 09-15 09:21 · 09-15 09:31
+세 번 전부 같은 줄이었다.
+
+진단이 오래 걸린 이유가 하나 더 있다. `die()` 만 `[deploy] 실패:` 를 찍고 원장의
+`reason` 은 그 문자열을 grep 해서 만든다. `cp` 에는 `|| die` 가 없어 `set -e` 로
+죽었고, 그래서 원장에는 **「실패 메시지 없음 — 강제 종료일 수 있습니다」** 라고만
+남았다. 강제 종료가 아니었다. 전문 로그(`/srv/moneyworry/deploy-logs/<run_id>.log`)
+에는 `cp:` 한 줄이 그대로 있었다.
+
+재현:
+
+```bash
+sudo systemd-run --pipe --wait -p RestrictSUIDSGID=yes /usr/bin/install -d -m 2775 /tmp/x  # 실패
+sudo systemd-run --pipe --wait -p RestrictSUIDSGID=no  /usr/bin/install -d -m 2775 /tmp/y  # 성공
+```
+
+되돌리려면 배포기가 setgid 디렉터리를 만들지 않게 먼저 바꿔야 한다.
+`test_deploy_automation.py` 의 `test_setgid_is_allowed_because_the_deployer_must_create_one`
+이 둘을 묶어 두었다 — 한쪽만 바꾸면 CI 에서 걸린다.
+
+### 이 커밋을 서버에 반영할 때
+
+`infra/systemd/` 는 관문이다. 배포에 `--ack-guarded infra/systemd/` 를 붙이고, 그
+뒤에 유닛을 다시 깐다(위 「설치」의 2번). **임시 드롭인이 있다면 지운다** —
+이 저장소는 드롭인을 정본으로 치지 않는다.
+
+```bash
+sudo rm -f /etc/systemd/system/moneyworry-autodeploy.service.d/10-allow-setgid.conf
+sudo rmdir --ignore-fail-on-non-empty /etc/systemd/system/moneyworry-autodeploy.service.d
+sudo systemctl daemon-reload
+systemctl show --no-pager moneyworry-autodeploy.service -p RestrictSUIDSGID -p DropInPaths
+```
+
+`RestrictSUIDSGID=no` 이면서 `DropInPaths=` 가 비어 있어야 한다.
+
 ## 알려진 한계
 
 - **SIGKILL 은 못 잡는다.** 유닛 타임아웃(`TimeoutStartSec=50min`)을 넘기면
