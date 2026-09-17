@@ -90,7 +90,7 @@ summary:focus-visible {
 }
 
 .narrow-shell {
-  width: min(920px, calc(100% - 40px));
+  width: min(1080px, calc(100% - 40px));
 }
 
 .skip-link {
@@ -3708,13 +3708,14 @@ summary:focus-visible {
 .consumer-mobile-nav { display: none; }
 
 .consumer-footer { border-top: 1px solid #1c3a5c; background: #081f3a; color: #fff; padding: 48px 0 34px; }
-.consumer-footer-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 25px 70px; }
+.consumer-footer-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 25px 70px; align-items: end; }
 .consumer-footer-grid > div > p { max-width: 480px; margin: 16px 0 0; color: rgb(255 255 255 / 56%); font-size: .79rem; }
 .consumer-footer nav { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 24px; align-content: start; font-size: .78rem; font-weight: 750; }
 .consumer-footer nav a { color: rgb(255 255 255 / 72%); }
 .consumer-footer nav a:hover { color: var(--brand); }
 .consumer-footer nav .inspector-footer-link { color: var(--brand); }
-.consumer-footer-note { grid-column: 1 / -1; border-top: 1px solid rgb(255 255 255 / 10%); margin: 0; padding-top: 20px; color: rgb(255 255 255 / 42%); font-size: .68rem; }
+/* 하단 메뉴를 걷어내면서 두 문장만 남았다. 같은 줄 양끝에 세워 한눈에 읽히게 한다. */
+.consumer-footer-note { align-self: end; margin: 16px 0 0; text-align: right; color: rgb(255 255 255 / 56%); font-size: .79rem; }
 
 .refresh-hero { position: relative; overflow: hidden; background: radial-gradient(circle at 82% 28%, rgb(255 214 0 / 26%), transparent 27%), linear-gradient(180deg, #fbfdff 0%, #fff 100%); padding: 88px 0 62px; }
 .refresh-hero::before { position: absolute; top: -160px; right: -120px; width: 420px; height: 420px; border: 1px solid rgb(25 31 40 / 6%); border-radius: 50%; content: ""; }
@@ -4675,9 +4676,12 @@ summary:focus-visible {
 /* ── 지역 지도 ──────────────────────────────────────────────
    사업장 수를 노랑 한 색의 진하기로만 나타낸다. 색을 여러 개 쓰면 지역마다
    다른 뜻이 있는 것처럼 읽힌다. 여기서 다른 것은 양뿐이다. */
-.region-map { display: grid; justify-items: center; gap: 0.75rem; margin-top: 0.5rem; }
+/* justify-items: center 만 두면 칸이 내용 크기로 줄어들어 아래 max-width 가
+   적용되지 않는다. 바깥 폭을 먼저 잡아 준다. */
+.region-map { display: grid; justify-items: center; gap: 0.75rem; margin-top: 0.5rem; width: 100%; }
 /* 섬을 덜어내고 여백을 걷어낸 뒤라 폭을 키워도 도형이 늘어지지 않는다. */
-.region-map-canvas { width: 100%; max-width: min(100%, 30rem); height: auto; }
+/* 지금까지 실제로 그려지던 폭이 300px 이었다. 그 1.5배인 450px(28rem)로 잡는다. */
+.region-map-canvas { width: min(100%, 28rem); height: auto; }
 
 .region-map-area {
   fill: var(--surface);
@@ -4723,11 +4727,10 @@ summary:focus-visible {
    돈워리와 이야기하는 화면이라 다른 탭보다 부드러워야 한다. 바탕과 테두리에만
    브랜드 노랑을 옅게 깔고, 글자는 파란 계열(--ink / --ink-soft / --muted)을
    그대로 둔다. 색으로 정보를 나르지 않으므로 읽기에 영향이 없다. */
-.conversation-page {
-  background:
-    radial-gradient(circle at 12% 0%, rgb(255 214 0 / 16%), transparent 42%),
-    radial-gradient(circle at 88% 8%, rgb(255 214 0 / 10%), transparent 38%),
-    #fffdf3;
+/* 페이지 바탕은 흰색으로 둔다. 따뜻함은 안쪽 카드가 맡는다. */
+.conversation-page,
+.search-page {
+  background: transparent;
 }
 
 .conversation-page .chat-panel {
@@ -4813,4 +4816,57 @@ summary:focus-visible {
 .contract-upload .selected-file {
   width: 100%;
   text-align: left;
+}
+
+
+/* 제목 상자의 기본 760px 제한 때문에 '계약서에서 놓친 항목이 있나요?' 와
+   '현장의 목소리를 안전하게 전달하세요' 가 두 줄로 접혔다. 이 두 화면에서만
+   제한을 풀어 한 줄에 담는다. */
+.refresh-contract-page .page-heading,
+.worksite-page .page-heading {
+  max-width: none;
+}
+
+/* ── 사업장 확인도 상담 탭과 같은 따뜻한 결로 ──────────────
+   두 화면 모두 바탕은 흰색이고, 카드 안쪽에만 옅은 노랑을 깐다. */
+.search-page .search-workspace {
+  border-color: #f0dfa0;
+  background: #fffdf5;
+}
+
+.search-page .search-form {
+  border-bottom-color: #f0dfa0;
+}
+
+.search-page .search-input-field {
+  border-color: #f0dfa0;
+  background: var(--white);
+}
+
+.search-page .search-filter-toggle {
+  border-color: #f0dfa0;
+}
+
+.search-page .demo-query-row {
+  border-color: #f0dfa0;
+  background: var(--brand-soft);
+}
+
+.conversation-page .chat-panel,
+.conversation-page .question-guide,
+.search-page .search-workspace {
+  box-shadow: 0 8px 24px rgb(214 168 0 / 10%);
+}
+
+
+/* 로그인 버튼 폭을 로고(그림+글자) 폭에 맞춘다. 헤더 양끝이 같은 무게로 선다.
+   실측 152px = 9.5rem, 좁은 화면에서는 로고가 작아지므로 118px = 7.375rem. */
+.consumer-header-side > .button {
+  width: 9.5rem;
+}
+
+@media (max-width: 640px) {
+  .consumer-header-side > .button {
+    width: 7.375rem;
+  }
 }

@@ -550,7 +550,7 @@ export function ChatPanel({
             ))}
           </div>
         ))}
-        <p className="guide-scope-note">현재 공식 근거 검색 범위에 맞춘 질문입니다. 수록 범위 밖 주제는 해당 이유와 공식 확인 창구를 안내합니다.</p>
+        <p className="guide-scope-note">현재 공식 근거 검색 범위에 맞춘 질문입니다.<br />수록 범위 밖 주제는 해당 이유와 공식 확인 창구를 안내합니다.</p>
       </aside>
     </div>
   );
