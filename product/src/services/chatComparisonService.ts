@@ -61,6 +61,15 @@ function outOfScopeResponse(policyBaseline: ChatResponse, topic: string): ChatRe
   };
 }
 
+function generalCompanyIndicatorResponse(policyBaseline: ChatResponse): ChatResponse {
+  return {
+    ...clarificationFallback(policyBaseline),
+    answer: "긍정 지표가 0개라는 것은 현재 공개 자료에서 긍정 신호가 확인되지 않았다는 뜻일 뿐, 회사가 나쁘거나 위험하다는 판단은 아닙니다. 반대로 안전 인증도 아니므로, 특정 회사의 표시를 해석하려면 그 사업장을 선택한 뒤 임금 지급일·급여명세서·근로계약 조건을 함께 확인해 보세요.",
+    answer_type: "general_guidance",
+    limitations: ["특정 사업장의 실제 상태나 향후 근로조건을 이 일반 설명만으로 판단할 수 없습니다."],
+  };
+}
+
 function policyShortCircuitResponse({
   request,
   policyBaseline,
@@ -170,6 +179,20 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
   const companyMismatch = intentDecision.intent === "company" && Boolean(request.company_id)
     && policyBaseline.answer_type === "clarification"
     && policyBaseline.suggested_actions.some((action) => action.code === "SEARCH_COMPANY");
+  if (intentDecision.intent === "company" && !request.company_id
+    && intentDecision.company_scope === "general") {
+    return policyShortCircuitResponse({
+      request,
+      policyBaseline: generalCompanyIndicatorResponse(policyBaseline),
+      configs,
+      intentDecision,
+      ragRetrieval: {
+        query: request.message, status: "no_match", reason: "general_company_explanation", topic: null, threshold: null, documents: [],
+      },
+      guardrailStatus: "limited",
+      guardrailHits: ["GENERAL_COMPANY_EXPLANATION"],
+    });
+  }
   if (intentDecision.intent === "off_topic" || intentDecision.intent === "unclear"
     || companyMismatch || (intentDecision.intent === "company" && !request.company_id)) {
     const baseline = intentDecision.intent === "off_topic"

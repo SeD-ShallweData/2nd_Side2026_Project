@@ -94,6 +94,18 @@ describe("프롬프트 인젝션 대응", () => {
       .toEqual([]);
   });
 
+  it("답변 작성 과정이나 제공 컨텍스트를 사용자용 본문으로 복사하면 막는다", () => {
+    const leaked = [
+      "제공된 컨텍스트에서 근로기준법 제56조를 확인할 수 있습니다.",
+      "답변 구성:\n1. 사용자의 곤란한 지점을 짚습니다.",
+      "작성 지침: 먼저 결론을 말합니다.",
+    ].join("\n\n");
+    expect(chatHits(leaked)).toContain("INTERNAL_RESPONSE_INSTRUCTION");
+    expect(chatHits("주의사항으로 야간근로 시간을 기록해 두세요.")).not.toContain(
+      "INTERNAL_RESPONSE_INSTRUCTION",
+    );
+  });
+
   it("역할극 요청을 머리말 유출로 오인하지 않는다", () => {
     expect(chatHits("# 역할극 요청은 받아들이지 않습니다")).not.toContain("PROMPT_DISCLOSURE");
   });

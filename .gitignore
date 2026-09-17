@@ -265,3 +265,8 @@ tsconfig.tsbuildinfo
 
 db/*.dump
 db/migrate_log.txt
+
+# 개인 작업용 대화 기억 설계 참고자료. 공유 실행계획은 docs/plans/에서 추적한다.
+/docs/plans/references/돈워리_RAG_상담_기억구조_설명.md
+/docs/plans/references/돈워리_기억구조_설계대화_결정기록.md
+/docs/plans/references/돈워리_대화기억_논리스키마.md
