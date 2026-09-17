@@ -4573,12 +4573,17 @@ summary:focus-visible {
 .worksite-tip-list-item p { margin: 0 0 13px; color: var(--ink-soft); font-size: .78rem; line-height: 1.55; }
 .worksite-tip-list-foot { justify-content: flex-start; flex-wrap: wrap; }
 .worksite-tip-list-foot .button { margin-left: auto; }
-.worksite-detail-panel { margin-top: 16px; border-top: 3px solid var(--ink); background: var(--surface); padding: 18px; }
+.worksite-detail-panel { margin: 0 0 20px; border-top: 3px solid var(--ink); background: var(--surface); padding: 18px; }
 .worksite-detail-head time { display: block; margin-top: 6px; color: var(--muted); font-size: .72rem; }
 .worksite-detail-body { white-space: pre-wrap; margin: 18px 0; color: var(--ink-soft); font-size: .85rem; line-height: 1.75; }
 .worksite-attachment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.worksite-attachment-grid a { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--white); padding: 11px; color: var(--ink); font-size: .75rem; font-weight: 800; }
+/* 사진 자체가 버튼이다. 누르면 원본이 새 창에서 열린다. 규격을 4:3 한 가지로
+   고정해 세로 사진과 가로 사진이 섞여도 줄이 흐트러지지 않게 한다. */
+.worksite-attachment-thumb { display: grid; gap: 6px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--white); padding: 8px; color: var(--ink); font-size: .75rem; font-weight: 800; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.worksite-attachment-thumb img { display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 7px; background: var(--surface); object-fit: cover; }
+.worksite-attachment-thumb:hover, .worksite-attachment-thumb:focus-visible { border-color: var(--ink); box-shadow: var(--shadow-sm); }
 .worksite-attachment-grid span { color: var(--muted); font-size: .67rem; font-weight: 600; }
+.worksite-attachment-empty { margin: 12px 0 0; color: var(--muted); font-size: .78rem; }
 
 @media (max-width: 700px) {
   .worksite-privacy-strip, .worksite-form-intro, .worksite-receipt, .worksite-form-actions { align-items: flex-start; flex-direction: column; }
@@ -4800,17 +4805,18 @@ summary:focus-visible {
 
 /* '파일 찾아보기' 와 '선택한 파일 검토' 는 같은 크기로 위아래에 선다.
    하나는 label, 하나는 button 이라 크기를 따로 맞춰 줘야 한다. */
-.contract-upload > .button,
-.contract-upload .contract-actions > .button {
+.contract-upload .contract-actions > .button,
+.contract-upload .contract-actions > label.button {
   width: 14rem;
   height: 3.25rem;
   padding-block: 0;
 }
 
 .contract-upload .contract-actions {
-  display: grid;
-  justify-items: center;
-  gap: 0.625rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
 }
 
 .contract-upload .selected-file {
