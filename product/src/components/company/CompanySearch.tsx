@@ -125,22 +125,23 @@ export function CompanySearch() {
       <form className="search-form" onSubmit={handleSubmit} noValidate>
         <label htmlFor={inputId}>회사명 또는 사업장명</label>
         <div className="search-input-row">
-          <span className="search-icon" aria-hidden="true">
-            ⌕
-          </span>
-          <input
-            id={inputId}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="예: 건설, 한빛테크"
-            aria-describedby={validation ? `${inputId}-error` : `${inputId}-help`}
-            aria-invalid={Boolean(validation)}
-            autoComplete="off"
-          />
+          {/* 돋보기를 입력칸 위에 겹쳐 놓으면 글자와 부딪힌다. 테두리를 감싸는
+              상자에 돋보기와 입력칸을 나란히 두고, 입력칸 자체는 테두리를 없앤다. */}
+          <div className="search-input-field">
+            <span className="search-icon" aria-hidden="true">
+              ⌕
+            </span>
+            <input
+              id={inputId}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="예: 건설, 한빛테크"
+              aria-describedby={validation ? `${inputId}-error` : `${inputId}-help`}
+              aria-invalid={Boolean(validation)}
+              autoComplete="off"
+            />
+          </div>
           <div className="search-action-stack">
-            <button type="submit" className="button button-dark" disabled={loading}>
-              {loading ? "검색 중" : "검색"}
-            </button>
             <button
               type="button"
               className="search-filter-toggle"
@@ -151,6 +152,9 @@ export function CompanySearch() {
               <span aria-hidden="true">☷</span>
               필터{appliedFilters.region || appliedFilters.industry ? ` (${Number(Boolean(appliedFilters.region)) + Number(Boolean(appliedFilters.industry))})` : ""}
               <span className="filter-toggle-caret" aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
+            </button>
+            <button type="submit" className="button button-dark" disabled={loading}>
+              {loading ? "검색 중" : "검색"}
             </button>
           </div>
         </div>
