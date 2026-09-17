@@ -9,6 +9,8 @@
   --logo-blue: #53718a;
   /* 돈워리 아바타가 입은 옷의 짙은 파랑. 아바타 원형 테두리에 쓴다. */
   --avatar-ring: #425168;
+  /* 테두리 두께. 세 군데가 같은 값을 쓰도록 한 곳에서 정한다. */
+  --avatar-ring-width: 0.00625rem;
   --line: #d6e4f3;
   --line-strong: #b0c7e2;
   --surface: #f0f6fd;
@@ -803,12 +805,6 @@ summary:focus-visible {
   font-size: 0.68rem;
   font-weight: 950;
   letter-spacing: 0.06em;
-}
-
-.mode-banner-real {
-  border-color: #b9d7e3;
-  background: var(--info-bg);
-  color: var(--info);
 }
 
 .mock-banner > span,
@@ -1959,8 +1955,13 @@ summary:focus-visible {
   box-shadow: var(--shadow-sm);
 }
 
+/* .comparison-chat-panel 이 overflow: visible 로 덮어써서 패널의 둥근 모서리가
+   상단 띠를 잘라 주지 못한다. 띠가 스스로 같은 곡률을 갖게 한다 —
+   패널 반지름 24px 에서 테두리 1px 을 뺀 값이다. */
 .chat-topbar {
   display: flex;
+  border-top-left-radius: 23px;
+  border-top-right-radius: 23px;
   min-height: 56px;
   align-items: center;
   justify-content: space-between;
@@ -3272,24 +3273,6 @@ summary:focus-visible {
   border-top: 1px solid var(--line);
 }
 
-.community-policy-note {
-  margin-top: 18px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface-warm);
-  padding: 16px;
-}
-
-.community-policy-note strong {
-  font-size: 0.8rem;
-}
-
-.community-policy-note p {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: 0.72rem;
-}
-
 .dual-api-note {
   margin: 0;
   padding: 0 18px 12px;
@@ -3720,7 +3703,7 @@ summary:focus-visible {
 
 /* 시연장에서 멀리서도 눈에 들어오도록 기존 크기의 1.5배로 키운다. */
 .consumer-floating-chat { position: fixed; right: 28px; bottom: 26px; z-index: 90; display: flex; align-items: center; gap: 15px; border: 3px solid var(--ink); border-radius: 999px; background: var(--brand); box-shadow: 0 13px 0 rgb(8 31 58 / 12%); padding: 12px 23px 12px 12px; font-size: 1.2rem; font-weight: 900; }
-.consumer-floating-chat img { display: block; width: 3rem; height: 3rem; border: 0.0625rem solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
+.consumer-floating-chat img { display: block; width: 3rem; height: 3rem; border: var(--avatar-ring-width) solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
 .consumer-floating-chat-label { text-align: center; line-height: 1.3; }
 .consumer-mobile-nav { display: none; }
 
@@ -3750,7 +3733,7 @@ summary:focus-visible {
    보이게 하고, 옆의 검은 버튼과 크기·그림자를 똑같이 맞춘다. */
 .consult-cta { display: inline-flex; height: 3.5rem; align-items: center; gap: 0.625rem; box-shadow: 0 8px 20px rgb(8 31 58 / 16%); padding-block: 0; }
 .consult-cta:hover:not(:disabled) { box-shadow: 0 11px 26px rgb(8 31 58 / 22%); }
-.consult-cta img { display: block; width: 1.75rem; height: 1.75rem; flex-shrink: 0; border: 0.0625rem solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
+.consult-cta img { display: block; width: 1.75rem; height: 1.75rem; flex-shrink: 0; border: var(--avatar-ring-width) solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
 
 /* 나란히 놓이는 두 버튼은 높이를 맞춘다. 너비까지 묶으면 글자가 긴 쪽이
    두 줄로 접히면서 오히려 높이가 어긋난다. 너비는 글자에 맡긴다. */
@@ -3913,7 +3896,7 @@ summary:focus-visible {
 .chat-experience-layout > .chat-panel { min-width: 0; }
 .question-guide { position: sticky; top: 94px; border: 1px solid var(--line); border-radius: 17px; background: #fff; box-shadow: var(--shadow-sm); padding: 18px; }
 .guide-title { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; margin-bottom: 15px; }/* 'AI' 라고 적힌 노란 칸 자리에 안경 쓴 돈워리를 같은 규격으로 넣는다. */
-.guide-title .guide-avatar { display: block; width: 34px; height: 34px; border: 0.0625rem solid var(--avatar-ring); border-radius: 9px; background: var(--brand); object-fit: cover; }.guide-title > div { display: grid; }.guide-title strong { font-size: .8rem; }.guide-title small { color: var(--muted); font-size: .61rem; }
+.guide-title .guide-avatar { display: block; width: 34px; height: 34px; border: var(--avatar-ring-width) solid var(--avatar-ring); border-radius: 9px; background: var(--brand); object-fit: cover; }.guide-title > div { display: grid; }.guide-title strong { font-size: .8rem; }.guide-title small { color: var(--muted); font-size: .61rem; }
 .guide-context { display: grid; border-radius: 10px; background: var(--brand-soft); margin: 0 0 15px; padding: 10px; font-size: .66rem; }.guide-context span { color: var(--muted); }.guide-group { margin-top: 15px; }.guide-group > strong { display: block; margin-bottom: 6px; color: var(--muted); font-size: .66rem; }.guide-group button { width: 100%; border: 1px solid var(--line); border-radius: 9px; background: #fff; margin-top: 6px; padding: 9px; text-align: left; font-size: .69rem; cursor: pointer; }.guide-group button:hover:not(:disabled) { border-color: #d8bd20; background: #f9fcff; }.guide-scope-note { border-top: 1px solid var(--line); margin: 16px 0 0; padding-top: 12px; color: var(--muted); font-size: .6rem; }
 
 .refresh-community-page .page-heading h1 { font-size: clamp(2.35rem,5vw,4.1rem); letter-spacing: -.055em; }
@@ -4551,8 +4534,10 @@ summary:focus-visible {
 .inspector-chat-error { background: var(--danger-bg); color: var(--review); font-size: 0.7rem; margin: 0; padding: 8px 16px; }
 
 .worksite-page { background: var(--surface); }
-.worksite-privacy-strip { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; border: 1px solid #c8d8d0; border-radius: 12px; background: var(--normal-bg); padding: 13px 15px; color: var(--ink-soft); font-size: .78rem; }
-.worksite-privacy-strip strong { color: var(--normal); }
+/* 커뮤니티·계약서 안내 박스와 같은 모양을 쓴다. 성격이 같은 안내를 화면마다
+   다른 색으로 두면 색이 무슨 뜻인지 배우게 만든다. */
+.worksite-privacy-strip { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; border: 1px solid #e8d47e; border-radius: 13px; background: var(--brand-soft); padding: 12px 16px; color: #081f3a; font-size: .84rem; }
+.worksite-privacy-strip > strong { display: inline-flex; flex: 0 0 auto; align-items: center; border-radius: 999px; background: var(--ink); color: var(--brand); padding: 3px 9px; font-size: .68rem; font-weight: 950; letter-spacing: .06em; }
 .worksite-tip-form, .worksite-inspector-view { border: 1px solid var(--line); border-radius: 16px; background: var(--white); padding: 22px; box-shadow: 0 8px 24px rgb(36 35 28 / 4%); }
 .worksite-form-intro, .worksite-list-toolbar, .worksite-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .worksite-form-intro { margin-bottom: 22px; }
