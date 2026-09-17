@@ -165,12 +165,12 @@ export function SiteHeader() {
         <p className="shell field-error" role="alert">{logoutError}</p>
       ) : null}
       {!isInspector && pathname !== "/chat" ? (
-        <Link href="/chat" className="consumer-floating-chat" aria-label="노무 전문 상담가 돈워리와 대화하기">
+        <Link href="/chat" className="consumer-floating-chat" aria-label="전문가보다 먼저 AI 챗봇 돈워리와 상담">
           <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />
           <span className="consumer-floating-chat-label">
-            노무 전문 상담가
+            {"전문가보다 먼저 AI "}
             <br />
-            돈워리와 대화하기
+            챗봇 돈워리와 상담
           </span>
         </Link>
       ) : null}
