@@ -125,7 +125,7 @@ summary:focus-visible {
   font-size: 0.79rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  /* uppercase 를 걸면 'Co끼리' 가 'CO끼리' 로 나온다. 브랜드 표기를 지킨다. */
 }
 
 .muted-text {
@@ -256,6 +256,8 @@ summary:focus-visible {
 }
 
 .brand-word {
+  /* 상단 메뉴 글자와 같은 파랑. --ink 는 너무 어두워 검게 읽힌다. */
+  color: var(--muted);
   font-size: 1.75rem;
   font-weight: 950;
   letter-spacing: -0.05em;
@@ -3712,7 +3714,7 @@ summary:focus-visible {
 
 /* 시연장에서 멀리서도 눈에 들어오도록 기존 크기의 1.5배로 키운다. */
 .consumer-floating-chat { position: fixed; right: 28px; bottom: 26px; z-index: 90; display: flex; align-items: center; gap: 15px; border: 3px solid var(--ink); border-radius: 999px; background: var(--brand); box-shadow: 0 13px 0 rgb(8 31 58 / 12%); padding: 12px 23px 12px 12px; font-size: 1.2rem; font-weight: 900; }
-.consumer-floating-chat img { display: block; width: 3rem; height: 3rem; border: 0.1875rem solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
+.consumer-floating-chat img { display: block; width: 3rem; height: 3rem; border: 0.0625rem solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
 .consumer-floating-chat-label { text-align: center; line-height: 1.3; }
 .consumer-mobile-nav { display: none; }
 
@@ -3742,7 +3744,7 @@ summary:focus-visible {
    보이게 하고, 옆의 검은 버튼과 크기·그림자를 똑같이 맞춘다. */
 .consult-cta { display: inline-flex; height: 3.5rem; align-items: center; gap: 0.625rem; box-shadow: 0 8px 20px rgb(8 31 58 / 16%); padding-block: 0; }
 .consult-cta:hover:not(:disabled) { box-shadow: 0 11px 26px rgb(8 31 58 / 22%); }
-.consult-cta img { display: block; width: 1.75rem; height: 1.75rem; flex-shrink: 0; border: 0.125rem solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
+.consult-cta img { display: block; width: 1.75rem; height: 1.75rem; flex-shrink: 0; border: 0.0625rem solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
 
 /* 나란히 놓이는 두 버튼은 글자 수가 달라도 같은 크기를 갖는다. */
 .refresh-hero-copy .refresh-button-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
