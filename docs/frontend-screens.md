@@ -91,6 +91,10 @@ getCompanyDataMode() === "mock"  → MockCompanyRepository / MockRiskProvider (m
 - 피드백 저장: `fetch("/api/chat/feedback")` → [app/api/chat/feedback/route.ts](../product/src/app/api/chat/feedback/route.ts)(분석 대상 밖, 내부 구현 확인 필요).
 
 ### 3-5. 근로감독관 대시보드 (`/inspector`)
+- **접근 권한: `admin`** (2026-09-17 변경, 이전에는 `inspector`). 이 영역에는 배치 현황과 ML 대시보드처럼
+  모델 재학습 상태를 다루는 플랫폼 운영 기능이 함께 들어 있다. 근로감독관 계정은 고용노동부·사업장 노무
+  담당자에게 내주는 계정이라 운영 기능을 여는 것이 역할과 맞지 않는다. 규칙은
+  [`server/auth/inspectorAccess.ts`](../product/src/server/auth/inspectorAccess.ts) 한 곳에서 정한다.
 - `InspectorDashboard.tsx` → `fetch("/api/inspector/overview?...")`, `fetch("/api/inspector/companies/{id}")`, `fetch("/api/inspector/companies/search?...")`.
 - `services/inspectorService.ts`가 이 요청들을 처리하며, **Mock/Real 스위치 없이 항상 PostgreSQL을 직접 조회**한다(`public.batches`, `public.inspector_queue`, `public.firms`, `industrial_safety.v_llm_firm_safety_context`). `config/dataMode.ts`의 `getCompanyDataMode()`를 사용하지 않으므로 감독관 화면에는 별도 Mock 데이터 경로가 없다.
 

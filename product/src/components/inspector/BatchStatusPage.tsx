@@ -34,7 +34,7 @@ export function BatchStatusPage() {
   }, []);
 
   return (
-    <main className="inspector-content batch-status-page">
+    <main className="shell inspector-content batch-status-page">
       <div className="inspector-page-heading">
         <div>
           <span className="eyebrow">읽기 전용 · ML 운영 상태</span>

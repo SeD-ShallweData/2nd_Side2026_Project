@@ -54,7 +54,7 @@ function requireSubmitter(user: SessionUserDto): void {
 }
 
 function requireInspector(user: SessionUserDto): void {
-  requireUserRole(user, ["inspector"]);
+  requireUserRole(user, ["admin"]);
 }
 
 function parseRequiredText(

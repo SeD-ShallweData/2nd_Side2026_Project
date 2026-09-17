@@ -10,7 +10,7 @@ export default function ContractsPage() {
     <div className="page-section contract-page refresh-contract-page">
       <div className="shell narrow-shell">
         <div className="page-heading">
-          <span className="eyebrow">근로계약서 확인</span>
+          <span className="eyebrow">근로계약서 확인 및 분석</span>
           <h1>계약서에서 놓친 항목이 있나요?</h1>
           <p>파일을 올리면 확인된 항목, 누락 가능 항목과 회사에 다시 물어볼 질문을 구분합니다.</p>
         </div>
