@@ -4691,7 +4691,8 @@ summary:focus-visible {
    사업장 수를 노랑 한 색의 진하기로만 나타낸다. 색을 여러 개 쓰면 지역마다
    다른 뜻이 있는 것처럼 읽힌다. 여기서 다른 것은 양뿐이다. */
 .region-map { display: grid; justify-items: center; gap: 0.75rem; margin-top: 0.5rem; }
-.region-map-canvas { width: 100%; max-width: 27rem; height: auto; }
+/* 섬을 덜어내고 여백을 걷어낸 뒤라 폭을 키워도 도형이 늘어지지 않는다. */
+.region-map-canvas { width: 100%; max-width: min(100%, 30rem); height: auto; }
 
 .region-map-area {
   fill: var(--surface);
@@ -4792,4 +4793,39 @@ summary:focus-visible {
 .conversation-page .chat-meta,
 .conversation-page .guide-scope-note {
   border-top-color: #f0dfa0;
+}
+
+
+/* ── 계약서 업로드 ────────────────────────────────────────
+   올리기 전 화면에는 고를 것이 둘뿐이다. 왼쪽에 몰아 두지 않고 가운데로
+   모아 무엇을 눌러야 하는지 바로 보이게 한다. */
+.contract-upload {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.contract-upload .upload-copy {
+  justify-content: center;
+  text-align: left;
+}
+
+/* '파일 찾아보기' 와 '선택한 파일 검토' 는 같은 크기로 위아래에 선다.
+   하나는 label, 하나는 button 이라 크기를 따로 맞춰 줘야 한다. */
+.contract-upload > .button,
+.contract-upload .contract-actions > .button {
+  width: 14rem;
+  height: 3.25rem;
+  padding-block: 0;
+}
+
+.contract-upload .contract-actions {
+  display: grid;
+  justify-items: center;
+  gap: 0.625rem;
+}
+
+.contract-upload .selected-file {
+  width: 100%;
+  text-align: left;
 }

@@ -125,7 +125,7 @@ export function RegionMap({
         <span>많음</span>
       </div>
       <p className="region-map-note">
-        지금 조회 가능한 사업장 {total.toLocaleString("ko-KR")}곳 · 경계 자료 출처 통계청(2018)
+        지금 조회 가능한 사업장 {total.toLocaleString("ko-KR")}곳
       </p>
     </div>
   );
