@@ -8,6 +8,8 @@ import { parseChatRequest, sendChatMessage } from "@/services/chatService";
 import { getCompanyRisk } from "@/services/riskService";
 import { retrieveLaborLawContext } from "@/services/ragService";
 import { rewriteFollowupQuery } from "@/services/queryRewriteService";
+import { classifyChatIntent, type IntentDecision } from "@/services/chatIntentService";
+import { clarificationFallback } from "@/services/chatFallback";
 import {
   getLlmProviderConfigs,
   getLlmTimeoutMs,
@@ -35,48 +37,26 @@ const EMPTY_USAGE = {
 };
 
 const OUT_OF_SCOPE_REFERRALS: Record<string, { label: string; url: string }> = {
-  부동산: { label: "국토교통부 실거래가 공개시스템", url: "https://rt.molit.go.kr/" },
-  세금: { label: "국세청 홈택스", url: "https://www.hometax.go.kr/" },
-  투자: { label: "금융감독원", url: "https://www.fss.or.kr/" },
-  프로그래밍: { label: "K-MOOC 강좌 검색", url: "https://www.kmooc.kr/view/course" },
+  real_estate: { label: "국토교통부 실거래가 공개시스템", url: "https://rt.molit.go.kr/" },
+  tax: { label: "국세청 홈택스", url: "https://www.hometax.go.kr/" },
+  investment: { label: "금융감독원", url: "https://www.fss.or.kr/" },
+  programming: { label: "K-MOOC 강좌 검색", url: "https://www.kmooc.kr/view/course" },
 };
 
 function outOfScopeResponse(policyBaseline: ChatResponse, topic: string): ChatResponse {
-  const referral = OUT_OF_SCOPE_REFERRALS[topic] ?? {
-    label: "고용노동부 고객상담센터 1350",
-    url: "https://1350.moel.go.kr/home/",
-  };
+  const referral = OUT_OF_SCOPE_REFERRALS[topic];
   return {
-    ...policyBaseline,
-    answer: `이 질문은 노동·근로계약 상담 범위 밖의 ${topic} 내용입니다. ${referral.label}에서 확인해 주세요.`,
+    ...clarificationFallback(policyBaseline),
+    answer: `이 상담은 노동·근로계약과 회사의 임금·안전 정보를 다룹니다. 해당 질문은 이 상담에서 답하기 어렵습니다.${referral ? ` 관련 정보는 ${referral.label}에서 확인해 주세요.` : ""}`,
     answer_type: "clarification",
     sources: [],
-    suggested_actions: [{
+    suggested_actions: referral ? [{
       code: "OUT_OF_SCOPE_REFERRAL",
       label: referral.label,
       url: referral.url,
       priority: "next",
-    }],
-    limitations: [`현재 공식 노동법 근거 검색 범위에는 ${topic} 자료가 수록되어 있지 않습니다.`],
-    guardrail_status: "limited",
-  };
-}
-
-function isCompanyLaborQuestion(query: string): boolean {
-  const companyReference = /회사|사업장|기업|업체|직장|이곳|여기/;
-  const laborQuestion = /임금|급여|월급|체불|산재|산업재해|안전|근로|노동|계약|퇴직|연차|휴가|해고|채용|입사|지표|위험|보험|수당|근무/;
-  const genericCompanyEvaluation = /^(?:이\s*)?(?:회사|기업|사업장|업체)(?:는|가|은)?\s*(?:어때|괜찮)/;
-  return (companyReference.test(query) && laborQuestion.test(query)) || genericCompanyEvaluation.test(query);
-}
-
-function noMatchWithoutCompanySummary(policyBaseline: ChatResponse): ChatResponse {
-  return {
-    ...policyBaseline,
-    answer: "이 질문에 직접 관련된 공식 노동법 근거를 찾지 못했습니다. 노동·근로계약이나 선택한 사업장의 임금·안전 정보에 관한 질문이라면 확인하려는 상황을 조금 더 구체적으로 알려주세요.",
-    answer_type: "insufficient_evidence",
-    sources: [],
-    suggested_actions: [],
-    limitations: ["현재 검색 결과로는 질문의 주제와 사실관계를 확인할 수 없습니다."],
+    }] : [],
+    limitations: ["질문 의도에 따른 범위 안내이며 회사에 대한 평가가 아닙니다."],
     guardrail_status: "limited",
   };
 }
@@ -88,6 +68,7 @@ function policyShortCircuitResponse({
   ragRetrieval,
   guardrailStatus,
   guardrailHits,
+  intentDecision,
 }: {
   request: ChatRequest;
   policyBaseline: ChatResponse;
@@ -95,6 +76,7 @@ function policyShortCircuitResponse({
   ragRetrieval: RagRetrievalResult;
   guardrailStatus: GuardrailStatus;
   guardrailHits: string[];
+  intentDecision?: IntentDecision;
 }): ChatComparisonResponse {
   const now = new Date().toISOString();
   const isComparison = configs.length > 1;
@@ -134,6 +116,8 @@ function policyShortCircuitResponse({
         usage: EMPTY_USAGE,
       },
       trace: {
+        question_intent: intentDecision?.intent,
+        intent_status: intentDecision?.status,
         prompt_policy_version: CHAT_POLICY_VERSION,
         query_transform: rewritten ? "llm_rewrite" : "none",
         context_mode: request.company_id ? "company" : "general",
@@ -182,58 +166,54 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
   const request = rewrite.changed
     ? { ...parsedRequest, resolved_query: rewrite.query }
     : parsedRequest;
+  const intentDecision = await classifyChatIntent(request, configs);
+  const companyMismatch = intentDecision.intent === "company" && Boolean(request.company_id)
+    && policyBaseline.answer_type === "clarification"
+    && policyBaseline.suggested_actions.some((action) => action.code === "SEARCH_COMPANY");
+  if (intentDecision.intent === "off_topic" || intentDecision.intent === "unclear"
+    || companyMismatch || (intentDecision.intent === "company" && !request.company_id)) {
+    const baseline = intentDecision.intent === "off_topic"
+      ? outOfScopeResponse(policyBaseline, intentDecision.topic)
+      : clarificationFallback(policyBaseline, companyMismatch ? policyBaseline.answer : intentDecision.intent === "company"
+        ? "어느 회사의 정보인지 확인할 수 있도록 사업장을 먼저 선택해 주세요."
+        : undefined);
+    return policyShortCircuitResponse({
+      request, policyBaseline: baseline, configs, intentDecision,
+      ragRetrieval: { query: request.message, status: "unavailable", reason: "intent_short_circuit", topic: null, threshold: null, documents: [] },
+      guardrailStatus: "limited",
+      guardrailHits: [intentDecision.intent === "off_topic" ? "INTENT_OUT_OF_SCOPE" : "INTENT_CLARIFICATION"],
+    });
+  }
+  Object.assign(policyBaseline, clarificationFallback(policyBaseline));
+  policyBaseline.answer_type = intentDecision.intent === "company" ? "company_context" : "general_guidance";
   const ragRetrieval = await retrieveLaborLawContext(rewrite.query);
 
   if (ragRetrieval.status === "matched") {
     policyBaseline.sources = ragRetrieval.documents.map((document) => document.source);
-  } else if (ragRetrieval.status === "no_match") {
-    if (ragRetrieval.reason === "out_of_scope" && ragRetrieval.topic) {
-      return policyShortCircuitResponse({
-        request,
-        policyBaseline: outOfScopeResponse(policyBaseline, ragRetrieval.topic),
-        configs,
-        ragRetrieval,
-        guardrailStatus: "limited",
-        guardrailHits: ["RAG_NO_MATCH", "RAG_OUT_OF_SCOPE"],
-      });
-    }
-    if (policyBaseline.answer_type === "company_context" && !isCompanyLaborQuestion(rewrite.query)) {
-      return policyShortCircuitResponse({
-        request,
-        policyBaseline: noMatchWithoutCompanySummary(policyBaseline),
-        configs,
-        ragRetrieval,
-        guardrailStatus: "limited",
-        guardrailHits: ["RAG_NO_MATCH"],
-      });
-    }
-    // 사업장 답변은 법령 RAG가 아니라 사업장 DB 결과를 근거로 하므로 출처를 보존한다.
-    if (policyBaseline.answer_type !== "company_context") policyBaseline.sources = [];
-    policyBaseline.limitations = [
-      ...policyBaseline.limitations,
-      "연결된 공식 노동법 검색 범위에서 직접 관련된 근거를 찾지 못했습니다.",
-    ];
+    policyBaseline.guardrail_status = "passed";
+  } else if (intentDecision.intent !== "company") {
     return policyShortCircuitResponse({
       request,
-      policyBaseline,
+      policyBaseline: clarificationFallback(policyBaseline,
+        "현재 질문에 직접 관련된 공식 노동법 근거를 확인하지 못했습니다. 어떤 근무 조건이나 회사의 조치 때문에 어려움을 겪고 계신지 조금 더 구체적으로 알려주시겠어요?"),
       configs,
       ragRetrieval,
+      intentDecision,
       guardrailStatus: "limited",
-      guardrailHits: [
-        "RAG_NO_MATCH",
-        ...(ragRetrieval.reason === "out_of_scope" ? ["RAG_OUT_OF_SCOPE"] : []),
-      ],
+      guardrailHits: [ragRetrieval.status === "no_match" ? "RAG_NO_MATCH" : "RAG_UNAVAILABLE"],
     });
   } else {
     policyBaseline.sources = [];
     policyBaseline.limitations = [
       ...policyBaseline.limitations,
-      "공식 노동법 검색 서비스에 연결하지 못해 이 답변에는 확인된 법령 근거가 첨부되지 않았습니다.",
+      ragRetrieval.status === "unavailable"
+        ? "공식 노동법 검색 서비스에 연결하지 못해 확인된 법령 근거가 없습니다. 회사 자료의 의미와 한계만 설명합니다."
+        : "질문과 직접 관련된 법령 근거를 찾지 못했습니다. 회사 자료의 의미와 한계만 설명합니다.",
     ];
   }
   let companyContext;
 
-  if (request.company_id) {
+  if (request.company_id && intentDecision.intent === "company") {
     const [company, risk] = await Promise.all([
       getCompanyById(request.company_id),
       getCompanyRisk(request.company_id),
@@ -247,11 +227,12 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
       size_label: company.size_label,
       risk,
     };
+    if (ragRetrieval.status !== "matched") policyBaseline.sources = risk.sources;
   }
 
   const provider = new DualLlmChatProvider(
     configs,
     new OpenAICompatibleChatClient(fetch, getLlmTimeoutMs()),
   );
-  return provider.compare({ request, policyBaseline, companyContext, ragRetrieval });
+  return provider.compare({ request, policyBaseline, companyContext, ragRetrieval, questionIntent: intentDecision.intent });
 }

@@ -73,7 +73,9 @@ class RetrievalPolicyTest(unittest.TestCase):
         )
         for query, topic in cases:
             with self.subTest(query=query):
-                self.assertEqual(topic, retriever._out_of_scope_topic(query, 0.41))
+                self.assertEqual(topic, retriever._out_of_scope_topic(query, 0.60))
+                self.assertIsNone(retriever._out_of_scope_topic(query, 0.35))
+                self.assertIsNone(retriever._out_of_scope_topic(query, 0.41))
                 self.assertIsNone(retriever._out_of_scope_topic(query, 0.20))
 
         for query in ("부동산 회사의 임금체불", "주식회사 근로계약", "파이썬 개발자의 연차"):

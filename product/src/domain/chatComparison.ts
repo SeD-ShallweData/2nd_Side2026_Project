@@ -32,6 +32,8 @@ export interface ProviderMetrics {
 }
 
 export interface SafeExecutionTrace {
+  question_intent?: "labor" | "company" | "off_topic" | "unclear";
+  intent_status?: "classified" | "unavailable";
   prompt_policy_version: string;
   query_transform: "none" | "llm_rewrite";
   context_mode: "general" | "company";
@@ -87,6 +89,7 @@ export interface ChatComparisonResponse {
 }
 
 export interface ComparisonContext {
+  questionIntent?: "labor" | "company";
   request: ChatRequest;
   policyBaseline: ChatResponse;
   companyContext?: {

@@ -8,6 +8,29 @@ import { useEffect, useState } from "react";
 import type { SessionResponse } from "@/app/api/auth/authApiContract";
 import { AuthApiError, getSession, logout } from "@/services/authClient";
 
+const NAV_ITEMS = [
+  { href: "/", label: "서비스 소개" },
+  { href: "/companies", label: "사업장 확인" },
+  { href: "/contracts", label: "계약서 진단" },
+  { href: "/community", label: "커뮤니티" },
+  { href: "/worksite-tips", label: "현장 신고" },
+] as const;
+
+const MOBILE_NAV_ITEMS = [
+  { href: "/", label: "소개" },
+  { href: "/companies", label: "사업장" },
+  { href: "/contracts", label: "계약서" },
+  { href: "/community", label: "커뮤니티" },
+  { href: "/worksite-tips", label: "현장 신고" },
+  { href: "/chat", label: "AI 상담" },
+] as const;
+
+// "/" 는 정확히 일치할 때만 현재 탭이다. 접두사로 보면 모든 경로가 홈이 된다.
+export function isCurrentNavPath(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 type SessionState =
   | { status: "loading" }
   | { status: "ready"; session: SessionResponse };
@@ -97,15 +120,22 @@ export function SiteHeader() {
             <Brand />
           </Link>
           <nav className="consumer-main-nav" aria-label="주요 메뉴">
-            <Link href="/">서비스 소개</Link>
-            <Link href="/companies">사업장 확인</Link>
-            <Link href="/contracts">계약서 진단</Link>
-            <Link href="/community">커뮤니티</Link>
-            <Link href="/worksite-tips">현장 신고</Link>
-            <Link href="/chat" className="consumer-ai-link">AI 노동 상담</Link>
+            {NAV_ITEMS.map((item) => {
+              const current = isCurrentNavPath(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={current ? "is-current" : undefined}
+                  aria-current={current ? "page" : undefined}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
           <div className="consumer-header-side" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {!isInspector ? (
+            {!isInspector && user?.role === "inspector" ? (
               <Link href="/inspector" className="consumer-mode-switch" aria-label="일반 사용자 모드에서 근로감독관 모드로 전환">
                 근로감독관 모드 <span aria-hidden="true">↗</span>
               </Link>
@@ -135,15 +165,25 @@ export function SiteHeader() {
         <p className="shell field-error" role="alert">{logoutError}</p>
       ) : null}
       {!isInspector && pathname !== "/chat" ? (
-        <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리와 상담 바로가기">
-          <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} /> 돈워리와 상담
+        <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리 AI에게 상담하기">
+          <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />
+          <span className="consumer-floating-chat-label">돈워리 AI에게 상담하기</span>
         </Link>
       ) : null}
       <nav className="consumer-mobile-nav" aria-label="모바일 주요 메뉴">
-        <Link href="/">소개</Link><Link href="/companies">사업장</Link>
-        <Link href="/contracts">계약서</Link><Link href="/community">커뮤니티</Link>
-        <Link href="/worksite-tips">현장 신고</Link>
-        <Link href="/chat">AI 상담</Link>
+        {MOBILE_NAV_ITEMS.map((item) => {
+          const current = isCurrentNavPath(pathname, item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={current ? "is-current" : undefined}
+              aria-current={current ? "page" : undefined}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
     </>
   );

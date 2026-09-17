@@ -21,8 +21,9 @@ import {
   scanRules,
 } from "@/server/guardrails";
 import { loadPrompt, withRuntimeContext } from "@/server/promptLoader";
+import { clarificationFallback } from "@/services/chatFallback";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-08-12-v5";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-16-v6";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -118,6 +119,7 @@ function publicSignalForPrompt(risk: CompanyRiskResult) {
 
 function buildSystemPrompt(context: ComparisonContext): string {
   const safeContext = {
+    question_intent: context.questionIntent ?? null,
     company: context.companyContext
       ? {
           company_id: context.companyContext.company_id,
@@ -140,7 +142,7 @@ function buildSystemPrompt(context: ComparisonContext): string {
     previously_cited_labor_law: previousCitations(context),
     retrieval_status: context.ragRetrieval.status,
     retrieval_reason: context.ragRetrieval.reason ?? null,
-    retrieval_topic: context.ragRetrieval.topic ?? null,
+    retrieval_topic: context.questionIntent === "company" ? null : context.ragRetrieval.topic ?? null,
     policy_baseline: context.policyBaseline.answer,
     required_limitations: context.policyBaseline.limitations,
     suggested_actions: context.policyBaseline.suggested_actions,
@@ -168,6 +170,8 @@ function buildMessages(context: ComparisonContext) {
 
 function baseTrace(context: ComparisonContext): Omit<SafeExecutionTrace, "guardrail_action" | "guardrail_hits" | "upstream_request_id"> {
   return {
+    question_intent: context.questionIntent,
+    intent_status: context.questionIntent ? "classified" : undefined,
     prompt_policy_version: CHAT_POLICY_VERSION,
     query_transform:
       context.request.resolved_query && context.request.resolved_query !== context.request.message
@@ -189,6 +193,7 @@ function fallbackResult(
   context: ComparisonContext,
   error: LlmCallError,
 ): ProviderComparisonResult {
+  baseline = clarificationFallback(baseline, "답변 서비스에 일시적인 문제가 있어 답변을 확인하지 못했습니다. 잠시 후 같은 질문으로 다시 시도해 주세요.");
   return {
     provider: config.id,
     provider_label: config.label,
@@ -233,18 +238,19 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
         const completion = await this.client.complete(config, messages);
         const guardrailHits = scanGuardrails(completion.answer, context);
         const replaced = guardrailHits.length > 0;
-        const answer = replaced ? context.policyBaseline.answer : completion.answer;
+        const responseBaseline = replaced ? clarificationFallback(context.policyBaseline) : context.policyBaseline;
+        const answer = replaced ? responseBaseline.answer : completion.answer;
         return {
           provider: config.id,
           provider_label: config.label,
           model: completion.model,
           status: replaced ? "guardrail_replaced" : "success",
           answer,
-          answer_type: context.policyBaseline.answer_type,
-          sources: context.policyBaseline.sources,
-          suggested_actions: context.policyBaseline.suggested_actions,
+          answer_type: responseBaseline.answer_type,
+          sources: responseBaseline.sources,
+          suggested_actions: responseBaseline.suggested_actions,
           limitations: replaced
-            ? [...context.policyBaseline.limitations, "모델 답변이 서비스 정책에 맞지 않아 안전한 안내로 교체했습니다."]
+            ? [...responseBaseline.limitations, "모델 답변이 서비스 정책에 맞지 않아 확인 질문으로 교체했습니다."]
             : context.policyBaseline.limitations,
           guardrail_status: replaced ? "limited" : context.policyBaseline.guardrail_status,
           metrics: {

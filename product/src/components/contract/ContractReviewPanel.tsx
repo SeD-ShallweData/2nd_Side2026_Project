@@ -151,12 +151,6 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
             </button>
           ) : null}
         </div>
-        <p className="privacy-note">
-          <span aria-hidden="true">🔒</span>
-          {dataMode === "real"
-            ? "업로드된 원문은 내부 문서 분석 API에 전달되며 제품 서버나 Git에 영구 저장하지 않습니다."
-            : "업로드된 원문은 제품 서버나 Git에 영구 저장하지 않습니다. 데모 모드에서는 파일 내용도 분석하지 않습니다."}
-        </p>
         {error ? (
           <p className="field-error" role="alert">
             {error}

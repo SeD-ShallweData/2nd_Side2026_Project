@@ -62,6 +62,19 @@ function payload(answer: string, model: string) {
 }
 
 describe("실제 LLM 비교 Provider", () => {
+  it.each(["guardrail", "api_error"])("%s 대체 답변은 기존 회사 요약·출처·행동을 재사용하지 않는다", async (failure) => {
+    const fakeFetch = vi.fn(async () => failure === "api_error"
+      ? new Response("error", { status: 503 })
+      : new Response(JSON.stringify(payload("이 회사는 안전한 회사입니다.", "test")), { status: 200 }));
+    const response = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({
+      ...CONTEXT,
+      policyBaseline: { ...BASELINE, answer: "회사 산재 요약이 흘러나오면 실패", answer_type: "company_context", sources: [{ name: "회사 자료", category: "wage" }] },
+    });
+    expect(response.results[0].answer).not.toContain("회사 산재 요약");
+    expect(response.results[0].answer_type).toBe("clarification");
+    expect(response.results[0].sources).toEqual([]);
+    expect(response.results[0].suggested_actions).toEqual([]);
+  });
   it("기본 단일 구성은 Upstage 결과 하나와 single_api 실행 모드를 반환한다", async () => {
     const calls: string[] = [];
     const fakeFetch = (async (input: RequestInfo | URL) => {
@@ -101,7 +114,8 @@ describe("실제 LLM 비교 Provider", () => {
     expect(result.results).toHaveLength(1);
     expect(bodies[0].messages[0].content).toContain("돈워리");
     expect(result.results[0].status).toBe("guardrail_replaced");
-    expect(result.results[0].answer).toBe(BASELINE.answer);
+    expect(result.results[0].answer).toContain("어떤 점을 확인");
+    expect(result.results[0].sources).toEqual([]);
   });
 
   it("두 모델에 동일한 메시지와 생성 설정을 전달하고 상세 지표를 정규화한다", async () => {
@@ -145,7 +159,8 @@ describe("실제 LLM 비교 Provider", () => {
 
     const result = await new DualLlmChatProvider(CONFIGS, new OpenAICompatibleChatClient(fakeFetch)).compare(CONTEXT);
     expect(result.results[0].status).toBe("guardrail_replaced");
-    expect(result.results[0].answer).toBe(BASELINE.answer);
+    expect(result.results[0].answer).toContain("어떤 점을 확인");
+    expect(result.results[0].sources).toEqual([]);
     expect(result.results[0].trace.guardrail_hits).toContain("SAFE_COMPANY_CERTAINTY");
     expect(result.results[1].status).toBe("success");
   });
