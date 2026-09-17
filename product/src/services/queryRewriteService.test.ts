@@ -41,13 +41,23 @@ describe("follow-up query rewrite", () => {
     expect(body.messages?.[0].content).toContain("독립 질문");
   });
 
-  it("재작성 공급자가 실패하면 원래 질문으로 계속 진행한다", async () => {
+  it("재작성 공급자가 실패해도 생략형 후속 질문은 마지막 사용자 발화와 함께 검색한다", async () => {
     const fakeFetch = (async () => new Response("blocked", { status: 401 })) as typeof fetch;
     await expect(rewriteFollowupQuery(
       REQUEST,
       [CONFIG],
       new OpenAICompatibleChatClient(fakeFetch),
-    )).resolves.toEqual({ query: REQUEST.message, changed: false });
+    )).resolves.toEqual({ query: "월급이 두 달째 밀렸어요. 그럼 어디에 신고해?", changed: true });
+  });
+
+  it("재작성 결과가 원문 그대로여도 assistant 안내 대신 마지막 사용자 발화만 결합한다", async () => {
+    const fakeFetch = (async () => new Response(JSON.stringify({
+      model: "solar",
+      choices: [{ message: { content: REQUEST.message }, finish_reason: "stop" }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    const result = await rewriteFollowupQuery(REQUEST, [CONFIG], new OpenAICompatibleChatClient(fakeFetch));
+    expect(result).toEqual({ query: "월급이 두 달째 밀렸어요. 그럼 어디에 신고해?", changed: true });
+    expect(result.query).not.toContain("자료를 먼저 정리하세요");
   });
 
   it("대화 이력이 없으면 추가 LLM 호출을 하지 않는다", async () => {

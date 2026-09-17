@@ -85,6 +85,26 @@ function replacementBaseline(context: ComparisonContext): ChatResponse {
   ) {
     return context.policyBaseline;
   }
+
+  // 생성 결과만 안전하지 않은 경우에는 이미 이번 질문에서 확인한 노동법 자료와
+  // 관련된 다음 행동을 유지한다. 회사 요약이나 무관한 일반 재질문으로 바꾸면
+  // 가드레일은 통과해도 정상 노동 질문을 사실상 차단하게 된다.
+  if (context.questionIntent === "labor" && context.ragRetrieval.status === "matched") {
+    return {
+      conversation_id: context.policyBaseline.conversation_id,
+      answer: "말씀하신 근로조건 문제는 근로계약 내용, 실제 근로시간, 임금 지급 내역을 함께 확인해야 합니다. 근로계약서·출퇴근 또는 업무 기록·급여명세서를 먼저 정리한 뒤, 고용노동부 1350에 문의해 이번 상황에 적용되는 기준과 필요한 절차를 확인해 보세요.",
+      answer_type: "general_guidance",
+      sources: context.policyBaseline.sources,
+      suggested_actions: [
+        { code: "CHECK_WORK_RECORDS", label: "근로시간·임금 기록 확인", priority: "now" },
+        { code: "CONTACT_LABOR_HOTLINE", label: "고용노동부 1350 문의", priority: "next" },
+      ],
+      limitations: [
+        "이번 질문과 관련된 공식 자료를 확인했지만, 개별 적용 여부는 실제 근로계약과 근무 기록을 함께 봐야 합니다.",
+      ],
+      guardrail_status: "limited",
+    };
+  }
   return clarificationFallback(context.policyBaseline);
 }
 

@@ -106,6 +106,26 @@ describe("의도와 근거에 따른 상담 경로", () => {
       ragRetrieval: expect.objectContaining({ status: "no_match", reason: "company_context_only" }),
     }));
   });
+  it("회사를 선택하지 않은 일반 지표 질문은 사업장 선택 없이 설명한다", async () => {
+    mocks.classify.mockResolvedValue({
+      intent: "company", topic: "other", company_scope: "general", status: "classified",
+    });
+    const response = await sendComparedChatMessage({ message: "긍정 지표 0개면 나쁜 회사인가요?" });
+    expect(response.results[0]).toMatchObject({
+      answer_type: "general_guidance",
+      guardrail_status: "limited",
+      trace: {
+        question_intent: "company",
+        company_context_attached: false,
+        rag_reason: "general_company_explanation",
+        guardrail_hits: ["GENERAL_COMPANY_EXPLANATION"],
+      },
+    });
+    expect(response.results[0].answer).toContain("나쁘거나 위험하다는 판단은 아닙니다");
+    expect(response.results[0].answer).not.toContain("사업장을 먼저 선택");
+    expect(mocks.retrieve).not.toHaveBeenCalled();
+    expect(mocks.compare).not.toHaveBeenCalled();
+  });
   it.each([false, true])("노동 검색 매칭은 생성 경로 유지, compare=%s", async (compare) => {
     mocks.retrieve.mockResolvedValue({ status: "matched", documents: [{ source: { name: "법령" } }] });
     await sendComparedChatMessage({ message: "야근수당을 안 줘요", company_id: "C1", compare });
