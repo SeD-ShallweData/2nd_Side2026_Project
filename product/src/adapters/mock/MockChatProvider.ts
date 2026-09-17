@@ -245,11 +245,6 @@ function needsCompanySelection(id: string): ChatResponse {
   };
 }
 
-function evidenceSummary(labels: string[]): string {
-  if (labels.length === 0) return "세부 확인 신호가 제공되지 않았습니다.";
-  return labels.join(", ");
-}
-
 const COMPANY_NAME_PATTERN = /(?:주식회사\s*)?[가-힣A-Za-z0-9㈜()·]{2,30}(?:건설|산업|제조|물류|화학|전기|공사|식자재|디자인|요양|테크|중공업|엔지니어링|회사|기업)/g;
 
 async function findOtherReferencedCompany(
@@ -370,11 +365,13 @@ export class PolicyChatProvider implements ChatProvider {
     const safety = risk.safety_context;
     const baseLimitations = [CHAT_COPY.dataLimitation, CHAT_COPY.safetyScope];
 
-    if (containsAny(message, ["체불할 거", "체불할거", "체불할 것", "임금이 밀릴", "월급이 밀릴"])) {
+    if (containsAny(message, [
+      "체불할 거", "체불할거", "체불할 것", "임금이 밀릴", "임금이 밀린", "월급이 밀릴", "월급이 밀린",
+    ])) {
       return {
         answer: `${company.company_name}에서 향후 임금체불이 발생할지는 현재 정보만으로 확정할 수 없습니다. ${wage.summary} 입사 전에는 근로계약서의 임금 지급일·지급 방법·급여 구성과 계약서 교부 여부를 확인하세요.`,
         answer_type: "company_context",
-        sources: risk.sources,
+        sources: risk.sources.filter((source) => source.category === "wage"),
         suggested_actions: [
           { code: "CHECK_PAYDAY", label: "임금 지급일 확인", priority: "now" },
           { code: "CHECK_PAY_STRUCTURE", label: "급여 구성·계약서 교부 확인", priority: "next" },
@@ -404,20 +401,45 @@ export class PolicyChatProvider implements ChatProvider {
       };
     }
 
-    if (containsAny(message, ["왜", "이유", "추가 확인"])) {
+    if (containsAny(message, ["왜", "이유", "추가 확인", "임금 지급 카드", "산업재해 카드"])) {
       const wageLabels = wage.evidence_items.map((item) => item.label);
       const safetyLabels = safety.evidence_items.map((item) => item.label);
+      const asksWage = containsAny(message, ["임금", "월급", "급여", "체불"]);
+      const asksSafety = containsAny(message, ["산재", "산업재해", "안전", "사고"]);
+      const includeWage = asksWage || !asksSafety;
+      const includeSafety = asksSafety || !asksWage;
+      const explanations: string[] = [];
+      if (includeWage) {
+        explanations.push(wageLabels.length > 0
+          ? `${company.company_name}의 임금 지급 카드에서는 ${wageLabels.join(", ")} 항목이 확인 신호로 제공됐습니다. ${wage.summary}`
+          : `${company.company_name}의 임금 지급 카드에는 개별적인 추가 확인 신호가 제공되지 않았습니다. ${wage.summary} 이 결과는 안전 인증이나 임금체불이 없다는 보장은 아니므로 임금 지급일·급여 구성·근로시간을 직접 확인하세요.`);
+      }
+      if (includeSafety) {
+        explanations.push(safetyLabels.length > 0
+          ? `산업재해 카드는 ${safety.region}·${safety.industry} 단위 정보이며, ${safetyLabels.join(", ")} 항목이 확인 신호로 제공됐습니다. ${safety.summary}`
+          : `산업재해 카드는 ${safety.region}·${safety.industry} 단위 정보입니다. 개별 확인 신호는 제공되지 않았으며, ${safety.summary}`);
+      }
       return {
-        answer: `${company.company_name}의 임금 지급 관련 카드에서는 ${evidenceSummary(wageLabels)} 항목을 확인할 필요가 있습니다. ${wage.summary}\n\n산업재해 카드는 ${safety.region}·${safety.industry} 단위 정보입니다. ${evidenceSummary(safetyLabels)} ${safety.summary}`,
+        answer: explanations.join("\n\n"),
         answer_type: "company_context",
-        sources: risk.sources,
+        sources: risk.sources.filter((source) =>
+          (includeWage && source.category === "wage")
+          || (includeSafety && source.category === "safety"),
+        ),
         suggested_actions: [
-          { code: "CHECK_PAYDAY", label: "임금 지급일 확인", priority: "now" },
-          { code: "CHECK_PAY_STRUCTURE", label: "급여 구성·근로시간 확인", priority: "next" },
-          { code: "CHECK_SAFETY_PROCESS", label: "안전교육·보고 절차 확인", priority: "next" },
+          ...(includeWage ? [
+            { code: "CHECK_PAYDAY", label: "임금 지급일 확인", priority: "now" as const },
+            { code: "CHECK_PAY_STRUCTURE", label: "급여 구성·근로시간 확인", priority: "next" as const },
+          ] : []),
+          ...(includeSafety ? [
+            { code: "CHECK_SAFETY_PROCESS", label: "안전교육·보고 절차 확인", priority: "next" as const },
+          ] : []),
         ],
         limitations: baseLimitations,
-        guardrail_status: wage.level === "unknown" || safety.level === "unknown" ? "limited" : "passed",
+        guardrail_status:
+          (includeWage && wage.level === "unknown") || (includeSafety && safety.level === "unknown")
+            ? "limited"
+            : "passed",
         conversation_id: id,
       };
     }
