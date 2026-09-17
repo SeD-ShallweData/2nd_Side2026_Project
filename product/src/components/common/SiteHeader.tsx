@@ -135,7 +135,7 @@ export function SiteHeader() {
             })}
           </nav>
           <div className="consumer-header-side" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {!isInspector && user?.role === "inspector" ? (
+            {!isInspector && user?.role === "admin" ? (
               <Link href="/inspector" className="consumer-mode-switch" aria-label="일반 사용자 모드에서 근로감독관 모드로 전환">
                 근로감독관 모드 <span aria-hidden="true">↗</span>
               </Link>

@@ -10,7 +10,7 @@ export default async function InspectorLayout({
 }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
   const user = await getOptionalSessionUser(cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null);
-  if (user?.role !== "inspector") forbidden();
+  if (user?.role !== "admin") forbidden();
 
   return children;
 }

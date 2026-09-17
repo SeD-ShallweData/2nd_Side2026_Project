@@ -46,7 +46,7 @@ export function MlDashboardPage() {
   }
 
   return (
-    <main className="inspector-content ml-dashboard-page">
+    <main className="shell inspector-content ml-dashboard-page">
       <div className="inspector-page-heading"><div><span className="eyebrow">읽기 전용 · 집계 화면</span><h1>ML 대시보드</h1><p>지역·업종별 분포를 확인합니다. 개별 사업장 값과 점수는 표시하지 않습니다.</p></div><span className="inspector-private-badge">개별 값 비노출</span></div>
       <div className="ml-dashboard-tabs" role="tablist" aria-label="ML 집계 종류"><button type="button" role="tab" aria-selected={tab === "wage"} className={tab === "wage" ? "is-active" : ""} onClick={() => changeTab("wage")}>임금체불 확인 신호</button><button type="button" role="tab" aria-selected={tab === "safety"} className={tab === "safety" ? "is-active" : ""} onClick={() => changeTab("safety")}>산업재해 확인 우선순위</button></div>
       {data ? <div className="ml-dashboard-notice"><strong>{data.tab === "wage" ? `기준월 ${data.data_as_of ?? "미확정"} · 예측 대상 ${data.target_label ?? "미확정"}` : `관측 기준 ${data.data_as_of ?? "미확정"} · 대상 기간 ${data.target_label ?? "미확정"}`}</strong><span>{data.basis_notice}</span>{data.stale_notice ? <span>{data.stale_notice}</span> : null}</div> : null}
