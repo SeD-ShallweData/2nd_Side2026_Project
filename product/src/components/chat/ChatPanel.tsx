@@ -522,14 +522,6 @@ export function ChatPanel({
         />
         <button type="submit" className="chat-send" disabled={loading || !draft.trim()} aria-label="질문 보내기"><span aria-hidden="true">↑</span></button>
       </form>
-      <p className="dual-api-note">
-        {executionMode === "dual_api"
-          ? compare
-            ? "비교를 켠 질문은 실제 Upstage Solar·SKT A.X API에 병렬 전송합니다."
-            : "기본 질문은 Upstage Solar API에만 전송합니다."
-          : "질문에 따라 허용된 도구만 서버에서 실행하며, 단일 OpenAI Responses 답변을 표시합니다."}{" "}
-        API 키와 숨은 프롬프트는 브라우저로 전송하지 않습니다.
-      </p>
       {!companyId ? (
         <p className="chat-company-help">
           특정 회사에 관해 질문하려면 <Link href="/companies">사업장을 먼저 검색해 선택</Link>하세요.

@@ -14,7 +14,6 @@ export default function CommunityPage() {
         </div>
         <div className="mock-banner" role="status"><span>안내</span>로그인 사용자는 게시글 작성과 신고를 이용할 수 있습니다. 댓글·공감 기능은 현재 제공하지 않으며 표시되는 수치는 조회용입니다.</div>
         <CommunityBoard />
-        <aside className="community-policy-note"><strong>커뮤니티 정보는 이렇게 구분합니다.</strong><p>게시물은 사용자 경험이며 공식 데이터나 법률 근거가 아닙니다. 익명 글의 작성자 식별정보는 공개 API에 포함하지 않습니다.</p></aside>
       </div>
     </div>
   );
