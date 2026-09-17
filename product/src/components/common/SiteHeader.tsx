@@ -165,13 +165,9 @@ export function SiteHeader() {
         <p className="shell field-error" role="alert">{logoutError}</p>
       ) : null}
       {!isInspector && pathname !== "/chat" ? (
-        <Link href="/chat" className="consumer-floating-chat" aria-label="전문가보다 먼저 AI 챗봇 돈워리와 상담">
+        <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리 AI에게 상담하기">
           <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />
-          <span className="consumer-floating-chat-label">
-            {"전문가보다 먼저 AI "}
-            <br />
-            챗봇 돈워리와 상담
-          </span>
+          <span className="consumer-floating-chat-label">돈워리 AI에게 상담하기</span>
         </Link>
       ) : null}
       <nav className="consumer-mobile-nav" aria-label="모바일 주요 메뉴">

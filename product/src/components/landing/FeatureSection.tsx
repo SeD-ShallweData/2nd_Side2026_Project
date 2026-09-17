@@ -91,6 +91,6 @@ export function ConsultPreviewSection() {
 
 export function FinalCta() {
   return (
-    <section className="refresh-final-cta"><div className="shell"><span className="eyebrow">지금 시작하세요</span><h2>일하기 전에도, 일하는 중에도<br />미리 대비하는 Co끼리</h2><p>회사명을 입력하면 공개 데이터에서 관측된 사실과 확인할 항목을 정리합니다.</p><div className="refresh-button-row"><Link href="/companies" className="button button-dark button-large">궁금한 사업장의 위험요소 보러가기 →</Link><Link href="/chat" className="button button-outline button-large consult-cta"><Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />전문가보다 먼저 AI 챗봇 돈워리와 상담</Link></div></div></section>
+    <section className="refresh-final-cta"><div className="shell"><span className="eyebrow">지금 시작하세요</span><h2>일하기 전에도, 일하는 중에도<br />미리 대비하는 Co끼리</h2><p>회사명을 입력하면 공개 데이터에서 관측된 사실과 확인할 항목을 정리합니다.</p><div className="refresh-button-row"><Link href="/chat" className="button button-outline button-large consult-cta"><Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />돈워리 AI에게 상담하기</Link><Link href="/companies" className="button button-dark button-large">궁금한 사업장의 위험요소 보러가기 →</Link></div></div></section>
   );
 }
