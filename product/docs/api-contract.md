@@ -335,6 +335,8 @@ DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`
 `DEMO_BASIC_AUTH_PASSWORD`를 반드시 설정해 페이지와 `/api/inspector/*` 전체를 Basic 인증으로 보호한다.
 
 - `GET /api/inspector/overview?limit=10&page=1`: 최신 배치 요약, 큐 우선순위별 건수와 최상위 100위 안의 위험큐 페이지를 반환한다. 기본값은 페이지당 10개이며 응답의 `queue_pagination`에 현재 페이지, 전체 페이지, 이전·다음 여부가 포함된다.
+- `GET /api/inspector/batches`: 실제 `public.batches` 전체 이력과 현재 서비스 중인 배치를 읽기 전용으로 반환한다.
+- `GET /api/admin/batches`: 관리자 배치 현황 화면에 같은 실제 `public.batches` 결과를 반환한다. 관리자와 근로감독관 역할만 접근할 수 있으며 응답은 저장하지 않는다.
 - `GET /api/inspector/companies/search?q=...`: 실제 `firms`에서 동명 사업장을 검색한다.
 - `GET /api/inspector/companies/{companyId}`: 최신 `risk_full`, 큐 순위·`grade`, 실제
   `reasons`, G1~G6 지표와 별도 산업안전 공표 구간을 반환한다.
