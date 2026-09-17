@@ -538,8 +538,14 @@ export function ChatPanel({
       </div>
       <aside className="question-guide" aria-label="AI 질문 가이드">
         <div className="guide-title">
-          <span aria-hidden="true">AI</span>
-          <div><strong>질문 가이드</strong><small>무엇부터 물을지 막막하다면</small></div>
+          <Image
+            className="guide-avatar"
+            src="/brand/donworry-avatar.png"
+            alt=""
+            width={192}
+            height={192}
+          />
+          <div><strong>AI 질문 가이드</strong><small>무엇부터 물을지 막막하다면</small></div>
         </div>
         {companyName ? (
           <div className="guide-context"><strong>{companyName}</strong><span>사업장 공개 컨텍스트 연결</span></div>

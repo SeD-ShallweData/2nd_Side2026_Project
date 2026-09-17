@@ -256,8 +256,8 @@ summary:focus-visible {
 }
 
 .brand-word {
-  /* 상단 메뉴 글자와 같은 파랑. --ink 는 너무 어두워 검게 읽힌다. */
-  color: var(--muted);
+  /* 색을 따로 주지 않는다. 밝은 헤더에서는 남색(--ink), 어두운 푸터에서는
+     흰색으로 물려받아야 두 곳 모두 읽힌다. */
   font-size: 1.75rem;
   font-weight: 950;
   letter-spacing: -0.05em;
@@ -3752,10 +3752,16 @@ summary:focus-visible {
 .consult-cta:hover:not(:disabled) { box-shadow: 0 11px 26px rgb(8 31 58 / 22%); }
 .consult-cta img { display: block; width: 1.75rem; height: 1.75rem; flex-shrink: 0; border: 0.0625rem solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
 
-/* 나란히 놓이는 두 버튼은 글자 수가 달라도 같은 크기를 갖는다. */
+/* 나란히 놓이는 두 버튼은 높이를 맞춘다. 너비까지 묶으면 글자가 긴 쪽이
+   두 줄로 접히면서 오히려 높이가 어긋난다. 너비는 글자에 맡긴다. */
 .refresh-hero-copy .refresh-button-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.refresh-hero-copy .refresh-button-row > .button-large { flex: 1 1 0; min-width: 16rem; }
-.refresh-final-cta .refresh-button-row > .button-large { flex: 0 1 22rem; }
+.refresh-hero-copy .refresh-button-row > .button-large,
+.refresh-final-cta .refresh-button-row > .button-large {
+  flex: 0 1 auto;
+  height: 3.5rem;
+  padding-block: 0;
+  white-space: nowrap;
+}
 .refresh-hero-facts { display: flex; gap: 0; margin: 33px 0 0; }
 .refresh-hero-facts div { display: grid; gap: 1px; border-left: 1px solid rgb(8 31 58 / 16%); padding: 0 21px; }
 .refresh-hero-facts div:first-child { border-left: 0; padding-left: 0; }
@@ -3906,7 +3912,8 @@ summary:focus-visible {
 .chat-experience-layout { display: grid; grid-template-columns: minmax(0,1fr) 250px; gap: 16px; align-items: start; }
 .chat-experience-layout > .chat-panel { min-width: 0; }
 .question-guide { position: sticky; top: 94px; border: 1px solid var(--line); border-radius: 17px; background: #fff; box-shadow: var(--shadow-sm); padding: 18px; }
-.guide-title { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; margin-bottom: 15px; }.guide-title > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; background: var(--brand); font-size: .63rem; font-weight: 950; }.guide-title > div { display: grid; }.guide-title strong { font-size: .8rem; }.guide-title small { color: var(--muted); font-size: .61rem; }
+.guide-title { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; margin-bottom: 15px; }/* 'AI' 라고 적힌 노란 칸 자리에 안경 쓴 돈워리를 같은 규격으로 넣는다. */
+.guide-title .guide-avatar { display: block; width: 34px; height: 34px; border: 0.0625rem solid var(--avatar-ring); border-radius: 9px; background: var(--brand); object-fit: cover; }.guide-title > div { display: grid; }.guide-title strong { font-size: .8rem; }.guide-title small { color: var(--muted); font-size: .61rem; }
 .guide-context { display: grid; border-radius: 10px; background: var(--brand-soft); margin: 0 0 15px; padding: 10px; font-size: .66rem; }.guide-context span { color: var(--muted); }.guide-group { margin-top: 15px; }.guide-group > strong { display: block; margin-bottom: 6px; color: var(--muted); font-size: .66rem; }.guide-group button { width: 100%; border: 1px solid var(--line); border-radius: 9px; background: #fff; margin-top: 6px; padding: 9px; text-align: left; font-size: .69rem; cursor: pointer; }.guide-group button:hover:not(:disabled) { border-color: #d8bd20; background: #f9fcff; }.guide-scope-note { border-top: 1px solid var(--line); margin: 16px 0 0; padding-top: 12px; color: var(--muted); font-size: .6rem; }
 
 .refresh-community-page .page-heading h1 { font-size: clamp(2.35rem,5vw,4.1rem); letter-spacing: -.055em; }
@@ -4726,3 +4733,63 @@ summary:focus-visible {
 .region-map-legend i[data-level="4"] { background: #e0b800; }
 
 .region-map-note { margin: 0; color: var(--muted); font-size: 0.76rem; }
+/* ── 상담 탭만 따뜻하게 ────────────────────────────────────
+   돈워리와 이야기하는 화면이라 다른 탭보다 부드러워야 한다. 바탕과 테두리에만
+   브랜드 노랑을 옅게 깔고, 글자는 파란 계열(--ink / --ink-soft / --muted)을
+   그대로 둔다. 색으로 정보를 나르지 않으므로 읽기에 영향이 없다. */
+.conversation-page {
+  background:
+    radial-gradient(circle at 12% 0%, rgb(255 214 0 / 16%), transparent 42%),
+    radial-gradient(circle at 88% 8%, rgb(255 214 0 / 10%), transparent 38%),
+    #fffdf3;
+}
+
+.conversation-page .chat-panel {
+  border-color: #f0dfa0;
+  background: #fffdf5;
+}
+
+.conversation-page .chat-topbar {
+  border-bottom-color: #f0dfa0;
+  background: var(--brand-soft);
+}
+
+.conversation-page .chat-body {
+  background:
+    radial-gradient(circle at 5% 5%, rgb(255 214 0 / 14%), transparent 28%),
+    #fffefa;
+}
+
+/* 돈워리가 한 말. 옅은 노랑 위에 파란 글자를 얹는다. */
+.conversation-page .chat-message-assistant {
+  border-color: #f2e3ab;
+  background: #fff8dd;
+  color: var(--ink-soft);
+}
+
+/* 내가 한 말은 그대로 남색으로 둔다. 두 사람을 색으로 구분해야 한다. */
+.conversation-page .chat-form,
+.conversation-page .question-guide {
+  border-color: #f0dfa0;
+  background: #fffdf5;
+}
+
+.conversation-page .chat-form textarea {
+  border-color: #f0dfa0;
+  background: var(--white);
+}
+
+.conversation-page .guide-group button {
+  border-color: #f0dfa0;
+  background: var(--white);
+}
+
+.conversation-page .guide-group button:hover:not(:disabled) {
+  border-color: var(--brand-deep);
+  background: var(--brand-soft);
+}
+
+.conversation-page .chat-meta,
+.conversation-page .guide-scope-note {
+  border-top-color: #f0dfa0;
+}
