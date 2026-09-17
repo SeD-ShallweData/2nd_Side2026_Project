@@ -23,7 +23,7 @@ import {
 import { loadPrompt, withRuntimeContext } from "@/server/promptLoader";
 import { clarificationFallback } from "@/services/chatFallback";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-16-v6";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-17-v7";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -63,7 +63,29 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
     context.ragRetrieval.documents.map((document) => document.citation),
   );
   if (unverified) hits.add("UNVERIFIED_LAW_CITATION");
+  if (context.questionIntent === "company" && context.companyContext) {
+    if (!answer.includes(context.companyContext.company_name)) {
+      hits.add("COMPANY_CONTEXT_MISSING");
+    }
+    const citesCompanySourceLikeLaw = context.policyBaseline.sources.some((source) =>
+      answer.includes(`(${source.name})`)
+      || answer.includes(`근거: ${source.name}`)
+      || answer.includes(`근거: (${source.name})`),
+    );
+    if (citesCompanySourceLikeLaw) hits.add("COMPANY_SOURCE_CITATION_FORMAT");
+  }
   return [...hits];
+}
+
+function replacementBaseline(context: ComparisonContext): ChatResponse {
+  if (
+    context.questionIntent === "company"
+    && context.companyContext
+    && context.policyBaseline.answer_type === "company_context"
+  ) {
+    return context.policyBaseline;
+  }
+  return clarificationFallback(context.policyBaseline);
 }
 
 /** 순위 표기를 지운다. "우선 확인 범위가 ‘상위1%’으로 표시됐습니다" 같은 문장이 대상이다. */
@@ -238,7 +260,7 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
         const completion = await this.client.complete(config, messages);
         const guardrailHits = scanGuardrails(completion.answer, context);
         const replaced = guardrailHits.length > 0;
-        const responseBaseline = replaced ? clarificationFallback(context.policyBaseline) : context.policyBaseline;
+        const responseBaseline = replaced ? replacementBaseline(context) : context.policyBaseline;
         const answer = replaced ? responseBaseline.answer : completion.answer;
         return {
           provider: config.id,

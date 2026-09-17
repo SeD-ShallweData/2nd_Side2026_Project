@@ -82,5 +82,7 @@ describe("RiskInformationCard 임금 공개 경계", () => {
     expect(html).toContain("연계 데이터 내 일치 결과 없음");
     expect(html).toContain("명단 공표 기준일 미수록");
     expect(html).not.toContain("공개 명단 일치 결과 없음");
+    expect(html).toContain("AI에게 묻기: 이 임금 지급 카드에서 무엇을 확인해야 하나요?");
+    expect(html).not.toContain("왜 임금 관련 추가 확인이 필요한가요?");
   });
 });

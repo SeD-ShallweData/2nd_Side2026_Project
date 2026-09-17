@@ -82,16 +82,27 @@ describe("의도와 근거에 따른 상담 경로", () => {
     expect(response.results[0].trace.guardrail_hits).toEqual(["RAG_UNAVAILABLE"]);
     expect(mocks.compare).not.toHaveBeenCalled();
   });
-  it("회사 지표는 법령 검색 실패여도 회사 자료로 생성하며 미선택이면 선택 요청", async () => {
+  it("회사 지표는 노동법을 검색하지 않고 회사 자료로 생성하며 미선택이면 선택 요청", async () => {
     mocks.classify.mockResolvedValue({ intent: "company", topic: "other", status: "classified" });
+    mocks.risk.mockResolvedValue({
+      sources: [
+        { name: "임금 자료", category: "wage" },
+        { name: "산재 자료", category: "safety" },
+      ],
+    });
     const question = "코딩 부서 입사인데 산업 지표가 나에게 적용되나요?";
     const before = await sendComparedChatMessage({ message: question });
     expect(before.results[0].answer).toContain("사업장을 먼저 선택");
     expect(mocks.compare).not.toHaveBeenCalled();
     await sendComparedChatMessage({ message: question, company_id: "C1" });
+    expect(mocks.retrieve).not.toHaveBeenCalled();
     expect(mocks.compare).toHaveBeenCalledWith(expect.objectContaining({
       questionIntent: "company", companyContext: expect.objectContaining({ company_id: "C1" }),
-      ragRetrieval: expect.objectContaining({ status: "no_match" }),
+      policyBaseline: expect.objectContaining({
+        answer: "선택 기업의 임금 위험과 산재 요약",
+        sources: [{ name: "기업 자료", category: "wage" }],
+      }),
+      ragRetrieval: expect.objectContaining({ status: "no_match", reason: "company_context_only" }),
     }));
   });
   it.each([false, true])("노동 검색 매칭은 생성 경로 유지, compare=%s", async (compare) => {

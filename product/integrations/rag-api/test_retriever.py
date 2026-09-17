@@ -28,6 +28,14 @@ class RetrievalPolicyTest(unittest.TestCase):
         )
         self.assertIn("서면 명시 교부", retriever._expand_query("근로계약서를 아직 못 받았어요"))
         self.assertIn("가산임금 지급", retriever._expand_query("포괄임금제면 야근수당을 못 받나요?"))
+        self.assertIn(
+            "연장 야간 근로 가산임금 지급",
+            retriever._expand_query("파이썬 코딩을 밤 10시까지 시키고 돈은 더 안 준대요"),
+        )
+        self.assertEqual(
+            "파이썬 코딩을 밤 10시까지 배우고 싶어요",
+            retriever._expand_query("파이썬 코딩을 밤 10시까지 배우고 싶어요"),
+        )
         self.assertIn("임금체불 진정 입증자료", retriever._expand_query("월급이 밀렸는데 어떤 자료를 준비할까요?"))
 
     def test_filters_special_worker_rules_until_the_query_mentions_them(self):
@@ -89,6 +97,17 @@ class RetrievalPolicyTest(unittest.TestCase):
         ):
             with self.subTest(query=query):
                 self.assertIsNone(retriever._out_of_scope_topic(query, 0.41))
+
+        self.assertIsNone(
+            retriever._out_of_scope_topic(
+                "파이썬 코딩을 밤 10시까지 시키고 돈은 더 안 준대요",
+                0.60,
+            ),
+        )
+        self.assertEqual(
+            "프로그래밍",
+            retriever._out_of_scope_topic("파이썬 코딩을 밤 10시까지 배우고 싶어요", 0.60),
+        )
 
     def test_filters_every_vector_candidate_by_the_distance_threshold(self):
         candidates = [
