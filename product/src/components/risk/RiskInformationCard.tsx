@@ -47,7 +47,11 @@ export function RiskInformationCard(props: CardProps) {
     : validatedFirmSafety
       ? "검증된 사업장 연결 · 사고확률 아님"
       : "개별 사업장 판정 아님";
-  const question = isWage ? "왜 임금 관련 추가 확인이 필요한가요?" : "산업재해 정보는 무엇을 확인해야 하나요?";
+  const question = isWage
+    ? props.data.level === "normal"
+      ? "이 임금 지급 카드에서 무엇을 확인해야 하나요?"
+      : "왜 임금 관련 추가 확인이 필요한가요?"
+    : "산업재해 정보는 무엇을 확인해야 하나요?";
   const unknown = props.data.level === "unknown";
   const unavailable = props.data.availability === "unavailable";
 
@@ -185,7 +189,7 @@ export function RiskInformationCard(props: CardProps) {
         <DataSourceList sources={props.sources} />
       </details>
 
-      <button type="button" className="button button-outline card-action" onClick={() => props.onAsk(question)}>
+      <button type="button" className="button button-outline card-action" aria-label={`AI에게 묻기: ${question}`} onClick={() => props.onAsk(question)}>
         자세히 물어보기 <span aria-hidden="true">→</span>
       </button>
     </article>

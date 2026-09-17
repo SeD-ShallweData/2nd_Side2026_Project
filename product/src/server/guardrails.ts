@@ -157,6 +157,8 @@ export const CHAT_OUTPUT_GUARDRAILS: GuardrailRule[] = [
   { code: "PUBLIC_RISK_VALUE", pattern: /(?:체불|산재|사고|위험)\s*(?:확률|점수|지수|등급|순위|랭킹)\s*(?:은|는|이|가|:|：)?\s*[A-Fa-f가-힣\d.]+|\d+(?:\.\d+)?\s*%[^.\n]{0,20}(?:위험|확률|체불)/i, allowNegated: true },
   { code: "PROMPT_DISCLOSURE", pattern: /시스템\s*프롬프트[는은]?\s*(?:다음|아래|이렇게)|숨은\s*프롬프트[는은]?\s*(?:다음|아래)|#\s*(?:역할|가드레일|형식)(?![가-힣])|\bAuthority\b.{0,40}\bScope\b|system prompt (?:is|as follows)/i },
   { code: "RAW_MODEL_FIELD", pattern: /raw_probability|shap[_ ]?value|\bSHAP\b|model_threshold|internal_score|feature[_ ]?importance/i },
+  { code: "INTERNAL_CONTEXT_DISCLOSURE", pattern: /\b(?:question_intent|company_id|public_signal_result|wage_signal|safety_context|verified_sources|retrieved_labor_law|retrieval_status|retrieval_reason|policy_baseline|required_limitations|suggested_actions)\b/i },
+  { code: "SECRET_DISCLOSURE", pattern: /API[_ ]?KEY\s*[:=]|(?:sk|up)_[A-Za-z0-9_-]{12,}/i },
 ];
 
 /**
