@@ -165,8 +165,13 @@ export function SiteHeader() {
         <p className="shell field-error" role="alert">{logoutError}</p>
       ) : null}
       {!isInspector && pathname !== "/chat" ? (
-        <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리와 상담 바로가기">
-          <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} /> 돈워리와 상담
+        <Link href="/chat" className="consumer-floating-chat" aria-label="노무 전문 상담가 돈워리와 대화하기">
+          <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />
+          <span className="consumer-floating-chat-label">
+            노무 전문 상담가
+            <br />
+            돈워리와 대화하기
+          </span>
         </Link>
       ) : null}
       <nav className="consumer-mobile-nav" aria-label="모바일 주요 메뉴">
