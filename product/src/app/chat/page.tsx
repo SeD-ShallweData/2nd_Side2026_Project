@@ -32,7 +32,8 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
           </h1>
           <p>
             근로기준법 조문과 공식 자료를 먼저 찾아본 뒤에 답합니다. 지어낸 말이 섞이지 않도록
-            RAG 구조로 설계해, 근거를 찾지 못하면 찾지 못했다고 말합니다.{" "}
+            RAG 구조로 설계해, 근거를 찾지 못하면 찾지 못했다고 말합니다.
+            <br />
             {executionMode === "dual_api"
               ? "두 모델의 답을 나란히 비교해 볼 수도 있습니다."
               : "필요한 공식 정보 도구만 골라 연결해 한 답변으로 정리합니다."}{" "}
