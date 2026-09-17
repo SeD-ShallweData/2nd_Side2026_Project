@@ -909,17 +909,24 @@ summary:focus-visible {
   box-shadow: 0 0 0 0.25rem rgb(255 214 0 / 22%);
 }
 
-.search-input-row input {
+/* 선택자를 길게 쓴 이유: 위쪽 `.search-form input:not([type=...])` 규칙이
+   명시도가 높아 테두리를 다시 그려 버린다. 같은 형태로 맞춰 이긴다. */
+.search-form .search-input-row input:not([type="checkbox"]):not([type="radio"]) {
   min-width: 0;
   width: 100%;
   height: 100%;
-  border: 0;
-  background: transparent;
+  border: none;
+  background-color: transparent;
   color: var(--ink);
   padding: 0;
+  /* 브라우저 기본 스타일과 자동완성 배경까지 눌러 둔다. 테두리는 바깥
+     .search-input-field 하나만 그린다. */
+  appearance: none;
+  box-shadow: none;
+  outline: none;
 }
 
-.search-input-row input:focus {
+.search-form .search-input-row input:not([type="checkbox"]):not([type="radio"]):focus {
   outline: 0;
 }
 
@@ -955,11 +962,10 @@ summary:focus-visible {
   justify-content: center;
   gap: 6px;
   border: 1px solid var(--line-strong);
-  border-radius: 10px;
   background: var(--white);
   color: var(--ink-soft);
   padding: 7px 10px;
-  font-size: 0.76rem;
+  font-size: 1rem;   /* 검색 버튼은 크기를 따로 안 주고 본문(1rem)을 물려받는다. 나란히 서므로 같은 값으로 맞춘다. */
   font-weight: 850;
   cursor: pointer;
   transition: border 160ms ease, background 160ms ease;
@@ -4673,3 +4679,50 @@ summary:focus-visible {
   .search-pagination > .button { min-height: 40px; padding-inline: 9px; }
   .search-pagination .pagination-page { min-width: 105px; }
 }
+
+/* ── 지역 지도 ──────────────────────────────────────────────
+   사업장 수를 노랑 한 색의 진하기로만 나타낸다. 색을 여러 개 쓰면 지역마다
+   다른 뜻이 있는 것처럼 읽힌다. 여기서 다른 것은 양뿐이다. */
+.region-map { display: grid; justify-items: center; gap: 0.75rem; margin-top: 0.5rem; }
+.region-map-canvas { width: 100%; max-width: 27rem; height: auto; }
+
+.region-map-area {
+  fill: var(--surface);
+  stroke: var(--white);
+  stroke-width: 0.8;
+  transition: fill 160ms ease;
+}
+.region-map-area[data-level="1"] { fill: #fff6bd; }
+.region-map-area[data-level="2"] { fill: #ffe98a; }
+.region-map-area[data-level="3"] { fill: #ffd600; }
+.region-map-area[data-level="4"] { fill: #e0b800; }
+
+/* 자료가 있는 지역만 누를 수 있다. 없는 지역은 커서도 바뀌지 않는다. */
+.region-map-area:not([aria-disabled="true"]) { cursor: pointer; }
+.region-map-area:not([aria-disabled="true"]):hover { fill: var(--brand-deep); }
+.region-map-area:focus-visible { outline: 0; stroke: var(--ink); stroke-width: 2.4; }
+.region-map-area[data-selected="true"] { stroke: var(--ink); stroke-width: 2.4; }
+
+.region-map-label {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 850;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.region-map-count {
+  fill: var(--ink-soft);
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.region-map-legend { display: flex; align-items: center; gap: 0.375rem; color: var(--muted); font-size: 0.76rem; font-weight: 800; }
+.region-map-legend i { width: 1.25rem; height: 0.625rem; border-radius: 0.1875rem; }
+.region-map-legend i[data-level="1"] { background: #fff6bd; }
+.region-map-legend i[data-level="2"] { background: #ffe98a; }
+.region-map-legend i[data-level="3"] { background: #ffd600; }
+.region-map-legend i[data-level="4"] { background: #e0b800; }
+
+.region-map-note { margin: 0; color: var(--muted); font-size: 0.76rem; }
