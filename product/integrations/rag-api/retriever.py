@@ -485,7 +485,26 @@ def _expand_query(query):
     if any(keyword in query for keyword in ("임금", "월급", "급여", "수당", "체불")):
         if any(keyword in query for keyword in ("자료", "증거", "증빙", "준비", "신고", "진정")):
             expansions.append("임금체불 진정 입증자료 근로계약서 급여자료 근로시간 자료")
+    if _looks_like_unpaid_late_work(query):
+        expansions.append("연장 야간 근로 가산임금 지급 근로기준법 제56조")
     return f"{query} {' '.join(expansions)}" if expansions else query
+
+
+def _looks_like_unpaid_late_work(query):
+    return (
+        any(keyword in query for keyword in ("밤", "늦게", "야근", "초과근무", "연장근로"))
+        and any(keyword in query for keyword in ("시키", "남으", "일하", "근무"))
+        and any(keyword in query for keyword in ("돈은 더 안", "돈을 더 안", "돈 더 안", "수당을 안", "수당은 안", "추가 수당"))
+    )
+
+
+def _has_labor_request_signal(query):
+    if any(keyword in query for keyword in (
+        "임금체불", "임금이 밀", "월급이 밀", "월급을 안", "급여를 안", "수당을 안",
+        "근로계약", "연차", "휴게시간", "해고", "퇴직금", "야근수당", "연장근로",
+    )):
+        return True
+    return _looks_like_unpaid_late_work(query)
 
 
 def _narrow_allowed(meta, query):
@@ -509,6 +528,8 @@ def _out_of_scope_topic(query, top_distance):
     for topic in OUT_OF_SCOPE_TOPICS:
         if any(keyword in query for keyword in topic["keywords"]):
             # Topic hints must not discard otherwise eligible labor evidence.
+            if topic["name"] in NON_LABOR_TOPICS and _has_labor_request_signal(query):
+                continue
             if (topic["name"] in NON_LABOR_TOPICS and top_distance is not None
                     and top_distance <= NO_MATCH_DISTANCE_THRESHOLD):
                 continue
