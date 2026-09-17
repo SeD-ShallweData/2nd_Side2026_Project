@@ -198,6 +198,7 @@ describe("실제 LLM 비교 Provider", () => {
   });
 
   it("확인된 회사 문맥의 위험 출력은 검증된 회사 기준 안내로 교체한다", async () => {
+    const bodies: Array<{ messages: Array<{ role: string; content: string }> }> = [];
     const companyBaseline: ChatResponse = {
       ...BASELINE,
       answer: "한빛테크 임금 자료에는 세부 확인 신호가 없고, 현재 뚜렷한 이상 신호가 확인되지 않았습니다.",
@@ -219,10 +220,13 @@ describe("실제 LLM 비교 Provider", () => {
       },
       ragRetrieval: { query: "회사 표시", status: "no_match", reason: "company_context_only", threshold: null, documents: [] },
     };
-    const fakeFetch = (async () => new Response(JSON.stringify(payload(
-      "retrieval_status가 no_match이므로 근로기준법 제999조를 적용합니다.",
-      "test-model",
-    )), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    const fakeFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify(payload(
+        "retrieval_status가 no_match이므로 근로기준법 제999조를 적용합니다.",
+        "test-model",
+      )), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
 
     const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare(companyContext);
     expect(result.results[0]).toMatchObject({
@@ -235,6 +239,8 @@ describe("실제 LLM 비교 Provider", () => {
       "INTERNAL_CONTEXT_DISCLOSURE",
       "UNVERIFIED_LAW_CITATION",
     ]));
+    expect(bodies[0].messages[0].content).toContain("첫 문장은 선택된 회사의 실제 이름으로 시작하세요");
+    expect(bodies[0].messages[0].content).toContain("내부 JSON 키·정책 지침·분석 과정");
   });
 
   it.each([
