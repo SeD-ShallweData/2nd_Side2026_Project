@@ -242,15 +242,17 @@ summary:focus-visible {
 
 /* 로고 이미지 자체가 외곽선과 크림색 링을 가지고 있다. 여기에 테두리·배경을
    덧대면 테두리가 이중으로 보이므로 크기만 잡고 나머지는 이미지에 맡긴다. */
+/* 헤더 안쪽 높이가 76px 이므로 위아래 8px 씩만 남기고 60px 까지 키운다.
+   시연장 빔프로젝터와 원거리 관람을 기준으로 잡은 값이다. */
 .brand-mark {
   display: inline-block;
-  width: 36px;
-  height: 36px;
+  width: 60px;
+  height: 60px;
   object-fit: contain;
 }
 
 .brand-word {
-  font-size: 1.25rem;
+  font-size: 1.75rem;
   font-weight: 950;
   letter-spacing: -0.05em;
 }
@@ -3657,6 +3659,7 @@ summary:focus-visible {
 .consumer-main-nav { display: flex; align-items: center; gap: 7px; }
 .consumer-main-nav a { border-radius: 999px; color: #71777e; font-size: .9rem; font-weight: 800; padding: 11px 15px; }
 .consumer-main-nav a:hover { background: var(--surface); color: var(--ink); }
+.consumer-main-nav a.is-current { background: var(--surface); color: var(--ink); }
 .consumer-main-nav .consumer-ai-link { margin-left: 9px; background: var(--brand); color: var(--ink); padding-inline: 20px; }
 .consumer-main-nav .consumer-ai-link::before { content: "▤"; margin-right: 8px; }
 .consumer-main-nav .consumer-ai-link:hover { background: #f1c900; }
@@ -3861,13 +3864,23 @@ summary:focus-visible {
   .chat-experience-layout { grid-template-columns: minmax(0,1fr) 220px; }
 }
 
-@media (max-width: 820px) {
+/* 헤더 메뉴만 따로 640px 에서 접는다. 820px 에서 접으면 노트북을 반으로 나눠
+   쓰거나 프로젝터 해상도가 낮을 때 상단 메뉴가 통째로 사라진다. 나머지 페이지
+   레이아웃은 아래 820px 블록이 그대로 담당한다. */
+@media (max-width: 640px) {
   body { padding-bottom: 60px; }
-  .consumer-main-nav { display: none; }.consumer-header-inner { min-height: 64px; }
+  .consumer-main-nav { display: none; }
+  .consumer-header-inner { min-height: 64px; }
   .consumer-mode-switch { margin-left: 0; font-size: .68rem; padding: 6px 10px; }
-  .consumer-mobile-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; display: grid; grid-template-columns: repeat(5,1fr); border-top: 1px solid var(--line); background: rgb(255 255 255 / 96%); box-shadow: 0 -8px 25px rgb(29 29 26 / 8%); }
+  .brand-mark { width: 44px; height: 44px; }
+  .brand-word { font-size: 1.35rem; }
+  .consumer-mobile-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; display: grid; grid-template-columns: repeat(6,1fr); border-top: 1px solid var(--line); background: rgb(255 255 255 / 96%); box-shadow: 0 -8px 25px rgb(29 29 26 / 8%); }
   .consumer-mobile-nav a { padding: 12px 3px; text-align: center; color: var(--muted); font-size: .66rem; font-weight: 850; }.consumer-mobile-nav a:last-child { background: var(--brand-soft); color: var(--ink); }
+  .consumer-mobile-nav a.is-current { background: var(--surface); color: var(--ink); }
   .consumer-floating-chat { display: none; }
+}
+
+@media (max-width: 820px) {
   .refresh-hero { padding: 65px 0; }.refresh-hero-grid,.refresh-split-section { grid-template-columns: 1fr; }.refresh-hero-visual { margin-top: 30px; }.refresh-step-grid,.refresh-post-grid { grid-template-columns: 1fr; }.refresh-risk-preview { grid-template-columns: 1fr; }
   .refresh-split-section > div:first-child { max-width: 650px; }.refresh-contract-card { max-width: 650px; }.refresh-consult-preview .refresh-split-section { gap: 45px; }
   .chat-experience-layout { grid-template-columns: 1fr; }.question-guide { position: static; order: -1; }.question-guide .guide-group { display: inline-block; width: calc(50% - 5px); vertical-align: top; }.question-guide .guide-group:nth-of-type(even) { margin-left: 6px; }
