@@ -33,13 +33,20 @@ export async function searchCompanies(
   filters: CompanySearchFilters = {},
 ): Promise<CompanySearchResponse> {
   const normalizedQuery = query.trim();
-  if (normalizedQuery.length < 1 || normalizedQuery.length > 100) {
+  const normalizedFilters = normalizeFilters(filters);
+  /*
+   * 검색어 없이 지역·업종만으로도 찾을 수 있다. 지도에서 지역을 고르는 길이
+   * 생기면서 필요해졌다. 다만 아무 조건 없이 전체를 훑는 것은 계속 막는다 —
+   * 그것은 검색이 아니라 명부 전체 내려받기다.
+   */
+  const hasFilter = Boolean(normalizedFilters.region || normalizedFilters.industry);
+  if (normalizedQuery.length > 100 || (normalizedQuery.length < 1 && !hasFilter)) {
     throw new ServiceError(
       "VALIDATION_ERROR",
       "검색어를 확인해 주세요.",
       400,
       false,
-      [{ field: "q", reason: "검색어는 한 글자 이상 100자 이하여야 합니다." }],
+      [{ field: "q", reason: "검색어는 100자 이하여야 하고, 비우려면 지역이나 업종을 골라야 합니다." }],
     );
   }
   if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
@@ -61,7 +68,6 @@ export async function searchCompanies(
     );
   }
 
-  const normalizedFilters = normalizeFilters(filters);
   if (getCompanyDataMode() === "mock") await delay(getMockDelayMs());
   const repository = getCompanyRepository();
   const [items, total] = await Promise.all([
