@@ -33,9 +33,21 @@ const ADMIN: SessionUserDto = {
   role: "admin",
 };
 
+/*
+ * 제보 목록을 읽는 계정. 근로감독 화면은 admin 이 연다 — 배치·ML 운영 기능이
+ * 같은 화면에 있어서다(server/auth/inspectorAccess.ts 참고).
+ */
 const INSPECTOR: SessionUserDto = {
   user_id: "10000000-0000-4000-8000-000000000003",
   email: "inspector@mock.donworry.local",
+  display_name: "운영 관리자(근로감독 화면)",
+  role: "admin",
+};
+
+/** 감독 화면 권한이 없는 계정. 예전에는 이 역할이 목록을 읽었다. */
+const LEGACY_INSPECTOR: SessionUserDto = {
+  user_id: "10000000-0000-4000-8000-000000000004",
+  email: "legacy-inspector@mock.donworry.local",
   display_name: "근로감독관",
   role: "inspector",
 };
@@ -329,10 +341,10 @@ describe("현장 제보 작성 계약", () => {
     }));
     expect(userList.status).toBe(403);
 
-    const adminList = await listTips(new Request("http://localhost/api/worksite-tips", {
-      headers: { cookie: await cookieFor(ADMIN) },
+    const legacyList = await listTips(new Request("http://localhost/api/worksite-tips", {
+      headers: { cookie: await cookieFor(LEGACY_INSPECTOR) },
     }));
-    expect(adminList.status).toBe(403);
+    expect(legacyList.status).toBe(403);
   });
 
   it("다른 출처의 작성 요청을 저장 전에 차단한다", async () => {

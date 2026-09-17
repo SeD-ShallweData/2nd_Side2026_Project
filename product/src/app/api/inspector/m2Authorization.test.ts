@@ -167,7 +167,7 @@ describe.each(protectedEndpoints)("M2 $name 권한", ({ invoke, service }) => {
   it.each([
     ["비로그인", null],
     ["일반 사용자", "user-token"],
-    ["관리자", "admin-token"],
+    ["근로감독관", "inspector-token"],
   ])("%s 요청을 서비스 실행 전에 403으로 차단한다", async (_label, token) => {
     const response = await invoke(token);
 
@@ -178,8 +178,9 @@ describe.each(protectedEndpoints)("M2 $name 권한", ({ invoke, service }) => {
     expect(service).not.toHaveBeenCalled();
   });
 
-  it("근로감독관 요청만 서비스로 전달한다", async () => {
-    const response = await invoke("inspector-token");
+  it("운영 관리자 요청만 서비스로 전달한다", async () => {
+    // 이 화면은 배치·ML 운영 기능이라 admin 이 연다. 근로감독관 계정은 막힌다.
+    const response = await invoke("admin-token");
 
     expect(response.status).toBe(200);
     expect(service).toHaveBeenCalledOnce();
