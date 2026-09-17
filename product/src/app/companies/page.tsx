@@ -13,8 +13,8 @@ export default function CompaniesPage() {
     <div className="page-section search-page">
       <div className="shell narrow-shell">
         <div className="page-heading">
-          <span className="eyebrow">사업장 신뢰 정보</span>
-          <h1>어느 사업장을 확인할까요?</h1>
+          <span className="eyebrow">AI 분석 기반 사업장 신뢰 정보</span>
+          <h1>궁금한 업장을 검색해주세요!</h1>
           <p>회사명을 검색한 뒤 지역과 업종을 비교해 정확한 사업장을 직접 선택하세요.</p>
         </div>
         <DataModeNotice

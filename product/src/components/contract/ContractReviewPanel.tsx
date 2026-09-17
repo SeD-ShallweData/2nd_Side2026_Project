@@ -118,9 +118,6 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
             <p>PDF, PNG, JPG · 최대 10MB</p>
           </div>
         </div>
-        <label className="button button-outline" htmlFor={inputId}>
-          파일 찾아보기
-        </label>
         <input
           ref={inputRef}
           id={inputId}
@@ -142,7 +139,12 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
           </div>
         ) : null}
         <div className="contract-actions">
-          <button type="submit" className="button button-dark" disabled={loading || !file}>
+          {/* 고르기와 검토하기는 한 줄에 나란히 선다. 둘 중 하나를 누르면 되는
+              자리라 위아래로 쌓으면 순서가 있는 것처럼 읽힌다. */}
+          <label className="button button-dark" htmlFor={inputId}>
+            파일 찾아보기
+          </label>
+          <button type="submit" className="button button-outline" disabled={loading || !file}>
             {loading ? "검토 중" : "선택한 파일 검토"}
           </button>
           {dataMode === "mock" ? (
