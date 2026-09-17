@@ -184,9 +184,20 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
       guardrailHits: [intentDecision.intent === "off_topic" ? "INTENT_OUT_OF_SCOPE" : "INTENT_CLARIFICATION"],
     });
   }
-  Object.assign(policyBaseline, clarificationFallback(policyBaseline));
+  if (intentDecision.intent !== "company") {
+    Object.assign(policyBaseline, clarificationFallback(policyBaseline));
+  }
   policyBaseline.answer_type = intentDecision.intent === "company" ? "company_context" : "general_guidance";
-  const ragRetrieval = await retrieveLaborLawContext(rewrite.query);
+  const ragRetrieval: RagRetrievalResult = intentDecision.intent === "company"
+    ? {
+        query: rewrite.query,
+        status: "no_match",
+        reason: "company_context_only",
+        topic: null,
+        threshold: null,
+        documents: [],
+      }
+    : await retrieveLaborLawContext(rewrite.query);
 
   if (ragRetrieval.status === "matched") {
     policyBaseline.sources = ragRetrieval.documents.map((document) => document.source);
@@ -203,7 +214,6 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
       guardrailHits: [ragRetrieval.status === "no_match" ? "RAG_NO_MATCH" : "RAG_UNAVAILABLE"],
     });
   } else {
-    policyBaseline.sources = [];
     policyBaseline.limitations = [
       ...policyBaseline.limitations,
       ragRetrieval.status === "unavailable"
@@ -227,7 +237,6 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
       size_label: company.size_label,
       risk,
     };
-    if (ragRetrieval.status !== "matched") policyBaseline.sources = risk.sources;
   }
 
   const provider = new DualLlmChatProvider(

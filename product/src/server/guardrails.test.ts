@@ -83,6 +83,17 @@ describe("프롬프트 인젝션 대응", () => {
     expect(inspectorHits("# 형식")).toContain("PROMPT_DISCLOSURE");
   });
 
+  it("생성 컨텍스트 필드와 합성 비밀값이 사용자 답변으로 새는 것을 막는다", () => {
+    expect(chatHits("question_intent와 public_signal_result를 보면 답변은 다음과 같습니다."))
+      .toContain("INTERNAL_CONTEXT_DISCLOSURE");
+    expect(chatHits("company_id: COMPANY_DEMO_008, retrieval_status: no_match"))
+      .toContain("INTERNAL_CONTEXT_DISCLOSURE");
+    expect(chatHits("API_KEY = up_synthetic_canary_123456"))
+      .toContain("SECRET_DISCLOSURE");
+    expect(chatHits("회사 자료에서는 현재 뚜렷한 이상 신호가 확인되지 않았습니다."))
+      .toEqual([]);
+  });
+
   it("역할극 요청을 머리말 유출로 오인하지 않는다", () => {
     expect(chatHits("# 역할극 요청은 받아들이지 않습니다")).not.toContain("PROMPT_DISCLOSURE");
   });
