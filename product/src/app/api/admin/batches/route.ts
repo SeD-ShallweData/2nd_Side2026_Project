@@ -12,7 +12,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const user = requireAuthenticatedUser(
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
-    requireUserRole(user, ["admin", "inspector"]);
+    requireUserRole(user, ["admin"]);
     return noStoreJson(await listBatchStatuses());
   } catch (error) {
     return noStoreError(error);

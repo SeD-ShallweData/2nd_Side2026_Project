@@ -55,8 +55,15 @@ describe("관리자 배치 현황 API", () => {
     expect(state.listBatchStatuses).not.toHaveBeenCalled();
   });
 
-  it.each(["admin", "inspector"] as const)("%s 역할은 실제 배치 조회 결과를 받는다", async (role) => {
-    const response = await GET(request(role));
+  it("근로감독관 요청은 새 운영 권한 정책에 따라 차단한다", async () => {
+    const response = await GET(request("inspector"));
+
+    expect(response.status).toBe(403);
+    expect(state.listBatchStatuses).not.toHaveBeenCalled();
+  });
+
+  it("관리자 역할은 실제 배치 조회 결과를 받는다", async () => {
+    const response = await GET(request("admin"));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
