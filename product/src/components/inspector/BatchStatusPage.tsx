@@ -37,7 +37,7 @@ export function BatchStatusPage() {
     <main className="shell inspector-content batch-status-page">
       <div className="inspector-page-heading">
         <div>
-          <span className="eyebrow">읽기 전용 · ML 운영 상태</span>
+          <span className="eyebrow">ML 운영 상태</span>
           <h1>배치 현황</h1>
           <p>서비스가 참조하는 ML 배치와 과거 적재 이력을 확인합니다.</p>
         </div>
