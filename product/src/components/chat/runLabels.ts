@@ -33,6 +33,9 @@ export function providerRunStatusLabel(
     case "guardrail_replaced":
       return "정책 교체";
     case "policy_short_circuit":
+      if (guardrailHits?.includes("INTENT_OUT_OF_SCOPE")) return "상담 범위 안내";
+      if (guardrailHits?.includes("INTENT_CLARIFICATION")) return "질문 확인 필요";
+      if (guardrailHits?.includes("RAG_UNAVAILABLE")) return "근거 검색 연결 제한";
       return isEmergencyRun(guardrailHits) ? "긴급정책 즉시 응답" : "근거 없음 · 정책 응답";
     default:
       return "정책 대체 응답";
@@ -75,11 +78,20 @@ export function executionModeCopy(
       summary: "긴급 상황은 모델 응답을 기다리지 않고 공통 안전 안내를 즉시 표시합니다.",
     };
   }
+  if (guardrailHits?.includes("INTENT_OUT_OF_SCOPE")) {
+    return { kicker: "상담 범위 안내", summary: "질문의 요청 목적에 따라 이 상담에서 다루는 범위를 안내합니다." };
+  }
+  if (guardrailHits?.includes("INTENT_CLARIFICATION")) {
+    return { kicker: "질문 확인 필요", summary: "확인하려는 상황이나 사업장을 알려주시면 상담을 이어갈 수 있습니다." };
+  }
+  if (guardrailHits?.includes("RAG_UNAVAILABLE")) {
+    return { kicker: "근거 검색 연결 제한", summary: "공식 근거 검색에 연결하지 못해 답변을 확인할 수 없습니다." };
+  }
 
   // 무엇을 답했는지가 아니라 무엇을 하지 않았는지를 적는다. 근거 없이 모델을 부르지
   // 않는 것이 정책이므로(POL-08), 그 사실 자체가 사용자에게 필요한 정보다.
   return {
     kicker: "공식 근거 없음 · 정책 응답",
-    summary: "공식 근거를 찾지 못해 모델을 호출하지 않고, 정책 기준 답변을 그대로 표시합니다.",
+    summary: "공식 근거를 찾지 못해 상세 답변 대신 추가 확인을 요청합니다.",
   };
 }
