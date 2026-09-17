@@ -216,9 +216,11 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
   } else {
     policyBaseline.limitations = [
       ...policyBaseline.limitations,
-      ragRetrieval.status === "unavailable"
-        ? "공식 노동법 검색 서비스에 연결하지 못해 확인된 법령 근거가 없습니다. 회사 자료의 의미와 한계만 설명합니다."
-        : "질문과 직접 관련된 법령 근거를 찾지 못했습니다. 회사 자료의 의미와 한계만 설명합니다.",
+      ragRetrieval.reason === "company_context_only"
+        ? "이 질문은 회사 공개 자료의 의미를 설명하며 별도의 노동법 검색 근거를 붙이지 않습니다."
+        : ragRetrieval.status === "unavailable"
+          ? "공식 노동법 검색 서비스에 연결하지 못해 확인된 법령 근거가 없습니다. 회사 자료의 의미와 한계만 설명합니다."
+          : "질문과 직접 관련된 법령 근거를 찾지 못했습니다. 회사 자료의 의미와 한계만 설명합니다.",
     ];
   }
   let companyContext;

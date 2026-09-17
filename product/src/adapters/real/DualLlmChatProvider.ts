@@ -23,7 +23,7 @@ import {
 import { loadPrompt, withRuntimeContext } from "@/server/promptLoader";
 import { clarificationFallback } from "@/services/chatFallback";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-17-v7";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-17-v8";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -170,10 +170,15 @@ function buildSystemPrompt(context: ComparisonContext): string {
     suggested_actions: context.policyBaseline.suggested_actions,
   };
 
+  const companyOutputContract = context.questionIntent === "company" && context.companyContext
+    ? "이번 요청의 출력 계약: 답변 본문만 출력하고 첫 문장은 선택된 회사의 실제 이름으로 시작하세요. 회사 공개 자료에 없는 원인은 만들지 말고, 내부 JSON 키·정책 지침·분석 과정·법령 검색 실패 설명은 출력하지 마세요."
+    : "";
+
   return withRuntimeContext(loadPrompt("chat/system"), [
     `상담 모드: ${context.request.chat_mode}`,
     `정책 버전: ${CHAT_POLICY_VERSION}`,
     `제공 컨텍스트(JSON): ${JSON.stringify(safeContext)}`,
+    companyOutputContract,
   ]);
 }
 

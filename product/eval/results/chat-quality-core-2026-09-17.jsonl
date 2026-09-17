@@ -20,3 +20,6 @@
 {"record_type":"case","phase":"candidate","id":"D1","intent":"unclear","execution_mode":"policy_short_circuit","rag_reason":"intent_short_circuit","company_context_attached":false,"outcome":"pass"}
 {"record_type":"case","phase":"candidate","id":"G1","intent":"company","execution_mode":"single_api","provider_status":"success","rag_reason":"company_context_only","company_context_attached":true,"guardrail_hits":[],"outcome":"pass"}
 {"record_type":"case","phase":"candidate","id":"D2","intent":"unclear","execution_mode":"policy_short_circuit","rag_reason":"intent_short_circuit","company_context_attached":false,"outcome":"pass"}
+{"record_type":"run","phase":"candidate_v8","base_sha":"85000dc","data_mode":"mock","rag":"local_real","llm":"upstage_real","real_database":false,"browser_verified":false,"prompt_policy_version":"donworry-chat-policy-2026-09-17-v8"}
+{"record_type":"repeat_summary","phase":"candidate_v8","id":"A1","attempts":3,"raw_generation_passed":2,"final_response_passed":3,"guardrail_replaced":1,"remaining_guardrail_hits":["UNVERIFIED_LAW_CITATION"]}
+{"record_type":"repeat_summary","phase":"candidate_v8","id":"A-normal-card","attempts":3,"raw_generation_passed":3,"final_response_passed":3,"guardrail_replaced":0,"remaining_guardrail_hits":[]}

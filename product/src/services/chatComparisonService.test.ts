@@ -101,6 +101,7 @@ describe("의도와 근거에 따른 상담 경로", () => {
       policyBaseline: expect.objectContaining({
         answer: "선택 기업의 임금 위험과 산재 요약",
         sources: [{ name: "기업 자료", category: "wage" }],
+        limitations: ["이 질문은 회사 공개 자료의 의미를 설명하며 별도의 노동법 검색 근거를 붙이지 않습니다."],
       }),
       ragRetrieval: expect.objectContaining({ status: "no_match", reason: "company_context_only" }),
     }));
