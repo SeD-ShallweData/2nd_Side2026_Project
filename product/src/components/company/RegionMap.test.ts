@@ -90,3 +90,19 @@ describe("사업장 수 진하기", () => {
     expect(regionShadeLevels([{ value: "A", count: 0 }]).size).toBe(0);
   });
 });
+
+describe("지도 여백", () => {
+  it("화면 양끝에 점처럼 남는 섬이 없다", () => {
+    // 인천 서해 먼바다 섬과 경북 울릉도·독도는 본토에서 멀리 떨어져 있어
+    // 지도 좌우에 점 하나로만 찍히고, 그만큼 본토가 작아진다.
+    const xs = KOREA_REGIONS.flatMap((region) =>
+      [...region.path.matchAll(/([\d.]+) [\d.]+/g)].map((match) => Number(match[1])),
+    );
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+
+    // 본토가 viewBox 를 꽉 채운다 — 양옆에 남는 여백이 10 단위를 넘지 않는다.
+    expect(minX).toBeLessThan(10);
+    expect(KOREA_MAP_VIEWBOX.width - maxX).toBeLessThan(10);
+  });
+});
