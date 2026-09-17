@@ -872,30 +872,37 @@ summary:focus-visible {
   box-shadow: 0 0 0 4px rgb(255 214 0 / 22%);
 }
 
+/* 입력칸 · 필터 · 검색 버튼을 한 줄에 놓는다. 셋 사이 간격은 --search-gap
+   하나로 관리하고, 좁아지면 입력칸만 줄어들고 버튼은 제 크기를 지킨다. */
 .search-input-row {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 1fr auto;
-  align-items: start;
-}
-
-/* 돋보기와 입력칸을 한 상자 안에 나란히 둔다. 겹쳐 놓으면 입력한 글자나
-   안내 문구와 부딪힌다. */
-.search-input-field {
+  --search-gap: 0.625rem;   /* 10px */
+  --search-control-height: 3.5rem;
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 56px;
+  gap: var(--search-gap);
+  flex-wrap: wrap;
+}
+
+/* 돋보기와 입력칸을 한 상자 안에 나란히 둔다. 겹쳐 놓으면 안내 문구
+   '예: 건설, 한빛테크' 의 첫 글자와 부딪힌다. */
+.search-input-field {
+  display: flex;
+  flex: 1 1 16rem;
+  min-width: 0;
+  align-items: center;
+  gap: var(--search-gap);
+  height: var(--search-control-height);
   border: 1px solid var(--line-strong);
-  border-radius: 14px;
+  border-radius: 0.875rem;
   background: var(--surface-warm);
-  padding: 0 18px;
+  padding-block: 0;
+  padding-inline: 1.125rem;
   transition: border 160ms ease, box-shadow 160ms ease;
 }
 
 .search-input-field:focus-within {
   border-color: var(--ink);
-  box-shadow: 0 0 0 4px rgb(255 214 0 / 22%);
+  box-shadow: 0 0 0 0.25rem rgb(255 214 0 / 22%);
 }
 
 .search-input-row input {
@@ -920,25 +927,26 @@ summary:focus-visible {
   line-height: 1;
 }
 
-/* 필터(좌)와 검색(우)을 같은 크기로 나란히 놓는다. */
+/* 필터와 검색은 같은 크기로 입력칸 오른쪽에 이어 붙는다. */
 .search-action-stack {
-  display: grid;
-  gap: 8px;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(104px, 1fr);
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--search-gap);
 }
 
 .search-action-stack > .button,
 .search-action-stack > .search-filter-toggle {
-  min-height: 56px;
-  height: 56px;
+  width: 6.5rem;
+  height: var(--search-control-height);
+  min-height: var(--search-control-height);
   margin: 0;
+  padding-block: 0;
+  padding-inline: 0.75rem;
 }
 
 .search-filter-toggle {
   display: flex;
-  min-height: 36px;
-  border-radius: 14px;
+  border-radius: 0.875rem;
   align-items: center;
   justify-content: center;
   gap: 6px;
@@ -3569,12 +3577,19 @@ summary:focus-visible {
     min-height: 0;
   }
 
-  .search-input-row {
-    grid-template-columns: 1fr;
+  /* 좁아지면 입력칸이 한 줄을 다 쓰고, 필터와 검색이 아랫줄을 반씩 나눠 갖는다. */
+  .search-input-field {
+    flex-basis: 100%;
   }
 
-  .search-input-row .button {
-    width: 100%;
+  .search-action-stack {
+    flex: 1 1 100%;
+  }
+
+  .search-action-stack > .button,
+  .search-action-stack > .search-filter-toggle {
+    flex: 1 1 0;
+    width: auto;
   }
 
   .mock-banner,
