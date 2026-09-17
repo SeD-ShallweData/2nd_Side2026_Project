@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export function LandingHero() {
@@ -12,8 +13,11 @@ export function LandingHero() {
           </h1>
           <p>사업장의 공개 정보부터 계약서, 노동 상담까지. 막막했던 확인을 한곳에서 시작하세요.</p>
           <div className="refresh-button-row">
-            <Link href="/companies" className="button button-dark button-large">무료로 위험카드 보기 <span aria-hidden="true">→</span></Link>
-            <Link href="/chat" className="button button-light button-large">AI 상담 먼저 해보기</Link>
+            <Link href="/companies" className="button button-dark button-large">궁금한 사업장의 위험요소 보러가기 <span aria-hidden="true">→</span></Link>
+            <Link href="/chat" className="button button-ai button-large consult-cta">
+              <Image src="/brand/logo.png" alt="" width={192} height={192} />
+              AI 챗봇 돈워리에게 상담 해보기
+            </Link>
           </div>
           <dl className="refresh-hero-facts">
             <div><dt>위험 정보</dt><dd>두 카드로 분리</dd></div>
