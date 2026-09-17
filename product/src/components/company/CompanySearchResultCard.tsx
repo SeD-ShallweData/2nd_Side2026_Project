@@ -10,9 +10,12 @@ const MATCH_LABEL = {
 export function CompanySearchResultCard({
   company,
   onSelect,
+  query = "",
 }: {
   company: CompanySearchResult;
   onSelect: (companyId: string) => void;
+  /** 이름으로 찾은 것이 아니면 비어 있다. 일치 표시를 붙일지 정하는 데 쓴다. */
+  query?: string;
 }) {
   return (
     <article className="company-result-card">
@@ -23,7 +26,8 @@ export function CompanySearchResultCard({
         <div>
           <div className="company-title-row">
             <h3>{company.company_name}</h3>
-            <span className="match-label">{MATCH_LABEL[company.match_type]}</span>
+            {/* 지역만 골라 찾은 결과에는 이름 일치 여부가 없다. 검색어가 있을 때만 붙인다. */}
+            {query ? <span className="match-label">{MATCH_LABEL[company.match_type]}</span> : null}
           </div>
           <dl className="company-meta-list">
             <div>
