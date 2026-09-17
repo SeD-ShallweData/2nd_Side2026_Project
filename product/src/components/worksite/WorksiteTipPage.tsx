@@ -1,7 +1,6 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
 import type { SessionResponse } from "@/app/api/auth/authApiContract";
 import type {
   WorksiteTipCategory,
@@ -25,7 +24,6 @@ function SessionGate({ session, onRetry }: { session: SessionResponse; onRetry: 
       <div className="worksite-state-card">
         <strong>로그인 후 현장 신고를 접수할 수 있습니다.</strong>
         <p>제보 내용과 사진은 공개 커뮤니티에 게시되지 않고 근로감독관 확인용으로만 전달됩니다.</p>
-        <Link className="button button-dark" href="/">홈으로 이동</Link>
       </div>
     );
   }
@@ -199,6 +197,6 @@ export function WorksiteTipPage() {
   }, [retry]);
 
   return (
-    <div className="page-section worksite-page"><div className="shell narrow-shell"><div className="page-heading page-heading-left"><span className="eyebrow">현장 안전 신고</span><h1>현장의 목소리를 안전하게 전달하세요</h1><p>제보는 공개 커뮤니티와 분리되어 근로감독관 확인용으로만 전달됩니다.</p></div><div className="worksite-privacy-strip"><strong>비공개 접수</strong><span>제보자의 이메일과 내부 식별정보는 화면에 표시하지 않습니다.</span></div>{error ? <div className="worksite-state-card"><strong>로그인 상태를 확인하지 못했습니다.</strong><p>{error}</p><button type="button" className="button button-outline" onClick={() => { setError(null); setRetry((value) => value + 1); }}>다시 시도</button></div> : session ? <SessionGate session={session} onRetry={() => setRetry((value) => value + 1)} /> : <div className="worksite-state-card">로그인 상태를 확인하는 중입니다.</div>}</div></div>
+    <div className="page-section worksite-page"><div className="shell narrow-shell"><div className="page-heading page-heading-left"><span className="eyebrow">현장 안전 신고</span><h1>현장의 목소리를 안전하게 전달하세요</h1><p>제보는 공개 커뮤니티와 분리되어 근로감독관 확인용으로만 전달됩니다.</p></div><div className="worksite-privacy-strip" role="status"><strong>안심하세요!</strong><span>제보자의 이메일과 내부 식별정보는 화면에 표시하지 않습니다.</span></div>{error ? <div className="worksite-state-card"><strong>로그인 상태를 확인하지 못했습니다.</strong><p>{error}</p><button type="button" className="button button-outline" onClick={() => { setError(null); setRetry((value) => value + 1); }}>다시 시도</button></div> : session ? <SessionGate session={session} onRetry={() => setRetry((value) => value + 1)} /> : <div className="worksite-state-card">로그인 상태를 확인하는 중입니다.</div>}</div></div>
   );
 }
