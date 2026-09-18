@@ -17,6 +17,8 @@ export interface RecentMessage {
 
 export interface ChatRequest {
   message: string;
+  /** 클라이언트 재전송을 같은 저장 turn으로 묶는 키. 원문 저장 시에만 쓴다. */
+  request_id?: string;
   conversation_id?: string;
   company_id?: string;
   resolved_query?: string;

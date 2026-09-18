@@ -5,6 +5,7 @@ import { delay } from "@/utils/delay";
 import { ServiceError } from "@/utils/errors";
 
 const CHAT_MODES: ChatMode[] = ["general", "wage", "safety", "contract"];
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,100}$/;
 
 function normalizeMessages(value: unknown): RecentMessage[] {
   if (!Array.isArray(value)) return [];
@@ -52,9 +53,22 @@ export function parseChatRequest(value: unknown): ChatRequest {
       [{ field: "compare", reason: "compare는 true 또는 false여야 합니다." }],
     );
   }
+  if (
+    input.request_id !== undefined
+    && (typeof input.request_id !== "string" || !REQUEST_ID_PATTERN.test(input.request_id))
+  ) {
+    throw new ServiceError(
+      "VALIDATION_ERROR",
+      "대화 요청 식별값을 확인해 주세요.",
+      400,
+      false,
+      [{ field: "request_id", reason: "request_id는 16~100자의 영숫자, 밑줄, 하이픈이어야 합니다." }],
+    );
+  }
 
   return {
     message,
+    request_id: typeof input.request_id === "string" ? input.request_id : undefined,
     conversation_id: typeof input.conversation_id === "string" ? input.conversation_id : undefined,
     company_id: typeof input.company_id === "string" ? input.company_id : undefined,
     compare: input.compare === true,
