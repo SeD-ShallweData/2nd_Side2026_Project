@@ -85,33 +85,22 @@ export async function getMlDashboard(
   if (tab === "wage") {
     const [rows, options, meta] = await Promise.all([
       queryReadOnly<WageRow>(
-        `WITH base AS (
-           SELECT COALESCE(NULLIF(f.sido, ''), '지역 미상') AS region,
-                  CASE WHEN s.industry_category ~ '업$' THEN s.industry_category ELSE '업종 미상' END AS industry,
-                  CASE WHEN v."판정" = '안정신호' THEN 'normal'
-                       WHEN v."판정" = '유보' THEN 'watch'
-                       WHEN v."판정" LIKE '배제%' THEN 'review'
-                       ELSE 'unknown' END AS signal_level
-             FROM public.v_current_scored AS s
-             LEFT JOIN public.v_current_safe AS v USING (firm_id, batch_id)
-             JOIN public.firms AS f USING (firm_id)
-         ), grouped AS (
-           SELECT region, industry, count(*)::int AS firm_count,
-                  count(*) FILTER (WHERE signal_level = 'normal')::int AS normal_count,
-                  count(*) FILTER (WHERE signal_level = 'watch')::int AS watch_count,
-                  count(*) FILTER (WHERE signal_level = 'review')::int AS review_count,
-                  count(*) FILTER (WHERE signal_level = 'unknown')::int AS unknown_count
-             FROM base
-            WHERE ($1::text IS NULL OR region = $1) AND ($2::text IS NULL OR industry = $2)
-            GROUP BY region, industry
-         ) SELECT * FROM grouped ORDER BY firm_count DESC, region, industry`,
+        `SELECT sido AS region,
+                industry,
+                firm_count::int,
+                normal_count::int,
+                watch_count::int,
+                review_count::int,
+                unknown_count::int
+           FROM public.v_region_industry_signal
+          WHERE ($1::text IS NULL OR sido = $1) AND ($2::text IS NULL OR industry = $2)
+          ORDER BY firm_count DESC, sido, industry`,
         [region, industry],
       ),
       queryReadOnly<OptionRow>(
-        `SELECT DISTINCT COALESCE(NULLIF(f.sido, ''), '지역 미상') AS region,
-                CASE WHEN s.industry_category ~ '업$' THEN s.industry_category ELSE '업종 미상' END AS industry
-           FROM public.v_current_scored AS s JOIN public.firms AS f USING (firm_id)
-          ORDER BY region, industry`,
+        `SELECT sido AS region, industry
+           FROM public.v_region_industry_signal
+          ORDER BY sido, industry`,
       ),
       queryReadOnly<MetaRow>(`SELECT as_of_date::text AS data_as_of, target_month::text AS target_label FROM public.batches ORDER BY as_of_date DESC, ingested_at DESC, id DESC LIMIT 1`),
     ]);
