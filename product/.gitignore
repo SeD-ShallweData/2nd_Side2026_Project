@@ -212,6 +212,7 @@ out/
 next-env.d.ts
 coverage/
 .runtime/
+eval/results/local/
 
 # Local environment files (keep examples)
 .env.local

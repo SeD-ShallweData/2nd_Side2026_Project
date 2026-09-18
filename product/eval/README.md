@@ -19,3 +19,15 @@ The corpus contract is checked by `src/services/chatQualityEvaluation.test.ts`. 
 - GCP/deployed behavior was not changed or verified. No PR, merge, commit, or deployment was performed.
 
 The JSONL file is a sanitized trace summary, not a raw provider log. It intentionally excludes prompts, answer bodies, credentials, request IDs, and private data.
+
+## Answer-contract evaluator (stage 2)
+
+`answer-contract-cases.json` is a small, explicit set of answer obligations derived from the reproduced QA cases. It is intentionally separate from the 60-case routing corpus: its purpose is to evaluate the displayed final answer, not just intent fields or fixture shape.
+
+Run a bounded live batch against a started local app (default: eight cases, one attempt each):
+
+```powershell
+npm.cmd run eval:answer-quality
+```
+
+Use `-- --cases AQ01-selected-company-reason,AQ02-general-positive-indicator --runs 3` for the mandatory repeated checks of a changed case. Raw final answers and safe response traces are written only to the ignored `.runtime/answer-quality/` directory. The evaluator returns `PASS`, `FAIL`, or `ORACLE_UNCERTAIN`; API/runtime failures are `BLOCKED`. Legal correctness and source relevance remain listed as required human/source review rather than being falsely promoted to string-match success.
