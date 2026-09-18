@@ -12,6 +12,8 @@ vi.mock("@/server/databaseConfig", () => ({
   getAuthDatabaseConnectionString: () => "postgresql://wg_auth:secret@db.test/wageguard",
   getCommunityDatabaseConnectionString: () =>
     "postgresql://wg_community:secret@db.test/wageguard",
+  getConversationDatabaseConnectionString: () =>
+    "postgresql://wg_conversation:secret@db.test/wageguard",
   getTipDatabaseConnectionString: () =>
     "postgresql://wg_tip:secret@db.test/wageguard",
 }));
@@ -109,14 +111,17 @@ describe("롤별 연결", () => {
     await queryWrite("auth", "SELECT 1");
     await queryWrite("community", "SELECT 1");
     await queryWrite("tip", "SELECT 1");
+    await queryWrite("conversation", "SELECT 1");
 
-    expect(pg.constructed).toHaveLength(3);
+    expect(pg.constructed).toHaveLength(4);
     expect(pg.constructed[0]?.connectionString).toContain("wg_auth");
     expect(pg.constructed[0]?.application_name).toBe("donworry-product-auth");
     expect(pg.constructed[1]?.connectionString).toContain("wg_community");
     expect(pg.constructed[1]?.application_name).toBe("donworry-product-community");
     expect(pg.constructed[2]?.connectionString).toContain("wg_tip");
     expect(pg.constructed[2]?.application_name).toBe("donworry-product-worksite-tip");
+    expect(pg.constructed[3]?.connectionString).toContain("wg_conversation");
+    expect(pg.constructed[3]?.application_name).toBe("donworry-product-conversation");
   });
 
   /*
@@ -145,6 +150,7 @@ describe("롤별 연결", () => {
     expect(isWriteDatabaseConfigured("auth")).toBe(true);
     expect(isWriteDatabaseConfigured("community")).toBe(true);
     expect(isWriteDatabaseConfigured("tip")).toBe(true);
+    expect(isWriteDatabaseConfigured("conversation")).toBe(true);
   });
 });
 

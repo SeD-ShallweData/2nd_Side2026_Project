@@ -10,6 +10,7 @@ import type {
   StoredConversationSummary,
   StoredConversationTurn,
 } from "@/domain/conversation";
+import type { ConversationStructuredSummary, StoredConversationSummaryState } from "@/domain/conversationSummary";
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -19,9 +20,23 @@ interface StoredThread extends StoredConversationDetail {
 
 const mockGlobal = globalThis as typeof globalThis & {
   __donworryMockConversations?: Map<string, StoredThread>;
+  __donworryMockConversationSummaries?: Map<string, StoredConversationSummaryState>;
 };
 const threads = mockGlobal.__donworryMockConversations ?? new Map<string, StoredThread>();
 mockGlobal.__donworryMockConversations = threads;
+const summaries = mockGlobal.__donworryMockConversationSummaries ?? new Map<string, StoredConversationSummaryState>();
+mockGlobal.__donworryMockConversationSummaries = summaries;
+
+function emptySummary(): ConversationStructuredSummary {
+  return {
+    user_goals: [], user_stated_facts: [], system_confirmed_facts: [],
+    actions_already_given: [], open_questions: [], referenced_company_ids: [], contract_review_summary: null,
+  };
+}
+
+function cloneSummaryState(value: StoredConversationSummaryState): StoredConversationSummaryState {
+  return { ...value, summary: structuredClone(value.summary) };
+}
 
 function cloneSummary(thread: StoredThread): StoredConversationSummary {
   return {
@@ -108,8 +123,8 @@ export class MockConversationRepository implements ConversationRepository {
       guardrail_status: input.guardrail_status,
       created_at: now.toISOString(),
       messages: [
-        { role: "user", content: input.user_message },
-        { role: "assistant", content: input.assistant_message },
+        { message_id: randomUUID(), role: "user", content: input.user_message },
+        { message_id: randomUUID(), role: "assistant", content: input.assistant_message },
       ],
       sources: input.sources.map((source) => ({ ...source })),
     });
@@ -124,6 +139,7 @@ export class MockConversationRepository implements ConversationRepository {
     const thread = threads.get(conversationId);
     if (!thread || thread.owner_user_id !== ownerUserId) return false;
     threads.delete(conversationId);
+    summaries.delete(conversationId);
     return true;
   }
 
@@ -132,6 +148,7 @@ export class MockConversationRepository implements ConversationRepository {
     for (const [id, thread] of threads) {
       if (Date.parse(thread.expires_at) <= now.getTime()) {
         threads.delete(id);
+        summaries.delete(id);
         deleted += 1;
       }
     }
@@ -140,5 +157,51 @@ export class MockConversationRepository implements ConversationRepository {
 
   resetForTests(): void {
     threads.clear();
+    summaries.clear();
+  }
+
+  async findSummary(conversationId: string): Promise<StoredConversationSummaryState | null> {
+    const summary = summaries.get(conversationId);
+    return summary ? cloneSummaryState(summary) : null;
+  }
+
+  async claimSummary(conversationId: string, throughSequence: number): Promise<boolean> {
+    if (!threads.has(conversationId)) return false;
+    const existing = summaries.get(conversationId);
+    if (existing && (existing.status === "pending" || existing.summarized_through_sequence >= throughSequence)) return false;
+    summaries.set(conversationId, {
+      conversation_id: conversationId,
+      summary: existing?.summary ?? emptySummary(),
+      summarized_through_sequence: existing?.summarized_through_sequence ?? 0,
+      pending_through_sequence: throughSequence,
+      summary_version: existing?.summary_version ?? "extractive-v1",
+      status: "pending",
+      retry_count: existing?.retry_count ?? 0,
+      last_error_code: null,
+      updated_at: new Date().toISOString(),
+    });
+    return true;
+  }
+
+  async completeSummary(input: {
+    conversation_id: string; through_sequence: number; summary: ConversationStructuredSummary; summary_version: string;
+  }): Promise<boolean> {
+    const current = summaries.get(input.conversation_id);
+    if (!current || current.pending_through_sequence !== input.through_sequence) return false;
+    summaries.set(input.conversation_id, {
+      ...current, summary: structuredClone(input.summary), summarized_through_sequence: input.through_sequence,
+      pending_through_sequence: null, summary_version: input.summary_version, status: "ready",
+      last_error_code: null, updated_at: new Date().toISOString(),
+    });
+    return true;
+  }
+
+  async failSummary(conversationId: string, throughSequence: number, errorCode: string): Promise<void> {
+    const current = summaries.get(conversationId);
+    if (!current || current.pending_through_sequence !== throughSequence) return;
+    summaries.set(conversationId, {
+      ...current, pending_through_sequence: null, status: "failed", retry_count: current.retry_count + 1,
+      last_error_code: errorCode, updated_at: new Date().toISOString(),
+    });
   }
 }

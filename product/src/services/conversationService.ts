@@ -11,6 +11,10 @@ import type { ChatRequest } from "@/domain/chat";
 import type { ChatComparisonResponse } from "@/domain/chatComparison";
 import type { StoredConversationDetail, StoredConversationSummary } from "@/domain/conversation";
 import { getConversationRepository } from "@/services/userDataProviders";
+import {
+  maybeUpdateConversationSummary,
+  toConversationMemoryContext,
+} from "@/services/conversationSummaryService";
 import { ServiceError } from "@/utils/errors";
 
 const MAX_LIST_LIMIT = 50;
@@ -100,11 +104,18 @@ export async function hydrateConversationRequest(
 ): Promise<ChatRequest> {
   if (!request.conversation_id) return request;
   const detail = await ownerDetail(request.conversation_id, user);
-  const history = detail.turns.flatMap((turn) => turn.messages).slice(-HISTORY_MESSAGE_LIMIT);
+  const summary = await getConversationRepository().findSummary(detail.conversation_id);
+  const allMessages = detail.turns.flatMap((turn) => turn.messages);
+  const through = summary?.status === "ready" ? summary.summarized_through_sequence : 0;
+  const history = allMessages
+    .slice(through)
+    .slice(-HISTORY_MESSAGE_LIMIT)
+    .map(({ role, content }) => ({ role, content }));
   return {
     ...request,
     company_id: request.company_id ?? detail.active_company_id ?? undefined,
     recent_messages: history,
+    conversation_memory: toConversationMemoryContext(summary),
   };
 }
 
@@ -135,6 +146,13 @@ export async function persistCompletedChat(
     guardrail_status: primary.guardrail_status,
     sources: primary.sources,
   });
+  /* 요약 실패는 이미 생성된 사용자 답변을 실패시키지 않는다. 다음 완료 turn에서 재시도한다. */
+  try {
+    const detail = await repository.findConversation(result.conversation_id);
+    if (detail && detail.owner_user_id === user.user_id) await maybeUpdateConversationSummary(detail);
+  } catch {
+    // 실패 상태 기록 자체가 DB 장애로 불가능해도, 원문 저장 성공을 되돌리지는 않는다.
+  }
   return result.conversation_id;
 }
 

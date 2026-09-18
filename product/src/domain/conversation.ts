@@ -1,6 +1,11 @@
 import type { ConversationApiSource } from "@/app/api/conversations/conversationApiContract";
 import type { AnswerType, GuardrailStatus, RecentMessage } from "@/domain/chat";
 import type { SourceReference } from "@/domain/risk";
+import type { ConversationStructuredSummary, StoredConversationSummaryState } from "@/domain/conversationSummary";
+
+export interface StoredConversationMessage extends RecentMessage {
+  message_id: string;
+}
 
 export interface StoredConversationSummary {
   conversation_id: string;
@@ -20,7 +25,7 @@ export interface StoredConversationTurn {
   answer_type: AnswerType;
   guardrail_status: GuardrailStatus;
   created_at: string;
-  messages: RecentMessage[];
+  messages: StoredConversationMessage[];
   sources: SourceReference[];
 }
 
@@ -54,4 +59,13 @@ export interface ConversationRepository {
   recordCompletedTurn(input: RecordCompletedConversationTurn): Promise<RecordedConversationTurn>;
   deleteConversation(conversationId: string, ownerUserId: string): Promise<boolean>;
   deleteExpiredConversations(now: Date): Promise<number>;
+  findSummary(conversationId: string): Promise<StoredConversationSummaryState | null>;
+  claimSummary(conversationId: string, throughSequence: number): Promise<boolean>;
+  completeSummary(input: {
+    conversation_id: string;
+    through_sequence: number;
+    summary: ConversationStructuredSummary;
+    summary_version: string;
+  }): Promise<boolean>;
+  failSummary(conversationId: string, throughSequence: number, errorCode: string): Promise<void>;
 }
