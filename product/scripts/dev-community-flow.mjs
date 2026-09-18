@@ -64,7 +64,9 @@ function show(label, value) {
 }
 
 async function api(method, path, body) {
-  const headers = { origin: BASE };
+  // proxy.ts 의 API 게이트가 브라우저 문맥을 요구한다. 이 스크립트는 브라우저가
+  // 아니므로 같은 신호를 직접 붙인다(붙이지 않으면 전 요청이 403 이다).
+  const headers = { origin: BASE, "sec-fetch-site": "same-origin" };
   if (body !== undefined) headers["content-type"] = "application/json";
   if (cookie) headers.cookie = cookie;
 
