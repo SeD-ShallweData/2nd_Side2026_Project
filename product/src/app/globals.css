@@ -3698,7 +3698,9 @@ summary:focus-visible {
 .consumer-main-nav .consumer-ai-link::before { content: "▤"; margin-right: 8px; }
 .consumer-main-nav .consumer-ai-link:hover { background: #f1c900; }
 
-.consumer-mode-switch { flex-shrink: 0; margin-left: 16px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink-soft); font-size: .78rem; font-weight: 800; padding: 8px 14px; white-space: nowrap; }
+/* 로고와 첫 메뉴 사이에 선다. */
+.consumer-header-lead { display: flex; align-items: center; gap: 16px; }
+.consumer-mode-switch { flex-shrink: 0; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink-soft); font-size: .78rem; font-weight: 800; padding: 8px 14px; white-space: nowrap; }
 .consumer-mode-switch:hover { border-color: var(--ink); background: var(--surface); color: var(--ink); }
 
 /* 시연장에서 멀리서도 눈에 들어오도록 기존 크기의 1.5배로 키운다. */
@@ -3927,7 +3929,8 @@ summary:focus-visible {
   body { padding-bottom: 60px; }
   .consumer-main-nav { display: none; }
   .consumer-header-inner { min-height: 64px; }
-  .consumer-mode-switch { margin-left: 0; font-size: .68rem; padding: 6px 10px; }
+  .consumer-header-lead { gap: 10px; }
+  .consumer-mode-switch { font-size: .68rem; padding: 6px 10px; }
   .brand-mark { width: 44px; height: 44px; }
   .brand-word { font-size: 1.35rem; }
   .consumer-mobile-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; display: grid; grid-template-columns: repeat(6,1fr); border-top: 1px solid var(--line); background: rgb(255 255 255 / 96%); box-shadow: 0 -8px 25px rgb(8 31 58 / 8%); }
