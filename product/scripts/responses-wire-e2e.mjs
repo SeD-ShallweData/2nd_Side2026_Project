@@ -6,8 +6,13 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-async function jsonRequest(path, init) {
-  const response = await fetch(`${baseUrl}${path}`, init);
+async function jsonRequest(path, init = {}) {
+  // proxy.ts 의 API 게이트가 브라우저 문맥을 요구한다. 이 스크립트는 브라우저가
+  // 아니므로 같은 신호를 직접 붙인다(붙이지 않으면 전 요청이 403 이다).
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: { ...init.headers, "sec-fetch-site": "same-origin" },
+  });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(`${path} returned HTTP ${response.status}: ${JSON.stringify(payload)}`);
