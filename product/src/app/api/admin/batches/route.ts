@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
-import { batchStatusService } from "@/services/batchStatusService";
+import { getOptionalSessionUser } from "@/services/authService";
+import { listBatchStatuses } from "@/services/batchService";
+import { noStoreError, noStoreJson } from "@/server/auth/http";
+import { requireAuthenticatedUser, requireUserRole } from "@/server/auth/permissions";
+import { getSessionTokenFromRequest } from "@/server/auth/sessionCookie";
 
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request): Promise<NextResponse> {
   try {
-    const data = await batchStatusService.getBatches();
-    return NextResponse.json(data);
+    const user = requireAuthenticatedUser(
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
+    );
+    requireUserRole(user, ["admin"]);
+    return noStoreJson(await listBatchStatuses());
   } catch (error) {
-    return NextResponse.json({ error: "데이터를 불러오지 못했습니다." }, { status: 500 });
+    return noStoreError(error);
   }
 }
