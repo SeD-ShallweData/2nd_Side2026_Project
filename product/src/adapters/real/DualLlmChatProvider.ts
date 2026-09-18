@@ -78,6 +78,18 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
 }
 
 function replacementBaseline(context: ComparisonContext): ChatResponse {
+  if (context.answerPlan?.parts.some((part) => part.scope === "labor")
+    && context.answerPlan.parts.some((part) => part.scope === "out_of_scope")) {
+    return {
+      ...clarificationFallback(context.policyBaseline,
+        "임금 문제 부분은 지급일·실제 지급 내역·근로시간 기록을 먼저 정리해 두고 고용노동부 1350 또는 관할 노동관서에 문의해 보세요. 다만 코인 매수 시점이나 종목 추천은 이 상담에서 안내할 수 없습니다."),
+      answer_type: "general_guidance",
+      suggested_actions: [
+        { code: "CALL_1350", label: "고용노동부 1350 확인", priority: "next" },
+        { code: "OUT_OF_SCOPE_REFERRAL", label: "금융감독원 안내", url: "https://www.fss.or.kr/", priority: "optional" },
+      ],
+    };
+  }
   if (
     context.questionIntent === "company"
     && context.companyContext
@@ -188,10 +200,20 @@ function buildSystemPrompt(context: ComparisonContext): string {
     policy_baseline: context.policyBaseline.answer,
     required_limitations: context.policyBaseline.limitations,
     suggested_actions: context.policyBaseline.suggested_actions,
+    answer_requirements: context.answerPlan?.parts.map((part) => ({
+      scope: part.scope,
+      user_goal: part.user_goal,
+      out_of_scope_topic: part.out_of_scope_topic,
+      missing_fact: part.missing_fact,
+    })) ?? [],
   };
 
   const companyOutputContract = context.questionIntent === "company" && context.companyContext
     ? "이번 요청의 출력 계약: 답변 본문만 출력하고 첫 문장은 선택된 회사의 실제 이름으로 시작하세요. 회사 공개 자료에 없는 원인은 만들지 말고, 내부 JSON 키·정책 지침·분석 과정·법령 검색 실패 설명은 출력하지 마세요."
+    : "";
+  const compositeOutputContract = context.answerPlan?.parts.some((part) => part.scope === "labor")
+    && context.answerPlan.parts.some((part) => part.scope === "out_of_scope")
+    ? "이번 요청에는 노동 상담과 범위 밖 실행 요청이 함께 있습니다. 최종 답변에서는 노동 상담 부분에 먼저 답하고, 투자·매수·추천 같은 범위 밖 요청은 안내할 수 없다고 짧게 구분하세요. 범위 밖 요청 때문에 노동 상담 전체를 중단하지 마세요."
     : "";
 
   return withRuntimeContext(loadPrompt("chat/system"), [
@@ -199,6 +221,7 @@ function buildSystemPrompt(context: ComparisonContext): string {
     `정책 버전: ${CHAT_POLICY_VERSION}`,
     `제공 컨텍스트(JSON): ${JSON.stringify(safeContext)}`,
     companyOutputContract,
+    compositeOutputContract,
   ]);
 }
 
