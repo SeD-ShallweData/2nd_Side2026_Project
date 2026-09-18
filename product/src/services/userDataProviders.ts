@@ -2,6 +2,7 @@ import "server-only";
 
 import { MockAuthRepository } from "@/adapters/mock/MockAuthRepository";
 import { MockCommunityRepository } from "@/adapters/mock/MockCommunityRepository";
+import { MockFavoriteRepository } from "@/adapters/mock/MockFavoriteRepository";
 import { MockWorksiteTipRepository } from "@/adapters/mock/MockWorksiteTipRepository";
 import { RealAuthRepository } from "@/adapters/real/RealAuthRepository";
 import { RealCommunityRepository } from "@/adapters/real/RealCommunityRepository";
@@ -9,11 +10,14 @@ import { RealWorksiteTipRepository } from "@/adapters/real/RealWorksiteTipReposi
 import {
   getAuthDataMode,
   getCommunityDataMode,
+  getFavoriteDataMode,
   getWorksiteTipDataMode,
 } from "@/config/dataMode";
 import type { AuthRepository } from "@/domain/auth";
 import type { CommunityRepository } from "@/domain/community";
+import type { FavoriteRepository } from "@/domain/favorite";
 import type { WorksiteTipRepository } from "@/domain/worksiteTip";
+import { ServiceError } from "@/utils/errors";
 
 /*
  * 사용자 데이터(회원·세션·게시글·신고·현장 제보) 저장소 선택.
@@ -28,6 +32,7 @@ const mockAuthRepository = new MockAuthRepository();
 const realAuthRepository = new RealAuthRepository();
 const realCommunityRepository = new RealCommunityRepository();
 const mockCommunityRepository = new MockCommunityRepository();
+const mockFavoriteRepository = new MockFavoriteRepository();
 const mockWorksiteTipRepository = new MockWorksiteTipRepository();
 const realWorksiteTipRepository = new RealWorksiteTipRepository();
 
@@ -45,6 +50,22 @@ export function getWorksiteTipRepository(): WorksiteTipRepository {
     : mockWorksiteTipRepository;
 }
 
+export function getFavoriteRepository(): FavoriteRepository {
+  if (getFavoriteDataMode() === "real") {
+    throw new ServiceError(
+      "FAVORITE_DATABASE_NOT_CONFIGURED",
+      "즐겨찾기 데이터베이스가 아직 연결되지 않았습니다.",
+      503,
+      true,
+    );
+  }
+  return mockFavoriteRepository;
+}
+
 export function resetMockWorksiteTipsForTests(): void {
   mockWorksiteTipRepository.resetForTests();
+}
+
+export function resetMockFavoritesForTests(): void {
+  mockFavoriteRepository.resetForTests();
 }
