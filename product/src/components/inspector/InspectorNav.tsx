@@ -7,8 +7,8 @@ export function InspectorNav({ current }: { current: "dashboard" | "chat" | "bat
         <Link href="/inspector" className="inspector-identity">
           <span aria-hidden="true">DW</span>
           <div>
-            <strong>DONWORRY INSPECTOR</strong>
-            <small>근로감독 지원 프로토타입</small>
+            <strong>Machine Learning Operations</strong>
+            <small>임금체불 · 산업재해 예측 모델링 지원</small>
           </div>
         </Link>
         <nav aria-label="근로감독관 메뉴">

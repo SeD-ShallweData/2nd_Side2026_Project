@@ -66,6 +66,9 @@ function record(value, label) {
 async function jsonRequest(path, init = {}) {
   const headers = new Headers(init.headers);
   if (authorization) headers.set("authorization", authorization);
+  // proxy.ts 의 API 게이트가 브라우저 문맥을 요구한다. 이 스크립트는 브라우저가
+  // 아니므로 같은 신호를 직접 붙인다(Basic 자격증명이 없을 때도 통과해야 한다).
+  headers.set("sec-fetch-site", "same-origin");
 
   let response;
   try {

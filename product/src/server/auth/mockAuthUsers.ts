@@ -28,8 +28,9 @@ const MOCK_USERS: readonly MockUserEntry[] = [
   {
     user_id: "10000000-0000-4000-8000-000000000003",
     email: "inspector@mock.donworry.local",
-    display_name: "근로감독관",
-    role: "inspector",
+    display_name: "운영 관리자(근로감독 화면)",
+    // 근로감독관 화면은 admin 이 연다. inspectorAccess.ts 의 설명을 참고할 것.
+    role: "admin",
     password_environment: "MOCK_AUTH_INSPECTOR_PASSWORD",
   },
 ] as const;

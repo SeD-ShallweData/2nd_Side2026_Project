@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useId, useState } from "react";
+import { FormEvent, useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { CompanySearchResultCard } from "@/components/company/CompanySearchResultCard";
+import { RegionMap } from "@/components/company/RegionMap";
 import type {
   CompanyFilterOptions,
   CompanySearchFilters,
@@ -32,10 +33,19 @@ export function CompanySearch() {
   const [pageDraft, setPageDraft] = useState("");
   const [pageValidation, setPageValidation] = useState<string | null>(null);
 
+  // 지도를 첫 화면에 띄우려면 지역별 사업장 수가 먼저 있어야 한다. 필터 패널을
+  // 열 때까지 기다리지 않고 들어오자마자 한 번 불러온다.
+  useEffect(() => {
+    void loadFilterOptions();
+    // 화면에 처음 들어올 때 한 번이면 된다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function search(nextQuery: string, page = 1, nextFilters = appliedFilters) {
     const trimmed = nextQuery.trim();
-    if (trimmed.length < 1) {
-      setValidation("사업장명을 한 글자 이상 입력해 주세요.");
+    const hasFilter = Boolean(nextFilters.region || nextFilters.industry);
+    if (trimmed.length < 1 && !hasFilter) {
+      setValidation("사업장명을 한 글자 이상 입력하거나 지도에서 지역을 골라 주세요.");
       setResult(null);
       return;
     }
@@ -61,6 +71,13 @@ export function CompanySearch() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void search(query, 1, draftFilters);
+  }
+
+  function selectRegionFromMap(region: string) {
+    const nextFilters: CompanySearchFilters = { ...appliedFilters, region };
+    setDraftFilters(nextFilters);
+    setFiltersOpen(false);
+    void search(query, 1, nextFilters);
   }
 
   function applyRecommendedQuery(value: string) {
@@ -125,22 +142,23 @@ export function CompanySearch() {
       <form className="search-form" onSubmit={handleSubmit} noValidate>
         <label htmlFor={inputId}>회사명 또는 사업장명</label>
         <div className="search-input-row">
-          <span className="search-icon" aria-hidden="true">
-            ⌕
-          </span>
-          <input
-            id={inputId}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="예: 건설, 한빛테크"
-            aria-describedby={validation ? `${inputId}-error` : `${inputId}-help`}
-            aria-invalid={Boolean(validation)}
-            autoComplete="off"
-          />
+          {/* 돋보기를 입력칸 위에 겹쳐 놓으면 글자와 부딪힌다. 테두리를 감싸는
+              상자에 돋보기와 입력칸을 나란히 두고, 입력칸 자체는 테두리를 없앤다. */}
+          <div className="search-input-field">
+            <span className="search-icon" aria-hidden="true">
+              ⌕
+            </span>
+            <input
+              id={inputId}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="예: 건설, 한빛테크"
+              aria-describedby={validation ? `${inputId}-error` : `${inputId}-help`}
+              aria-invalid={Boolean(validation)}
+              autoComplete="off"
+            />
+          </div>
           <div className="search-action-stack">
-            <button type="submit" className="button button-dark" disabled={loading}>
-              {loading ? "검색 중" : "검색"}
-            </button>
             <button
               type="button"
               className="search-filter-toggle"
@@ -151,6 +169,9 @@ export function CompanySearch() {
               <span aria-hidden="true">☷</span>
               필터{appliedFilters.region || appliedFilters.industry ? ` (${Number(Boolean(appliedFilters.region)) + Number(Boolean(appliedFilters.industry))})` : ""}
               <span className="filter-toggle-caret" aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
+            </button>
+            <button type="submit" className="button button-dark" disabled={loading}>
+              {loading ? "검색 중" : "검색"}
             </button>
           </div>
         </div>
@@ -250,7 +271,10 @@ export function CompanySearch() {
               <div>
                 <span className="eyebrow">검색 결과</span>
                 <h2>
-                  ‘{result.query}’ 관련 사업장 <strong>{result.total}</strong>곳
+                  {result.query
+                    ? `‘${result.query}’ 관련 사업장 `
+                    : `${[appliedFilters.region, appliedFilters.industry].filter(Boolean).join(" · ")} 사업장 `}
+                  <strong>{result.total}</strong>곳
                 </h2>
               </div>
               <p>첫 번째 결과가 자동 선택되지 않습니다.</p>
@@ -268,6 +292,7 @@ export function CompanySearch() {
                 <CompanySearchResultCard
                   key={company.company_id}
                   company={company}
+                  query={result.query}
                   onSelect={(companyId) => router.push(`/companies/${encodeURIComponent(companyId)}`)}
                 />
               ))}
@@ -332,11 +357,20 @@ export function CompanySearch() {
         ) : null}
         {!loading && !error && result === null ? (
           <div className="search-placeholder">
-            <div aria-hidden="true" className="search-placeholder-icon">
-              ⌕
-            </div>
-            <h2>확인할 사업장을 검색해 보세요</h2>
-            <p>회사명이 같을 수 있으므로 지역과 업종을 함께 확인해 정확한 사업장을 선택하세요.</p>
+            <h2>어느 지역부터 볼까요?</h2>
+            <p>지도에서 지역을 고르면 그 지역의 사업장을 바로 보여드립니다. 회사명을 알고 있다면 위에서 바로 검색하세요.</p>
+            {filterOptionsError ? (
+              <p className="field-error" role="alert">{filterOptionsError}</p>
+            ) : filterOptions ? (
+              <RegionMap
+                counts={filterOptions.regions}
+                selected={appliedFilters.region}
+                onSelect={selectRegionFromMap}
+                disabled={loading}
+              />
+            ) : (
+              <p className="muted-text">지역별 사업장 수를 불러오는 중입니다.</p>
+            )}
           </div>
         ) : null}
       </section>

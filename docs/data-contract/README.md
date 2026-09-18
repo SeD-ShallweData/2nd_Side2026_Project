@@ -39,6 +39,8 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 | --- | --- | --- |
 | `README.md` | 이 문서. 계약 버전·범위·색인 | ✅ |
 | [`wage-risk.md`](wage-risk.md) | 임금체불 — 사용자 경로와 감독관 경로 분리, 판정·등급 매핑, 기준일, 식별키 | ✅ |
+| [`positive-signals.md`](positive-signals.md) | 긍정 신호 — 확인된 개수·항목 공개, 원시 필드 비공개, null/0 구분 | PR #67 구현 반영 |
+| [`conversation-memory.md`](conversation-memory.md) | 상담 기억 — 저장 대상·민감정보 제외·재조회·승인 경계 | 인계용 설계 초안, 기간·운영 정책 합의 필요 |
 | [`samples/`](samples/) | 상태별 API 응답 예시 5종 | ✅ |
 | [`safety-risk.md`](safety-risk.md) | 산업재해 — band 매핑, `provisional`·`research_only` 취급, 셀→사업장 배분 | ✅ |
 | [`verification.md`](verification.md) | **실측 검증** — 계약 수치와 운영 DB 대조, **실제 API 응답 표시 검증**, 재현 명령 | ✅ |

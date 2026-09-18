@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
+
 import { getOptionalSessionUser } from "@/services/authService";
-import { listBatchStatuses } from "@/services/batchService";
+import { listFavoriteCompanies } from "@/services/favoriteService";
 import { noStoreError, noStoreJson } from "@/server/auth/http";
-import { requireAuthenticatedUser, requireUserRole } from "@/server/auth/permissions";
+import { requireAuthenticatedUser } from "@/server/auth/permissions";
 import { getSessionTokenFromRequest } from "@/server/auth/sessionCookie";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +13,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const user = requireAuthenticatedUser(
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
-    requireUserRole(user, ["admin"]);
-    return noStoreJson(await listBatchStatuses());
+    return noStoreJson(await listFavoriteCompanies(user));
   } catch (error) {
     return noStoreError(error);
   }
