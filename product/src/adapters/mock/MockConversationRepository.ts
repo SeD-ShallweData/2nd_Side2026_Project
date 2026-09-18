@@ -3,6 +3,9 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import type {
+  ClaimConversationRequest,
+  ClaimConversationRequestInput,
+  CompleteConversationRequestInput,
   ConversationRepository,
   RecordCompletedConversationTurn,
   RecordedConversationTurn,
@@ -18,14 +21,29 @@ interface StoredThread extends StoredConversationDetail {
   idempotency: Map<string, string>;
 }
 
+interface StoredRequest {
+  owner_user_id: string;
+  request_id: string;
+  conversation_id: string;
+  status: ClaimConversationRequest["status"];
+  response: CompleteConversationRequestInput["response"] | null;
+}
+
 const mockGlobal = globalThis as typeof globalThis & {
   __donworryMockConversations?: Map<string, StoredThread>;
   __donworryMockConversationSummaries?: Map<string, StoredConversationSummaryState>;
+  __donworryMockConversationRequests?: Map<string, StoredRequest>;
 };
 const threads = mockGlobal.__donworryMockConversations ?? new Map<string, StoredThread>();
 mockGlobal.__donworryMockConversations = threads;
 const summaries = mockGlobal.__donworryMockConversationSummaries ?? new Map<string, StoredConversationSummaryState>();
 mockGlobal.__donworryMockConversationSummaries = summaries;
+const requests = mockGlobal.__donworryMockConversationRequests ?? new Map<string, StoredRequest>();
+mockGlobal.__donworryMockConversationRequests = requests;
+
+function requestKey(ownerUserId: string, requestId: string): string {
+  return `${ownerUserId}:${requestId}`;
+}
 
 function emptySummary(): ConversationStructuredSummary {
   return {
@@ -88,6 +106,73 @@ export class MockConversationRepository implements ConversationRepository {
     return cloneDetail(thread);
   }
 
+  async claimRequest(input: ClaimConversationRequestInput): Promise<ClaimConversationRequest> {
+    const key = requestKey(input.owner_user_id, input.request_id);
+    const existingRequest = requests.get(key);
+    if (existingRequest) {
+      return {
+        conversation_id: existingRequest.conversation_id,
+        status: existingRequest.status,
+        reused: true,
+        response: existingRequest.response ? structuredClone(existingRequest.response) : null,
+      };
+    }
+    const now = new Date();
+    const existingThread = input.conversation_id ? threads.get(input.conversation_id) : undefined;
+    if (input.conversation_id && (!existingThread || existingThread.owner_user_id !== input.owner_user_id
+      || Date.parse(existingThread.expires_at) <= now.getTime())) throw new Error("conversation not found");
+    const thread = existingThread ?? {
+      conversation_id: randomUUID(),
+      owner_user_id: input.owner_user_id,
+      title: titleFor(input.user_message),
+      active_company_id: input.company_id,
+      created_at: now.toISOString(),
+      last_activity_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + RETENTION_MS).toISOString(),
+      turn_count: 0,
+      turns: [],
+      idempotency: new Map<string, string>(),
+    };
+    threads.set(thread.conversation_id, thread);
+    requests.set(key, {
+      owner_user_id: input.owner_user_id,
+      request_id: input.request_id,
+      conversation_id: thread.conversation_id,
+      status: "pending",
+      response: null,
+    });
+    return { conversation_id: thread.conversation_id, status: "pending", reused: false, response: null };
+  }
+
+  async completeRequest(input: CompleteConversationRequestInput): Promise<{
+    conversation_id: string; response: CompleteConversationRequestInput["response"]; reused: boolean;
+  }> {
+    const key = requestKey(input.owner_user_id, input.idempotency_key);
+    const request = requests.get(key);
+    if (!request || request.conversation_id !== input.conversation_id) throw new Error("conversation request not found");
+    if (request.status === "completed" && request.response) {
+      return { conversation_id: request.conversation_id, response: structuredClone(request.response), reused: true };
+    }
+    if (request.status !== "pending") throw new Error("conversation request is not pending");
+    await this.recordCompletedTurn({ ...input, conversation_id: request.conversation_id });
+    request.status = "completed";
+    request.response = structuredClone(input.response);
+    requests.set(key, request);
+    return { conversation_id: request.conversation_id, response: structuredClone(input.response), reused: false };
+  }
+
+  async failRequest(
+    ownerUserId: string,
+    requestId: string,
+    status: "failed" | "cancelled",
+    _errorCode: string,
+  ): Promise<void> {
+    const request = requests.get(requestKey(ownerUserId, requestId));
+    if (!request || request.status !== "pending") return;
+    request.status = status;
+    requests.set(requestKey(ownerUserId, requestId), request);
+  }
+
   async recordCompletedTurn(input: RecordCompletedConversationTurn): Promise<RecordedConversationTurn> {
     const now = new Date();
     const existing = input.conversation_id ? threads.get(input.conversation_id) : undefined;
@@ -140,6 +225,7 @@ export class MockConversationRepository implements ConversationRepository {
     if (!thread || thread.owner_user_id !== ownerUserId) return false;
     threads.delete(conversationId);
     summaries.delete(conversationId);
+    for (const [key, request] of requests) if (request.conversation_id === conversationId) requests.delete(key);
     return true;
   }
 
@@ -149,6 +235,7 @@ export class MockConversationRepository implements ConversationRepository {
       if (Date.parse(thread.expires_at) <= now.getTime()) {
         threads.delete(id);
         summaries.delete(id);
+        for (const [key, request] of requests) if (request.conversation_id === id) requests.delete(key);
         deleted += 1;
       }
     }
@@ -158,6 +245,7 @@ export class MockConversationRepository implements ConversationRepository {
   resetForTests(): void {
     threads.clear();
     summaries.clear();
+    requests.clear();
   }
 
   async findSummary(conversationId: string): Promise<StoredConversationSummaryState | null> {

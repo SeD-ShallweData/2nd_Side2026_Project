@@ -1,5 +1,6 @@
 import type { ConversationApiSource } from "@/app/api/conversations/conversationApiContract";
 import type { AnswerType, GuardrailStatus, RecentMessage } from "@/domain/chat";
+import type { ChatComparisonResponse } from "@/domain/chatComparison";
 import type { SourceReference } from "@/domain/risk";
 import type { ConversationStructuredSummary, StoredConversationSummaryState } from "@/domain/conversationSummary";
 
@@ -51,11 +52,39 @@ export interface RecordedConversationTurn {
   reused: boolean;
 }
 
+export interface CompleteConversationRequestInput extends RecordCompletedConversationTurn {
+  response: ChatComparisonResponse;
+}
+
+export type ConversationRequestStatus = "pending" | "completed" | "failed" | "cancelled";
+
+export interface ClaimConversationRequest {
+  conversation_id: string;
+  status: ConversationRequestStatus;
+  reused: boolean;
+  response: ChatComparisonResponse | null;
+}
+
+export interface ClaimConversationRequestInput {
+  owner_user_id: string;
+  conversation_id?: string;
+  request_id: string;
+  company_id: string | null;
+  user_message: string;
+}
+
 export interface ConversationRepository {
   readonly source: ConversationApiSource;
   assertAvailable(): void;
   listConversations(ownerUserId: string, limit: number): Promise<StoredConversationSummary[]>;
   findConversation(conversationId: string): Promise<StoredConversationDetail | null>;
+  claimRequest(input: ClaimConversationRequestInput): Promise<ClaimConversationRequest>;
+  completeRequest(input: CompleteConversationRequestInput): Promise<{
+    conversation_id: string;
+    response: ChatComparisonResponse;
+    reused: boolean;
+  }>;
+  failRequest(ownerUserId: string, requestId: string, status: "failed" | "cancelled", errorCode: string): Promise<void>;
   recordCompletedTurn(input: RecordCompletedConversationTurn): Promise<RecordedConversationTurn>;
   deleteConversation(conversationId: string, ownerUserId: string): Promise<boolean>;
   deleteExpiredConversations(now: Date): Promise<number>;
