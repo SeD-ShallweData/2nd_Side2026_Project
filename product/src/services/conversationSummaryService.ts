@@ -35,10 +35,20 @@ function redactDirectIdentifiers(value: string): string {
     .trim();
 }
 
-function excerpt(message: StoredConversationMessage, max = 300): ConversationSummaryItem | null {
+function excerpt(
+  message: StoredConversationMessage,
+  max = 300,
+  companyId?: string,
+  isCorrection = false,
+): ConversationSummaryItem | null {
   const text = redactDirectIdentifiers(message.content);
   if (!text) return null;
-  return { text: text.length > max ? `${text.slice(0, max - 1)}…` : text, source_message_ids: [message.message_id] };
+  return {
+    text: text.length > max ? `${text.slice(0, max - 1)}…` : text,
+    source_message_ids: [message.message_id],
+    ...(companyId ? { company_id: companyId } : {}),
+    ...(isCorrection ? { is_correction: true } : {}),
+  };
 }
 
 function appendUnique(
@@ -55,23 +65,32 @@ function isOpenQuestion(content: string): boolean {
   return /[?？]$/.test(content.trim()) || /(어떻게|어디|무엇|왜|가능|되나요|인가요|까요)\s*$/.test(content.trim());
 }
 
+function isCorrection(content: string): boolean {
+  return /(정정|사실은|다시 말하면|아니라|아니고|잘못 말)/.test(content);
+}
+
 function buildSummary(
   previous: ConversationStructuredSummary | null,
   newlySummarized: StoredConversationMessage[],
   companies: string[],
+  companyByMessageId: Map<string, string | undefined>,
 ): ConversationStructuredSummary {
   const base = previous ?? emptySummary();
   const userMessages = newlySummarized.filter((message) => message.role === "user");
   const assistantMessages = newlySummarized.filter((message) => message.role === "assistant");
-  const userItems = userMessages.map((message) => excerpt(message)).filter((item): item is ConversationSummaryItem => Boolean(item));
-  const assistantItems = assistantMessages.map((message) => excerpt(message, 260)).filter((item): item is ConversationSummaryItem => Boolean(item));
+  const userItems = userMessages
+    .map((message) => excerpt(message, 300, companyByMessageId.get(message.message_id), isCorrection(message.content)))
+    .filter((item): item is ConversationSummaryItem => Boolean(item));
+  const assistantItems = assistantMessages
+    .map((message) => excerpt(message, 260, companyByMessageId.get(message.message_id)))
+    .filter((item): item is ConversationSummaryItem => Boolean(item));
   const facts = userMessages
-    .filter((message) => !isOpenQuestion(message.content) && /(?:했|됐|있|없|받|근무|입사|퇴사|계약|월급|임금)/.test(message.content))
-    .map((message) => excerpt(message))
+    .filter((message) => !isOpenQuestion(message.content) && /(?:했|됐|있|없|받|근무|입사|퇴사|계약|월급|임금|체불)/.test(message.content))
+    .map((message) => excerpt(message, 300, companyByMessageId.get(message.message_id), isCorrection(message.content)))
     .filter((item): item is ConversationSummaryItem => Boolean(item));
   const questions = userMessages
     .filter((message) => isOpenQuestion(message.content))
-    .map((message) => excerpt(message))
+    .map((message) => excerpt(message, 300, companyByMessageId.get(message.message_id), isCorrection(message.content)))
     .filter((item): item is ConversationSummaryItem => Boolean(item));
 
   return {
@@ -105,15 +124,21 @@ export async function maybeUpdateConversationSummary(
   try {
     const batch = messages.slice(through, target);
     // 완료 turn만 저장하므로 batch는 항상 user/assistant 짝을 보존한다.
-    const companies = detail.turns
-      .filter((turn) => turn.turn_index * 2 <= target && turn.company_id)
+    const summarizedTurns = detail.turns
+      .filter((turn) => turn.turn_index * 2 <= target);
+    const companies = summarizedTurns
+      .filter((turn) => turn.company_id)
       .map((turn) => turn.company_id!);
+    const companyByMessageId = new Map<string, string | undefined>(
+      summarizedTurns.flatMap((turn) => turn.messages.map((message) => [message.message_id, turn.company_id ?? undefined] as const)),
+    );
     const summary = buildSummary(
       existing && existing.summarized_through_sequence > 0
         ? existing.summary
         : null,
       batch,
       companies,
+      companyByMessageId,
     );
     return await repository.completeSummary({
       conversation_id: detail.conversation_id,
@@ -128,7 +153,7 @@ export async function maybeUpdateConversationSummary(
 }
 
 function renderItems(label: string, items: ConversationSummaryItem[]): string[] {
-  return items.map((item) => `${label}: ${item.text} (원문 ID: ${item.source_message_ids.join(",")})`);
+  return items.map((item) => `${item.is_correction ? "사용자 정정" : label}: ${item.text} (원문 ID: ${item.source_message_ids.join(",")}${item.company_id ? `, 회사 ID: ${item.company_id}` : ""})`);
 }
 
 /* 모델에는 항목의 출처와 "사용자 진술/기존 안내" 성격을 명시해 사실·근거로 오인하지 않게 한다. */

@@ -6,6 +6,8 @@
 export interface ConversationSummaryItem {
   text: string;
   source_message_ids: string[];
+  company_id?: string;
+  is_correction?: boolean;
 }
 
 export interface ConversationStructuredSummary {
