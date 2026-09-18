@@ -91,6 +91,26 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "column_default:public.worksite_tips.status_received",
     "column_default_absent:public.worksite_tips.category",
   ]),
+  "0014_conversation_memory": Object.freeze([
+    "table:public.conversation_threads",
+    "table:public.conversation_turns",
+    "table:public.conversation_messages",
+    "table:public.conversation_sources",
+    "table:public.conversation_company_events",
+    "index:public.conversation_threads_owner_activity_idx",
+    "index:public.conversation_threads_expires_idx",
+    "index:public.conversation_turns_idempotency_uq",
+    "index:public.conversation_turns_sequence_uq",
+    "index:public.conversation_messages_turn_role_uq",
+    "constraint:public.conversation_threads.conversation_threads_owner_user_id_users_id_fk",
+    "constraint:public.conversation_turns.conversation_turns_conversation_id_conversation_threads_id_fk",
+    "constraint:public.conversation_messages.conversation_messages_turn_id_conversation_turns_id_fk",
+    "constraint:public.conversation_sources.conversation_sources_turn_id_conversation_turns_id_fk",
+    "constraint:public.conversation_company_events.conversation_company_events_conversation_id_conversation_threads_id_fk",
+    "constraint:public.conversation_threads.conversation_threads_title_ck",
+    "constraint:public.conversation_turns.conversation_turns_answer_type_ck",
+    "constraint:public.conversation_messages.conversation_messages_role_ck",
+  ]),
 });
 
 function migrationLabel(migration) {

@@ -2173,6 +2173,26 @@ summary:focus-visible {
   flex: 0 0 auto;
 }
 
+.chat-history {
+  border-top: 1px solid var(--line);
+  background: var(--surface-warm);
+  padding: 10px 16px;
+}
+
+.chat-history > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.chat-history strong { font-size: 0.76rem; }
+.chat-history small, .chat-history .muted-text { color: var(--muted); font-size: 0.66rem; }
+.chat-history ul { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
+.chat-history li { display: flex; gap: 6px; }
+.chat-history li button:first-child { overflow: hidden; flex: 1; border: 0; background: transparent; color: var(--ink); cursor: pointer; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.chat-history li button:last-child { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 0.68rem; }
+.chat-history button:disabled { cursor: not-allowed; opacity: 0.45; }
+
 .chat-form {
   position: relative;
   border-top: 1px solid var(--line);

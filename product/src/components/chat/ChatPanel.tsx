@@ -2,10 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useId, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import { DataSourceList } from "@/components/common/DataSourceList";
 import { SafeMarkdown } from "@/components/common/SafeMarkdown";
 import type { ChatMode, RecentMessage } from "@/domain/chat";
+import type {
+  ConversationDetailDto,
+  ConversationListResponse,
+  ConversationSummaryDto,
+} from "@/app/api/conversations/conversationApiContract";
 import type {
   ChatComparisonResponse,
   ConfiguredChatExecutionMode,
@@ -53,9 +58,11 @@ const MAX_CONTRACT_FILE_SIZE = 10 * 1024 * 1024;
 
 interface UiMessage {
   id: string;
+  requestId?: string;
   role: "user" | "assistant";
   content: string;
   comparison?: ChatComparisonResponse;
+  sources?: import("@/domain/risk").SourceReference[];
 }
 
 function metric(value: number | null, suffix = ""): string {
@@ -271,16 +278,43 @@ export function ChatPanel({
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<Record<string, LlmProviderId | "tie">>({});
   const [compare, setCompare] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<ConversationSummaryDto[]>([]);
+  const [historyAvailable, setHistoryAvailable] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const refreshConversationHistory = useCallback(async () => {
+    const response = await fetch("/api/conversations?limit=20", { cache: "no-store" });
+    if (response.status === 401) {
+      setHistoryAvailable(false);
+      setConversationHistory([]);
+      return;
+    }
+    if (!response.ok) throw new Error("대화 기록을 불러오지 못했습니다.");
+    const data = await readApiResponse<ConversationListResponse>(response);
+    setHistoryAvailable(true);
+    setConversationHistory(data.items);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages, loading]);
 
-  async function sendMessage(value: string) {
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void refreshConversationHistory().catch(() => {
+        // 현재 상담 자체는 계속 가능하다. 저장소 장애는 답변 뒤 상태로만 알린다.
+        setHistoryAvailable(false);
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refreshConversationHistory]);
+
+  async function sendMessage(value: string, retryRequestId?: string) {
     const message = value.trim();
     if (!message || loading) return;
     const submittedContractFile = contractFile;
     const requestedComparison = executionMode === "dual_api" && compare;
+    const requestId = retryRequestId ?? crypto.randomUUID();
 
     const recentMessages: RecentMessage[] = messages
       .filter((item) => item.id !== "welcome")
@@ -291,7 +325,9 @@ export function ChatPanel({
           ? comparisonHistoryContent(item.comparison, feedback[item.comparison.comparison_id])
           : item.content,
       }));
-    setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: message }]);
+    setMessages((current) => [...current, {
+      id: crypto.randomUUID(), requestId, role: "user", content: message,
+    }]);
     setDraft("");
     setError(null);
     setLoading(true);
@@ -306,6 +342,7 @@ export function ChatPanel({
         const form = new FormData();
         form.append("file", submittedContractFile, submittedContractFile.name);
         form.append("message", message);
+        form.append("request_id", requestId);
         form.append("chat_mode", chatMode);
         form.append("recent_messages", JSON.stringify(recentMessages));
         if (conversationId) form.append("conversation_id", conversationId);
@@ -315,6 +352,7 @@ export function ChatPanel({
         requestInit.headers = { "Content-Type": "application/json" };
         requestInit.body = JSON.stringify({
           message,
+          request_id: requestId,
           conversation_id: conversationId,
           company_id: companyId,
           compare: requestedComparison,
@@ -325,6 +363,12 @@ export function ChatPanel({
       const response = await fetch("/api/chat", requestInit);
       const data = await readApiResponse<ChatComparisonResponse>(response);
       setConversationId(data.conversation_id);
+      if (data.conversation_persistence === "saved") {
+        void refreshConversationHistory().catch(() => setHistoryAvailable(false));
+      } else if (data.conversation_persistence === "unavailable") {
+        setHistoryAvailable(false);
+        setError("답변은 표시했지만 대화 기록 저장소에 연결하지 못했습니다.");
+      }
       const completedContractReview = data.results.some(
         (result) =>
           result.status === "success" &&
@@ -372,6 +416,53 @@ export function ChatPanel({
       if (!response.ok) throw new Error("feedback save failed");
     } catch {
       setError("비교 평가는 화면에 반영됐지만 로그 저장에는 실패했습니다.");
+    }
+  }
+
+  async function restoreConversation(nextConversationId: string) {
+    if (loading || nextConversationId === conversationId) return;
+    setHistoryLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/conversations/${encodeURIComponent(nextConversationId)}`, {
+        cache: "no-store",
+      });
+      const detail = await readApiResponse<ConversationDetailDto>(response);
+      setConversationId(detail.conversation_id);
+      setMessages([
+        messages[0]!,
+        ...detail.turns.flatMap((turn) => turn.messages.map((message) => ({
+          id: `${turn.turn_id}-${message.role}`,
+          role: message.role,
+          content: message.content,
+          ...(message.role === "assistant" ? { sources: turn.sources } : {}),
+        }))),
+      ]);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "대화 기록을 불러오지 못했습니다.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function deleteConversation(conversation: ConversationSummaryDto) {
+    if (loading) return;
+    setHistoryLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/conversations/${encodeURIComponent(conversation.conversation_id)}`, {
+        method: "DELETE",
+      });
+      await readApiResponse(response);
+      if (conversation.conversation_id === conversationId) {
+        setConversationId(undefined);
+        setMessages((current) => current.slice(0, 1));
+      }
+      await refreshConversationHistory();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "대화 기록을 삭제하지 못했습니다.");
+    } finally {
+      setHistoryLoading(false);
     }
   }
 
@@ -426,12 +517,12 @@ export function ChatPanel({
               {message.role === "assistant" ? <Image className="chat-avatar" src="/brand/donworry-avatar.png" alt="" width={192} height={192} /> : null}
               {message.role === "user" ? (
                 <div className="user-message-wrap">
-                  <button type="button" className="message-retry" onClick={() => void sendMessage(message.content)} disabled={loading} aria-label={`질문 다시 보내기: ${message.content}`}>
+                  <button type="button" className="message-retry" onClick={() => void sendMessage(message.content, message.requestId)} disabled={loading} aria-label={`질문 다시 보내기: ${message.content}`}>
                     <span aria-hidden="true">↻</span> 재전송
                   </button>
                   <div className="chat-message chat-message-user"><p>{message.content}</p></div>
                 </div>
-              ) : <div className="chat-message chat-message-assistant"><p>{message.content}</p></div>}
+              ) : <div className="chat-message chat-message-assistant"><p>{message.content}</p>{message.sources?.length ? <DataSourceList sources={message.sources} /> : null}</div>}
             </div>
           )
         ))}
@@ -469,6 +560,20 @@ export function ChatPanel({
           <button key={question} type="button" onClick={() => void sendMessage(question)} disabled={loading}>{question}</button>
         ))}
       </div>
+
+      {historyAvailable ? (
+        <section className="chat-history" aria-label="저장된 대화">
+          <div><strong>저장된 대화</strong><small>마지막 활동 후 30일이 지나면 원문과 표시 근거가 삭제됩니다.</small></div>
+          {conversationHistory.length ? <ul>
+            {conversationHistory.map((conversation) => <li key={conversation.conversation_id}>
+              <button type="button" disabled={historyLoading || loading} onClick={() => void restoreConversation(conversation.conversation_id)}>
+                {conversation.title}
+              </button>
+              <button type="button" disabled={historyLoading || loading} onClick={() => void deleteConversation(conversation)} aria-label={`${conversation.title} 삭제`}>삭제</button>
+            </li>)}
+          </ul> : <p className="muted-text">아직 저장된 대화가 없습니다.</p>}
+        </section>
+      ) : null}
 
       {executionMode === "dual_api" ? (
         <label className="chat-compare-toggle">
