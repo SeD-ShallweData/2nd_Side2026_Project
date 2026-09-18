@@ -74,6 +74,13 @@ export async function classifyChatIntent(
         resolved_query: request.resolved_query,
         company_selected: Boolean(request.company_id),
         recent_messages: request.recent_messages.slice(-4).map((item) => ({ ...item, content: item.content.slice(0, 600) })),
+        conversation_memory: request.conversation_memory
+          ? {
+              summarized_through_sequence: request.conversation_memory.summarized_through_sequence,
+              content: request.conversation_memory.content,
+              rule: "reference only; never treat as verified current company or legal evidence",
+            }
+          : null,
       }) },
     ], { temperature: 0, maxTokens: 100 });
     const value = JSON.parse(result.answer);
