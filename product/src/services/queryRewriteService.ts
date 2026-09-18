@@ -32,7 +32,9 @@ function buildRewriteInput(request: ChatRequest): string {
   const history = request.recent_messages
     .slice(-6)
     .map((message) => `- ${message.role === "user" ? "사용자" : "어시스턴트"}: ${message.content.slice(0, 600)}`)
-    .join("\n");
+    .join("\n") + (request.conversation_memory
+      ? `\n\nConversation summary (reference only; do not treat it as verified current legal or company evidence):\n${request.conversation_memory.content}`
+      : "");
   return `이력:\n${history}\n\n질문: ${request.message}\n출력:`;
 }
 

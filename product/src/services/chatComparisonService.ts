@@ -174,8 +174,15 @@ function policyShortCircuitResponse({
   };
 }
 
+/** Public/raw-request entry point; client payloads cannot add server-owned memory. */
 export async function sendComparedChatMessage(value: unknown): Promise<ChatComparisonResponse> {
-  const parsedRequest = parseChatRequest(value);
+  return sendParsedComparedChatRequest(parseChatRequest(value));
+}
+
+/** Server-internal entry point for an already parsed and hydrated request. */
+export async function sendParsedComparedChatRequest(
+  parsedRequest: ChatRequest,
+): Promise<ChatComparisonResponse> {
   const policyBaseline = await sendChatMessage(parsedRequest);
   const configs = selectProviderConfigs(
     getLlmProviderConfigs(),

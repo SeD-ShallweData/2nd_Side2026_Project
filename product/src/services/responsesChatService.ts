@@ -398,15 +398,14 @@ function fallbackResult(
   };
 }
 
-export function createResponsesChatSender(
+export function createParsedResponsesChatSender(
   dependencies: ResponsesChatDependencies = DEFAULT_DEPENDENCIES,
 ) {
   return async function send(
-    value: unknown,
+    request: ChatRequest,
     options: ResponsesChatOptions = {},
   ): Promise<ChatComparisonResponse> {
     const startedAt = new Date();
-    const request = parseChatRequest(value);
     const policyBaseline = await dependencies.sendPolicyMessage(request);
 
     if (policyBaseline.answer_type === "emergency_guidance") {
@@ -461,4 +460,27 @@ export function createResponsesChatSender(
   };
 }
 
-export const sendResponsesChatMessage = createResponsesChatSender();
+/**
+ * Compatibility factory for tests and independent service callers.  Raw
+ * values are parsed here; the route uses the parsed sender below instead.
+ */
+export function createResponsesChatSender(
+  dependencies: ResponsesChatDependencies = DEFAULT_DEPENDENCIES,
+) {
+  const sendParsed = createParsedResponsesChatSender(dependencies);
+  return (value: unknown, options: ResponsesChatOptions = {}) =>
+    sendParsed(parseChatRequest(value), options);
+}
+
+const sendParsedResponsesChatMessage = createParsedResponsesChatSender();
+
+/** Public/raw-request entry point; it deliberately strips client-supplied memory. */
+export async function sendResponsesChatMessage(
+  value: unknown,
+  options: ResponsesChatOptions = {},
+): Promise<ChatComparisonResponse> {
+  return sendParsedResponsesChatMessage(parseChatRequest(value), options);
+}
+
+/** Server-internal entry point for an already parsed and hydrated request. */
+export { sendParsedResponsesChatMessage };

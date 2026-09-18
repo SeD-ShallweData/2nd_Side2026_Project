@@ -1,36 +1,37 @@
 import type { ChatComparisonResponse } from "@/domain/chatComparison";
-import { sendComparedChatMessage } from "@/services/chatComparisonService";
+import type { ChatRequest } from "@/domain/chat";
+import { sendParsedComparedChatRequest } from "@/services/chatComparisonService";
 import {
-  sendResponsesChatMessage,
+  sendParsedResponsesChatMessage,
   type ResponsesChatOptions,
 } from "@/services/responsesChatService";
 import { getChatExecutionMode } from "@/server/responses/responsesConfig";
 
 export interface ChatExecutionDependencies {
   getMode: typeof getChatExecutionMode;
-  sendDual(value: unknown): Promise<ChatComparisonResponse>;
+  sendDual(request: ChatRequest): Promise<ChatComparisonResponse>;
   sendResponses(
-    value: unknown,
+    request: ChatRequest,
     options?: ResponsesChatOptions,
   ): Promise<ChatComparisonResponse>;
 }
 
 const DEFAULT_DEPENDENCIES: ChatExecutionDependencies = {
   getMode: getChatExecutionMode,
-  sendDual: sendComparedChatMessage,
-  sendResponses: sendResponsesChatMessage,
+  sendDual: sendParsedComparedChatRequest,
+  sendResponses: sendParsedResponsesChatMessage,
 };
 
 export function createConfiguredChatSender(
   dependencies: ChatExecutionDependencies = DEFAULT_DEPENDENCIES,
 ) {
   return async function sendConfigured(
-    value: unknown,
+    request: ChatRequest,
     options: ResponsesChatOptions = {},
   ): Promise<ChatComparisonResponse> {
     return dependencies.getMode() === "openai_responses"
-      ? dependencies.sendResponses(value, options)
-      : dependencies.sendDual(value);
+      ? dependencies.sendResponses(request, options)
+      : dependencies.sendDual(request);
   };
 }
 
