@@ -161,7 +161,7 @@ function policyShortCircuitResponse({
         query_transform: rewritten ? "llm_rewrite" : "none",
         context_mode: request.company_id ? "company" : "general",
         company_context_attached: Boolean(request.company_id && policyBaseline.answer_type === "company_context"),
-        recent_message_count: request.recent_messages.slice(-6).length,
+        recent_message_count: request.recent_messages.slice(-10).length,
         guardrail_action: "short_circuit",
         guardrail_hits: guardrailHits,
         upstream_request_id: null,

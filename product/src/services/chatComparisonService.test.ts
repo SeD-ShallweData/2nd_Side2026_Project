@@ -54,6 +54,15 @@ describe("의도와 근거에 따른 상담 경로", () => {
     expect(mocks.company).not.toHaveBeenCalled();
     expect(mocks.compare).not.toHaveBeenCalled();
   });
+  it("정책 단축 trace도 최근 원문 최대 10개 기준을 기록한다", async () => {
+    mocks.classify.mockResolvedValue({ intent: "off_topic", topic: "other", status: "classified" });
+    const recent_messages = Array.from({ length: 12 }, (_, index) => ({
+      role: index % 2 === 0 ? "user" as const : "assistant" as const,
+      content: `history ${index}`,
+    }));
+    const response = await sendComparedChatMessage({ message: "메뉴 추천", recent_messages });
+    expect(response.results[0]?.trace.recent_message_count).toBe(10);
+  });
   it("분야별 창구는 허용된 주소만 사용", async () => {
     mocks.classify.mockResolvedValue({ intent: "off_topic", topic: "investment", status: "classified" });
     const response = await sendComparedChatMessage({ message: "월급으로 주식 추천" });

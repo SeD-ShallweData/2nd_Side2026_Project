@@ -148,4 +148,47 @@ describe("로그인 대화 원문 저장", () => {
     await expect(deleteUserConversation(conversationId, USER)).resolves.toEqual({ deleted: true, conversation_id: conversationId });
     await expect(repository.findSummary(conversationId)).resolves.toBeNull();
   });
+
+  it("사용자 정정과 턴 당시 회사를 요약 원문 출처에 함께 남긴다", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    const userMessages = [
+      "회사 A에서 임금을 아직 받지 못했습니다.",
+      "지급일은 지난주였습니다.",
+      "근무 기록도 있습니다.",
+      "회사 B로 선택을 바꿨습니다.",
+      "정정할게요. 체불액은 100만원이 아니라 200만원입니다.",
+    ];
+    let conversationId = "";
+    for (const [index, message] of userMessages.entries()) {
+      conversationId = await persistCompletedChat({
+        message,
+        request_id: `correction_request_${String(index).padStart(4, "0")}`,
+        chat_mode: "wage",
+        recent_messages: [],
+        conversation_id: conversationId || undefined,
+        company_id: index < 3 ? "COMPANY_A" : "COMPANY_B",
+      }, response(`안내 ${index}`), USER);
+    }
+
+    const repository = getConversationRepository();
+    const summary = await repository.findSummary(conversationId);
+    expect(summary?.summary.referenced_company_ids).toEqual(["COMPANY_A", "COMPANY_B"]);
+    expect(summary?.summary.user_stated_facts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        text: expect.stringContaining("200만원"),
+        company_id: "COMPANY_B",
+        is_correction: true,
+        source_message_ids: [expect.any(String)],
+      }),
+    ]));
+    const hydrated = await hydrateConversationRequest({
+      message: "그 금액 기준으로 다음에 뭘 해야 하나요?",
+      request_id: "correction_request_hydrate",
+      chat_mode: "wage",
+      recent_messages: [],
+      conversation_id: conversationId,
+    }, USER);
+    expect(hydrated.conversation_memory?.content).toContain("사용자 정정");
+    expect(hydrated.conversation_memory?.content).toContain("회사 ID: COMPANY_B");
+  });
 });
