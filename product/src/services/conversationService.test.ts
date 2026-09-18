@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 import type { ChatComparisonResponse } from "@/domain/chatComparison";
 import {
   deleteUserConversation,
@@ -8,7 +10,11 @@ import {
   listUserConversations,
   persistCompletedChat,
 } from "@/services/conversationService";
-import { resetMockConversationsForTests } from "@/services/userDataProviders";
+import { summaryTargetForMessageCount } from "@/services/conversationSummaryService";
+import {
+  getConversationRepository,
+  resetMockConversationsForTests,
+} from "@/services/userDataProviders";
 
 const USER = { user_id: "00000000-0000-4000-8000-000000000001", email: "user@example.com", display_name: "사용자", role: "user" as const };
 const OTHER = { ...USER, user_id: "00000000-0000-4000-8000-000000000002", email: "other@example.com" };
@@ -35,18 +41,24 @@ afterEach(() => {
 });
 
 describe("로그인 대화 원문 저장", () => {
+  it("메시지 10개 단위에서만 요약 대상을 전진시킨다", () => {
+    expect([9, 10, 11, 19, 20, 21].map(summaryTargetForMessageCount)).toEqual([
+      0, 10, 10, 10, 20, 20,
+    ]);
+  });
+
   it("최종 표시 답변과 표시 근거만 저장하고 재시작 문맥을 복원한다", async () => {
     vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
     const conversationId = await persistCompletedChat({ message: "임금이 밀렸어요", request_id: REQUEST_ID, chat_mode: "wage", recent_messages: [] }, response(), USER);
     const detail = await getUserConversation(conversationId, USER);
 
-    expect(detail.turns[0]?.messages).toEqual([
+    expect(detail.turns[0]?.messages.map(({ role, content }) => ({ role, content }))).toEqual([
       { role: "user", content: "임금이 밀렸어요" },
       { role: "assistant", content: "최종 표시 답변입니다." },
     ]);
     expect(detail.turns[0]?.sources).toEqual([{ name: "근로기준법", category: "labor_law" }]);
     await expect(hydrateConversationRequest({ message: "그다음은요?", conversation_id: conversationId, request_id: "request_0000000000000002", chat_mode: "wage", recent_messages: [] }, USER)).resolves.toMatchObject({
-      recent_messages: detail.turns[0]?.messages,
+      recent_messages: detail.turns[0]?.messages.map(({ role, content }) => ({ role, content })),
     });
   });
 
@@ -59,5 +71,81 @@ describe("로그인 대화 원문 저장", () => {
     await expect(getUserConversation(conversationId, OTHER)).rejects.toMatchObject({ code: "CONVERSATION_NOT_FOUND" });
     await expect(deleteUserConversation(conversationId, OTHER)).rejects.toMatchObject({ code: "CONVERSATION_NOT_FOUND" });
     expect((await listUserConversations(USER, 20)).items).toHaveLength(1);
+  });
+
+  it("완료 메시지 10개는 출처를 가진 요약으로 저장하고 이후 원문만 최근 10개를 사용한다", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    let conversationId = "";
+    for (let index = 0; index < 5; index += 1) {
+      conversationId = await persistCompletedChat({
+        message: index === 0 ? "연락처 010-1234-5678 관련 임금 문의" : `임금 문의 ${index}`,
+        request_id: `summary_request_${String(index).padStart(4, "0")}`,
+        chat_mode: "wage",
+        recent_messages: [],
+        conversation_id: conversationId || undefined,
+      }, response(`안내 ${index}`), USER);
+    }
+
+    const repository = getConversationRepository();
+    const initial = await repository.findSummary(conversationId);
+    expect(initial).toMatchObject({ status: "ready", summarized_through_sequence: 10, summary_version: "extractive-v1" });
+    expect(initial?.summary.user_goals[0]?.source_message_ids).toHaveLength(1);
+    expect(initial?.summary.user_goals.map((item) => item.text).join(" ")).not.toContain("010-1234-5678");
+    expect(initial?.summary.system_confirmed_facts).toEqual([]);
+
+    conversationId = await persistCompletedChat({
+      message: "후속 질문",
+      request_id: "summary_request_0005",
+      chat_mode: "wage",
+      recent_messages: [],
+      conversation_id: conversationId,
+    }, response("후속 안내"), USER);
+    const hydrated = await hydrateConversationRequest({
+      message: "현재 질문",
+      request_id: "summary_request_0006",
+      chat_mode: "wage",
+      recent_messages: [],
+      conversation_id: conversationId,
+    }, USER);
+    expect(hydrated.recent_messages).toEqual([
+      { role: "user", content: "후속 질문" },
+      { role: "assistant", content: "후속 안내" },
+    ]);
+    expect(hydrated.conversation_memory?.summarized_through_sequence).toBe(10);
+
+    expect(await repository.claimSummary(conversationId, 20)).toBe(true);
+    await repository.failSummary(conversationId, 20, "SUMMARY_BUILD_FAILED");
+    const failedButUsable = await hydrateConversationRequest({
+      message: "요약 실패 중 현재 질문",
+      request_id: "summary_request_failure",
+      chat_mode: "wage",
+      recent_messages: [],
+      conversation_id: conversationId,
+    }, USER);
+    expect(failedButUsable.conversation_memory?.summarized_through_sequence).toBe(10);
+
+    for (let index = 6; index < 11; index += 1) {
+      conversationId = await persistCompletedChat({
+        message: `장기 대화 질문 ${index}`,
+        request_id: `summary_request_${String(index).padStart(4, "0")}`,
+        chat_mode: "wage",
+        recent_messages: [],
+        conversation_id: conversationId,
+      }, response(`장기 대화 안내 ${index}`), USER);
+    }
+    const extended = await repository.findSummary(conversationId);
+    expect(extended).toMatchObject({ status: "ready", summarized_through_sequence: 20 });
+    const longHydrated = await hydrateConversationRequest({
+      message: "장기 대화 현재 질문",
+      request_id: "summary_request_0011",
+      chat_mode: "wage",
+      recent_messages: [],
+      conversation_id: conversationId,
+    }, USER);
+    expect(longHydrated.recent_messages).toHaveLength(2);
+    expect(longHydrated.conversation_memory?.summarized_through_sequence).toBe(20);
+
+    await expect(deleteUserConversation(conversationId, USER)).resolves.toEqual({ deleted: true, conversation_id: conversationId });
+    await expect(repository.findSummary(conversationId)).resolves.toBeNull();
   });
 });

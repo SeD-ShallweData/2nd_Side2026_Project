@@ -52,7 +52,7 @@ GRANT CONNECT ON DATABASE :"db_name" TO :"conversation_user";
 GRANT USAGE ON SCHEMA public TO :"conversation_user";
 GRANT SELECT, INSERT, UPDATE, DELETE
   ON conversation_threads, conversation_turns, conversation_messages,
-     conversation_sources, conversation_company_events
+     conversation_sources, conversation_company_events, conversation_summaries
   TO :"conversation_user";
 SQL
 

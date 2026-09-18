@@ -1,15 +1,20 @@
 import "server-only";
 
-import type { AnswerType, GuardrailStatus, RecentMessage } from "@/domain/chat";
+import type { AnswerType, GuardrailStatus } from "@/domain/chat";
 import type {
   ConversationRepository,
   RecordCompletedConversationTurn,
   RecordedConversationTurn,
   StoredConversationDetail,
+  StoredConversationMessage,
   StoredConversationSummary,
   StoredConversationTurn,
 } from "@/domain/conversation";
 import type { SourceReference } from "@/domain/risk";
+import type {
+  ConversationStructuredSummary,
+  StoredConversationSummaryState,
+} from "@/domain/conversationSummary";
 import {
   isWriteDatabaseConfigured,
   queryWrite,
@@ -39,6 +44,7 @@ interface TurnRow {
 }
 
 interface MessageRow {
+  message_id: string;
   turn_id: string;
   role: "user" | "assistant";
   content: string;
@@ -54,6 +60,18 @@ interface SourceRow {
   as_of: string | null;
   url: string | null;
   document_id: string | null;
+}
+
+interface SummaryRow {
+  conversation_id: string;
+  summary: ConversationStructuredSummary;
+  summarized_through_sequence: number;
+  pending_through_sequence: number | null;
+  summary_version: string;
+  status: StoredConversationSummaryState["status"];
+  retry_count: number;
+  last_error_code: string | null;
+  updated_at: Date;
 }
 
 function missingConversation(): ServiceError {
@@ -93,6 +111,20 @@ function titleFor(message: string): string {
 
 function validUuid(value: string): boolean {
   return UUID_PATTERN.test(value);
+}
+
+function toStoredSummary(row: SummaryRow): StoredConversationSummaryState {
+  return {
+    conversation_id: row.conversation_id,
+    summary: row.summary,
+    summarized_through_sequence: row.summarized_through_sequence,
+    pending_through_sequence: row.pending_through_sequence,
+    summary_version: row.summary_version,
+    status: row.status,
+    retry_count: row.retry_count,
+    last_error_code: row.last_error_code,
+    updated_at: new Date(row.updated_at).toISOString(),
+  };
 }
 
 export class RealConversationRepository implements ConversationRepository {
@@ -151,7 +183,7 @@ export class RealConversationRepository implements ConversationRepository {
     const turnIds = turns.map((turn) => turn.turn_id);
     const messages = turnIds.length === 0 ? [] : await queryWrite<MessageRow>(
       "conversation",
-      `SELECT turn_id::text, role, content
+      `SELECT id::text AS message_id, turn_id::text, role, content
          FROM conversation_messages
         WHERE turn_id = ANY($1::uuid[])
         ORDER BY created_at ASC, id ASC`,
@@ -165,10 +197,10 @@ export class RealConversationRepository implements ConversationRepository {
         ORDER BY position ASC`,
       [turnIds],
     );
-    const messageByTurn = new Map<string, RecentMessage[]>();
+    const messageByTurn = new Map<string, StoredConversationMessage[]>();
     for (const message of messages) {
       const list = messageByTurn.get(message.turn_id) ?? [];
-      list.push({ role: message.role, content: message.content });
+      list.push({ message_id: message.message_id, role: message.role, content: message.content });
       messageByTurn.set(message.turn_id, list);
     }
     const sourceByTurn = new Map<string, SourceReference[]>();
@@ -293,5 +325,66 @@ export class RealConversationRepository implements ConversationRepository {
       [now.toISOString()],
     );
     return Number(rows[0]?.count ?? 0);
+  }
+
+  async findSummary(conversationId: string): Promise<StoredConversationSummaryState | null> {
+    if (!validUuid(conversationId)) return null;
+    const rows = await queryWrite<SummaryRow>(
+      "conversation",
+      `SELECT conversation_id::text, summary, summarized_through_sequence, pending_through_sequence,
+              summary_version, status, retry_count, last_error_code, updated_at
+         FROM conversation_summaries
+        WHERE conversation_id = $1::uuid`,
+      [conversationId],
+    );
+    return rows[0] ? toStoredSummary(rows[0]) : null;
+  }
+
+  async claimSummary(conversationId: string, throughSequence: number): Promise<boolean> {
+    if (!validUuid(conversationId)) return false;
+    const rows = await queryWrite<{ conversation_id: string }>(
+      "conversation",
+      `INSERT INTO conversation_summaries
+         (conversation_id, summary, summarized_through_sequence, pending_through_sequence, summary_version, status)
+       VALUES ($1::uuid, '{}'::jsonb, 0, $2, 'extractive-v1', 'pending')
+       ON CONFLICT (conversation_id) DO UPDATE
+         SET pending_through_sequence = EXCLUDED.pending_through_sequence,
+             status = 'pending', last_error_code = NULL, updated_at = now()
+       WHERE conversation_summaries.pending_through_sequence IS NULL
+         AND conversation_summaries.summarized_through_sequence < EXCLUDED.pending_through_sequence
+       RETURNING conversation_id::text`,
+      [conversationId, throughSequence],
+    );
+    return rows.length === 1;
+  }
+
+  async completeSummary(input: {
+    conversation_id: string;
+    through_sequence: number;
+    summary: ConversationStructuredSummary;
+    summary_version: string;
+  }): Promise<boolean> {
+    const rows = await queryWrite<{ conversation_id: string }>(
+      "conversation",
+      `UPDATE conversation_summaries
+          SET summary = $3::jsonb, summarized_through_sequence = $2,
+              pending_through_sequence = NULL, summary_version = $4, status = 'ready',
+              last_error_code = NULL, updated_at = now()
+        WHERE conversation_id = $1::uuid AND pending_through_sequence = $2
+        RETURNING conversation_id::text`,
+      [input.conversation_id, input.through_sequence, JSON.stringify(input.summary), input.summary_version],
+    );
+    return rows.length === 1;
+  }
+
+  async failSummary(conversationId: string, throughSequence: number, errorCode: string): Promise<void> {
+    await queryWrite(
+      "conversation",
+      `UPDATE conversation_summaries
+          SET pending_through_sequence = NULL, status = 'failed', retry_count = retry_count + 1,
+              last_error_code = $3, updated_at = now()
+        WHERE conversation_id = $1::uuid AND pending_through_sequence = $2`,
+      [conversationId, throughSequence, errorCode.slice(0, 80)],
+    );
   }
 }

@@ -620,6 +620,32 @@ SELECT json_build_object(
       SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='public' AND c.relname='conversation_messages' AND con.conname='conversation_messages_role_ck'
     )
+  ),
+  '0015_conversation_summaries', json_build_object(
+    'table:public.conversation_summaries', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_summaries' AND c.relkind IN ('r','p')
+    ),
+    'index:public.conversation_summaries_status_updated_idx', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_summaries_status_updated_idx' AND c.relkind IN ('i','I')
+    ),
+    'constraint:public.conversation_summaries.conversation_summaries_conversation_id_conversation_threads_id_fk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_summaries' AND con.conname='conversation_summaries_conversation_id_conversation_threads_id_fk'
+    ),
+    'constraint:public.conversation_summaries.conversation_summaries_status_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_summaries' AND con.conname='conversation_summaries_status_ck'
+    ),
+    'constraint:public.conversation_summaries.conversation_summaries_sequence_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_summaries' AND con.conname='conversation_summaries_sequence_ck'
+    ),
+    'constraint:public.conversation_summaries.conversation_summaries_payload_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_summaries' AND con.conname='conversation_summaries_payload_ck'
+    )
   )
 )::text;
 COMMIT;

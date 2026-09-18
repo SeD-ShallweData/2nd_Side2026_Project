@@ -19,7 +19,7 @@ export interface ConversationTurnDto {
   answer_type: AnswerType;
   guardrail_status: GuardrailStatus;
   created_at: string;
-  messages: RecentMessage[];
+  messages: Array<RecentMessage & { message_id: string }>;
   sources: SourceReference[];
 }
 

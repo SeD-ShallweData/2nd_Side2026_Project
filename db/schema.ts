@@ -488,6 +488,31 @@ export const conversationCompanyEvents = pgTable(
   ],
 );
 
+/* 최신 누적 요약 하나만 유지한다. 원문은 삭제하지 않고 LLM 문맥에서만 압축한다. */
+export const conversationSummaries = pgTable(
+  "conversation_summaries",
+  {
+    conversationId: uuid("conversation_id")
+      .primaryKey()
+      .references(() => conversationThreads.id, { onDelete: "cascade" }),
+    summary: jsonb().notNull().default(sql`'{}'::jsonb`),
+    summarizedThroughSequence: integer("summarized_through_sequence").notNull().default(0),
+    pendingThroughSequence: integer("pending_through_sequence"),
+    summaryVersion: text("summary_version").notNull().default("extractive-v1"),
+    status: text().notNull().default("pending"),
+    retryCount: integer("retry_count").notNull().default(0),
+    lastErrorCode: text("last_error_code"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("conversation_summaries_status_updated_idx").on(t.status, t.updatedAt),
+    check("conversation_summaries_status_ck", sql`${t.status} in ('pending','ready','failed')`),
+    check("conversation_summaries_sequence_ck", sql`${t.summarizedThroughSequence} >= 0 and (${t.pendingThroughSequence} is null or ${t.pendingThroughSequence} > ${t.summarizedThroughSequence})`),
+    check("conversation_summaries_retry_ck", sql`${t.retryCount} >= 0`),
+    check("conversation_summaries_payload_ck", sql`jsonb_typeof(${t.summary}) = 'object'`),
+  ],
+);
+
 /* ── posts: API 계약에 맞춘 상태값 + 카테고리 + 수정/삭제/숨김 이력 ────── */
 export const posts = pgTable(
   "posts",

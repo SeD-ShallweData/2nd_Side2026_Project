@@ -111,6 +111,14 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "constraint:public.conversation_turns.conversation_turns_answer_type_ck",
     "constraint:public.conversation_messages.conversation_messages_role_ck",
   ]),
+  "0015_conversation_summaries": Object.freeze([
+    "table:public.conversation_summaries",
+    "index:public.conversation_summaries_status_updated_idx",
+    "constraint:public.conversation_summaries.conversation_summaries_conversation_id_conversation_threads_id_fk",
+    "constraint:public.conversation_summaries.conversation_summaries_status_ck",
+    "constraint:public.conversation_summaries.conversation_summaries_sequence_ck",
+    "constraint:public.conversation_summaries.conversation_summaries_payload_ck",
+  ]),
 });
 
 function migrationLabel(migration) {
