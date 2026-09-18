@@ -118,9 +118,6 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
             <p>PDF, PNG, JPG · 최대 10MB</p>
           </div>
         </div>
-        <label className="button button-outline" htmlFor={inputId}>
-          파일 찾아보기
-        </label>
         <input
           ref={inputRef}
           id={inputId}
@@ -142,7 +139,12 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
           </div>
         ) : null}
         <div className="contract-actions">
-          <button type="submit" className="button button-dark" disabled={loading || !file}>
+          {/* 고르기와 검토하기는 한 줄에 나란히 선다. 둘 중 하나를 누르면 되는
+              자리라 위아래로 쌓으면 순서가 있는 것처럼 읽힌다. */}
+          <label className="button button-dark" htmlFor={inputId}>
+            파일 찾아보기
+          </label>
+          <button type="submit" className="button button-outline" disabled={loading || !file}>
             {loading ? "검토 중" : "선택한 파일 검토"}
           </button>
           {dataMode === "mock" ? (
@@ -151,12 +153,6 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
             </button>
           ) : null}
         </div>
-        <p className="privacy-note">
-          <span aria-hidden="true">🔒</span>
-          {dataMode === "real"
-            ? "업로드된 원문은 내부 문서 분석 API에 전달되며 제품 서버나 Git에 영구 저장하지 않습니다."
-            : "업로드된 원문은 제품 서버나 Git에 영구 저장하지 않습니다. 데모 모드에서는 파일 내용도 분석하지 않습니다."}
-        </p>
         {error ? (
           <p className="field-error" role="alert">
             {error}

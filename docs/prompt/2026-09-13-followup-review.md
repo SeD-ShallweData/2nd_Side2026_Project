@@ -1,5 +1,7 @@
 # 상담·계약서 후속 검토 C3·C4·C6
 
+> **현재 반영 상태 (2026-09-18):** C3 기본 Upstage·선택적 SKT 비교는 [PR #70](https://github.com/SeD-ShallweData/2nd_Side2026_Project/pull/70), C4 세 규칙은 [PR #78](https://github.com/SeD-ShallweData/2nd_Side2026_Project/pull/78), 안전 단정 보완은 #79·#90으로 병합됐다. 아래 ‘미구현’·‘선언만’·‘합의 후 구현’ 서술은 9월 13일 검토 당시 기록이다. C4 현재 구현 범위는 [반영 문서](2026-09-15-contract-rules-implementation.md)를 따른다. 별도 법적 정책 합의 여부는 구현 병합만으로 확정하지 않는다.
+
 검토 기준: 2026-09-13 main `1cdf7e1`. 법적 판정 정책은 팀 합의 전 초안이며 이 문서 PR은 계약서 규칙 코드를 바꾸지 않는다.
 
 ## C3 단일 LLM 영향 검토

@@ -116,9 +116,18 @@ export function SiteHeader() {
     <>
       <header className="consumer-header">
         <div className="shell consumer-header-inner">
-          <Link href="/" className="brand-link">
-            <Brand />
-          </Link>
+          {/* 모드 전환은 로고 바로 옆에 둔다. 오른쪽 계정 영역에 있으면
+              로그인·로그아웃과 같은 성격으로 읽힌다. */}
+          <div className="consumer-header-lead">
+            <Link href="/" className="brand-link">
+              <Brand />
+            </Link>
+            {!isInspector && user?.role === "admin" ? (
+              <Link href="/inspector" className="consumer-mode-switch" aria-label="일반 사용자 모드에서 관리자 모드로 전환">
+                관리자 모드 <span aria-hidden="true">↗</span>
+              </Link>
+            ) : null}
+          </div>
           <nav className="consumer-main-nav" aria-label="주요 메뉴">
             {NAV_ITEMS.map((item) => {
               const current = isCurrentNavPath(pathname, item.href);
@@ -135,11 +144,6 @@ export function SiteHeader() {
             })}
           </nav>
           <div className="consumer-header-side" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {!isInspector && user?.role === "inspector" ? (
-              <Link href="/inspector" className="consumer-mode-switch" aria-label="일반 사용자 모드에서 근로감독관 모드로 전환">
-                근로감독관 모드 <span aria-hidden="true">↗</span>
-              </Link>
-            ) : null}
             {sessionState.status === "loading" ? null : user ? (
               <div className="consumer-header-account" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span className="muted-text">{(user.display_name || "사용자").trim() || "사용자"}님</span>
@@ -165,8 +169,9 @@ export function SiteHeader() {
         <p className="shell field-error" role="alert">{logoutError}</p>
       ) : null}
       {!isInspector && pathname !== "/chat" ? (
-        <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리와 상담 바로가기">
-          <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} /> 돈워리와 상담
+        <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리 AI에게 상담하기">
+          <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />
+          <span className="consumer-floating-chat-label">돈워리 AI에게 상담하기</span>
         </Link>
       ) : null}
       <nav className="consumer-mobile-nav" aria-label="모바일 주요 메뉴">

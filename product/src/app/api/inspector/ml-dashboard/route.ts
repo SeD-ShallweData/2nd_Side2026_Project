@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<NextResponse> {
   try {
     const user = requireAuthenticatedUser(await getOptionalSessionUser(getSessionTokenFromRequest(request)));
-    requireUserRole(user, ["inspector"]);
+    requireUserRole(user, ["admin"]);
     const url = new URL(request.url);
     const tab = url.searchParams.get("tab") ?? "wage";
     return noStoreJson(await getMlDashboard(tab as "wage" | "safety", url.searchParams.get("region"), url.searchParams.get("industry")));

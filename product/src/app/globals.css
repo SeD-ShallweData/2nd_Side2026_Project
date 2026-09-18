@@ -2,13 +2,19 @@
   --brand: #ffd600;
   --brand-soft: #fff6bd;
   --brand-deep: #d5a900;
-  --ink: #1d1d1a;
-  --ink-soft: #4c4c45;
-  --muted: #76766e;
-  --line: #e4e2d9;
-  --line-strong: #cbc8bb;
-  --surface: #f7f6f1;
-  --surface-warm: #fffdf5;
+  --ink: #081f3a;
+  --ink-soft: #2a507b;
+  --muted: #3a6ba3;
+  /* 로고 코끼리에서 뽑은 실제 청색. --muted 보다 차분해 도식·삽화에 쓴다. */
+  --logo-blue: #53718a;
+  /* 돈워리 아바타가 입은 옷의 짙은 파랑. 아바타 원형 테두리에 쓴다. */
+  --avatar-ring: #425168;
+  /* 테두리 두께. 세 군데가 같은 값을 쓰도록 한 곳에서 정한다. */
+  --avatar-ring-width: 0.00625rem;
+  --line: #d6e4f3;
+  --line-strong: #b0c7e2;
+  --surface: #f0f6fd;
+  --surface-warm: #f9fcff;
   --white: #ffffff;
   --watch: #5f6872;
   --watch-bg: #eef1f4;
@@ -23,8 +29,8 @@
   --radius-sm: 10px;
   --radius-md: 18px;
   --radius-lg: 28px;
-  --shadow-sm: 0 8px 24px rgb(29 29 26 / 7%);
-  --shadow-lg: 0 26px 70px rgb(29 29 26 / 13%);
+  --shadow-sm: 0 8px 24px rgb(8 31 58 / 7%);
+  --shadow-lg: 0 26px 70px rgb(8 31 58 / 13%);
 }
 
 * {
@@ -84,7 +90,7 @@ summary:focus-visible {
 }
 
 .narrow-shell {
-  width: min(920px, calc(100% - 40px));
+  width: min(1080px, calc(100% - 40px));
 }
 
 .skip-link {
@@ -121,7 +127,7 @@ summary:focus-visible {
   font-size: 0.79rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  /* uppercase 를 걸면 'Co끼리' 가 'CO끼리' 로 나온다. 브랜드 표기를 지킨다. */
 }
 
 .muted-text {
@@ -156,12 +162,12 @@ summary:focus-visible {
 .button-dark {
   background: var(--ink);
   color: var(--white);
-  box-shadow: 0 8px 20px rgb(29 29 26 / 16%);
+  box-shadow: 0 8px 20px rgb(8 31 58 / 16%);
 }
 
 .button-dark:hover:not(:disabled) {
   background: #050505;
-  box-shadow: 0 11px 26px rgb(29 29 26 / 22%);
+  box-shadow: 0 11px 26px rgb(8 31 58 / 22%);
 }
 
 .button-outline {
@@ -181,7 +187,7 @@ summary:focus-visible {
 }
 
 .button-ghost:hover:not(:disabled) {
-  background: rgb(29 29 26 / 6%);
+  background: rgb(8 31 58 / 6%);
 }
 
 .button-large {
@@ -218,7 +224,7 @@ summary:focus-visible {
   position: sticky;
   top: 0;
   z-index: 50;
-  border-bottom: 1px solid rgb(228 226 217 / 80%);
+  border-bottom: 1px solid rgb(214 228 243 / 80%);
   background: rgb(255 255 255 / 92%);
   backdrop-filter: blur(18px);
 }
@@ -252,6 +258,8 @@ summary:focus-visible {
 }
 
 .brand-word {
+  /* 색을 따로 주지 않는다. 밝은 헤더에서는 남색(--ink), 어두운 푸터에서는
+     흰색으로 물려받아야 두 곳 모두 읽힌다. */
   font-size: 1.75rem;
   font-weight: 950;
   letter-spacing: -0.05em;
@@ -282,7 +290,7 @@ summary:focus-visible {
   overflow: hidden;
   background:
     radial-gradient(circle at 82% 28%, rgb(255 214 0 / 26%), transparent 27%),
-    linear-gradient(180deg, #fffef9 0%, #fff 100%);
+    linear-gradient(180deg, #fbfdff 0%, #fff 100%);
   padding: 92px 0 104px;
 }
 
@@ -290,7 +298,7 @@ summary:focus-visible {
   position: absolute;
   width: 420px;
   height: 420px;
-  border: 1px solid rgb(29 29 26 / 6%);
+  border: 1px solid rgb(8 31 58 / 6%);
   border-radius: 50%;
   content: "";
   right: -120px;
@@ -447,7 +455,7 @@ summary:focus-visible {
   min-height: 132px;
   border: 1px solid #ead58d;
   border-radius: 16px;
-  background: #fffaf0;
+  background: #f7fbff;
   padding: 17px;
 }
 
@@ -680,14 +688,14 @@ summary:focus-visible {
 }
 
 .cta-card p {
-  color: rgb(29 29 26 / 72%);
+  color: rgb(8 31 58 / 72%);
 }
 
 /* Footer */
 
 .site-footer {
   margin-top: 70px;
-  border-top: 1px solid #33332f;
+  border-top: 1px solid #17365a;
   background: var(--ink);
   color: var(--white);
   padding: 54px 0;
@@ -731,7 +739,7 @@ summary:focus-visible {
 
 .page-section {
   min-height: 70vh;
-  background: linear-gradient(180deg, #fffdf5 0, #fff 340px);
+  background: linear-gradient(180deg, #f9fcff 0, #fff 340px);
   padding: 74px 0 100px;
 }
 
@@ -768,7 +776,7 @@ summary:focus-visible {
   border: 1px solid #e8d47e;
   border-radius: 13px;
   background: var(--brand-soft);
-  color: #5d4b00;
+  color: #081f3a;
   padding: 12px 16px;
   font-size: 0.84rem;
 }
@@ -781,7 +789,7 @@ summary:focus-visible {
   border: 1px solid #e8d47e;
   border-radius: 13px;
   background: var(--brand-soft);
-  color: #5d4b00;
+  color: #081f3a;
   padding: 12px 16px;
   font-size: 0.84rem;
 }
@@ -797,12 +805,6 @@ summary:focus-visible {
   font-size: 0.68rem;
   font-weight: 950;
   letter-spacing: 0.06em;
-}
-
-.mode-banner-real {
-  border-color: #b9d7e3;
-  background: var(--info-bg);
-  color: var(--info);
 }
 
 .mock-banner > span,
@@ -870,63 +872,96 @@ summary:focus-visible {
   box-shadow: 0 0 0 4px rgb(255 214 0 / 22%);
 }
 
+/* 입력칸 · 필터 · 검색 버튼을 한 줄에 놓는다. 셋 사이 간격은 --search-gap
+   하나로 관리하고, 좁아지면 입력칸만 줄어들고 버튼은 제 크기를 지킨다. */
 .search-input-row {
-  position: relative;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 1fr auto;
-  align-items: start;
+  --search-gap: 0.625rem;   /* 10px */
+  --search-control-height: 3.5rem;
+  display: flex;
+  align-items: center;
+  gap: var(--search-gap);
+  flex-wrap: wrap;
 }
 
-.search-input-row input {
-  width: 100%;
-  height: 56px;
+/* 돋보기와 입력칸을 한 상자 안에 나란히 둔다. 겹쳐 놓으면 안내 문구
+   '예: 건설, 한빛테크' 의 첫 글자와 부딪힌다. */
+.search-input-field {
+  display: flex;
+  flex: 1 1 16rem;
+  min-width: 0;
+  align-items: center;
+  gap: var(--search-gap);
+  height: var(--search-control-height);
   border: 1px solid var(--line-strong);
-  border-radius: 14px;
+  border-radius: 0.875rem;
   background: var(--surface-warm);
-  color: var(--ink);
-  padding: 0 18px 0 48px;
+  padding-block: 0;
+  padding-inline: 1.125rem;
   transition: border 160ms ease, box-shadow 160ms ease;
 }
 
-.search-input-row input:focus {
+.search-input-field:focus-within {
   border-color: var(--ink);
-  box-shadow: 0 0 0 4px rgb(255 214 0 / 22%);
+  box-shadow: 0 0 0 0.25rem rgb(255 214 0 / 22%);
+}
+
+/* 선택자를 길게 쓴 이유: 위쪽 `.search-form input:not([type=...])` 규칙이
+   명시도가 높아 테두리를 다시 그려 버린다. 같은 형태로 맞춰 이긴다. */
+.search-form .search-input-row input:not([type="checkbox"]):not([type="radio"]) {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background-color: transparent;
+  color: var(--ink);
+  padding: 0;
+  /* 브라우저 기본 스타일과 자동완성 배경까지 눌러 둔다. 테두리는 바깥
+     .search-input-field 하나만 그린다. */
+  appearance: none;
+  box-shadow: none;
+  outline: none;
+}
+
+.search-form .search-input-row input:not([type="checkbox"]):not([type="radio"]):focus {
   outline: 0;
 }
 
 .search-icon {
-  position: absolute;
-  top: 13px;
-  left: 16px;
-  z-index: 2;
+  flex-shrink: 0;
   color: var(--muted);
   font-size: 1.4rem;
   font-weight: 900;
+  line-height: 1;
 }
 
+/* 필터와 검색은 같은 크기로 입력칸 오른쪽에 이어 붙는다. */
 .search-action-stack {
-  display: grid;
-  min-width: 108px;
-  gap: 8px;
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--search-gap);
 }
 
-.search-action-stack > .button {
-  min-height: 56px;
+.search-action-stack > .button,
+.search-action-stack > .search-filter-toggle {
+  width: 6.5rem;
+  height: var(--search-control-height);
+  min-height: var(--search-control-height);
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 0.75rem;
 }
 
 .search-filter-toggle {
   display: flex;
-  min-height: 36px;
+  border-radius: 0.875rem;
   align-items: center;
   justify-content: center;
   gap: 6px;
   border: 1px solid var(--line-strong);
-  border-radius: 10px;
   background: var(--white);
   color: var(--ink-soft);
   padding: 7px 10px;
-  font-size: 0.76rem;
+  font-size: 1rem;   /* 검색 버튼은 크기를 따로 안 주고 본문(1rem)을 물려받는다. 나란히 서므로 같은 값으로 맞춘다. */
   font-weight: 850;
   cursor: pointer;
   transition: border 160ms ease, background 160ms ease;
@@ -1468,7 +1503,7 @@ summary:focus-visible {
   border-radius: 24px;
   background: var(--white);
   padding: 27px;
-  box-shadow: 0 6px 20px rgb(29 29 26 / 4%);
+  box-shadow: 0 6px 20px rgb(8 31 58 / 4%);
 }
 
 .risk-card-wage {
@@ -1920,8 +1955,13 @@ summary:focus-visible {
   box-shadow: var(--shadow-sm);
 }
 
+/* .comparison-chat-panel 이 overflow: visible 로 덮어써서 패널의 둥근 모서리가
+   상단 띠를 잘라 주지 못한다. 띠가 스스로 같은 곡률을 갖게 한다 —
+   패널 반지름 24px 에서 테두리 1px 을 뺀 값이다. */
 .chat-topbar {
   display: flex;
+  border-top-left-radius: 23px;
+  border-top-right-radius: 23px;
   min-height: 56px;
   align-items: center;
   justify-content: space-between;
@@ -2096,7 +2136,7 @@ summary:focus-visible {
   align-items: center;
   border-radius: 6px;
   background: var(--brand-soft);
-  color: #6b5500;
+  color: #0d315a;
   padding: 2px 6px;
   font-size: 0.58rem;
   font-weight: 850;
@@ -2357,7 +2397,7 @@ summary:focus-visible {
 
 .check-item.is-checked {
   border-color: #dec43e;
-  background: #fffdf0;
+  background: #f9fcff;
 }
 
 .check-item input {
@@ -2768,7 +2808,7 @@ summary:focus-visible {
 
 .provider-answer-head {
   align-items: center;
-  background: #f8f8f6;
+  background: #f2f8fe;
   border-bottom: 1px solid var(--line);
   display: flex;
   gap: 12px;
@@ -2861,7 +2901,7 @@ summary:focus-visible {
   display: grid;
   gap: 14px;
   border-top: 1px solid var(--line);
-  background: #fffef9;
+  background: #fbfdff;
   padding: 15px 16px;
 }
 
@@ -2943,7 +2983,7 @@ summary:focus-visible {
 }
 
 .trace-security-note {
-  background: #f5f5f2;
+  background: #eff5fc;
   border-radius: 8px;
   color: var(--muted);
   font-size: 0.7rem;
@@ -2995,7 +3035,7 @@ summary:focus-visible {
 
 .comparison-feedback {
   align-items: center;
-  background: #faf9f3;
+  background: #f5f9fe;
   border: 1px solid var(--line);
   border-radius: 12px;
   display: flex;
@@ -3057,7 +3097,7 @@ summary:focus-visible {
 
 .dual-loading span {
   align-items: center;
-  background: #f5f5f2;
+  background: #eff5fc;
   border-radius: 999px;
   display: flex;
   font-size: 0.75rem;
@@ -3073,7 +3113,7 @@ summary:focus-visible {
 
 .chat-compare-toggle {
   align-items: center;
-  background: #faf9f3;
+  background: #f5f9fe;
   border-top: 1px solid var(--line);
   cursor: pointer;
   display: flex;
@@ -3151,7 +3191,7 @@ summary:focus-visible {
   display: inline-flex;
   border-radius: 999px;
   background: var(--brand-soft);
-  color: #6b5500;
+  color: #0d315a;
   padding: 3px 8px;
   font-size: 0.66rem;
   font-weight: 800;
@@ -3251,24 +3291,6 @@ summary:focus-visible {
   margin-top: 22px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
-}
-
-.community-policy-note {
-  margin-top: 18px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface-warm);
-  padding: 16px;
-}
-
-.community-policy-note strong {
-  font-size: 0.8rem;
-}
-
-.community-policy-note p {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: 0.72rem;
 }
 
 .dual-api-note {
@@ -3568,12 +3590,19 @@ summary:focus-visible {
     min-height: 0;
   }
 
-  .search-input-row {
-    grid-template-columns: 1fr;
+  /* 좁아지면 입력칸이 한 줄을 다 쓰고, 필터와 검색이 아랫줄을 반씩 나눠 갖는다. */
+  .search-input-field {
+    flex-basis: 100%;
   }
 
-  .search-input-row .button {
-    width: 100%;
+  .search-action-stack {
+    flex: 1 1 100%;
+  }
+
+  .search-action-stack > .button,
+  .search-action-stack > .search-filter-toggle {
+    flex: 1 1 0;
+    width: auto;
   }
 
   .mock-banner,
@@ -3670,60 +3699,86 @@ summary:focus-visible {
   position: sticky;
   top: 0;
   z-index: 80;
-  border-bottom: 1px solid rgb(228 226 217 / 88%);
+  border-bottom: 1px solid rgb(214 228 243 / 88%);
   background: rgb(255 255 255 / 94%);
   backdrop-filter: blur(14px);
 }
 
-.consumer-header-inner { display: flex; min-height: 76px; align-items: center; justify-content: space-between; }
-.consumer-main-nav { display: flex; align-items: center; gap: 7px; }
-.consumer-main-nav a { border-radius: 999px; color: #71777e; font-size: .9rem; font-weight: 800; padding: 11px 15px; }
+/* 가운데 칸을 자동 폭으로 두고 양옆을 1fr 로 밀어 메뉴를 화면 가운데에 세운다.
+   메뉴 항목의 글자 수가 제각각이라 메뉴 전체의 중심과 가운데 항목('계약서 진단')의
+   중심이 어긋난다. --nav-shift 로 그 차이만큼 왼쪽으로 평행이동해 가운데 항목이
+   화면 정중앙에 오게 한다. 항목 사이 간격은 건드리지 않는다. */
+.consumer-header-inner { display: grid; min-height: 76px; align-items: center; grid-template-columns: 1fr auto 1fr; }
+.consumer-header-inner > :last-child { justify-self: end; }
+.consumer-main-nav { --nav-shift: 0.9375rem;   /* 실측 15px. '서비스 소개·사업장 확인' 이 '커뮤니티·현장 신고' 보다 넓어 생기는 차이다. */ display: flex; align-items: center; gap: 7px; transform: translateX(calc(-1 * var(--nav-shift))); }
+.consumer-main-nav a { border-radius: 999px; color: var(--muted); font-size: .9rem; font-weight: 800; padding: 11px 15px; }
 .consumer-main-nav a:hover { background: var(--surface); color: var(--ink); }
 .consumer-main-nav a.is-current { background: var(--surface); color: var(--ink); }
 .consumer-main-nav .consumer-ai-link { margin-left: 9px; background: var(--brand); color: var(--ink); padding-inline: 20px; }
 .consumer-main-nav .consumer-ai-link::before { content: "▤"; margin-right: 8px; }
 .consumer-main-nav .consumer-ai-link:hover { background: #f1c900; }
 
-.consumer-mode-switch { flex-shrink: 0; margin-left: 16px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink-soft); font-size: .78rem; font-weight: 800; padding: 8px 14px; white-space: nowrap; }
+/* 로고와 첫 메뉴 사이에 선다. */
+.consumer-header-lead { display: flex; align-items: center; gap: 16px; }
+.consumer-mode-switch { flex-shrink: 0; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink-soft); font-size: .78rem; font-weight: 800; padding: 8px 14px; white-space: nowrap; }
 .consumer-mode-switch:hover { border-color: var(--ink); background: var(--surface); color: var(--ink); }
 
-.consumer-floating-chat { position: fixed; right: 28px; bottom: 26px; z-index: 90; display: flex; align-items: center; gap: 10px; border: 3px solid var(--ink); border-radius: 999px; background: var(--brand); box-shadow: 0 9px 0 rgb(29 29 26 / 12%); padding: 8px 15px 8px 8px; font-size: .8rem; font-weight: 900; }
-.consumer-floating-chat img { display: block; width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+/* 시연장에서 멀리서도 눈에 들어오도록 기존 크기의 1.5배로 키운다. */
+.consumer-floating-chat { position: fixed; right: 28px; bottom: 26px; z-index: 90; display: flex; align-items: center; gap: 15px; border: 3px solid var(--ink); border-radius: 999px; background: var(--brand); box-shadow: 0 13px 0 rgb(8 31 58 / 12%); padding: 12px 23px 12px 12px; font-size: 1.2rem; font-weight: 900; }
+.consumer-floating-chat img { display: block; width: 3rem; height: 3rem; border: var(--avatar-ring-width) solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
+.consumer-floating-chat-label { text-align: center; line-height: 1.3; }
 .consumer-mobile-nav { display: none; }
 
-.consumer-footer { border-top: 1px solid #323944; background: #171d26; color: #fff; padding: 48px 0 34px; }
-.consumer-footer-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 25px 70px; }
+.consumer-footer { border-top: 1px solid #1c3a5c; background: #081f3a; color: #fff; padding: 48px 0 34px; }
+.consumer-footer-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 25px 70px; align-items: end; }
 .consumer-footer-grid > div > p { max-width: 480px; margin: 16px 0 0; color: rgb(255 255 255 / 56%); font-size: .79rem; }
 .consumer-footer nav { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 24px; align-content: start; font-size: .78rem; font-weight: 750; }
 .consumer-footer nav a { color: rgb(255 255 255 / 72%); }
 .consumer-footer nav a:hover { color: var(--brand); }
 .consumer-footer nav .inspector-footer-link { color: var(--brand); }
-.consumer-footer-note { grid-column: 1 / -1; border-top: 1px solid rgb(255 255 255 / 10%); margin: 0; padding-top: 20px; color: rgb(255 255 255 / 42%); font-size: .68rem; }
+/* 하단 메뉴를 걷어내면서 두 문장만 남았다. 같은 줄 양끝에 세워 한눈에 읽히게 한다. */
+.consumer-footer-note { align-self: end; margin: 16px 0 0; text-align: right; color: rgb(255 255 255 / 56%); font-size: .79rem; }
 
-.refresh-hero { position: relative; overflow: hidden; background: radial-gradient(circle at 82% 28%, rgb(255 214 0 / 26%), transparent 27%), linear-gradient(180deg, #fffef9 0%, #fff 100%); padding: 88px 0 62px; }
+.refresh-hero { position: relative; overflow: hidden; background: radial-gradient(circle at 82% 28%, rgb(255 214 0 / 26%), transparent 27%), linear-gradient(180deg, #fbfdff 0%, #fff 100%); padding: 88px 0 62px; }
 .refresh-hero::before { position: absolute; top: -160px; right: -120px; width: 420px; height: 420px; border: 1px solid rgb(25 31 40 / 6%); border-radius: 50%; content: ""; }
 .refresh-hero-grid { position: relative; display: grid; grid-template-columns: minmax(0,1.05fr) minmax(380px,.95fr); gap: 70px; align-items: center; }
 .refresh-hero-copy { min-width: 0; }
 .refresh-hero-copy h1 { max-width: 100%; margin: 20px 0 24px; line-height: 1.12; letter-spacing: -.055em; }
-.refresh-hero-copy h1 > span { display: block; margin-bottom: 8px; color: #353a3f; font-size: clamp(1.65rem, 3vw, 2.55rem); font-weight: 750; }
-.refresh-hero-copy h1 mark { display: block; max-width: 100%; background: none; color: #353a3f; font-size: clamp(1.65rem, 3vw, 2.55rem); font-weight: 750; padding-inline: 4px; white-space: normal; }
+.refresh-hero-copy h1 > span { display: block; margin-bottom: 8px; color: #1c3a5c; font-size: clamp(1.65rem, 3vw, 2.55rem); font-weight: 750; }
+.refresh-hero-copy h1 mark { display: block; max-width: 100%; background: none; color: #1c3a5c; font-size: clamp(1.65rem, 3vw, 2.55rem); font-weight: 750; padding-inline: 4px; white-space: normal; }
 .refresh-hero-copy h1 mark .refresh-brand-word { position: relative; isolation: isolate; display: inline-block; margin-left: .08em; color: var(--ink); font-size: clamp(2.6rem, 4vw, 4.2rem); font-weight: 950; line-height: .9; vertical-align: -.06em; white-space: nowrap; }
 .refresh-hero-copy h1 mark .refresh-brand-word::before { position: absolute; z-index: -1; right: 0; bottom: .02em; left: 0; height: .4em; background: var(--brand); content: ""; transform: rotate(-1deg); transform-origin: center; }
 .refresh-hero-copy > p { max-width: 590px; color: var(--ink-soft); font-size: 1.14rem; line-height: 1.65; }
 .refresh-button-row { display: flex; flex-wrap: wrap; gap: 11px; margin-top: 30px; }
-.button-light { border-color: rgb(29 29 26 / 12%); background: rgb(255 255 255 / 72%); color: var(--ink); }
+.button-light { border-color: rgb(8 31 58 / 12%); background: rgb(255 255 255 / 72%); color: var(--ink); }
 .button-ai { background: var(--brand); color: var(--ink); }
+/* 상담 유도 버튼. 안경 쓴 돈워리를 앞에 세워 어떤 서비스로 가는지 한눈에
+   보이게 하고, 옆의 검은 버튼과 크기·그림자를 똑같이 맞춘다. */
+.consult-cta { display: inline-flex; height: 3.5rem; align-items: center; gap: 0.625rem; box-shadow: 0 8px 20px rgb(8 31 58 / 16%); padding-block: 0; }
+.consult-cta:hover:not(:disabled) { box-shadow: 0 11px 26px rgb(8 31 58 / 22%); }
+.consult-cta img { display: block; width: 1.75rem; height: 1.75rem; flex-shrink: 0; border: var(--avatar-ring-width) solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
+
+/* 나란히 놓이는 두 버튼은 높이를 맞춘다. 너비까지 묶으면 글자가 긴 쪽이
+   두 줄로 접히면서 오히려 높이가 어긋난다. 너비는 글자에 맡긴다. */
+.refresh-hero-copy .refresh-button-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.refresh-hero-copy .refresh-button-row > .button-large,
+.refresh-final-cta .refresh-button-row > .button-large {
+  flex: 0 1 auto;
+  height: 3.5rem;
+  padding-block: 0;
+  white-space: nowrap;
+}
 .refresh-hero-facts { display: flex; gap: 0; margin: 33px 0 0; }
-.refresh-hero-facts div { display: grid; gap: 1px; border-left: 1px solid rgb(29 29 26 / 16%); padding: 0 21px; }
+.refresh-hero-facts div { display: grid; gap: 1px; border-left: 1px solid rgb(8 31 58 / 16%); padding: 0 21px; }
 .refresh-hero-facts div:first-child { border-left: 0; padding-left: 0; }
-.refresh-hero-facts dt { color: #77756d; font-size: .66rem; }
+.refresh-hero-facts dt { color: #3a6ba3; font-size: .66rem; }
 .refresh-hero-facts dd { margin: 0; font-size: .76rem; font-weight: 850; }
 .refresh-hero-visual { position: relative; }
 .refresh-demo-label { position: absolute; right: 15px; top: -31px; color: #746618; font-size: .67rem; font-weight: 850; }
-.refresh-demo-window { overflow: hidden; border: 1px solid rgb(29 29 26 / 15%); border-radius: 22px; background: #fff; box-shadow: 0 30px 80px rgb(87 71 0 / 18%); transform: rotate(1deg); }
-.refresh-demo-bar { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--line); background: #f5f5f2; padding: 12px 16px; }
-.refresh-demo-bar i { width: 8px; height: 8px; border-radius: 50%; background: #d4d2c8; }
-.refresh-demo-bar span { margin-left: 8px; color: #99978e; font-size: .61rem; }
+.refresh-demo-window { overflow: hidden; border: 1px solid rgb(8 31 58 / 15%); border-radius: 22px; background: #fff; box-shadow: 0 30px 80px rgb(8 31 58 / 18%); transform: rotate(1deg); }
+.refresh-demo-bar { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--line); background: #eff5fc; padding: 12px 16px; }
+.refresh-demo-bar i { width: 8px; height: 8px; border-radius: 50%; background: #c0d2e7; }
+.refresh-demo-bar span { margin-left: 8px; color: #799cc5; font-size: .61rem; }
 .refresh-demo-company { display: flex; align-items: center; gap: 12px; padding: 22px 24px 15px; }
 .refresh-demo-company > b { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 11px; background: var(--brand); font-size: .7rem; }
 .refresh-demo-company div { display: grid; }
@@ -3732,13 +3787,13 @@ summary:focus-visible {
 .refresh-demo-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; padding: 0 24px 25px; }
 .refresh-demo-cards article { display: flex; min-height: 218px; flex-direction: column; border: 2px solid; border-radius: 15px; padding: 18px; }
 .refresh-demo-cards article.is-review { border-color: #e26a53; background: #fffaf8; }
-.refresh-demo-cards article.is-watch { border-color: #d6a508; background: #fffdf3; }
+.refresh-demo-cards article.is-watch { border-color: #d6a508; background: #f9fcff; }
 .refresh-demo-cards small { color: var(--muted); font-size: .61rem; }
 .refresh-demo-cards strong { margin: 3px 0 18px; font-size: .82rem; }
 .refresh-demo-cards em { align-self: flex-start; border-radius: 999px; background: var(--review-bg); color: var(--review); padding: 6px 9px; font-size: .72rem; font-style: normal; font-weight: 900; }
 .refresh-demo-cards .is-watch em { background: var(--watch-bg); color: var(--watch); }
 .refresh-demo-cards p { margin: auto 0 0; color: var(--muted); font-size: .68rem; }
-.refresh-float-chip { position: absolute; border: 1px solid rgb(29 29 26 / 12%); border-radius: 999px; background: #fff; box-shadow: var(--shadow-sm); padding: 9px 13px; font-size: .66rem; font-weight: 850; }
+.refresh-float-chip { position: absolute; border: 1px solid rgb(8 31 58 / 12%); border-radius: 999px; background: #fff; box-shadow: var(--shadow-sm); padding: 9px 13px; font-size: .66rem; font-weight: 850; }
 .refresh-chip-top { right: -22px; top: 42px; }.refresh-chip-bottom { bottom: -18px; left: 30px; }
 
 .refresh-flow { background: #fff; }
@@ -3747,14 +3802,14 @@ summary:focus-visible {
 .refresh-step-grid i { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 13px; background: var(--brand-soft); font-size: 1.25rem; font-style: normal; font-weight: 900; }
 .refresh-step-grid article > span { display: block; margin-top: 20px; color: #9a7b00; font-size: .66rem; font-weight: 900; }
 .refresh-step-grid h3 { margin: 4px 0 7px; font-size: 1.18rem; }.refresh-step-grid p { color: var(--muted); font-size: .83rem; }
-.refresh-step-grid b { position: absolute; bottom: 24px; border-radius: 999px; background: #f1f1ed; padding: 5px 9px; font-size: .61rem; }
+.refresh-step-grid b { position: absolute; bottom: 24px; border-radius: 999px; background: #e9f0f9; padding: 5px 9px; font-size: .61rem; }
 
 .refresh-section-row { display: flex; align-items: end; justify-content: space-between; gap: 25px; margin-bottom: 30px; }
 .refresh-section-row h2,.refresh-split-section h2 { margin: 8px 0; font-size: clamp(2rem,4vw,3.15rem); line-height: 1.18; letter-spacing: -.045em; }
 .refresh-section-row p,.refresh-split-section > div > p { max-width: 650px; margin: 0; color: var(--muted); }
-.refresh-risk-showcase { background: #f6f5ef; }
+.refresh-risk-showcase { background: #eff5fc; }
 .refresh-risk-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.refresh-risk-card { overflow: hidden; border: 3px solid; border-radius: 20px; background: #fff; box-shadow: 0 12px 35px rgb(29 29 26 / 8%); padding: 25px; }
+.refresh-risk-card { overflow: hidden; border: 3px solid; border-radius: 20px; background: #fff; box-shadow: 0 12px 35px rgb(8 31 58 / 8%); padding: 25px; }
 .refresh-risk-card.is-review { border-color: #d95842; }.refresh-risk-card.is-watch { border-color: #d2a000; }
 .refresh-risk-card header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
 .refresh-risk-card header small { color: var(--muted); font-size: .64rem; font-weight: 750; }.refresh-risk-card h3 { margin: 3px 0 0; font-size: 1.15rem; }
@@ -3772,22 +3827,22 @@ summary:focus-visible {
 
 .refresh-contract-preview { background: #fff; }.refresh-split-section { display: grid; grid-template-columns: .85fr 1.15fr; gap: 70px; align-items: center; }
 .refresh-split-section .button { margin-top: 24px; }
-.refresh-contract-card { display: flex; gap: 22px; border: 1px solid var(--line); border-radius: 22px; background: #fffdf5; box-shadow: var(--shadow-lg); padding: 30px; }
+.refresh-contract-card { display: flex; gap: 22px; border: 1px solid var(--line); border-radius: 22px; background: #f9fcff; box-shadow: var(--shadow-lg); padding: 30px; }
 .refresh-contract-card > span { display: grid; width: 62px; height: 62px; flex: 0 0 62px; place-items: center; border-radius: 16px; background: var(--brand); font-size: 1.8rem; }
 .refresh-contract-card small { color: var(--muted); }.refresh-contract-card h3 { margin: 4px 0 18px; }
 .refresh-contract-card ul { display: grid; gap: 8px; min-width: 280px; margin: 0; padding: 0; list-style: none; }
 .refresh-contract-card li { display: grid; grid-template-columns: 25px 1fr auto; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; font-size: .78rem; }
 .refresh-contract-card li b { color: #40744f; }.refresh-contract-card li strong { font-size: .95rem; }
 
-.refresh-community-preview { background: #f6f5ef; }.refresh-post-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 15px; }
+.refresh-community-preview { background: #eff5fc; }.refresh-post-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 15px; }
 .refresh-post-grid article { border: 1px solid var(--line); border-radius: 17px; background: #fff; padding: 22px; }
 .refresh-post-grid article > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .refresh-post-grid b { font-size: .72rem; }.refresh-post-grid em { border-radius: 999px; background: var(--brand-soft); padding: 4px 8px; font-size: .61rem; font-style: normal; font-weight: 850; }
-.refresh-post-grid h3 { margin: 18px 0 7px; font-size: 1rem; line-height: 1.45; }.refresh-post-grid p { color: var(--muted); font-size: .76rem; }.refresh-post-grid small { color: #a19f95; font-size: .61rem; }
+.refresh-post-grid h3 { margin: 18px 0 7px; font-size: 1rem; line-height: 1.45; }.refresh-post-grid p { color: var(--muted); font-size: .76rem; }.refresh-post-grid small { color: #82a3c9; font-size: .61rem; }
 
 .refresh-consult-preview { background: #fff; }.refresh-prompt-list { display: grid; gap: 8px; margin-top: 25px; }.refresh-prompt-list a { display: flex; max-width: 420px; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 11px 3px; font-size: .8rem; font-weight: 800; }
 .refresh-answer-preview { overflow: hidden; border: 1px solid #2d3540; border-radius: 19px; box-shadow: var(--shadow-lg); }
-.refresh-answer-preview > header { display: flex; justify-content: space-between; background: #19202a; color: #fff; padding: 15px 18px; font-size: .72rem; font-weight: 850; }.refresh-answer-preview header small { color: rgb(255 255 255 / 52%); }
+.refresh-answer-preview > header { display: flex; justify-content: space-between; background: #0c2a4c; color: #fff; padding: 15px 18px; font-size: .72rem; font-weight: 850; }.refresh-answer-preview header small { color: rgb(255 255 255 / 52%); }
 .refresh-answer-preview > div { display: grid; grid-template-columns: 1fr 1fr; }.refresh-answer-preview article { min-height: 310px; border-right: 1px solid var(--line); padding: 23px; }.refresh-answer-preview article:last-child { border: 0; }
 .refresh-answer-preview article > b { font-size: .75rem; }.refresh-answer-preview article h3 { margin: 22px 0 10px; font-size: .88rem; }.refresh-answer-preview article p,.refresh-answer-preview article li { color: var(--muted); font-size: .72rem; }.refresh-answer-preview article small { display: block; border-top: 1px solid var(--line); margin-top: 30px; padding-top: 12px; color: var(--muted); font-size: .61rem; }
 .refresh-final-cta { background: linear-gradient(125deg,#ffe764,#ffd000); padding: 82px 0; text-align: center; }.refresh-final-cta h2 { margin: 10px 0; font-size: clamp(2.15rem,4vw,3.6rem); line-height: 1.18; letter-spacing: -.05em; }.refresh-final-cta p { margin-bottom: 0; }.refresh-final-cta .refresh-button-row { justify-content: center; }
@@ -3798,10 +3853,10 @@ summary:focus-visible {
 .risk-card.risk-level-normal { border: 3px solid #5da979; box-shadow: 0 12px 34px rgb(37 107 69 / 12%); }
 .risk-card.risk-level-unknown { border: 3px solid #8b9299; }
 .risk-card .status-badge { padding: 8px 11px; font-size: .76rem; font-weight: 950; }
-.risk-card .risk-summary { border-radius: 11px; background: #f7f7f4; padding: 14px; font-size: .9rem; font-weight: 750; }
+.risk-card .risk-summary { border-radius: 11px; background: #f0f6fd; padding: 14px; font-size: .9rem; font-weight: 750; }
 .risk-level-review .risk-summary { background: var(--review-bg); color: #773428; }.risk-level-watch .risk-summary { background: var(--watch-bg); color: #705100; }.risk-level-normal .risk-summary { background: var(--normal-bg); color: #1f5c3b; }
 .wage-observation-section { border-top: 1px solid var(--line); padding-top: 18px; }
-.wage-indicator-coverage { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #ead57c; border-radius: 11px; background: #fffaf0; margin-top: 16px; padding: 11px 13px; font-size: .7rem; }.wage-indicator-coverage span { color: var(--muted); font-weight: 750; }
+.wage-indicator-coverage { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #ead57c; border-radius: 11px; background: #f7fbff; margin-top: 16px; padding: 11px 13px; font-size: .7rem; }.wage-indicator-coverage span { color: var(--muted); font-weight: 750; }
 .observation-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.observation-title-row span { border-radius: 999px; background: #eee; padding: 4px 8px; color: var(--muted); font-size: .64rem; font-weight: 800; }
 .wage-observation-list { display: grid; grid-template-columns: 1fr 1fr; margin: 0; }.wage-observation-list div { display: flex; justify-content: space-between; gap: 7px; border-bottom: 1px solid var(--line); padding: 9px 5px; font-size: .69rem; }.wage-observation-list dd { margin: 0; color: var(--muted); font-weight: 800; }.observation-note { margin: 10px 0 0; color: var(--muted); font-size: .64rem; }.unavailable-panel { border-color: #c5c8cb; background: #f0f1f2; color: #565b60; }
 
@@ -3863,12 +3918,15 @@ summary:focus-visible {
 .chat-experience-layout { display: grid; grid-template-columns: minmax(0,1fr) 250px; gap: 16px; align-items: start; }
 .chat-experience-layout > .chat-panel { min-width: 0; }
 .question-guide { position: sticky; top: 94px; border: 1px solid var(--line); border-radius: 17px; background: #fff; box-shadow: var(--shadow-sm); padding: 18px; }
-.guide-title { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; margin-bottom: 15px; }.guide-title > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; background: var(--brand); font-size: .63rem; font-weight: 950; }.guide-title > div { display: grid; }.guide-title strong { font-size: .8rem; }.guide-title small { color: var(--muted); font-size: .61rem; }
-.guide-context { display: grid; border-radius: 10px; background: var(--brand-soft); margin: 0 0 15px; padding: 10px; font-size: .66rem; }.guide-context span { color: var(--muted); }.guide-group { margin-top: 15px; }.guide-group > strong { display: block; margin-bottom: 6px; color: var(--muted); font-size: .66rem; }.guide-group button { width: 100%; border: 1px solid var(--line); border-radius: 9px; background: #fff; margin-top: 6px; padding: 9px; text-align: left; font-size: .69rem; cursor: pointer; }.guide-group button:hover:not(:disabled) { border-color: #d8bd20; background: #fffdf1; }.guide-scope-note { border-top: 1px solid var(--line); margin: 16px 0 0; padding-top: 12px; color: var(--muted); font-size: .6rem; }
+.guide-title { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; margin-bottom: 15px; }/* 'AI' 라고 적힌 노란 칸 자리에 안경 쓴 돈워리를 같은 규격으로 넣는다. */
+.guide-title .guide-avatar { display: block; width: 34px; height: 34px; border: var(--avatar-ring-width) solid var(--avatar-ring); border-radius: 9px; background: var(--brand); object-fit: cover; }.guide-title > div { display: grid; }.guide-title strong { font-size: .8rem; }.guide-title small { color: var(--muted); font-size: .61rem; }
+.guide-context { display: grid; border-radius: 10px; background: var(--brand-soft); margin: 0 0 15px; padding: 10px; font-size: .66rem; }.guide-context span { color: var(--muted); }.guide-group { margin-top: 15px; }.guide-group > strong { display: block; margin-bottom: 6px; color: var(--muted); font-size: .66rem; }.guide-group button { width: 100%; border: 1px solid var(--line); border-radius: 9px; background: #fff; margin-top: 6px; padding: 9px; text-align: left; font-size: .69rem; cursor: pointer; }.guide-group button:hover:not(:disabled) { border-color: #d8bd20; background: #f9fcff; }.guide-scope-note { border-top: 1px solid var(--line); margin: 16px 0 0; padding-top: 12px; color: var(--muted); font-size: .6rem; }
 
 .refresh-community-page .page-heading h1 { font-size: clamp(2.35rem,5vw,4.1rem); letter-spacing: -.055em; }
-.refresh-contract-page .page-heading h1 { white-space: nowrap; font-size: clamp(1.05rem,5vw,2.5rem); letter-spacing: -.03em; }
-.refresh-contract-page .contract-upload { border: 2px dashed #d5cfab; border-radius: 20px; background: #fffdf5; padding: 34px; }
+/* 제목 크기를 .page-heading h1 기본값(사업장 확인 탭과 같은 값)에 맡긴다.
+   nowrap 으로 한 줄에 욱여넣느라 글씨가 작아져 있었다. */
+.refresh-contract-page .page-heading h1 { letter-spacing: -.03em; }
+.refresh-contract-page .contract-upload { border: 2px dashed #d5cfab; border-radius: 20px; background: #f9fcff; padding: 34px; }
 .refresh-contract-page .upload-icon { width: 58px; height: 58px; border-radius: 16px; background: var(--brand); font-size: 1.6rem; }
 .community-interaction-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin: 22px 0; }
 .community-interaction-row .community-toolbar { margin: 0; }
@@ -3891,10 +3949,11 @@ summary:focus-visible {
   body { padding-bottom: 60px; }
   .consumer-main-nav { display: none; }
   .consumer-header-inner { min-height: 64px; }
-  .consumer-mode-switch { margin-left: 0; font-size: .68rem; padding: 6px 10px; }
+  .consumer-header-lead { gap: 10px; }
+  .consumer-mode-switch { font-size: .68rem; padding: 6px 10px; }
   .brand-mark { width: 44px; height: 44px; }
   .brand-word { font-size: 1.35rem; }
-  .consumer-mobile-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; display: grid; grid-template-columns: repeat(6,1fr); border-top: 1px solid var(--line); background: rgb(255 255 255 / 96%); box-shadow: 0 -8px 25px rgb(29 29 26 / 8%); }
+  .consumer-mobile-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; display: grid; grid-template-columns: repeat(6,1fr); border-top: 1px solid var(--line); background: rgb(255 255 255 / 96%); box-shadow: 0 -8px 25px rgb(8 31 58 / 8%); }
   .consumer-mobile-nav a { padding: 12px 3px; text-align: center; color: var(--muted); font-size: .66rem; font-weight: 850; }.consumer-mobile-nav a:last-child { background: var(--brand-soft); color: var(--ink); }
   .consumer-mobile-nav a.is-current { background: var(--surface); color: var(--ink); }
   .consumer-floating-chat { display: none; }
@@ -4025,7 +4084,7 @@ summary:focus-visible {
 .inspector-hero {
   background:
     radial-gradient(circle at 85% 20%, rgb(255 214 0 / 20%), transparent 26%),
-    linear-gradient(135deg, #fff 0%, #fffdf3 70%, #f5edc2 100%);
+    linear-gradient(135deg, #fff 0%, #f9fcff 70%, #f5edc2 100%);
   border-bottom: 1px solid var(--line);
   padding: 58px 0 64px;
 }
@@ -4331,7 +4390,7 @@ summary:focus-visible {
 .inspector-queue-table th { background: #f6f7f8; color: var(--muted); font-size: 0.65rem; padding: 10px 12px; text-align: left; }
 .inspector-queue-table td { border-top: 1px solid var(--line); font-size: 0.73rem; padding: 13px 12px; }
 .inspector-queue-table tbody tr { cursor: pointer; }
-.inspector-queue-table tbody tr:hover { background: #fffdf3; }
+.inspector-queue-table tbody tr:hover { background: #f9fcff; }
 .inspector-queue-table th:first-child,
 .inspector-queue-table td:first-child { color: var(--inspector-blue); width: 54px; }
 .inspector-queue-table th:last-child,
@@ -4373,13 +4432,13 @@ summary:focus-visible {
 .inspector-detail-head .eyebrow { color: var(--brand); }
 .inspector-detail-head h2 { font-size: 1.45rem; letter-spacing: -0.045em; margin: 5px 0 3px; }
 .inspector-detail-head p { color: rgb(255 255 255 / 60%); font-size: 0.7rem; margin: 0; }
-.inspector-score-section { background: #fffef8; border-bottom: 1px solid var(--line); padding: 25px 27px; }
+.inspector-score-section { background: #fbfdff; border-bottom: 1px solid var(--line); padding: 25px 27px; }
 .inspector-score-copy { display: grid; }
 .inspector-score-copy > span { color: var(--muted); font-size: 0.7rem; font-weight: 750; }
 .inspector-score-copy strong { font-size: 2.8rem; letter-spacing: -0.05em; line-height: 1.15; margin: 5px 0; }
 .inspector-score-copy small { color: #886807; font-size: 0.69rem; font-weight: 750; }
 .inspector-score-position { margin-top: 18px; }
-.inspector-score-position > div { background: #e8e7e0; border-radius: 99px; height: 8px; overflow: hidden; }
+.inspector-score-position > div { background: #dde9f6; border-radius: 99px; height: 8px; overflow: hidden; }
 .inspector-score-position > div span { background: linear-gradient(90deg, #f2c900, #d34d3a); border-radius: inherit; display: block; height: 100%; }
 .inspector-score-position p { color: var(--muted); font-size: 0.62rem; margin: 7px 0 0; }
 .inspector-score-meta { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 20px 0 0; }
@@ -4407,7 +4466,7 @@ summary:focus-visible {
 .inspector-green-grid strong { font-size: 0.68rem; }
 .inspector-green-grid small { color: var(--muted); font-size: 0.6rem; }
 .inspector-green-grid .is-on { background: #f0f8f3; border-color: #b9dbc5; }
-.inspector-green-grid .is-off { background: #faf7f2; }
+.inspector-green-grid .is-off { background: #f5f9fe; }
 .inspector-green-grid .is-unknown { background: var(--surface); }
 .inspector-safety-strip { align-items: flex-start; background: #eef4f8; border-bottom: 1px solid #ccdae5; display: flex; gap: 20px; justify-content: space-between; padding: 18px 25px; }
 .inspector-safety-strip div { display: grid; }
@@ -4415,7 +4474,7 @@ summary:focus-visible {
 .inspector-safety-strip strong { font-size: 0.78rem; margin: 3px 0; }
 .inspector-safety-strip p,
 .inspector-safety-strip > small { color: var(--muted); font-size: 0.61rem; margin: 0; }
-.inspector-batch-strip { background: #f7f7f4; border-bottom: 1px solid var(--line); padding: 16px 25px; }
+.inspector-batch-strip { background: #f0f6fd; border-bottom: 1px solid var(--line); padding: 16px 25px; }
 .inspector-batch-strip dl { display: grid; gap: 9px; grid-template-columns: repeat(4, 1fr); margin: 0; }
 .inspector-batch-strip dt { color: var(--muted); font-size: 0.58rem; }
 .inspector-batch-strip dd { font-size: 0.65rem; font-weight: 750; margin: 2px 0 0; overflow-wrap: anywhere; }
@@ -4472,13 +4531,13 @@ summary:focus-visible {
 .inspector-comparison .rag-status { border: 1px solid #b9c8db; border-radius: 999px; color: #405d80; flex: 0 0 auto; font-size: 0.62rem; padding: 4px 7px; }
 .inspector-answer-grid { display: grid; gap: 11px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .inspector-answer { border: 1px solid var(--line); border-radius: 12px; min-width: 0; overflow: hidden; }
-.inspector-answer-head { align-items: center; background: #f8f8f6; border-bottom: 1px solid var(--line); display: flex; gap: 8px; justify-content: space-between; padding: 11px 12px; }
+.inspector-answer-head { align-items: center; background: #f2f8fe; border-bottom: 1px solid var(--line); display: flex; gap: 8px; justify-content: space-between; padding: 11px 12px; }
 .inspector-answer-head > div { align-items: center; display: flex; flex-wrap: wrap; gap: 6px; }
 .inspector-answer-head small,
 .inspector-answer-head > span { color: var(--muted); font-size: 0.6rem; }
 .inspector-answer-copy { font-size: 0.76rem; line-height: 1.75; min-height: 230px; padding: 15px; white-space: pre-wrap; }
 .inspector-answer-error { background: var(--danger-bg); color: var(--review); font-size: 0.65rem; margin: 0; padding: 8px 12px; }
-.inspector-answer-limit { background: #fffdf5; border-top: 1px solid var(--line); padding: 12px; }
+.inspector-answer-limit { background: #f9fcff; border-top: 1px solid var(--line); padding: 12px; }
 .inspector-answer-limit strong { font-size: 0.67rem; }
 .inspector-answer-limit ul { color: var(--muted); font-size: 0.62rem; margin: 6px 0 0; padding-left: 16px; }
 .inspector-answer details { border-top: 1px solid var(--line); padding: 0 12px; }
@@ -4487,7 +4546,7 @@ summary:focus-visible {
 .inspector-answer details dl div { border-top: 1px dashed var(--line); padding: 7px; }
 .inspector-answer details dt { color: var(--muted); font-size: 0.58rem; }
 .inspector-answer details dd { font-size: 0.64rem; margin: 0; }
-.inspector-chat-sources { background: #fffef8; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; padding: 12px; }
+.inspector-chat-sources { background: #fbfdff; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; padding: 12px; }
 .inspector-chat-sources > strong { font-size: 0.68rem; }
 .inspector-chat-loading { align-items: center; background: #f5f6f7; border-radius: 11px; display: flex; gap: 12px; margin: 17px 0; padding: 14px; }
 .inspector-chat-loading div { display: grid; }
@@ -4499,8 +4558,10 @@ summary:focus-visible {
 .inspector-chat-error { background: var(--danger-bg); color: var(--review); font-size: 0.7rem; margin: 0; padding: 8px 16px; }
 
 .worksite-page { background: var(--surface); }
-.worksite-privacy-strip { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; border: 1px solid #c8d8d0; border-radius: 12px; background: var(--normal-bg); padding: 13px 15px; color: var(--ink-soft); font-size: .78rem; }
-.worksite-privacy-strip strong { color: var(--normal); }
+/* 커뮤니티·계약서 안내 박스와 같은 모양을 쓴다. 성격이 같은 안내를 화면마다
+   다른 색으로 두면 색이 무슨 뜻인지 배우게 만든다. */
+.worksite-privacy-strip { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; border: 1px solid #e8d47e; border-radius: 13px; background: var(--brand-soft); padding: 12px 16px; color: #081f3a; font-size: .84rem; }
+.worksite-privacy-strip > strong { display: inline-flex; flex: 0 0 auto; align-items: center; border-radius: 999px; background: var(--ink); color: var(--brand); padding: 3px 9px; font-size: .68rem; font-weight: 950; letter-spacing: .06em; }
 .worksite-tip-form, .worksite-inspector-view { border: 1px solid var(--line); border-radius: 16px; background: var(--white); padding: 22px; box-shadow: 0 8px 24px rgb(36 35 28 / 4%); }
 .worksite-form-intro, .worksite-list-toolbar, .worksite-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .worksite-form-intro { margin-bottom: 22px; }
@@ -4535,12 +4596,17 @@ summary:focus-visible {
 .worksite-tip-list-item p { margin: 0 0 13px; color: var(--ink-soft); font-size: .78rem; line-height: 1.55; }
 .worksite-tip-list-foot { justify-content: flex-start; flex-wrap: wrap; }
 .worksite-tip-list-foot .button { margin-left: auto; }
-.worksite-detail-panel { margin-top: 16px; border-top: 3px solid var(--ink); background: var(--surface); padding: 18px; }
+.worksite-detail-panel { margin: 0 0 20px; border-top: 3px solid var(--ink); background: var(--surface); padding: 18px; }
 .worksite-detail-head time { display: block; margin-top: 6px; color: var(--muted); font-size: .72rem; }
 .worksite-detail-body { white-space: pre-wrap; margin: 18px 0; color: var(--ink-soft); font-size: .85rem; line-height: 1.75; }
 .worksite-attachment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.worksite-attachment-grid a { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--white); padding: 11px; color: var(--ink); font-size: .75rem; font-weight: 800; }
+/* 사진 자체가 버튼이다. 누르면 원본이 새 창에서 열린다. 규격을 4:3 한 가지로
+   고정해 세로 사진과 가로 사진이 섞여도 줄이 흐트러지지 않게 한다. */
+.worksite-attachment-thumb { display: grid; gap: 6px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--white); padding: 8px; color: var(--ink); font-size: .75rem; font-weight: 800; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.worksite-attachment-thumb img { display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 7px; background: var(--surface); object-fit: cover; }
+.worksite-attachment-thumb:hover, .worksite-attachment-thumb:focus-visible { border-color: var(--ink); box-shadow: var(--shadow-sm); }
 .worksite-attachment-grid span { color: var(--muted); font-size: .67rem; font-weight: 600; }
+.worksite-attachment-empty { margin: 12px 0 0; color: var(--muted); font-size: .78rem; }
 
 @media (max-width: 700px) {
   .worksite-privacy-strip, .worksite-form-intro, .worksite-receipt, .worksite-form-actions { align-items: flex-start; flex-direction: column; }
@@ -4560,7 +4626,7 @@ summary:focus-visible {
 .inspector-external-consent li strong { color: #4f3b04; }
 .inspector-external-consent details p { background: rgb(255 255 255 / 45%); border-radius: 7px; font-size: 0.59rem; line-height: 1.45; margin: 8px 0 2px; padding: 7px 8px; }
 .inspector-chat-form { align-items: end; border-top: 1px solid var(--line); display: grid; gap: 8px; grid-template-columns: 1fr auto; padding: 13px 15px; }
-.inspector-chat-form textarea { background: #f7f7f4; border: 1px solid var(--line); border-radius: 11px; max-height: 160px; min-height: 52px; padding: 11px; resize: vertical; }
+.inspector-chat-form textarea { background: #f0f6fd; border: 1px solid var(--line); border-radius: 11px; max-height: 160px; min-height: 52px; padding: 11px; resize: vertical; }
 .inspector-chat-form textarea:focus { border-color: var(--inspector-blue); outline: 3px solid rgb(85 121 184 / 13%); }
 .inspector-chat-form button { align-items: center; background: var(--brand); border: 1px solid var(--ink); border-radius: 10px; cursor: pointer; display: flex; font-size: 1.2rem; font-weight: 900; height: 45px; justify-content: center; width: 45px; }
 .inspector-chat-form button:disabled { cursor: not-allowed; opacity: 0.45; }
@@ -4633,4 +4699,203 @@ summary:focus-visible {
   .search-pagination { gap: 7px; }
   .search-pagination > .button { min-height: 40px; padding-inline: 9px; }
   .search-pagination .pagination-page { min-width: 105px; }
+}
+
+/* ── 지역 지도 ──────────────────────────────────────────────
+   사업장 수를 노랑 한 색의 진하기로만 나타낸다. 색을 여러 개 쓰면 지역마다
+   다른 뜻이 있는 것처럼 읽힌다. 여기서 다른 것은 양뿐이다. */
+/* justify-items: center 만 두면 칸이 내용 크기로 줄어들어 아래 max-width 가
+   적용되지 않는다. 바깥 폭을 먼저 잡아 준다. */
+.region-map { display: grid; justify-items: center; gap: 0.75rem; margin-top: 0.5rem; width: 100%; }
+/* 섬을 덜어내고 여백을 걷어낸 뒤라 폭을 키워도 도형이 늘어지지 않는다. */
+/* 지금까지 실제로 그려지던 폭이 300px 이었다. 그 1.5배인 450px(28rem)로 잡는다. */
+.region-map-canvas { width: min(100%, 28rem); height: auto; }
+
+.region-map-area {
+  fill: var(--surface);
+  stroke: var(--white);
+  stroke-width: 0.8;
+  transition: fill 160ms ease;
+}
+.region-map-area[data-level="1"] { fill: #fff6bd; }
+.region-map-area[data-level="2"] { fill: #ffe98a; }
+.region-map-area[data-level="3"] { fill: #ffd600; }
+.region-map-area[data-level="4"] { fill: #e0b800; }
+
+/* 자료가 있는 지역만 누를 수 있다. 없는 지역은 커서도 바뀌지 않는다. */
+.region-map-area:not([aria-disabled="true"]) { cursor: pointer; }
+.region-map-area:not([aria-disabled="true"]):hover { fill: var(--brand-deep); }
+.region-map-area:focus-visible { outline: 0; stroke: var(--ink); stroke-width: 2.4; }
+.region-map-area[data-selected="true"] { stroke: var(--ink); stroke-width: 2.4; }
+
+.region-map-label {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 850;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.region-map-count {
+  fill: var(--ink-soft);
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.region-map-legend { display: flex; align-items: center; gap: 0.375rem; color: var(--muted); font-size: 0.76rem; font-weight: 800; }
+.region-map-legend i { width: 1.25rem; height: 0.625rem; border-radius: 0.1875rem; }
+.region-map-legend i[data-level="1"] { background: #fff6bd; }
+.region-map-legend i[data-level="2"] { background: #ffe98a; }
+.region-map-legend i[data-level="3"] { background: #ffd600; }
+.region-map-legend i[data-level="4"] { background: #e0b800; }
+
+.region-map-note { margin: 0; color: var(--muted); font-size: 0.76rem; }
+/* ── 상담 탭만 따뜻하게 ────────────────────────────────────
+   돈워리와 이야기하는 화면이라 다른 탭보다 부드러워야 한다. 바탕과 테두리에만
+   브랜드 노랑을 옅게 깔고, 글자는 파란 계열(--ink / --ink-soft / --muted)을
+   그대로 둔다. 색으로 정보를 나르지 않으므로 읽기에 영향이 없다. */
+/* 페이지 바탕은 흰색으로 둔다. 따뜻함은 안쪽 카드가 맡는다. */
+.conversation-page,
+.search-page {
+  background: transparent;
+}
+
+.conversation-page .chat-panel {
+  border-color: #f0dfa0;
+  background: #fffdf5;
+}
+
+.conversation-page .chat-topbar {
+  border-bottom-color: #f0dfa0;
+  background: var(--brand-soft);
+}
+
+.conversation-page .chat-body {
+  background:
+    radial-gradient(circle at 5% 5%, rgb(255 214 0 / 14%), transparent 28%),
+    #fffefa;
+}
+
+/* 돈워리가 한 말. 옅은 노랑 위에 파란 글자를 얹는다. */
+.conversation-page .chat-message-assistant {
+  border-color: #f2e3ab;
+  background: #fff8dd;
+  color: var(--ink-soft);
+}
+
+/* 내가 한 말은 그대로 남색으로 둔다. 두 사람을 색으로 구분해야 한다. */
+.conversation-page .chat-form,
+.conversation-page .question-guide {
+  border-color: #f0dfa0;
+  background: #fffdf5;
+}
+
+.conversation-page .chat-form textarea {
+  border-color: #f0dfa0;
+  background: var(--white);
+}
+
+.conversation-page .guide-group button {
+  border-color: #f0dfa0;
+  background: var(--white);
+}
+
+.conversation-page .guide-group button:hover:not(:disabled) {
+  border-color: var(--brand-deep);
+  background: var(--brand-soft);
+}
+
+.conversation-page .chat-meta,
+.conversation-page .guide-scope-note {
+  border-top-color: #f0dfa0;
+}
+
+
+/* ── 계약서 업로드 ────────────────────────────────────────
+   올리기 전 화면에는 고를 것이 둘뿐이다. 왼쪽에 몰아 두지 않고 가운데로
+   모아 무엇을 눌러야 하는지 바로 보이게 한다. */
+.contract-upload {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.contract-upload .upload-copy {
+  justify-content: center;
+  text-align: left;
+}
+
+/* '파일 찾아보기' 와 '선택한 파일 검토' 는 같은 크기로 위아래에 선다.
+   하나는 label, 하나는 button 이라 크기를 따로 맞춰 줘야 한다. */
+.contract-upload .contract-actions > .button,
+.contract-upload .contract-actions > label.button {
+  width: 14rem;
+  height: 3.25rem;
+  padding-block: 0;
+}
+
+.contract-upload .contract-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.contract-upload .selected-file {
+  width: 100%;
+  text-align: left;
+}
+
+
+/* 제목 상자의 기본 760px 제한 때문에 '계약서에서 놓친 항목이 있나요?' 와
+   '현장의 목소리를 안전하게 전달하세요' 가 두 줄로 접혔다. 이 두 화면에서만
+   제한을 풀어 한 줄에 담는다. */
+.refresh-contract-page .page-heading,
+.worksite-page .page-heading {
+  max-width: none;
+}
+
+/* ── 사업장 확인도 상담 탭과 같은 따뜻한 결로 ──────────────
+   두 화면 모두 바탕은 흰색이고, 카드 안쪽에만 옅은 노랑을 깐다. */
+.search-page .search-workspace {
+  border-color: #f0dfa0;
+  background: #fffdf5;
+}
+
+.search-page .search-form {
+  border-bottom-color: #f0dfa0;
+}
+
+.search-page .search-input-field {
+  border-color: #f0dfa0;
+  background: var(--white);
+}
+
+.search-page .search-filter-toggle {
+  border-color: #f0dfa0;
+}
+
+.search-page .demo-query-row {
+  border-color: #f0dfa0;
+  background: var(--brand-soft);
+}
+
+.conversation-page .chat-panel,
+.conversation-page .question-guide,
+.search-page .search-workspace {
+  box-shadow: 0 8px 24px rgb(214 168 0 / 10%);
+}
+
+
+/* 로그인 버튼 폭을 로고(그림+글자) 폭에 맞춘다. 헤더 양끝이 같은 무게로 선다.
+   실측 152px = 9.5rem, 좁은 화면에서는 로고가 작아지므로 118px = 7.375rem. */
+.consumer-header-side > .button {
+  width: 9.5rem;
+}
+
+@media (max-width: 640px) {
+  .consumer-header-side > .button {
+    width: 7.375rem;
+  }
 }

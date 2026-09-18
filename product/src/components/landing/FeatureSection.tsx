@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   CONNECTED_WAGE_LISTING_LABEL,
@@ -74,7 +75,7 @@ export function CommunityPreview() {
   return (
     <section className="section refresh-community-preview" aria-labelledby="community-preview-title"><div className="shell">
       <div className="refresh-section-row"><div><span className="eyebrow">커뮤니티</span><h2 id="community-preview-title">같은 현장, 같은 고민</h2><p>사용자 경험은 공식 데이터와 구분해 표시합니다.</p></div><Link href="/community" className="button button-outline">커뮤니티 보기 →</Link></div>
-      <div className="refresh-post-grid">{COMMUNITY_PREVIEW.map(([place, tag, title, body]) => <article key={title}><div><b>{place}</b><em>{tag}</em></div><h3>{title}</h3><p>{body}</p><small>DEMO 게시물</small></article>)}</div>
+      <div className="refresh-post-grid">{COMMUNITY_PREVIEW.map(([place, tag, title, body]) => <article key={title}><div><b>{place}</b><em>{tag}</em></div><h3>{title}</h3><p>{body}</p></article>)}</div>
     </div></section>
   );
 }
@@ -82,7 +83,7 @@ export function CommunityPreview() {
 export function ConsultPreviewSection() {
   return (
     <section className="section refresh-consult-preview" aria-labelledby="consult-preview-title"><div className="shell refresh-split-section">
-      <div><span className="eyebrow">AI 노동 상담</span><h2 id="consult-preview-title">막막할 때<br />AI가 먼저 답합니다</h2><p>같은 질문을 두 모델에 보내고, 공식 근거와 다음 행동을 나란히 비교합니다.</p><div className="refresh-prompt-list"><Link href="/chat?prompt=임금이%20밀릴%20때%20어떤%20자료부터%20준비해야%20하나요%3F">“급여가 밀릴 때 뭘 준비하나요?” <span>→</span></Link><Link href="/chat?prompt=근로계약서에서%20꼭%20확인할%20항목을%20알려주세요.">“계약서에서 꼭 볼 것은?” <span>→</span></Link></div></div>
+      <div><span className="eyebrow">AI 노동 상담</span><h2 id="consult-preview-title">막막할 때<br />AI가 먼저 답합니다</h2><p>공식 문서를 기반으로 답변을 생성하고 다음 행동을 제안합니다.</p><div className="refresh-prompt-list"><Link href="/chat?prompt=임금이%20밀릴%20때%20어떤%20자료부터%20준비해야%20하나요%3F">“급여가 밀릴 때 뭘 준비하나요?” <span>→</span></Link><Link href="/chat?prompt=근로계약서에서%20꼭%20확인할%20항목을%20알려주세요.">“계약서에서 꼭 볼 것은?” <span>→</span></Link></div></div>
       <div className="refresh-answer-preview"><header><span>두 모델 답변 비교</span><small>같은 질문 · 같은 공식 근거</small></header><div><article><b>Upstage Solar</b><h3>지금 확인할 순서</h3><ol><li>계약서와 임금명세서 확보</li><li>입금 내역과 근무기록 정리</li><li>회사에 지급일 서면 확인</li></ol><small>공식 근거 · 답변 한계 표시</small></article><article><b>SKT A.X</b><h3>핵심 확인 사항</h3><p>사실관계를 기록하고 공식 상담 창구와 구제 절차를 함께 확인하세요.</p><small>응답 상세 · 기술 정보 토글</small></article></div></div>
     </div></section>
   );
@@ -90,6 +91,6 @@ export function ConsultPreviewSection() {
 
 export function FinalCta() {
   return (
-    <section className="refresh-final-cta"><div className="shell"><span className="eyebrow">지금 시작하세요</span><h2>일하기 전에도, 일하는 중에도<br />미리 대비하는 Co끼리</h2><p>회사명을 입력하면 공개 데이터에서 관측된 사실과 확인할 항목을 정리합니다.</p><div className="refresh-button-row"><Link href="/companies" className="button button-dark button-large">무료로 위험카드 보기 →</Link><Link href="/chat" className="button button-outline button-large">AI 상담 먼저 해보기</Link></div></div></section>
+    <section className="refresh-final-cta"><div className="shell"><span className="eyebrow">지금 시작하세요</span><h2>일하기 전에도, 일하는 중에도<br />미리 대비하는 Co끼리</h2><div className="refresh-button-row"><Link href="/chat" className="button button-outline button-large consult-cta"><Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />돈워리 AI에게 상담하기</Link><Link href="/companies" className="button button-dark button-large">궁금한 사업장의 위험요소 보러가기 →</Link></div></div></section>
   );
 }
