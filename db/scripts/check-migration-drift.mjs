@@ -646,6 +646,48 @@ SELECT json_build_object(
       SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='public' AND c.relname='conversation_summaries' AND con.conname='conversation_summaries_payload_ck'
     )
+  ),
+  '0016_conversation_request_lifecycle', json_build_object(
+    'column:public.conversation_messages.message_index', EXISTS (
+      SELECT 1 FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_messages' AND a.attname='message_index' AND NOT a.attisdropped
+    ),
+    'index:public.conversation_messages_turn_sequence_uq', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_messages_turn_sequence_uq' AND c.relkind IN ('i','I')
+    ),
+    'constraint:public.conversation_messages.conversation_messages_sequence_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_messages' AND con.conname='conversation_messages_sequence_ck'
+    ),
+    'table:public.conversation_requests', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests' AND c.relkind IN ('r','p')
+    ),
+    'index:public.conversation_requests_owner_request_uq', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests_owner_request_uq' AND c.relkind IN ('i','I')
+    ),
+    'index:public.conversation_requests_conversation_status_idx', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests_conversation_status_idx' AND c.relkind IN ('i','I')
+    ),
+    'constraint:public.conversation_requests.conversation_requests_owner_user_id_users_id_fk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests' AND con.conname='conversation_requests_owner_user_id_users_id_fk'
+    ),
+    'constraint:public.conversation_requests.conversation_requests_conversation_id_conversation_threads_id_fk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests' AND con.conname='conversation_requests_conversation_id_conversation_threads_id_fk'
+    ),
+    'constraint:public.conversation_requests.conversation_requests_status_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests' AND con.conname='conversation_requests_status_ck'
+    ),
+    'constraint:public.conversation_requests.conversation_requests_payload_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests' AND con.conname='conversation_requests_payload_ck'
+    )
   )
 )::text;
 COMMIT;

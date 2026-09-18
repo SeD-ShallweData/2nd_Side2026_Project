@@ -20,6 +20,30 @@ import { ServiceError } from "@/utils/errors";
 const MAX_LIST_LIMIT = 50;
 const HISTORY_MESSAGE_LIMIT = 10;
 const REQUEST_KEY_PATTERN = /^[A-Za-z0-9_-]{16,100}$/;
+const RECOVERY_TTL_MS = 5 * 60 * 1000;
+
+interface GeneratedRecovery {
+  response: ChatComparisonResponse;
+  expires_at: number;
+}
+
+const recoveryGlobal = globalThis as typeof globalThis & {
+  __donworryConversationGenerationRecovery?: Map<string, GeneratedRecovery>;
+};
+const generatedRecovery = recoveryGlobal.__donworryConversationGenerationRecovery
+  ?? new Map<string, GeneratedRecovery>();
+recoveryGlobal.__donworryConversationGenerationRecovery = generatedRecovery;
+
+function recoveryKey(userId: string, requestId: string): string {
+  return `${userId}:${requestId}`;
+}
+
+function requireRequestId(request: ChatRequest): string {
+  if (!request.request_id || !REQUEST_KEY_PATTERN.test(request.request_id)) {
+    throw new ServiceError("VALIDATION_ERROR", "Invalid chat request id.", 400, false);
+  }
+  return request.request_id;
+}
 
 function notFound(): ServiceError {
   return new ServiceError("CONVERSATION_NOT_FOUND", "대화 기록을 찾을 수 없습니다.", 404, false);
@@ -117,6 +141,84 @@ export async function hydrateConversationRequest(
     recent_messages: history,
     conversation_memory: toConversationMemoryContext(summary),
   };
+}
+
+export async function claimConversationRequest(
+  request: ChatRequest,
+  user: SessionUserDto,
+) {
+  const requestId = requireRequestId(request);
+  const repository = getConversationRepository();
+  repository.assertAvailable();
+  return repository.claimRequest({
+    owner_user_id: user.user_id,
+    conversation_id: request.conversation_id,
+    request_id: requestId,
+    company_id: request.company_id ?? null,
+    user_message: request.message,
+  });
+}
+
+export function cachedGeneratedResponse(user: SessionUserDto, requestId: string): ChatComparisonResponse | null {
+  const key = recoveryKey(user.user_id, requestId);
+  const value = generatedRecovery.get(key);
+  if (!value || value.expires_at <= Date.now()) {
+    generatedRecovery.delete(key);
+    return null;
+  }
+  return structuredClone(value.response);
+}
+
+export function rememberGeneratedResponse(
+  user: SessionUserDto,
+  requestId: string,
+  response: ChatComparisonResponse,
+): void {
+  generatedRecovery.set(recoveryKey(user.user_id, requestId), {
+    response: structuredClone(response),
+    expires_at: Date.now() + RECOVERY_TTL_MS,
+  });
+}
+
+export async function completeClaimedConversationRequest(
+  request: ChatRequest,
+  response: ChatComparisonResponse,
+  user: SessionUserDto,
+): Promise<{ conversation_id: string; response: ChatComparisonResponse; reused: boolean }> {
+  const requestId = requireRequestId(request);
+  if (!request.conversation_id) throw new ServiceError("CONVERSATION_NOT_FOUND", "Conversation request was not claimed.", 404, false);
+  const primary = response.results[0];
+  if (!primary) throw new ServiceError("CONVERSATION_PERSISTENCE_FAILED", "No displayed chat result to save.", 503, true);
+  const result = await getConversationRepository().completeRequest({
+    owner_user_id: user.user_id,
+    conversation_id: request.conversation_id,
+    idempotency_key: requestId,
+    company_id: request.company_id ?? null,
+    user_message: request.message,
+    assistant_message: primary.answer,
+    answer_type: primary.answer_type,
+    guardrail_status: primary.guardrail_status,
+    sources: primary.sources,
+    response,
+  });
+  generatedRecovery.delete(recoveryKey(user.user_id, requestId));
+  try {
+    const detail = await getConversationRepository().findConversation(result.conversation_id);
+    if (detail && detail.owner_user_id === user.user_id && !result.reused) await maybeUpdateConversationSummary(detail);
+  } catch {
+    // Summary work must never invalidate a completed request replay.
+  }
+  return result;
+}
+
+export async function failClaimedConversationRequest(
+  request: ChatRequest,
+  user: SessionUserDto,
+  status: "failed" | "cancelled",
+  errorCode: string,
+): Promise<void> {
+  const requestId = requireRequestId(request);
+  await getConversationRepository().failRequest(user.user_id, requestId, status, errorCode);
 }
 
 export async function persistCompletedChat(

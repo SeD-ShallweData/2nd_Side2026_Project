@@ -428,13 +428,16 @@ export const conversationMessages = pgTable(
       .notNull()
       .references(() => conversationTurns.id, { onDelete: "cascade" }),
     role: text().notNull(),
+    messageIndex: smallint("message_index").notNull(),
     content: text().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex("conversation_messages_turn_role_uq").on(t.turnId, t.role),
+    uniqueIndex("conversation_messages_turn_sequence_uq").on(t.turnId, t.messageIndex),
     index("conversation_messages_turn_created_idx").on(t.turnId, t.createdAt),
     check("conversation_messages_role_ck", sql`${t.role} in ('user','assistant')`),
+    check("conversation_messages_sequence_ck", sql`${t.messageIndex} in (1, 2)`),
     check("conversation_messages_content_ck", sql`char_length(${t.content}) between 1 and 20000`),
   ],
 );
@@ -510,6 +513,32 @@ export const conversationSummaries = pgTable(
     check("conversation_summaries_sequence_ck", sql`${t.summarizedThroughSequence} >= 0 and (${t.pendingThroughSequence} is null or ${t.pendingThroughSequence} > ${t.summarizedThroughSequence})`),
     check("conversation_summaries_retry_ck", sql`${t.retryCount} >= 0`),
     check("conversation_summaries_payload_ck", sql`jsonb_typeof(${t.summary}) = 'object'`),
+  ],
+);
+
+/* A request is claimed before generation. The stored completed payload makes retries replay-only. */
+export const conversationRequests = pgTable(
+  "conversation_requests",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requestId: text("request_id").notNull(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversationThreads.id, { onDelete: "cascade" }),
+    status: text().notNull().default("pending"),
+    responsePayload: jsonb("response_payload"),
+    failureCode: text("failure_code"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("conversation_requests_owner_request_uq").on(t.ownerUserId, t.requestId),
+    index("conversation_requests_conversation_status_idx").on(t.conversationId, t.status),
+    check("conversation_requests_status_ck", sql`${t.status} in ('pending','completed','failed','cancelled')`),
+    check("conversation_requests_payload_ck", sql`${t.responsePayload} is null or jsonb_typeof(${t.responsePayload}) = 'object'`),
   ],
 );
 

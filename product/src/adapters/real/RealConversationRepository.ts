@@ -2,6 +2,9 @@ import "server-only";
 
 import type { AnswerType, GuardrailStatus } from "@/domain/chat";
 import type {
+  ClaimConversationRequest,
+  ClaimConversationRequestInput,
+  CompleteConversationRequestInput,
   ConversationRepository,
   RecordCompletedConversationTurn,
   RecordedConversationTurn,
@@ -72,6 +75,12 @@ interface SummaryRow {
   retry_count: number;
   last_error_code: string | null;
   updated_at: Date;
+}
+
+interface RequestRow {
+  conversation_id: string;
+  status: ClaimConversationRequest["status"];
+  response_payload: CompleteConversationRequestInput["response"] | null;
 }
 
 function missingConversation(): ServiceError {
@@ -183,10 +192,11 @@ export class RealConversationRepository implements ConversationRepository {
     const turnIds = turns.map((turn) => turn.turn_id);
     const messages = turnIds.length === 0 ? [] : await queryWrite<MessageRow>(
       "conversation",
-      `SELECT id::text AS message_id, turn_id::text, role, content
-         FROM conversation_messages
-        WHERE turn_id = ANY($1::uuid[])
-        ORDER BY created_at ASC, id ASC`,
+      `SELECT m.id::text AS message_id, m.turn_id::text, m.role, m.content
+         FROM conversation_messages m
+         JOIN conversation_turns t ON t.id = m.turn_id
+        WHERE m.turn_id = ANY($1::uuid[])
+        ORDER BY t.turn_index ASC, m.message_index ASC`,
       [turnIds],
     );
     const sources = turnIds.length === 0 ? [] : await queryWrite<SourceRow>(
@@ -224,8 +234,116 @@ export class RealConversationRepository implements ConversationRepository {
     };
   }
 
+  async claimRequest(input: ClaimConversationRequestInput): Promise<ClaimConversationRequest> {
+    return withWriteTransaction("conversation", async (transaction) => {
+      await transaction.query(
+        "SELECT pg_advisory_xact_lock(hashtext($1))",
+        [`conversation-request:${input.owner_user_id}:${input.request_id}`],
+      );
+      const existingRequest = await transaction.query<RequestRow>(
+        `SELECT conversation_id::text, status, response_payload
+           FROM conversation_requests
+          WHERE owner_user_id = $1::uuid AND request_id = $2
+          FOR UPDATE`,
+        [input.owner_user_id, input.request_id],
+      );
+      if (existingRequest[0]) {
+        return {
+          conversation_id: existingRequest[0].conversation_id,
+          status: existingRequest[0].status,
+          reused: true,
+          response: existingRequest[0].response_payload,
+        };
+      }
+
+      let conversationId = input.conversation_id;
+      if (conversationId) {
+        if (!validUuid(conversationId)) throw missingConversation();
+        const existingThread = await transaction.query<{ conversation_id: string }>(
+          `SELECT id::text AS conversation_id
+             FROM conversation_threads
+            WHERE id = $1::uuid AND owner_user_id = $2::uuid AND expires_at > now()
+            FOR UPDATE`,
+          [conversationId, input.owner_user_id],
+        );
+        if (!existingThread[0]) throw missingConversation();
+      } else {
+        const created = await transaction.query<{ conversation_id: string }>(
+          `INSERT INTO conversation_threads (owner_user_id, active_company_id, title, expires_at)
+           VALUES ($1::uuid, $2, $3, now() + interval '30 days')
+           RETURNING id::text AS conversation_id`,
+          [input.owner_user_id, input.company_id, titleFor(input.user_message)],
+        );
+        conversationId = created[0]?.conversation_id;
+        if (!conversationId) throw new ServiceError("CONVERSATION_CREATE_FAILED", "Unable to create conversation.", 503, true);
+      }
+      await transaction.query(
+        `INSERT INTO conversation_requests (owner_user_id, request_id, conversation_id, status)
+         VALUES ($1::uuid, $2, $3::uuid, 'pending')`,
+        [input.owner_user_id, input.request_id, conversationId],
+      );
+      return { conversation_id: conversationId, status: "pending" as const, reused: false, response: null };
+    });
+  }
+
+  async completeRequest(input: CompleteConversationRequestInput): Promise<{
+    conversation_id: string; response: CompleteConversationRequestInput["response"]; reused: boolean;
+  }> {
+    return withWriteTransaction("conversation", async (transaction) => {
+      const request = await transaction.query<RequestRow>(
+        `SELECT conversation_id::text, status, response_payload
+           FROM conversation_requests
+          WHERE owner_user_id = $1::uuid AND request_id = $2
+          FOR UPDATE`,
+        [input.owner_user_id, input.idempotency_key],
+      );
+      const current = request[0];
+      if (!current || current.conversation_id !== input.conversation_id) throw missingConversation();
+      if (current.status === "completed" && current.response_payload) {
+        return { conversation_id: current.conversation_id, response: current.response_payload, reused: true };
+      }
+      if (current.status !== "pending") {
+        throw new ServiceError("CONVERSATION_REQUEST_NOT_PENDING", "Conversation request cannot be completed.", 409, false);
+      }
+      const recorded = await this.recordCompletedTurnInTransaction(transaction, {
+        ...input,
+        conversation_id: current.conversation_id,
+      });
+      await transaction.query(
+        `UPDATE conversation_requests
+            SET status = 'completed', response_payload = $3::jsonb, completed_at = now(), failure_code = null
+          WHERE owner_user_id = $1::uuid AND request_id = $2 AND status = 'pending'`,
+        [input.owner_user_id, input.idempotency_key, JSON.stringify(input.response)],
+      );
+      return { conversation_id: recorded.conversation_id, response: input.response, reused: false };
+    });
+  }
+
+  async failRequest(
+    ownerUserId: string,
+    requestId: string,
+    status: "failed" | "cancelled",
+    errorCode: string,
+  ): Promise<void> {
+    await queryWrite(
+      "conversation",
+      `UPDATE conversation_requests
+          SET status = $3, failure_code = $4, completed_at = now()
+        WHERE owner_user_id = $1::uuid AND request_id = $2 AND status = 'pending'`,
+      [ownerUserId, requestId, status, errorCode],
+    );
+  }
+
   async recordCompletedTurn(input: RecordCompletedConversationTurn): Promise<RecordedConversationTurn> {
     return withWriteTransaction("conversation", async (transaction) => {
+      return this.recordCompletedTurnInTransaction(transaction, input);
+    });
+  }
+
+  private async recordCompletedTurnInTransaction(
+    transaction: Parameters<Parameters<typeof withWriteTransaction>[1]>[0],
+    input: RecordCompletedConversationTurn,
+  ): Promise<RecordedConversationTurn> {
       let conversationId = input.conversation_id;
       let previousCompanyId: string | null = null;
       if (conversationId) {
@@ -274,8 +392,8 @@ export class RealConversationRepository implements ConversationRepository {
       if (!turnId) throw new ServiceError("CONVERSATION_WRITE_FAILED", "대화 기록을 저장하지 못했습니다.", 503, true);
 
       await transaction.query(
-        `INSERT INTO conversation_messages (turn_id, role, content)
-         VALUES ($1::uuid, 'user', $2), ($1::uuid, 'assistant', $3)`,
+        `INSERT INTO conversation_messages (turn_id, role, message_index, content)
+         VALUES ($1::uuid, 'user', 1, $2), ($1::uuid, 'assistant', 2, $3)`,
         [turnId, input.user_message, input.assistant_message],
       );
       for (const [position, source] of input.sources.entries()) {
@@ -301,7 +419,6 @@ export class RealConversationRepository implements ConversationRepository {
         );
       }
       return { conversation_id: conversationId, turn_id: turnId, reused: false };
-    });
   }
 
   async deleteConversation(conversationId: string, ownerUserId: string): Promise<boolean> {
