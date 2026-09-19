@@ -30,6 +30,7 @@ APP_DATA_MODE=real
 AUTH_DATA_MODE=real
 COMMUNITY_DATA_MODE=real
 WORKSITE_TIP_DATA_MODE=real
+FAVORITE_DATA_MODE=real
 AUTH_DATABASE_URL=postgresql://wg_auth:<URL_ENCODED_AUTH_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 COMMUNITY_DATABASE_URL=postgresql://wg_community:<URL_ENCODED_COMMUNITY_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 TIP_DATABASE_URL=postgresql://wg_tip:<URL_ENCODED_TIP_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
@@ -81,9 +82,9 @@ CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 금지된다. 전용 token은 `web.env`의 같은 이름 값과 일치하고 RAG token과 달라야 한다. 위 목록 외의 endpoint override도 거부한다. production unit이 두 file fallback을
 `/dev/null`로 고정하며 로그·계약서 캐시는 비활성화한다.
 
-## 인증·커뮤니티·현장 제보
+## 인증·커뮤니티·현장 제보·즐겨찾기
 
-PR #40·#45 로 `web.env` 에 키가 늘었다. **세 모드 키는 생략할 수 없다** —
+사용자 데이터 기능의 **네 모드 키는 생략할 수 없다** —
 생략하면 `APP_DATA_MODE=real` 을 따라가는데, 연결 문자열 없이 real 이 되면
 로그인·글쓰기가 조용히 503 이 된다. `validate-service-envs.py` 가 명시를 강제한다.
 
@@ -92,14 +93,17 @@ PR #40·#45 로 `web.env` 에 키가 늘었다. **세 모드 키는 생략할 �
 | `AUTH_DATA_MODE` | `real` 또는 `mock` | real 이면 `AUTH_DATABASE_URL` 필수 |
 | `COMMUNITY_DATA_MODE` | `real` 또는 `mock` | real 이면 `COMMUNITY_DATABASE_URL` 필수 |
 | `WORKSITE_TIP_DATA_MODE` | `real` 또는 `mock` | real 이면 `TIP_DATABASE_URL`과 고정 저장 경로 필수 |
+| `FAVORITE_DATA_MODE` | `real` 또는 `mock` | real 이면 `wg_auth` 연결로 `user_favorite_firms` 사용 |
 | `AUTH_DATABASE_URL` | `postgresql://wg_auth:…@127.0.0.1:5433/wageguard?sslmode=disable` | mock 일 때는 **두면 안 된다** |
 | `COMMUNITY_DATABASE_URL` | `postgresql://wg_community:…@127.0.0.1:5433/wageguard?sslmode=disable` | 〃 |
 | `TIP_DATABASE_URL` | `postgresql://wg_tip:…@127.0.0.1:5433/wageguard?sslmode=disable` | 〃 |
 | `WORKSITE_TIP_STORAGE_ROOT` | `/srv/moneyworry/worksite-tip-media` | 현장 제보 real 일 때만 사용하며 다른 경로는 거부 |
 | `MOCK_AUTH_*_PASSWORD` 3종 | mock 일 때만 | real 로 바꾸면 **지워야 한다** |
 
-현장 제보 real 저장의 `reporter_id`는 실제 `users` 행을 참조하므로
-`WORKSITE_TIP_DATA_MODE=real`이면 `AUTH_DATA_MODE`도 반드시 `real`이어야 한다.
+현장 제보의 `reporter_id`와 즐겨찾기의 `user_id`는 실제 `users` 행을 참조한다.
+따라서 `WORKSITE_TIP_DATA_MODE=real` 또는 `FAVORITE_DATA_MODE=real`이면
+`AUTH_DATA_MODE`도 반드시 `real`이어야 한다. 즐겨찾기는 별도 DB 비밀번호를 추가하지 않고
+최소 권한이 부여된 기존 `wg_auth` 연결을 사용한다.
 
 쓰기 롤 URL 은 **소유자(`DB_USER`)나 읽기 전용(`BOT_USER`)을 쓸 수 없다.** 검증기가 막는다.
 앱이 조용히 전체 권한 계정으로 붙으면 롤을 분리한 이유가 사라지기 때문이고,

@@ -202,17 +202,23 @@ def validate_write_role_url(
 
 
 def validate_user_data_modes(web: dict[str, str], db: dict[str, str]) -> None:
-    """인증·커뮤니티·현장 제보의 데이터 모드.
+    """인증·커뮤니티·현장 제보·즐겨찾기의 데이터 모드.
 
-    세 키 모두 **생략하면 안 된다.** 생략하면 APP_DATA_MODE=real 을 따라가는데
+    네 키 모두 **생략하면 안 된다.** 생략하면 APP_DATA_MODE=real 을 따라가는데
     (product/src/config/dataMode.ts), real 로 떨어진 채 연결 문자열이 없으면
-    로그인·글쓰기가 조용히 503 이 된다. 빠뜨리기 쉬운 사고라 명시를 강제한다.
+    로그인·글쓰기·즐겨찾기가 조용히 503 이 된다. 빠뜨리기 쉬운 사고라 명시를 강제한다.
     """
-    for key in ("AUTH_DATA_MODE", "COMMUNITY_DATA_MODE", "WORKSITE_TIP_DATA_MODE"):
+    mode_keys = (
+        "AUTH_DATA_MODE",
+        "COMMUNITY_DATA_MODE",
+        "WORKSITE_TIP_DATA_MODE",
+        "FAVORITE_DATA_MODE",
+    )
+    for key in mode_keys:
         if key not in web:
             fail(f"web.env must define {key} explicitly (it falls back to APP_DATA_MODE=real)")
 
-    for key in ("AUTH_DATA_MODE", "COMMUNITY_DATA_MODE", "WORKSITE_TIP_DATA_MODE"):
+    for key in mode_keys:
         if web[key] not in {"real", "mock"}:
             fail(f"web.env {key} must be real or mock")
 
@@ -220,6 +226,12 @@ def validate_user_data_modes(web: dict[str, str], db: dict[str, str]) -> None:
         fail(
             "web.env AUTH_DATA_MODE must be real when "
             "WORKSITE_TIP_DATA_MODE=real (reporter_id references the real users table)"
+        )
+
+    if web["FAVORITE_DATA_MODE"] == "real" and web["AUTH_DATA_MODE"] != "real":
+        fail(
+            "web.env AUTH_DATA_MODE must be real when "
+            "FAVORITE_DATA_MODE=real (favorites use the wg_auth connection)"
         )
 
     pairs = (
@@ -356,11 +368,12 @@ def validate_web(web: dict[str, str], db: dict[str, str]) -> None:
             "CONTRACT_TIMEOUT_MS",
             "RAG_INTERNAL_TOKEN",
             "CONTRACT_INTERNAL_TOKEN",
-            # 인증·커뮤니티·현장 제보 (PR #40·#45). 생략하면 APP_DATA_MODE=real 을
+            # 인증·커뮤니티·현장 제보·즐겨찾기. 생략하면 APP_DATA_MODE=real 을
             # 따라가므로 반드시 명시한다 — 아래 검사가 그것을 강제한다.
             "AUTH_DATA_MODE",
             "COMMUNITY_DATA_MODE",
             "WORKSITE_TIP_DATA_MODE",
+            "FAVORITE_DATA_MODE",
             "AUTH_DATABASE_URL",
             "COMMUNITY_DATABASE_URL",
             "TIP_DATABASE_URL",
