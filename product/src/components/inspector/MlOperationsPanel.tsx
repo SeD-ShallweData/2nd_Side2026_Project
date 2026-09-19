@@ -43,7 +43,6 @@ export function MlOperationsPanel({ batchLabel }: { batchLabel: string }) {
           <span className="eyebrow">운영 관리자</span>
           <h2>모델 운영</h2>
         </div>
-        <span className="ml-ops-scope">이 화면에서만 반영 · 서버 전송 없음</span>
       </header>
 
       <div className="ml-ops-grid">

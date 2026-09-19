@@ -158,7 +158,7 @@ function DetailPanel({ detail }: { detail: InspectorCompanyDetail }) {
   );
 }
 
-export function InspectorDashboard() {
+export function InspectorDashboard({ isOperator = false }: { isOperator?: boolean }) {
   const [overview, setOverview] = useState<InspectorOverview | null>(null);
   const [detail, setDetail] = useState<InspectorCompanyDetail | null>(null);
   const [query, setQuery] = useState("");
@@ -260,27 +260,31 @@ export function InspectorDashboard() {
 
   return (
     <div className="inspector-dashboard">
-      <section className="inspector-hero">
-        <div className="shell inspector-hero-grid">
-          <div>
-            <span className="eyebrow">Workplace Risk Monitoring</span>
-            <h1>확인이 필요한 사업장을<br /><mark>데이터로 먼저 살펴보세요.</mark></h1>
-            <p>최신 ML 배치의 감독관 점검 등급과 큐 순위, 실제 SHAP 사유를 한 화면에서 확인하는 내부용 시연 대시보드입니다.</p>
+      {/* 운영 관리자는 이 소개 단락을 이미 알고 있다. 근로감독관에게는
+          '점수는 확률이 아니다' 같은 해석 원칙을 계속 앞에 보여준다. */}
+      {!isOperator ? (
+        <section className="inspector-hero">
+          <div className="shell inspector-hero-grid">
+            <div>
+              <span className="eyebrow">Workplace Risk Monitoring</span>
+              <h1>확인이 필요한 사업장을<br /><mark>데이터로 먼저 살펴보세요.</mark></h1>
+              <p>최신 Machine Learning 배치의 감독관 점검 등급과 큐 순위, 실제 SHAP 사유를 한 화면에서 확인하는 내부용 시연 대시보드입니다.</p>
+            </div>
+            <aside>
+              <span>해석 원칙</span>
+              <strong>점수는 확률이 아닙니다.</strong>
+              <p>점검 등급은 모델 원점수 내림차순 상위 3,000곳의 현장 확인 순서를 구간화한 값입니다.</p>
+            </aside>
           </div>
-          <aside>
-            <span>해석 원칙</span>
-            <strong>점수는 확률이 아닙니다.</strong>
-            <p>점검 등급은 모델 원점수 내림차순 상위 3,000곳의 현장 확인 순서를 구간화한 값입니다.</p>
-          </aside>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <div className="shell inspector-content">
         {error ? <div className="inspector-alert" role="alert"><strong>데이터를 확인하지 못했습니다.</strong><span>{error}</span></div> : null}
 
         <section className="inspector-overview" aria-busy={loadingOverview}>
           <div className="inspector-section-head">
-            <div><span className="eyebrow">Latest batch</span><h2>점검 현황</h2></div>
+            <div><span className="eyebrow">{isOperator ? "Latest Workplace Risk Batch Monitoring" : "Latest batch"}</span><h2>점검 현황</h2></div>
             {overview ? <p>{dateLabel(overview.batch.data_as_of)} 데이터 기준 · {dateLabel(overview.batch.target_month)} 예측 대상</p> : null}
           </div>
           <div className="inspector-stat-grid">

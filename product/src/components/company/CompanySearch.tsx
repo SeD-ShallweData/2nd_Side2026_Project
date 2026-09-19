@@ -209,7 +209,6 @@ export function CompanySearch() {
               aria-controls={`${inputId}-filters`}
               onClick={toggleFilters}
             >
-              <span aria-hidden="true">☷</span>
               필터{appliedFilters.region || appliedFilters.industry ? ` (${Number(Boolean(appliedFilters.region)) + Number(Boolean(appliedFilters.industry))})` : ""}
               <span className="filter-toggle-caret" aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
             </button>
@@ -404,7 +403,9 @@ export function CompanySearch() {
         {!loading && !error && result === null ? (
           <div className="search-placeholder">
             <h2>어느 지역부터 볼까요?</h2>
-            <p>지도에서 지역을 고르면 그 지역의 사업장을 바로 보여드립니다. 회사명을 알고 있다면 위에서 바로 검색하세요.</p>
+            <p>지도에서 지역을 고르면 그 지역의 사업장을 바로 보여드립니다.
+            <br />
+            회사명을 알고 있다면 위에서 바로 검색하세요.</p>
             {filterOptionsError ? (
               <p className="field-error" role="alert">{filterOptionsError}</p>
             ) : filterOptions ? (

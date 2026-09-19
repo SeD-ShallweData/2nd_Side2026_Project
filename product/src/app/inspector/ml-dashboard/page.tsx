@@ -7,7 +7,7 @@ import { canOperatePlatform } from "@/server/auth/inspectorAccess";
 import { SESSION_COOKIE_NAME } from "@/server/auth/sessionCookie";
 import { getOptionalSessionUser } from "@/services/authService";
 
-export const metadata: Metadata = { title: "ML 대시보드" };
+export const metadata: Metadata = { title: "Machine Learning 대시보드" };
 
 /*
  * 집계는 근로감독관도 본다. 모델 운영 패널은 운영 관리자에게만 보인다.
