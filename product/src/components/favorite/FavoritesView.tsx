@@ -82,7 +82,7 @@ export function FavoritesView() {
         title="로그인이 필요합니다"
         description="즐겨찾기는 로그인한 사용자만 사용할 수 있습니다."
         action={
-          <Link href="/login" className="button button-dark">
+          <Link href="/login?next=%2Ffavorites" className="button button-dark">
             로그인하러 가기
           </Link>
         }
