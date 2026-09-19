@@ -33,11 +33,11 @@ export async function InspectorNav({ current }: { current: "dashboard" | "chat" 
               LLM 프롬프트
             </Link>
           ) : null}
-          <Link href="/inspector" aria-current={current === "dashboard" ? "page" : undefined}>
-            사업장 대시보드
-          </Link>
-          <Link href="/inspector/chat" aria-current={current === "chat" ? "page" : undefined}>
-            AI 점검 보조
+          {/* 'AI 점검 보조' 는 별도 탭을 없앤다. 사업장 대시보드에서 사업장을
+              열면 'AI 점검 보조 열기' 로 그 페이지에 바로 간다 — 고아 페이지가
+              아니다. 이름도 그 관계를 드러내게 바꾼다. */}
+          <Link href="/inspector" aria-current={current === "dashboard" || current === "chat" ? "page" : undefined}>
+            사업장 대시보드 및 Rag 점검
           </Link>
           {/* 배치는 플랫폼 운영이다. 근로감독관에게는 보이지 않는다. */}
           {isOperator ? (
