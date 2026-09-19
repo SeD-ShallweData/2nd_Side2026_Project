@@ -426,7 +426,7 @@ export function InspectorDashboard({ isOperator = false }: { isOperator?: boolea
 
         <div className="inspector-policy-note">
           <strong>의사결정 보조 자료</strong>
-          <p>본 화면은 시연용 내부 프로토타입입니다. 모델 결과만으로 조사 착수·위법 판단·행정처분을 자동 결정하지 않으며 반드시 원자료와 현장 사실을 확인해야 합니다.</p>
+          <p>본 모델 결과만으로 조사 착수·위법 판단·행정처분을 자동 결정하지 않으며 반드시 원자료와 현장 사실을 확인해야 합니다.</p>
         </div>
       </div>
     </div>

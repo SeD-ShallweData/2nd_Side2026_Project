@@ -128,7 +128,10 @@ export function SiteHeader() {
                 그 파일은 "server-only" 라 클라이언트 컴포넌트에서 가져올 수 없어 여기 그대로 둔다. */}
             {!isInspector && (user?.role === "admin" || user?.role === "inspector") ? (
               <Link
-                href="/inspector"
+                /* 관리자는 이 화면에서 배치·프롬프트를 직접 운영하므로 곧바로
+                   LLM 프롬프트 탭으로 보낸다. 감독관은 자기 업무 화면인
+                   사업장 대시보드로 그대로 간다. */
+                href={user?.role === "admin" ? "/inspector/prompts" : "/inspector"}
                 className="consumer-mode-switch"
                 aria-label={`일반 사용자 모드에서 ${user?.role === "admin" ? "관리자" : "감독관"} 모드로 전환`}
               >
