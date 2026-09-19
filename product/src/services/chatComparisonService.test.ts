@@ -54,6 +54,15 @@ describe("의도와 근거에 따른 상담 경로", () => {
     expect(mocks.company).not.toHaveBeenCalled();
     expect(mocks.compare).not.toHaveBeenCalled();
   });
+  it("정책 단축 trace도 최근 원문 최대 10개 기준을 기록한다", async () => {
+    mocks.classify.mockResolvedValue({ intent: "off_topic", topic: "other", status: "classified" });
+    const recent_messages = Array.from({ length: 12 }, (_, index) => ({
+      role: index % 2 === 0 ? "user" as const : "assistant" as const,
+      content: `history ${index}`,
+    }));
+    const response = await sendComparedChatMessage({ message: "메뉴 추천", recent_messages });
+    expect(response.results[0]?.trace.recent_message_count).toBe(10);
+  });
   it("분야별 창구는 허용된 주소만 사용", async () => {
     mocks.classify.mockResolvedValue({ intent: "off_topic", topic: "investment", status: "classified" });
     const response = await sendComparedChatMessage({ message: "월급으로 주식 추천" });
@@ -75,6 +84,15 @@ describe("의도와 근거에 따른 상담 경로", () => {
     expect(response.results[0].answer).not.toContain("선택 기업");
     expect(response.results[0].sources).toEqual([]);
     expect(mocks.compare).not.toHaveBeenCalled();
+  });
+  it("근거 없음과 무관한 근거를 다른 trace로 남긴다", async () => {
+    mocks.retrieve.mockResolvedValue({ status: "no_match", reason: "distance_threshold", topic: null, documents: [] });
+    const missing = await sendComparedChatMessage({ message: "야근수당을 안 줘요" });
+    expect(missing.results[0].trace.guardrail_hits).toEqual(["RAG_EVIDENCE_NOT_FOUND"]);
+
+    mocks.retrieve.mockResolvedValue({ status: "no_match", reason: "out_of_scope", topic: "investment", documents: [] });
+    const irrelevant = await sendComparedChatMessage({ message: "야근수당을 안 줘요" });
+    expect(irrelevant.results[0].trace.guardrail_hits).toEqual(["RAG_EVIDENCE_NOT_RELEVANT"]);
   });
   it("노동 목적에서 검색 장애가 나면 생성하지 않는다", async () => {
     mocks.retrieve.mockResolvedValue({ status: "unavailable", documents: [] });
@@ -106,12 +124,50 @@ describe("의도와 근거에 따른 상담 경로", () => {
       ragRetrieval: expect.objectContaining({ status: "no_match", reason: "company_context_only" }),
     }));
   });
+  it("회사를 선택하지 않은 일반 지표 질문은 사업장 선택 없이 설명한다", async () => {
+    mocks.classify.mockResolvedValue({
+      intent: "company", topic: "other", company_scope: "general", status: "classified",
+    });
+    const response = await sendComparedChatMessage({ message: "긍정 지표 0개면 나쁜 회사인가요?" });
+    expect(response.results[0]).toMatchObject({
+      answer_type: "general_guidance",
+      guardrail_status: "limited",
+      trace: {
+        question_intent: "company",
+        company_context_attached: false,
+        rag_reason: "general_company_explanation",
+        guardrail_hits: ["GENERAL_COMPANY_EXPLANATION"],
+      },
+    });
+    expect(response.results[0].answer).toContain("나쁘거나 위험하다는 판단은 아닙니다");
+    expect(response.results[0].answer).not.toContain("사업장을 먼저 선택");
+    expect(mocks.retrieve).not.toHaveBeenCalled();
+    expect(mocks.compare).not.toHaveBeenCalled();
+  });
   it.each([false, true])("노동 검색 매칭은 생성 경로 유지, compare=%s", async (compare) => {
     mocks.retrieve.mockResolvedValue({ status: "matched", documents: [{ source: { name: "법령" } }] });
     await sendComparedChatMessage({ message: "야근수당을 안 줘요", company_id: "C1", compare });
     expect(mocks.configs.map((c) => c.id)).toEqual(compare ? ["upstage", "skt"] : ["upstage"]);
     expect(mocks.compare.mock.calls[0][0].companyContext).toBeUndefined();
     expect(mocks.compare.mock.calls[0][0].policyBaseline.answer).not.toContain("선택 기업");
+  });
+  it("복합 노동+투자 요청은 노동 부분을 생성 경로로 보내고 투자 부분을 Answer Plan에 제한한다", async () => {
+    mocks.classify.mockResolvedValue({ intent: "unclear", topic: "other", company_scope: "not_applicable", status: "classified" });
+    mocks.retrieve.mockResolvedValue({
+      status: "matched", topic: "wage", documents: [{ source: { name: "근로기준법", category: "labor_law" } }],
+    });
+    await sendComparedChatMessage({ message: "밀린 월급을 받는 방법과 코인 매수 타이밍을 같이 알려줘", chat_mode: "wage" });
+    expect(mocks.retrieve).toHaveBeenCalledOnce();
+    expect(mocks.compare).toHaveBeenCalledWith(expect.objectContaining({
+      questionIntent: "labor",
+      answerPlan: expect.objectContaining({
+        requires_clarification: false,
+        parts: [
+          expect.objectContaining({ scope: "labor" }),
+          expect.objectContaining({ scope: "out_of_scope", out_of_scope_topic: "investment" }),
+        ],
+      }),
+    }));
   });
   it("선택한 회사와 질문 속 회사가 다르면 기존 재선택 안내를 보존한다", async () => {
     mocks.classify.mockResolvedValue({ intent: "company", topic: "other", status: "classified" });
