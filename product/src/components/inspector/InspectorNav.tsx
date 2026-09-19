@@ -5,7 +5,7 @@ import { canOperatePlatform } from "@/server/auth/inspectorAccess";
 import { SESSION_COOKIE_NAME } from "@/server/auth/sessionCookie";
 import { getOptionalSessionUser } from "@/services/authService";
 
-export async function InspectorNav({ current }: { current: "dashboard" | "chat" | "batches" | "ml-dashboard" }) {
+export async function InspectorNav({ current }: { current: "dashboard" | "chat" | "batches" | "ml-dashboard" | "prompts" }) {
   const cookieStore = await cookies();
   const user = await getOptionalSessionUser(cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null);
   const isOperator = canOperatePlatform(user?.role);
@@ -36,6 +36,12 @@ export async function InspectorNav({ current }: { current: "dashboard" | "chat" 
           <Link href="/inspector/ml-dashboard" aria-current={current === "ml-dashboard" ? "page" : undefined}>
             ML 대시보드
           </Link>
+          {/* 프롬프트도 플랫폼 운영이다. */}
+          {isOperator ? (
+            <Link href="/inspector/prompts" aria-current={current === "prompts" ? "page" : undefined}>
+              LLM 프롬프트
+            </Link>
+          ) : null}
         </nav>
         <span className="inspector-private-badge">
           {isOperator ? "운영 관리자" : "근로감독관 · 읽기 전용"}
