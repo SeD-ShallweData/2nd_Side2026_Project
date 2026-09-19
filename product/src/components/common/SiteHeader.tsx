@@ -142,6 +142,17 @@ export function SiteHeader() {
                 </Link>
               );
             })}
+            {/* 즐겨찾기는 일반 사용자 전용 기능이라 admin/inspector에게는 보이지 않는다.
+                NAV_ITEMS는 로그인 여부와 무관한 공통 메뉴라 여기에 넣지 않는다. */}
+            {user?.role === "user" ? (
+              <Link
+                href="/favorites"
+                className={isCurrentNavPath(pathname, "/favorites") ? "is-current" : undefined}
+                aria-current={isCurrentNavPath(pathname, "/favorites") ? "page" : undefined}
+              >
+                즐겨찾기
+              </Link>
+            ) : null}
           </nav>
           <div className="consumer-header-side" style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {sessionState.status === "loading" ? null : user ? (
@@ -188,6 +199,15 @@ export function SiteHeader() {
             </Link>
           );
         })}
+        {user?.role === "user" ? (
+          <Link
+            href="/favorites"
+            className={isCurrentNavPath(pathname, "/favorites") ? "is-current" : undefined}
+            aria-current={isCurrentNavPath(pathname, "/favorites") ? "page" : undefined}
+          >
+            즐겨찾기
+          </Link>
+        ) : null}
       </nav>
     </>
   );
