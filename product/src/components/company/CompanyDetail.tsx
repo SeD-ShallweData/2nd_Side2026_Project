@@ -6,9 +6,14 @@ import { useEffect, useState } from "react";
 import { ActionChecklist } from "@/components/common/ActionChecklist";
 import { DataFreshnessNotice } from "@/components/common/DataFreshnessNotice";
 import { EmptyState, ErrorState, LimitationNotice, LoadingSkeleton } from "@/components/common/AsyncStates";
+import { FavoriteButton } from "@/components/favorite/FavoriteButton";
+import { getFavoriteEligibility } from "@/components/favorite/favoriteAuth";
 import { RiskInformationCard } from "@/components/risk/RiskInformationCard";
+import type { SessionResponse } from "@/app/api/auth/authApiContract";
 import type { Company } from "@/domain/company";
 import type { CompanyRiskResult } from "@/domain/risk";
+import { getSession } from "@/services/authClient";
+import { getFavorites } from "@/services/favoriteClient";
 import { readApiResponse } from "@/utils/clientApi";
 
 export function CompanyDetail({ company, dataMode }: { company: Company; dataMode: "mock" | "real" }) {
@@ -16,6 +21,36 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
   const [risk, setRisk] = useState<CompanyRiskResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [session, setSession] = useState<SessionResponse | "loading">("loading");
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // 검색 결과와 마찬가지로 진입 시 즐겨찾기 목록을 한 번 조회해 이 사업장의
+  // 선택 상태만 뽑아 쓴다. 로그인하지 않았거나 일반 사용자가 아니면 건너뛴다.
+  useEffect(() => {
+    let ignore = false;
+    const controller = new AbortController();
+    getSession({ signal: controller.signal })
+      .then((result) => {
+        if (ignore) return;
+        setSession(result);
+        if (result.authenticated && result.user.role === "user") {
+          return getFavorites({ signal: controller.signal }).then((favorites) => {
+            if (!ignore) {
+              setIsFavorite(favorites.items.some((item) => item.company_id === company.company_id));
+            }
+          });
+        }
+        return undefined;
+      })
+      .catch((caught: unknown) => {
+        if (ignore || (caught instanceof DOMException && caught.name === "AbortError")) return;
+        setSession({ authenticated: false, user: null, expires_at: null });
+      });
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
+  }, [company.company_id]);
 
   async function loadRisk(signal?: AbortSignal) {
     setLoading(true);
@@ -75,6 +110,13 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
             <Link href="/companies" className="button button-outline change-company">
               사업장 변경
             </Link>
+            <FavoriteButton
+              companyId={company.company_id}
+              companyName={company.company_name}
+              initialIsFavorite={isFavorite}
+              eligibility={getFavoriteEligibility(session)}
+              onChange={(_, nextIsFavorite) => setIsFavorite(nextIsFavorite)}
+            />
           </div>
         </div>
       </section>

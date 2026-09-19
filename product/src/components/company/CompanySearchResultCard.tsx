@@ -1,3 +1,5 @@
+import { FavoriteButton } from "@/components/favorite/FavoriteButton";
+import type { FavoriteEligibility } from "@/components/favorite/favoriteAuth";
 import type { CompanySearchResult } from "@/domain/company";
 
 const MATCH_LABEL = {
@@ -11,11 +13,17 @@ export function CompanySearchResultCard({
   company,
   onSelect,
   query = "",
+  isFavorite,
+  favoriteEligibility,
+  onFavoriteChange,
 }: {
   company: CompanySearchResult;
   onSelect: (companyId: string) => void;
   /** 이름으로 찾은 것이 아니면 비어 있다. 일치 표시를 붙일지 정하는 데 쓴다. */
   query?: string;
+  isFavorite: boolean;
+  favoriteEligibility: FavoriteEligibility;
+  onFavoriteChange: (companyId: string, isFavorite: boolean) => void;
 }) {
   return (
     <article className="company-result-card">
@@ -49,6 +57,13 @@ export function CompanySearchResultCard({
       >
         이 사업장 선택
       </button>
+      <FavoriteButton
+        companyId={company.company_id}
+        companyName={company.company_name}
+        initialIsFavorite={isFavorite}
+        eligibility={favoriteEligibility}
+        onChange={onFavoriteChange}
+      />
     </article>
   );
 }

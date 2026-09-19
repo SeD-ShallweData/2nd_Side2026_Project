@@ -103,7 +103,11 @@ export function CommunityBoard() {
           <article className="community-post-card" key={post.post_id}>
             <div>
               <span>{post.category_label}</span>
-              <small>{companyContextLabel(post.company_context)} · {post.author_label ?? "익명"} · {relativeTimeLabel(post.created_at)}</small>
+              <small>
+                {[companyContextLabel(post.company_context), post.author_label ?? "익명", relativeTimeLabel(post.created_at)]
+                  .filter((part): part is string => Boolean(part))
+                  .join(" · ")}
+              </small>
             </div>
             <h2><Link href={`/community/${encodeURIComponent(post.post_id)}`}>{post.title}</Link></h2><p>{post.body}</p>
             <strong>{post.like_count === null ? null : `공감 ${post.like_count}　`}댓글 {post.comment_count}</strong>
