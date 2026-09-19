@@ -91,6 +91,23 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "column_default:public.worksite_tips.status_received",
     "column_default_absent:public.worksite_tips.category",
   ]),
+  // 0014 는 즐겨찾기 테이블을 만든다. 복합 PK 와 두 FK 모두 ON DELETE CASCADE 로
+  // 정의되는 게 계약이라, 존재 확인과 별개로 constraint_definition 으로 그
+  // cascade 여부까지 고정한다 — 그냥 FK 존재만 보면 no-action 으로 잘못
+  // 만들어져도 aligned 로 오판한다.
+  "0014_real_hitman": Object.freeze([
+    "table:public.user_favorite_firms",
+    "column:public.user_favorite_firms.user_id",
+    "column:public.user_favorite_firms.firm_id",
+    "column:public.user_favorite_firms.created_at",
+    "constraint:public.user_favorite_firms.user_favorite_firms_user_id_firm_id_pk",
+    "constraint_definition:public.user_favorite_firms.user_favorite_firms_user_id_firm_id_pk",
+    "constraint:public.user_favorite_firms.user_favorite_firms_user_id_users_id_fk",
+    "constraint_definition:public.user_favorite_firms.user_favorite_firms_user_id_users_id_fk",
+    "constraint:public.user_favorite_firms.user_favorite_firms_firm_id_firms_firm_id_fk",
+    "constraint_definition:public.user_favorite_firms.user_favorite_firms_firm_id_firms_firm_id_fk",
+    "index:public.user_favorite_firms_user_created_idx",
+  ]),
 });
 
 function migrationLabel(migration) {

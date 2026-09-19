@@ -546,6 +546,67 @@ SELECT json_build_object(
       WHERE table_schema='public' AND table_name='worksite_tips' AND column_name='category'
         AND column_default IS NULL
     )
+  ),
+  '0014_real_hitman', json_build_object(
+    'table:public.user_favorite_firms', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='user_favorite_firms' AND c.relkind IN ('r','p')
+    ),
+    'column:public.user_favorite_firms.user_id', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='user_favorite_firms' AND column_name='user_id'
+    ),
+    'column:public.user_favorite_firms.firm_id', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='user_favorite_firms' AND column_name='firm_id'
+    ),
+    'column:public.user_favorite_firms.created_at', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='user_favorite_firms' AND column_name='created_at'
+    ),
+    'constraint:public.user_favorite_firms.user_favorite_firms_user_id_firm_id_pk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='user_favorite_firms'
+        AND con.conname='user_favorite_firms_user_id_firm_id_pk' AND con.contype='p'
+    ),
+    'constraint_definition:public.user_favorite_firms.user_favorite_firms_user_id_firm_id_pk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='user_favorite_firms'
+        AND con.conname='user_favorite_firms_user_id_firm_id_pk'
+        AND pg_get_constraintdef(con.oid) ~* 'PRIMARY KEY \(user_id, firm_id\)'
+    ),
+    'constraint:public.user_favorite_firms.user_favorite_firms_user_id_users_id_fk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='user_favorite_firms'
+        AND con.conname='user_favorite_firms_user_id_users_id_fk' AND con.contype='f'
+    ),
+    'constraint_definition:public.user_favorite_firms.user_favorite_firms_user_id_users_id_fk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='user_favorite_firms'
+        AND con.conname='user_favorite_firms_user_id_users_id_fk'
+        AND pg_get_constraintdef(con.oid) ~* 'ON DELETE CASCADE'
+    ),
+    'constraint:public.user_favorite_firms.user_favorite_firms_firm_id_firms_firm_id_fk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='user_favorite_firms'
+        AND con.conname='user_favorite_firms_firm_id_firms_firm_id_fk' AND con.contype='f'
+    ),
+    'constraint_definition:public.user_favorite_firms.user_favorite_firms_firm_id_firms_firm_id_fk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='user_favorite_firms'
+        AND con.conname='user_favorite_firms_firm_id_firms_firm_id_fk'
+        AND pg_get_constraintdef(con.oid) ~* 'ON DELETE CASCADE'
+    ),
+    'index:public.user_favorite_firms_user_created_idx', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='user_favorite_firms_user_created_idx' AND c.relkind IN ('i','I')
+    )
   )
 )::text;
 COMMIT;
