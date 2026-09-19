@@ -425,8 +425,8 @@ export const conversationMessages = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     turnId: uuid("turn_id")
-      .references(() => conversationTurns.id, { onDelete: "set null" }),
-    eventKind: text("event_kind").notNull().default("turn"),
+      .notNull()
+      .references(() => conversationTurns.id, { onDelete: "cascade" }),
     role: text().notNull(),
     messageIndex: smallint("message_index").notNull(),
     content: text().notNull(),
@@ -475,8 +475,8 @@ export const conversationCompanyEvents = pgTable(
       .notNull()
       .references(() => conversationThreads.id, { onDelete: "cascade" }),
     turnId: uuid("turn_id")
-      .notNull()
-      .references(() => conversationTurns.id, { onDelete: "cascade" }),
+      .references(() => conversationTurns.id, { onDelete: "set null" }),
+    eventKind: text("event_kind").notNull().default("turn"),
     previousCompanyId: text("previous_company_id").references(() => firms.firmId, {
       onDelete: "set null",
     }),
