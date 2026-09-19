@@ -1,8 +1,8 @@
 import type { NextResponse } from "next/server";
 
 import { getOptionalSessionUser } from "@/services/authService";
-import { deleteUserConversation, getUserConversation } from "@/services/conversationService";
-import { assertSameOriginRequest, noStoreError, noStoreJson } from "@/server/auth/http";
+import { deleteUserConversation, getUserConversation, updateUserConversation } from "@/services/conversationService";
+import { assertSameOriginRequest, noStoreError, noStoreJson, readJsonBody } from "@/server/auth/http";
 import { requireAuthenticatedUser } from "@/server/auth/permissions";
 import { getSessionTokenFromRequest } from "@/server/auth/sessionCookie";
 
@@ -28,6 +28,22 @@ export async function DELETE(request: Request, context: RouteContext): Promise<N
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     return noStoreJson(await deleteUserConversation((await context.params).conversationId, user));
+  } catch (error) {
+    return noStoreError(error);
+  }
+}
+
+export async function PATCH(request: Request, context: RouteContext): Promise<NextResponse> {
+  try {
+    assertSameOriginRequest(request);
+    const user = requireAuthenticatedUser(
+      await getOptionalSessionUser(getSessionTokenFromRequest(request)),
+    );
+    return noStoreJson(await updateUserConversation(
+      (await context.params).conversationId,
+      await readJsonBody(request),
+      user,
+    ));
   } catch (error) {
     return noStoreError(error);
   }

@@ -12,6 +12,7 @@ import type {
   StoredConversationMessage,
   StoredConversationSummary,
   StoredConversationTurn,
+  UpdateConversationInput,
 } from "@/domain/conversation";
 import type { SourceReference } from "@/domain/risk";
 import type {
@@ -44,6 +45,7 @@ interface TurnRow {
   answer_type: AnswerType;
   guardrail_status: GuardrailStatus;
   created_at: Date;
+  response_payload: CompleteConversationRequestInput["response"] | null;
 }
 
 interface MessageRow {
@@ -183,10 +185,15 @@ export class RealConversationRepository implements ConversationRepository {
 
     const turns = await queryWrite<TurnRow>(
       "conversation",
-      `SELECT id::text AS turn_id, turn_index, company_id, answer_type, guardrail_status, created_at
-         FROM conversation_turns
-        WHERE conversation_id = $1::uuid
-        ORDER BY turn_index ASC`,
+      `SELECT turn.id::text AS turn_id, turn.turn_index, turn.company_id, turn.answer_type,
+              turn.guardrail_status, turn.created_at, request.response_payload
+         FROM conversation_turns turn
+         LEFT JOIN conversation_requests request
+           ON request.conversation_id = turn.conversation_id
+          AND request.request_id = turn.idempotency_key
+          AND request.status = 'completed'
+        WHERE turn.conversation_id = $1::uuid
+        ORDER BY turn.turn_index ASC`,
       [conversationId],
     );
     const turnIds = turns.map((turn) => turn.turn_id);
@@ -230,6 +237,7 @@ export class RealConversationRepository implements ConversationRepository {
         created_at: new Date(turn.created_at).toISOString(),
         messages: messageByTurn.get(turn.turn_id) ?? [],
         sources: sourceByTurn.get(turn.turn_id) ?? [],
+        response: turn.response_payload,
       })),
     };
   }
@@ -413,8 +421,8 @@ export class RealConversationRepository implements ConversationRepository {
       );
       if (previousCompanyId !== input.company_id) {
         await transaction.query(
-          `INSERT INTO conversation_company_events (conversation_id, turn_id, previous_company_id, next_company_id)
-           VALUES ($1::uuid, $2::uuid, $3, $4)`,
+          `INSERT INTO conversation_company_events (conversation_id, turn_id, event_kind, previous_company_id, next_company_id)
+           VALUES ($1::uuid, $2::uuid, 'turn', $3, $4)`,
           [conversationId, turnId, previousCompanyId, input.company_id],
         );
       }
@@ -431,6 +439,43 @@ export class RealConversationRepository implements ConversationRepository {
       [conversationId, ownerUserId],
     );
     return rows.length === 1;
+  }
+
+  async updateConversation(input: UpdateConversationInput): Promise<StoredConversationSummary | null> {
+    if (!validUuid(input.conversation_id)) return null;
+    return withWriteTransaction("conversation", async (transaction) => {
+      const current = await transaction.query<{ active_company_id: string | null }>(
+        `SELECT active_company_id FROM conversation_threads
+          WHERE id = $1::uuid AND owner_user_id = $2::uuid AND expires_at > now()
+          FOR UPDATE`,
+        [input.conversation_id, input.owner_user_id],
+      );
+      if (!current[0]) return null;
+      const rows = await transaction.query<ThreadRow>(
+        `UPDATE conversation_threads
+            SET title = CASE WHEN $3::boolean THEN $4 ELSE title END,
+                active_company_id = CASE WHEN $5::boolean THEN $6 ELSE active_company_id END,
+                last_activity_at = now(), expires_at = now() + interval '30 days'
+          WHERE id = $1::uuid AND owner_user_id = $2::uuid
+          RETURNING id::text AS conversation_id, owner_user_id::text, title, active_company_id,
+                    created_at, last_activity_at, expires_at, 0::text AS turn_count`,
+        [input.conversation_id, input.owner_user_id, input.title !== undefined, input.title ?? null,
+          input.active_company_id !== undefined, input.active_company_id ?? null],
+      );
+      if (input.active_company_id !== undefined && current[0].active_company_id !== input.active_company_id) {
+        await transaction.query(
+          `INSERT INTO conversation_company_events
+             (conversation_id, turn_id, event_kind, previous_company_id, next_company_id)
+           VALUES ($1::uuid, NULL, 'manual', $2, $3)`,
+          [input.conversation_id, current[0].active_company_id, input.active_company_id],
+        );
+      }
+      const count = await transaction.query<{ turn_count: string }>(
+        "SELECT count(*)::text AS turn_count FROM conversation_turns WHERE conversation_id = $1::uuid",
+        [input.conversation_id],
+      );
+      return rows[0] ? toSummary({ ...rows[0], turn_count: count[0]?.turn_count ?? "0" }) : null;
+    });
   }
 
   async deleteExpiredConversations(now: Date): Promise<number> {

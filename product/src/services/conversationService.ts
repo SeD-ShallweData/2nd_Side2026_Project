@@ -5,6 +5,9 @@ import type {
   ConversationListResponse,
   ConversationSummaryDto,
   DeleteConversationResponse,
+  ImportGuestConversationRequest,
+  ImportGuestConversationResponse,
+  UpdateConversationRequest,
 } from "@/app/api/conversations/conversationApiContract";
 import type { SessionUserDto } from "@/app/api/auth/authApiContract";
 import type { ChatRequest } from "@/domain/chat";
@@ -21,6 +24,7 @@ const MAX_LIST_LIMIT = 50;
 const HISTORY_MESSAGE_LIMIT = 10;
 const REQUEST_KEY_PATTERN = /^[A-Za-z0-9_-]{16,100}$/;
 const RECOVERY_TTL_MS = 5 * 60 * 1000;
+const COMPANY_ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
 
 interface GeneratedRecovery {
   response: ChatComparisonResponse;
@@ -49,6 +53,61 @@ function notFound(): ServiceError {
   return new ServiceError("CONVERSATION_NOT_FOUND", "대화 기록을 찾을 수 없습니다.", 404, false);
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function parseUpdateConversation(value: unknown): UpdateConversationRequest {
+  const record = asRecord(value);
+  if (!record) throw new ServiceError("VALIDATION_ERROR", "수정할 상담 정보를 확인해 주세요.", 400, false);
+  const result: UpdateConversationRequest = {};
+  if ("title" in record) {
+    if (typeof record.title !== "string" || !record.title.trim() || record.title.trim().length > 120) {
+      throw new ServiceError("VALIDATION_ERROR", "상담 제목은 1~120자로 입력해 주세요.", 400, false);
+    }
+    result.title = record.title.replace(/\s+/g, " ").trim();
+  }
+  if ("active_company_id" in record) {
+    if (record.active_company_id !== null
+      && (typeof record.active_company_id !== "string" || !COMPANY_ID_PATTERN.test(record.active_company_id))) {
+      throw new ServiceError("VALIDATION_ERROR", "사업장 식별값을 확인해 주세요.", 400, false);
+    }
+    result.active_company_id = record.active_company_id as string | null;
+  }
+  if (result.title === undefined && result.active_company_id === undefined) {
+    throw new ServiceError("VALIDATION_ERROR", "수정할 항목을 하나 이상 보내 주세요.", 400, false);
+  }
+  return result;
+}
+
+function parseGuestImport(value: unknown): ImportGuestConversationRequest {
+  const record = asRecord(value);
+  if (!record || typeof record.import_id !== "string" || !REQUEST_KEY_PATTERN.test(record.import_id)
+    || !Array.isArray(record.turns) || record.turns.length < 1 || record.turns.length > 10) {
+    throw new ServiceError("VALIDATION_ERROR", "가져올 익명 상담을 확인해 주세요.", 400, false);
+  }
+  const turns = record.turns.map((value) => {
+    const turn = asRecord(value);
+    const response = asRecord(turn?.response);
+    const results = response?.results;
+    if (!turn || typeof turn.user_message !== "string" || !turn.user_message.trim()
+      || turn.user_message.length > 2_000 || (turn.company_id !== null
+        && (typeof turn.company_id !== "string" || !COMPANY_ID_PATTERN.test(turn.company_id)))
+      || !response || !Array.isArray(results) || results.length < 1
+      || !asRecord(results[0]) || typeof asRecord(results[0])?.answer !== "string") {
+      throw new ServiceError("VALIDATION_ERROR", "익명 상담 turn 형식을 확인해 주세요.", 400, false);
+    }
+    return {
+      user_message: turn.user_message.trim(),
+      company_id: turn.company_id as string | null,
+      response: structuredClone(turn.response) as ChatComparisonResponse,
+    };
+  });
+  return { import_id: record.import_id, turns };
+}
+
 function toSummary(value: StoredConversationSummary): ConversationSummaryDto {
   return {
     conversation_id: value.conversation_id,
@@ -74,6 +133,7 @@ function toDetail(value: StoredConversationDetail): ConversationDetailDto {
       created_at: turn.created_at,
       messages: turn.messages.map((message) => ({ ...message })),
       sources: turn.sources.map((source) => ({ ...source })),
+      response: turn.response ? structuredClone(turn.response) : null,
     })),
   };
 }
@@ -115,6 +175,65 @@ export async function deleteUserConversation(
   repository.assertAvailable();
   if (!(await repository.deleteConversation(conversationId, user.user_id))) throw notFound();
   return { deleted: true, conversation_id: conversationId };
+}
+
+export async function updateUserConversation(
+  conversationId: string,
+  body: unknown,
+  user: SessionUserDto,
+): Promise<ConversationSummaryDto> {
+  const patch = parseUpdateConversation(body);
+  const repository = getConversationRepository();
+  repository.assertAvailable();
+  const updated = await repository.updateConversation({
+    owner_user_id: user.user_id,
+    conversation_id: conversationId,
+    ...patch,
+  });
+  if (!updated) throw notFound();
+  return toSummary(updated);
+}
+
+export async function importGuestConversation(
+  body: unknown,
+  user: SessionUserDto,
+): Promise<ImportGuestConversationResponse> {
+  const input = parseGuestImport(body);
+  const repository = getConversationRepository();
+  repository.assertAvailable();
+  let conversationId: string | undefined;
+  let reused = false;
+  for (const [index, turn] of input.turns.entries()) {
+    const requestId = `guest_${input.import_id}_${index}`;
+    const claim = await repository.claimRequest({
+      owner_user_id: user.user_id,
+      conversation_id: conversationId,
+      request_id: requestId,
+      company_id: turn.company_id,
+      user_message: turn.user_message,
+    });
+    conversationId = claim.conversation_id;
+    reused ||= claim.reused;
+    if (claim.status === "completed") continue;
+    if (claim.status !== "pending") {
+      throw new ServiceError("GUEST_IMPORT_NOT_RETRYABLE", "이 익명 상담은 가져오기를 다시 시도할 수 없습니다.", 409, false);
+    }
+    const primary = turn.response.results[0]!;
+    await repository.completeRequest({
+      owner_user_id: user.user_id,
+      conversation_id: conversationId,
+      idempotency_key: requestId,
+      company_id: turn.company_id,
+      user_message: turn.user_message,
+      assistant_message: primary.answer,
+      answer_type: primary.answer_type,
+      guardrail_status: primary.guardrail_status,
+      sources: primary.sources,
+      response: { ...turn.response, conversation_id: conversationId, conversation_persistence: "saved" },
+    });
+  }
+  if (!conversationId) throw new ServiceError("GUEST_IMPORT_FAILED", "익명 상담을 가져오지 못했습니다.", 503, true);
+  return { imported: true, conversation_id: conversationId, reused };
 }
 
 /*

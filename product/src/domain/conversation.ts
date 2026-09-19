@@ -28,6 +28,14 @@ export interface StoredConversationTurn {
   created_at: string;
   messages: StoredConversationMessage[];
   sources: SourceReference[];
+  response: ChatComparisonResponse | null;
+}
+
+export interface UpdateConversationInput {
+  owner_user_id: string;
+  conversation_id: string;
+  title?: string;
+  active_company_id?: string | null;
 }
 
 export interface StoredConversationDetail extends StoredConversationSummary {
@@ -86,6 +94,7 @@ export interface ConversationRepository {
   }>;
   failRequest(ownerUserId: string, requestId: string, status: "failed" | "cancelled", errorCode: string): Promise<void>;
   recordCompletedTurn(input: RecordCompletedConversationTurn): Promise<RecordedConversationTurn>;
+  updateConversation(input: UpdateConversationInput): Promise<StoredConversationSummary | null>;
   deleteConversation(conversationId: string, ownerUserId: string): Promise<boolean>;
   deleteExpiredConversations(now: Date): Promise<number>;
   findSummary(conversationId: string): Promise<StoredConversationSummaryState | null>;
