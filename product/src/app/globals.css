@@ -4946,3 +4946,52 @@ summary:focus-visible {
   max-width: 44rem;
   font-size: 0.92rem;
 }
+
+/* ── 모델 운영 패널 (운영 관리자 전용) ─────────────────────
+   집계 화면 위에 얹는다. 보는 화면과 바꾸는 화면을 한 자리에 두어야
+   무엇을 보고 무엇을 눌렀는지가 이어진다. */
+.ml-ops-panel { margin-bottom: 26px; border: 1px solid var(--line); border-left: 4px solid var(--inspector-navy); border-radius: 14px; background: var(--white); box-shadow: var(--shadow-sm); padding: 20px 22px; }
+.ml-ops-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.ml-ops-head h2 { margin: 4px 0 0; color: var(--inspector-navy); font-size: 1.15rem; }
+.ml-ops-scope { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--muted); padding: 5px 11px; font-size: .68rem; font-weight: 800; }
+
+.ml-ops-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 14px; }
+.ml-ops-card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 16px; }
+.ml-ops-card h3 { margin: 0 0 6px; color: var(--inspector-navy); font-size: .92rem; }
+.ml-ops-card p { margin: 0 0 12px; color: var(--muted); font-size: .76rem; line-height: 1.6; }
+.ml-ops-state { color: var(--ink-soft) !important; font-weight: 750; }
+.ml-ops-state strong { color: var(--inspector-navy); }
+
+.ml-ops-cuts { display: grid; gap: 8px; margin: 0 0 14px; }
+.ml-ops-cuts > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ml-ops-cuts dt { color: var(--ink-soft); font-size: .78rem; font-weight: 800; }
+.ml-ops-cuts dd { display: flex; align-items: center; gap: 5px; margin: 0; color: var(--muted); font-size: .72rem; }
+.ml-ops-cuts input { width: 5.5rem; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--white); color: var(--ink); padding: 6px 8px; font-size: .78rem; font-weight: 800; text-align: right; }
+
+.ml-ops-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ml-ops-log { display: grid; gap: 4px; margin: 16px 0 0; border-top: 1px solid var(--line); padding: 12px 0 0 18px; color: var(--muted); font-size: .72rem; }
+
+/* ── 프롬프트 화면 ─────────────────────────────────────── */
+.prompt-studio-layout { display: grid; grid-template-columns: minmax(0, 17rem) minmax(0, 1fr); gap: 16px; align-items: start; }
+.prompt-studio-list { display: grid; gap: 8px; }
+.prompt-studio-list button { display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); padding: 13px 14px; text-align: left; cursor: pointer; }
+.prompt-studio-list button:hover { border-color: var(--inspector-navy); }
+.prompt-studio-list button.is-active { border-color: var(--inspector-navy); background: var(--surface); }
+.prompt-studio-list strong { color: var(--inspector-navy); font-size: .85rem; }
+.prompt-studio-list small { color: var(--ink-soft); font-size: .72rem; }
+.prompt-studio-list span { color: var(--muted); font-size: .68rem; }
+
+.prompt-studio-editor { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); box-shadow: var(--shadow-sm); padding: 18px; }
+.prompt-studio-editor > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.prompt-studio-editor header strong { display: block; color: var(--inspector-navy); font-size: .95rem; }
+.prompt-studio-editor header small { color: var(--muted); font-size: .72rem; }
+.prompt-saved-mark { border-radius: 999px; background: var(--brand-soft); color: var(--ink); padding: 4px 10px; font-size: .68rem; font-weight: 850; }
+.prompt-studio-editor textarea { width: 100%; min-height: 26rem; resize: vertical; border: 1px solid var(--line-strong); border-radius: 10px; background: #fbfdff; color: var(--ink); padding: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; line-height: 1.7; }
+.prompt-studio-editor textarea:focus { border-color: var(--inspector-navy); outline: 0; }
+.prompt-studio-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.prompt-studio-note { flex: 1 1 18rem; margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.6; }
+
+@media (max-width: 900px) {
+  .prompt-studio-layout { grid-template-columns: 1fr; }
+  .prompt-studio-editor textarea { min-height: 18rem; }
+}

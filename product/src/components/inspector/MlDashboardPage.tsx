@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import type { MlDashboardResponse, MlDashboardTab } from "@/domain/mlDashboard";
 import { readApiResponse } from "@/utils/clientApi";
+import { MlOperationsPanel } from "@/components/inspector/MlOperationsPanel";
 
 function percent(value: number | null): string {
   return value === null ? "비공개" : `${value.toFixed(2)}%`;
 }
 
-export function MlDashboardPage() {
+export function MlDashboardPage({ canOperate = false }: { canOperate?: boolean }) {
   const [tab, setTab] = useState<MlDashboardTab>("wage");
   const [region, setRegion] = useState("");
   const [industry, setIndustry] = useState("");
@@ -48,6 +49,7 @@ export function MlDashboardPage() {
   return (
     <main className="shell inspector-content ml-dashboard-page">
       <div className="inspector-page-heading"><div><span className="eyebrow">집계 화면</span><h1>ML 대시보드</h1><p>지역·업종별 분포를 확인합니다. 개별 사업장 값과 점수는 표시하지 않습니다.</p></div><span className="inspector-private-badge">개별 값 비노출</span></div>
+      {canOperate ? <MlOperationsPanel batchLabel={data?.data_as_of ?? "최신 배치"} /> : null}
       <div className="ml-dashboard-tabs" role="tablist" aria-label="ML 집계 종류"><button type="button" role="tab" aria-selected={tab === "wage"} className={tab === "wage" ? "is-active" : ""} onClick={() => changeTab("wage")}>임금체불 확인 신호</button><button type="button" role="tab" aria-selected={tab === "safety"} className={tab === "safety" ? "is-active" : ""} onClick={() => changeTab("safety")}>산업재해 확인 우선순위</button></div>
       {data ? <div className="ml-dashboard-notice"><strong>{data.tab === "wage" ? `기준월 ${data.data_as_of ?? "미확정"} · 예측 대상 ${data.target_label ?? "미확정"}` : `관측 기준 ${data.data_as_of ?? "미확정"} · 대상 기간 ${data.target_label ?? "미확정"}`}</strong><span>{data.basis_notice}</span>{data.stale_notice ? <span>{data.stale_notice}</span> : null}</div> : null}
       <div className="ml-dashboard-filters"><label>지역<select value={region} onChange={(event) => changeFilter("region", event.target.value)}><option value="">전체 지역</option>{data?.options.regions.map((option) => <option value={option} key={option}>{option}</option>)}</select></label><label>업종<select value={industry} onChange={(event) => changeFilter("industry", event.target.value)}><option value="">전체 업종</option>{data?.options.industries.map((option) => <option value={option} key={option}>{option}</option>)}</select></label></div>
