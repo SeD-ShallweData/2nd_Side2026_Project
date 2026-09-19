@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { DataSourceList } from "@/components/common/DataSourceList";
@@ -168,7 +169,9 @@ export function InspectorChatPanel({ companyId }: { companyId?: string }) {
             </div>
           ) : (
             <div className={`inspector-chat-row inspector-chat-row-${message.role}`} key={message.id}>
-              {message.role === "assistant" ? <span aria-hidden="true">DW</span> : null}
+              {message.role === "assistant" ? (
+                <Image className="inspector-chat-mascot" src="/brand/inspector-mascot.png" alt="" width={192} height={192} />
+              ) : null}
               <p>{message.content}</p>
             </div>
           ))}
