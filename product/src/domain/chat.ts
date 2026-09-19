@@ -15,8 +15,16 @@ export interface RecentMessage {
   content: string;
 }
 
+export interface ConversationMemoryContext {
+  summary_version: string;
+  summarized_through_sequence: number;
+  content: string;
+}
+
 export interface ChatRequest {
   message: string;
+  /** 클라이언트 재전송을 같은 저장 turn으로 묶는 키. 원문 저장 시에만 쓴다. */
+  request_id?: string;
   conversation_id?: string;
   company_id?: string;
   resolved_query?: string;
@@ -24,6 +32,8 @@ export interface ChatRequest {
   compare?: boolean;
   chat_mode: ChatMode;
   recent_messages: RecentMessage[];
+  /** 서버 소유 대화방의 ready 요약만 붙는다. 클라이언트 입력은 신뢰하지 않는다. */
+  conversation_memory?: ConversationMemoryContext;
 }
 
 export interface SuggestedAction {

@@ -166,6 +166,32 @@ describe("실제 LLM 비교 Provider", () => {
     expect(result.results[1].status).toBe("success");
   });
 
+  it("일치한 노동법 근거가 있는 답변의 내부 작성 지침 누출은 관련 fallback으로 교체한다", async () => {
+    const laborContext: ComparisonContext = {
+      ...CONTEXT,
+      questionIntent: "labor",
+      policyBaseline: {
+        ...BASELINE,
+        sources: [{ name: "근로기준법 제17조", category: "labor_law", organization: "국가법령정보센터" }],
+      },
+    };
+    const fakeFetch = (async () => new Response(JSON.stringify(payload(
+      "제공된 컨텍스트에서 근로기준법 제17조를 확인할 수 있습니다.\n\n답변 구성:\n근로시간을 확인합니다.",
+      "test-model",
+    )), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+
+    const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare(laborContext);
+    expect(result.results[0]).toMatchObject({
+      status: "guardrail_replaced",
+      answer_type: "general_guidance",
+      guardrail_status: "limited",
+      sources: laborContext.policyBaseline.sources,
+    });
+    expect(result.results[0].answer).toContain("근로시간");
+    expect(result.results[0].answer).not.toContain("회사\uC758 \uC784\uAE08\u00B7\uC548\uC804 \uC9C0\uD45C");
+    expect(result.results[0].trace.guardrail_hits).toContain("INTERNAL_RESPONSE_INSTRUCTION");
+  });
+
   it("한쪽 API 장애를 격리하고 다른 모델 응답을 유지한다", async () => {
     const fakeFetch = (async (input: RequestInfo | URL) => {
       if (String(input).includes("upstage")) return new Response("upstream error", { status: 503 });
