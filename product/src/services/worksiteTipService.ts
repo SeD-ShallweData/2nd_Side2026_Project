@@ -54,7 +54,8 @@ function requireSubmitter(user: SessionUserDto): void {
 }
 
 function requireInspector(user: SessionUserDto): void {
-  requireUserRole(user, ["admin"]);
+  // 제보 확인은 근로감독관의 일이다. 운영 관리자도 같은 화면을 본다.
+  requireUserRole(user, ["admin", "inspector"]);
 }
 
 function parseRequiredText(

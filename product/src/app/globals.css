@@ -737,9 +737,11 @@ summary:focus-visible {
 
 /* Shared pages */
 
+/* 배경은 모든 탭이 같다. 서비스 소개(랜딩)와 같은 흰 바탕을 쓴다. 탭마다
+   바탕색이 다르면 같은 서비스 안에서 이동한 것인지 헷갈린다. */
 .page-section {
   min-height: 70vh;
-  background: linear-gradient(180deg, #f9fcff 0, #fff 340px);
+  background: var(--white);
   padding: 74px 0 100px;
 }
 
@@ -4537,7 +4539,7 @@ summary:focus-visible {
 .inspector-question-chips button:hover:not(:disabled) { background: var(--brand-soft); border-color: #dbc43b; }
 .inspector-chat-error { background: var(--danger-bg); color: var(--review); font-size: 0.7rem; margin: 0; padding: 8px 16px; }
 
-.worksite-page { background: var(--surface); }
+
 /* 커뮤니티·계약서 안내 박스와 같은 모양을 쓴다. 성격이 같은 안내를 화면마다
    다른 색으로 두면 색이 무슨 뜻인지 배우게 만든다. */
 .worksite-privacy-strip { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; border: 1px solid #e8d47e; border-radius: 13px; background: var(--brand-soft); padding: 12px 16px; color: #081f3a; font-size: .84rem; }
@@ -4710,14 +4712,14 @@ summary:focus-visible {
 
 .region-map-label {
   fill: var(--ink);
-  font-size: 11px;
+  font-size: 8.5px;
   font-weight: 850;
   text-anchor: middle;
   pointer-events: none;
 }
 .region-map-count {
   fill: var(--ink-soft);
-  font-size: 9px;
+  font-size: 7px;
   font-weight: 700;
   text-anchor: middle;
   pointer-events: none;
@@ -4735,11 +4737,7 @@ summary:focus-visible {
    돈워리와 이야기하는 화면이라 다른 탭보다 부드러워야 한다. 바탕과 테두리에만
    브랜드 노랑을 옅게 깔고, 글자는 파란 계열(--ink / --ink-soft / --muted)을
    그대로 둔다. 색으로 정보를 나르지 않으므로 읽기에 영향이 없다. */
-/* 페이지 바탕은 흰색으로 둔다. 따뜻함은 안쪽 카드가 맡는다. */
-.conversation-page,
-.search-page {
-  background: transparent;
-}
+/* 따뜻함은 안쪽 카드가 맡는다. 바탕은 .page-section 의 흰색 그대로다. */
 
 .conversation-page .chat-panel {
   border-color: #f0dfa0;
@@ -4801,16 +4799,35 @@ summary:focus-visible {
   text-align: center;
 }
 
+/* 아래 버튼 두 개(14rem + 0.75rem 간격 + 14rem)와 같은 폭으로 세운다. */
+.contract-upload {
+  --upload-control-width: 14rem;
+  --upload-control-gap: 0.75rem;
+}
+
 .contract-upload .upload-copy {
-  justify-content: center;
+  width: calc(var(--upload-control-width) * 2 + var(--upload-control-gap));
+  max-width: 100%;
+  justify-content: flex-start;
+  gap: 18px;
   text-align: left;
 }
+
+.contract-upload .upload-icon {
+  width: 60px;
+  height: 60px;
+  flex: 0 0 60px;
+  font-size: 1.5rem;
+}
+
+.contract-upload .upload-copy h3 { font-size: 1.2rem; }
+.contract-upload .upload-copy p { font-size: 0.82rem; }
 
 /* '파일 찾아보기' 와 '선택한 파일 검토' 는 같은 크기로 위아래에 선다.
    하나는 label, 하나는 button 이라 크기를 따로 맞춰 줘야 한다. */
 .contract-upload .contract-actions > .button,
 .contract-upload .contract-actions > label.button {
-  width: 14rem;
+  width: var(--upload-control-width);
   height: 3.25rem;
   padding-block: 0;
 }
@@ -4878,4 +4895,23 @@ summary:focus-visible {
   .consumer-header-side > .button {
     width: 7.375rem;
   }
+}
+
+
+/* 로그인 전 현장 신고 안내. 화면에 이 카드 하나뿐이라 가운데로 모으고
+   제목을 키운다. 지금은 글씨가 작아 안내가 아니라 각주처럼 읽힌다. */
+.worksite-page .worksite-state-card {
+  text-align: center;
+  padding: 34px 24px;
+}
+
+.worksite-page .worksite-state-card strong {
+  font-size: 1.35rem;
+  line-height: 1.4;
+}
+
+.worksite-page .worksite-state-card p {
+  margin: 12px auto 0;
+  max-width: 44rem;
+  font-size: 0.92rem;
 }
