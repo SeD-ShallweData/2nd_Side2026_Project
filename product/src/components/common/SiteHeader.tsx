@@ -189,7 +189,7 @@ export function SiteHeader() {
       ) : null}
       {!isInspector && pathname !== "/chat" ? (
         <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리 AI에게 상담하기">
-          <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />
+          <Image src="/brand/donworry-mascot.png" alt="" width={192} height={192} />
           <span className="consumer-floating-chat-label">돈워리 AI에게 상담하기</span>
         </Link>
       ) : null}
