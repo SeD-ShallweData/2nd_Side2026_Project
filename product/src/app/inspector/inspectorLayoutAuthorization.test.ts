@@ -63,7 +63,6 @@ describe("M2 /inspector 레이아웃 권한", () => {
   it.each([
     ["비로그인", null],
     ["일반 사용자", "user-token"],
-    ["근로감독관", "inspector-token"],
   ])("%s 접근은 403 인터럽트를 발생시킨다", async (_label, token) => {
     layoutState.token = token;
 
@@ -73,9 +72,12 @@ describe("M2 /inspector 레이아웃 권한", () => {
     expect(layoutState.forbidden).toHaveBeenCalledOnce();
   });
 
-  it("운영 관리자에게만 하위 화면을 반환한다", async () => {
-    // 배치·ML 운영 화면이 여기 들어 있어 admin 으로 잠근다.
-    layoutState.token = "admin-token";
+  // 배치 현황처럼 운영에 속한 화면은 각 페이지가 다시 admin 으로 좁힌다.
+  it.each([
+    ["근로감독관", "inspector-token"],
+    ["운영 관리자", "admin-token"],
+  ])("%s 에게 하위 화면을 반환한다", async (_label, token) => {
+    layoutState.token = token;
 
     await expect(InspectorLayout({ children: "protected-content" })).resolves.toBe(
       "protected-content",
