@@ -1,7 +1,11 @@
 import type { CommunityCompanyContextDto } from "@/app/api/community/communityApiContract";
 
-export function companyContextLabel(context: CommunityCompanyContextDto | null): string {
-  if (!context) return "연결 사업장 없음";
+/*
+ * 게시글 작성 폼에 아직 사업장 선택 UI가 없어 company_context는 현재 항상
+ * null이다. "연결 사업장 없음"을 매번 찍는 대신, 값이 있을 때만 표시한다.
+ */
+export function companyContextLabel(context: CommunityCompanyContextDto | null): string | null {
+  if (!context) return null;
   return `${context.region ?? "지역 미확인"} · ${context.industry ?? "업종 미확인"}`;
 }
 
