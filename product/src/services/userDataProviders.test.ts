@@ -4,13 +4,16 @@ vi.mock("server-only", () => ({}));
 
 import { MockAuthRepository } from "@/adapters/mock/MockAuthRepository";
 import { MockCommunityRepository } from "@/adapters/mock/MockCommunityRepository";
+import { MockFavoriteRepository } from "@/adapters/mock/MockFavoriteRepository";
 import { MockWorksiteTipRepository } from "@/adapters/mock/MockWorksiteTipRepository";
 import { RealAuthRepository } from "@/adapters/real/RealAuthRepository";
 import { RealCommunityRepository } from "@/adapters/real/RealCommunityRepository";
+import { RealFavoriteRepository } from "@/adapters/real/RealFavoriteRepository";
 import { RealWorksiteTipRepository } from "@/adapters/real/RealWorksiteTipRepository";
 import {
   getAuthRepository,
   getCommunityRepository,
+  getFavoriteRepository,
   getWorksiteTipRepository,
 } from "@/services/userDataProviders";
 
@@ -22,10 +25,12 @@ describe("사용자 데이터 저장소 선택", () => {
   it("mock 모드에서는 메모리 저장소를 쓴다", () => {
     vi.stubEnv("AUTH_DATA_MODE", "mock");
     vi.stubEnv("COMMUNITY_DATA_MODE", "mock");
+    vi.stubEnv("FAVORITE_DATA_MODE", "mock");
     vi.stubEnv("WORKSITE_TIP_DATA_MODE", "mock");
 
     expect(getAuthRepository()).toBeInstanceOf(MockAuthRepository);
     expect(getCommunityRepository()).toBeInstanceOf(MockCommunityRepository);
+    expect(getFavoriteRepository()).toBeInstanceOf(MockFavoriteRepository);
     expect(getWorksiteTipRepository()).toBeInstanceOf(MockWorksiteTipRepository);
   });
 
@@ -34,6 +39,7 @@ describe("사용자 데이터 저장소 선택", () => {
 
     expect(getAuthRepository()).toBeInstanceOf(MockAuthRepository);
     expect(getCommunityRepository()).toBeInstanceOf(MockCommunityRepository);
+    expect(getFavoriteRepository()).toBeInstanceOf(MockFavoriteRepository);
     expect(getWorksiteTipRepository()).toBeInstanceOf(MockWorksiteTipRepository);
   });
 
@@ -50,6 +56,11 @@ describe("사용자 데이터 저장소 선택", () => {
   it("현장 제보도 실제 모드에서 전용 DB·파일 저장소를 쓴다", () => {
     vi.stubEnv("WORKSITE_TIP_DATA_MODE", "real");
     expect(getWorksiteTipRepository()).toBeInstanceOf(RealWorksiteTipRepository);
+  });
+
+  it("즐겨찾기도 실제 모드에서 인증 DB 저장소를 쓴다", () => {
+    vi.stubEnv("FAVORITE_DATA_MODE", "real");
+    expect(getFavoriteRepository()).toBeInstanceOf(RealFavoriteRepository);
   });
 
   /*

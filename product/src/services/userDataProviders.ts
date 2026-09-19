@@ -8,6 +8,7 @@ import { MockWorksiteTipRepository } from "@/adapters/mock/MockWorksiteTipReposi
 import { RealAuthRepository } from "@/adapters/real/RealAuthRepository";
 import { RealCommunityRepository } from "@/adapters/real/RealCommunityRepository";
 import { RealConversationRepository } from "@/adapters/real/RealConversationRepository";
+import { RealFavoriteRepository } from "@/adapters/real/RealFavoriteRepository";
 import { RealWorksiteTipRepository } from "@/adapters/real/RealWorksiteTipRepository";
 import {
   getAuthDataMode,
@@ -21,10 +22,9 @@ import type { CommunityRepository } from "@/domain/community";
 import type { ConversationRepository } from "@/domain/conversation";
 import type { FavoriteRepository } from "@/domain/favorite";
 import type { WorksiteTipRepository } from "@/domain/worksiteTip";
-import { ServiceError } from "@/utils/errors";
 
 /*
- * 사용자 데이터(회원·세션·게시글·신고·현장 제보) 저장소 선택.
+ * 사용자 데이터(회원·세션·게시글·신고·현장 제보·즐겨찾기) 저장소 선택.
  *
  * services/providers.ts 와 나눠 둔 이유가 있다. 그쪽은 사업장·위험도·상담처럼
  * 화면 어디서나 쓰는 공용 조회 어댑터를 모아 두는 곳이고, 이 파일이 다루는
@@ -39,6 +39,7 @@ const realConversationRepository = new RealConversationRepository();
 const mockConversationRepository = new MockConversationRepository();
 const mockCommunityRepository = new MockCommunityRepository();
 const mockFavoriteRepository = new MockFavoriteRepository();
+const realFavoriteRepository = new RealFavoriteRepository();
 const mockWorksiteTipRepository = new MockWorksiteTipRepository();
 const realWorksiteTipRepository = new RealWorksiteTipRepository();
 
@@ -63,15 +64,7 @@ export function getWorksiteTipRepository(): WorksiteTipRepository {
 }
 
 export function getFavoriteRepository(): FavoriteRepository {
-  if (getFavoriteDataMode() === "real") {
-    throw new ServiceError(
-      "FAVORITE_DATABASE_NOT_CONFIGURED",
-      "즐겨찾기 데이터베이스가 아직 연결되지 않았습니다.",
-      503,
-      true,
-    );
-  }
-  return mockFavoriteRepository;
+  return getFavoriteDataMode() === "real" ? realFavoriteRepository : mockFavoriteRepository;
 }
 
 export function resetMockWorksiteTipsForTests(): void {
