@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActionChecklist } from "@/components/common/ActionChecklist";
 import { DataFreshnessNotice } from "@/components/common/DataFreshnessNotice";
-import { EmptyState, ErrorState, LimitationNotice, LoadingSkeleton } from "@/components/common/AsyncStates";
+import { EmptyState, LimitationNotice } from "@/components/common/AsyncStates";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import { getFavoriteEligibility } from "@/components/favorite/favoriteAuth";
 import { RiskInformationCard } from "@/components/risk/RiskInformationCard";
@@ -14,13 +14,26 @@ import type { Company } from "@/domain/company";
 import type { CompanyRiskResult } from "@/domain/risk";
 import { getSession } from "@/services/authClient";
 import { getFavorites } from "@/services/favoriteClient";
-import { readApiResponse } from "@/utils/clientApi";
 
-export function CompanyDetail({ company, dataMode }: { company: Company; dataMode: "mock" | "real" }) {
+/*
+ * 위험 신호는 서버 컴포넌트(app/companies/[companyId]/page.tsx)가 받아 props 로 내린다.
+ * 전에는 이 컴포넌트가 마운트 후 /api/companies/{id}/risk 를 직접 불렀다.
+ *
+ * 브라우저가 그 경로를 부르지 않게 되어, 라우트를 외부에서 차단해도 화면이 산다.
+ * risk 가 null 이면 분석 결과가 없거나 조회가 실패한 것이고, 아래에서 EmptyState 를 그린다.
+ *
+ * 즐겨찾기(session·isFavorite)는 로그인 상태에 따라 달라지므로 클라이언트에 남긴다.
+ */
+export function CompanyDetail({
+  company,
+  risk,
+  dataMode,
+}: {
+  company: Company;
+  risk: CompanyRiskResult | null;
+  dataMode: "mock" | "real";
+}) {
   const router = useRouter();
-  const [risk, setRisk] = useState<CompanyRiskResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<SessionResponse | "loading">("loading");
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -50,35 +63,6 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
       ignore = true;
       controller.abort();
     };
-  }, [company.company_id]);
-
-  async function loadRisk(signal?: AbortSignal) {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/companies/${encodeURIComponent(company.company_id)}/risk`, { signal });
-      setRisk(await readApiResponse<CompanyRiskResult>(response));
-    } catch (caught) {
-      if (caught instanceof DOMException && caught.name === "AbortError") return;
-      setError(caught instanceof Error ? caught.message : "사업장 정보를 불러오지 못했습니다.");
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(`/api/companies/${encodeURIComponent(company.company_id)}/risk`, { signal: controller.signal })
-      .then((response) => readApiResponse<CompanyRiskResult>(response))
-      .then((data) => setRisk(data))
-      .catch((caught: unknown) => {
-        if (caught instanceof DOMException && caught.name === "AbortError") return;
-        setError(caught instanceof Error ? caught.message : "사업장 정보를 불러오지 못했습니다.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
   }, [company.company_id]);
 
   function ask(question: string) {
@@ -122,15 +106,13 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
       </section>
 
       <div className="shell detail-content">
-        {loading ? <LoadingSkeleton label="임금·산업재해 신호를 불러오고 있습니다." /> : null}
-        {!loading && error ? <ErrorState message={error} onRetry={() => void loadRisk()} /> : null}
-        {!loading && !error && !risk ? (
+        {!risk ? (
           <EmptyState
             title="표시할 위험 정보가 없습니다"
             description="이 사업장은 아직 임금·산업재해 신호 분석 결과가 연결되지 않았습니다. 사업장 정보를 다시 확인하거나 다른 사업장을 검색해 보세요."
           />
         ) : null}
-        {!loading && risk ? (
+        {risk ? (
           <>
             <DataFreshnessNotice
               freshness={risk.freshness}
