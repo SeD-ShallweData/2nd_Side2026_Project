@@ -64,6 +64,18 @@ export function RegionMap({
   const titleId = useId();
   const levels = regionShadeLevels(counts);
   const total = counts.reduce((sum, entry) => sum + entry.count, 0);
+  const regionData = KOREA_REGIONS.map((region) => {
+    const matched = resolveRegionValue(region, counts);
+    const regionValue = matched?.value ?? region.name;
+    const count = matched?.count ?? 0;
+    const level = levels.get(regionValue) ?? 0;
+    const isSelected = selected === regionValue;
+    const label =
+      count > 0
+        ? `${regionValue} 사업장 ${count.toLocaleString("ko-KR")}곳`
+        : `${regionValue} 등록된 사업장 없음`;
+    return { region, regionValue, count, level, isSelected, label };
+  });
 
   return (
     <div className="region-map">
@@ -74,49 +86,45 @@ export function RegionMap({
         aria-labelledby={titleId}
       >
         <title id={titleId}>지역별 사업장 수 지도. 지역을 고르면 그 지역의 사업장을 보여줍니다.</title>
-        {KOREA_REGIONS.map((region) => {
-          const matched = resolveRegionValue(region, counts);
-          const regionValue = matched?.value ?? region.name;
-          const count = matched?.count ?? 0;
-          const level = levels.get(regionValue) ?? 0;
-          const isSelected = selected === regionValue;
-          const label =
-            count > 0
-              ? `${regionValue} 사업장 ${count.toLocaleString("ko-KR")}곳`
-              : `${regionValue} 등록된 사업장 없음`;
-          return (
-            <g key={region.name}>
-              <path
-                className="region-map-area"
-                d={region.path}
-                data-level={level}
-                data-selected={isSelected ? "true" : undefined}
-                role="button"
-                tabIndex={disabled || count === 0 ? -1 : 0}
-                aria-disabled={disabled || count === 0 ? true : undefined}
-                aria-label={label}
-                onClick={() => {
-                  if (disabled || count === 0) return;
-                  onSelect(regionValue);
-                }}
-                onKeyDown={(event) => {
-                  if (disabled || count === 0) return;
-                  if (event.key !== "Enter" && event.key !== " ") return;
-                  event.preventDefault();
-                  onSelect(regionValue);
-                }}
-              />
-              <text className="region-map-label" x={region.labelX} y={region.labelY}>
-                {region.short}
+        {/* SVG는 그린 순서대로 위에 덮인다. 도형과 글자를 한 지역씩 묶어 두면
+            뒤에 그려지는 이웃 지역의 도형이 앞 지역의 글자를 가린다(충북이
+            그랬다). 그래서 도형을 전부 먼저 그리고, 글자는 그 다음에
+            전부 그려서 무슨 지역이 이웃이든 글자가 항상 맨 위에 오게 한다. */}
+        {regionData.map(({ region, regionValue, count, level, isSelected, label }) => (
+          <path
+            key={region.name}
+            className="region-map-area"
+            d={region.path}
+            data-level={level}
+            data-selected={isSelected ? "true" : undefined}
+            role="button"
+            tabIndex={disabled || count === 0 ? -1 : 0}
+            aria-disabled={disabled || count === 0 ? true : undefined}
+            aria-label={label}
+            onClick={() => {
+              if (disabled || count === 0) return;
+              onSelect(regionValue);
+            }}
+            onKeyDown={(event) => {
+              if (disabled || count === 0) return;
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              onSelect(regionValue);
+            }}
+          />
+        ))}
+        {regionData.map(({ region, count }) => (
+          <g key={region.name} className="region-map-label-group">
+            <text className="region-map-label" x={region.labelX} y={region.labelY}>
+              {region.short}
+            </text>
+            {count > 0 ? (
+              <text className="region-map-count" x={region.labelX} y={region.labelY + 11}>
+                {count.toLocaleString("ko-KR")}
               </text>
-              {count > 0 ? (
-                <text className="region-map-count" x={region.labelX} y={region.labelY + 11}>
-                  {count.toLocaleString("ko-KR")}
-                </text>
-              ) : null}
-            </g>
-          );
-        })}
+            ) : null}
+          </g>
+        ))}
       </svg>
 
       <div className="region-map-legend">
