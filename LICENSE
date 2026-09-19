@@ -1,0 +1,19 @@
+Copyright (c) 2026 Co끼리 (SeD-ShallweData). All rights reserved.
+
+학습·심사 목적의 열람만 허용하며, 복제·수정·배포·상업적 이용을 허용하지 않습니다.
+
+Viewing is permitted for study and competition-review purposes only.
+Copying, modification, redistribution, and commercial use are not permitted.
+
+---
+
+## 이 저장소가 포함한 제3자 자료
+
+아래 자료는 위 조건이 아니라 각자의 원래 조건을 따릅니다.
+
+| 자료 | 위치 | 출처와 조건 |
+| --- | --- | --- |
+| 대한민국 시·도 경계 | `product/src/components/company/koreaRegions.ts` | 통계청(KOSTAT) 2018년 시도 경계를 단순화한 것. 배포처 `southkorea/southkorea-maps` 가 밝힌 KOSTAT 자료 조건은 "Free to share or remix". |
+
+`product/` 아래의 npm 의존성과 `product/integrations/` 아래의 Python 의존성은
+각 패키지의 라이선스를 따릅니다. 이 저장소는 그 사본을 포함하지 않습니다.
