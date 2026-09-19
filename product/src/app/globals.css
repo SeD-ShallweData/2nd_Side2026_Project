@@ -773,6 +773,7 @@ summary:focus-visible {
 .mock-banner {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   margin: 0 0 22px;
   border: 1px solid #e8d47e;
@@ -786,6 +787,7 @@ summary:focus-visible {
 .mode-banner {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   margin: 0 0 22px;
   border: 1px solid #e8d47e;
@@ -4512,8 +4514,11 @@ summary:focus-visible {
 .inspector-chat-page { padding-bottom: 90px; }
 .inspector-chat-shell { padding-top: 50px; }
 .inspector-chat-heading { max-width: 780px; margin-bottom: 28px; }
-.inspector-chat-heading h1 { font-size: clamp(2rem, 4vw, 3.35rem); }
-.inspector-chat-heading p { color: var(--muted); margin: 0; }
+/* .inspector-page-heading(배치 현황 등)과 같은 크기로 맞춘다. 위쪽의
+   .inspector-hero h1 과 공유하던 규칙(최대 4.15rem)이 여기서도 적용되고
+   있어 글자가 배치 현황보다 훨씬 컸다. */
+.inspector-chat-heading h1 { font-size: clamp(1.7rem, 3vw, 2.35rem); margin: 5px 0 8px; }
+.inspector-chat-heading p { color: var(--muted); font-size: .85rem; margin: 0; }
 .inspector-chat-layout { align-items: start; display: grid; gap: 16px; grid-template-columns: 280px minmax(0, 1fr); }
 .inspector-chat-context,
 .inspector-chat-panel,
@@ -4576,7 +4581,11 @@ summary:focus-visible {
 
 /* 커뮤니티·계약서 안내 박스와 같은 모양을 쓴다. 성격이 같은 안내를 화면마다
    다른 색으로 두면 색이 무슨 뜻인지 배우게 만든다. */
-.worksite-privacy-strip { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; border: 1px solid #e8d47e; border-radius: 13px; background: var(--brand-soft); padding: 12px 16px; color: #081f3a; font-size: .84rem; }
+/* 로그인 안내를 겸하는 박스라 통째로 누를 수 있게 <a> 로 그린다. 다른 안내
+   박스와 같은 규칙을 쓰되 justify-content:center 를 추가하고, 링크라서
+   생기는 밑줄·기본 색을 지운다. */
+.worksite-privacy-strip { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 0 0 18px; border: 1px solid #e8d47e; border-radius: 13px; background: var(--brand-soft); padding: 12px 16px; color: #081f3a; font-size: .84rem; text-decoration: none; transition: box-shadow 160ms ease; }
+.worksite-privacy-strip:hover, .worksite-privacy-strip:focus-visible { box-shadow: 0 4px 14px rgb(232 212 126 / 45%); }
 .worksite-privacy-strip > strong { display: inline-flex; flex: 0 0 auto; align-items: center; border-radius: 999px; background: var(--ink); color: var(--brand); padding: 3px 9px; font-size: .68rem; font-weight: 950; letter-spacing: .06em; }
 .worksite-tip-form, .worksite-inspector-view { border: 1px solid var(--line); border-radius: 16px; background: var(--white); padding: 22px; box-shadow: 0 8px 24px rgb(36 35 28 / 4%); }
 .worksite-form-intro, .worksite-list-toolbar, .worksite-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
@@ -4839,12 +4848,16 @@ summary:focus-visible {
   --upload-control-gap: 0.75rem;
 }
 
+/* 아이콘+글자 묶음 자체는 아래 버튼 두 개와 같은 폭으로 가운데 세우되,
+   그 폭 안에서는 첨부 사진처럼 왼쪽 정렬한다 — 아이콘이 왼쪽 끝에 서고
+   글자가 그 오른쪽에 붙는다. 버튼 두 개도 같은 폭이라 왼쪽 끝이 서로
+   맞는다. */
 .contract-upload .upload-copy {
   width: calc(var(--upload-control-width) * 2 + var(--upload-control-gap));
   max-width: 100%;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 18px;
-  text-align: center;
+  text-align: left;
 }
 
 .contract-upload .upload-icon {

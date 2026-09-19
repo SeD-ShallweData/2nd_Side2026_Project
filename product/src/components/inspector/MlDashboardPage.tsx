@@ -27,7 +27,7 @@ export function MlDashboardPage({ canOperate = false }: { canOperate?: boolean }
       .then((result) => { setData(result); setError(null); })
       .catch((caught: unknown) => {
         if (caught instanceof DOMException && caught.name === "AbortError") return;
-        setError(caught instanceof Error ? caught.message : "ML 대시보드를 불러오지 못했습니다.");
+        setError(caught instanceof Error ? caught.message : "Machine Learning 대시보드를 불러오지 못했습니다.");
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -48,9 +48,9 @@ export function MlDashboardPage({ canOperate = false }: { canOperate?: boolean }
 
   return (
     <main className="shell inspector-content ml-dashboard-page">
-      <div className="inspector-page-heading"><div><span className="eyebrow">집계 화면</span><h1>ML 대시보드</h1><p>지역·업종별 분포를 확인합니다. 개별 사업장 값과 점수는 표시하지 않습니다.</p></div><span className="inspector-private-badge">개별 값 비노출</span></div>
+      <div className="inspector-page-heading"><div><span className="eyebrow">집계 화면</span><h1>Machine Learning 대시보드</h1><p>지역·업종별 분포를 확인합니다. 개별 사업장 값과 점수는 표시하지 않습니다.</p></div></div>
       {canOperate ? <MlOperationsPanel batchLabel={data?.data_as_of ?? "최신 배치"} /> : null}
-      <div className="ml-dashboard-tabs" role="tablist" aria-label="ML 집계 종류"><button type="button" role="tab" aria-selected={tab === "wage"} className={tab === "wage" ? "is-active" : ""} onClick={() => changeTab("wage")}>임금체불 확인 신호</button><button type="button" role="tab" aria-selected={tab === "safety"} className={tab === "safety" ? "is-active" : ""} onClick={() => changeTab("safety")}>산업재해 확인 우선순위</button></div>
+      <div className="ml-dashboard-tabs" role="tablist" aria-label="Machine Learning 집계 종류"><button type="button" role="tab" aria-selected={tab === "wage"} className={tab === "wage" ? "is-active" : ""} onClick={() => changeTab("wage")}>임금체불 확인 신호</button><button type="button" role="tab" aria-selected={tab === "safety"} className={tab === "safety" ? "is-active" : ""} onClick={() => changeTab("safety")}>산업재해 확인 우선순위</button></div>
       {data ? <div className="ml-dashboard-notice"><strong>{data.tab === "wage" ? `기준월 ${data.data_as_of ?? "미확정"} · 예측 대상 ${data.target_label ?? "미확정"}` : `관측 기준 ${data.data_as_of ?? "미확정"} · 대상 기간 ${data.target_label ?? "미확정"}`}</strong><span>{data.basis_notice}</span>{data.stale_notice ? <span>{data.stale_notice}</span> : null}</div> : null}
       <div className="ml-dashboard-filters"><label>지역<select value={region} onChange={(event) => changeFilter("region", event.target.value)}><option value="">전체 지역</option>{data?.options.regions.map((option) => <option value={option} key={option}>{option}</option>)}</select></label><label>업종<select value={industry} onChange={(event) => changeFilter("industry", event.target.value)}><option value="">전체 업종</option>{data?.options.industries.map((option) => <option value={option} key={option}>{option}</option>)}</select></label></div>
       {loading ? <div className="batch-state-card">집계 데이터를 불러오는 중입니다.</div> : null}
