@@ -12,6 +12,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const user = requireAuthenticatedUser(
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
+    // 배치는 플랫폼 운영이다. 근로감독관에게는 열지 않는다.
     requireUserRole(user, ["admin"]);
     return noStoreJson(await listBatchStatuses());
   } catch (error) {
