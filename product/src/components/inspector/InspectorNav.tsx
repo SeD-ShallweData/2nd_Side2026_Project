@@ -16,11 +16,23 @@ export async function InspectorNav({ current }: { current: "dashboard" | "chat" 
         <Link href="/inspector" className="inspector-identity">
           <span aria-hidden="true">DW</span>
           <div>
-            <strong>Machine Learning Operations</strong>
-            <small>임금체불 · 산업재해 예측 모델링 지원</small>
+            {/* 운영 관리자에게는 프롬프트·모델 운영까지 이 화면의 소관임을 이름으로 밝힌다.
+                근로감독관에게는 원래 이름(모델 상태 확인용)을 그대로 둔다. */}
+            <strong>{isOperator ? "AI & Machine Learning Operations" : "Machine Learning Operations"}</strong>
+            <small>
+              {isOperator
+                ? "LLM 프롬프트 엔지니어링 · 임금체불·산업재해 예측 모델링 지원"
+                : "임금체불 · 산업재해 예측 모델링 지원"}
+            </small>
           </div>
         </Link>
         <nav aria-label="근로감독관 메뉴">
+          {/* LLM 프롬프트는 운영 관리자에게만 보이고, 메뉴 맨 앞에 선다. */}
+          {isOperator ? (
+            <Link href="/inspector/prompts" aria-current={current === "prompts" ? "page" : undefined}>
+              LLM 프롬프트
+            </Link>
+          ) : null}
           <Link href="/inspector" aria-current={current === "dashboard" ? "page" : undefined}>
             사업장 대시보드
           </Link>
@@ -36,12 +48,6 @@ export async function InspectorNav({ current }: { current: "dashboard" | "chat" 
           <Link href="/inspector/ml-dashboard" aria-current={current === "ml-dashboard" ? "page" : undefined}>
             ML 대시보드
           </Link>
-          {/* 프롬프트도 플랫폼 운영이다. */}
-          {isOperator ? (
-            <Link href="/inspector/prompts" aria-current={current === "prompts" ? "page" : undefined}>
-              LLM 프롬프트
-            </Link>
-          ) : null}
         </nav>
         <span className="inspector-private-badge">
           {isOperator ? "운영 관리자" : "근로감독관 · 읽기 전용"}
