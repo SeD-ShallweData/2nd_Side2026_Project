@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 
@@ -14,7 +15,13 @@ export async function InspectorNav({ current }: { current: "dashboard" | "chat" 
     <div className="inspector-nav-wrap">
       <div className="shell inspector-nav">
         <Link href="/inspector" className="inspector-identity">
-          <span aria-hidden="true">DW</span>
+          <Image
+            className="inspector-identity-mascot"
+            src="/brand/inspector-mascot.png"
+            alt=""
+            width={192}
+            height={192}
+          />
           <div>
             {/* 운영 관리자에게는 프롬프트·모델 운영까지 이 화면의 소관임을 이름으로 밝힌다.
                 근로감독관에게는 원래 이름(모델 상태 확인용)을 그대로 둔다. */}
