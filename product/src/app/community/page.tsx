@@ -7,7 +7,7 @@ export default function CommunityPage() {
   return (
     <div className="page-section community-page refresh-community-page">
       <div className="shell community-shell">
-        <div className="page-heading page-heading-left community-heading">
+        <div className="page-heading community-heading">
           <span className="eyebrow">익명 커뮤니티</span>
           <h1>일하는 사람들의 확인 경험</h1>
           <p>혼자 묻기 어려웠던 질문과 확인 경험을 나눕니다. 일하는 사람들의 경험과 질문을 나누는 공간입니다.</p>
