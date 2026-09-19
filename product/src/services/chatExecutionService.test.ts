@@ -2,8 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+import type { ChatRequest } from "@/domain/chat";
 import type { ChatComparisonResponse } from "@/domain/chatComparison";
 import { createConfiguredChatSender } from "@/services/chatExecutionService";
+
+const REQUEST: ChatRequest = {
+  message: "질문",
+  chat_mode: "general",
+  recent_messages: [],
+};
 
 function response(executionMode: ChatComparisonResponse["execution_mode"]): ChatComparisonResponse {
   return {
@@ -33,10 +40,10 @@ describe("chat execution feature flag", () => {
       sendResponses,
     });
 
-    const result = await send({ message: "질문" }, { signal: AbortSignal.timeout(1_000) });
+    const result = await send(REQUEST, { signal: AbortSignal.timeout(1_000) });
 
     expect(result.execution_mode).toBe("dual_api");
-    expect(sendDual).toHaveBeenCalledWith({ message: "질문" });
+    expect(sendDual).toHaveBeenCalledWith(REQUEST);
     expect(sendResponses).not.toHaveBeenCalled();
   });
 
@@ -50,10 +57,10 @@ describe("chat execution feature flag", () => {
     });
     const signal = AbortSignal.timeout(1_000);
 
-    const result = await send({ message: "질문" }, { signal });
+    const result = await send(REQUEST, { signal });
 
     expect(result.execution_mode).toBe("openai_responses");
-    expect(sendResponses).toHaveBeenCalledWith({ message: "질문" }, { signal });
+    expect(sendResponses).toHaveBeenCalledWith(REQUEST, { signal });
     expect(sendDual).not.toHaveBeenCalled();
   });
 });

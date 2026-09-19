@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useId, useState } from "react";
 import { AuthApiError, login } from "@/services/authClient";
+import { hasGuestConversation } from "@/services/guestConversationClient";
 import type { ErrorDetail } from "@/utils/errors";
 
 interface FieldErrors {
@@ -67,7 +68,7 @@ export function LoginForm() {
     try {
       await login({ email: email.trim(), password });
       // 이동이 끝날 때까지 submitting을 유지해 중복 제출을 막는다.
-      router.push("/community");
+      router.push(hasGuestConversation() ? "/chat?guest_import=prompt" : "/community");
     } catch (caught) {
       setSubmitting(false);
       if (caught instanceof AuthApiError) {

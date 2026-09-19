@@ -2,19 +2,23 @@ import "server-only";
 
 import { MockAuthRepository } from "@/adapters/mock/MockAuthRepository";
 import { MockCommunityRepository } from "@/adapters/mock/MockCommunityRepository";
+import { MockConversationRepository } from "@/adapters/mock/MockConversationRepository";
 import { MockFavoriteRepository } from "@/adapters/mock/MockFavoriteRepository";
 import { MockWorksiteTipRepository } from "@/adapters/mock/MockWorksiteTipRepository";
 import { RealAuthRepository } from "@/adapters/real/RealAuthRepository";
 import { RealCommunityRepository } from "@/adapters/real/RealCommunityRepository";
+import { RealConversationRepository } from "@/adapters/real/RealConversationRepository";
 import { RealWorksiteTipRepository } from "@/adapters/real/RealWorksiteTipRepository";
 import {
   getAuthDataMode,
   getCommunityDataMode,
+  getConversationDataMode,
   getFavoriteDataMode,
   getWorksiteTipDataMode,
 } from "@/config/dataMode";
 import type { AuthRepository } from "@/domain/auth";
 import type { CommunityRepository } from "@/domain/community";
+import type { ConversationRepository } from "@/domain/conversation";
 import type { FavoriteRepository } from "@/domain/favorite";
 import type { WorksiteTipRepository } from "@/domain/worksiteTip";
 import { ServiceError } from "@/utils/errors";
@@ -31,6 +35,8 @@ import { ServiceError } from "@/utils/errors";
 const mockAuthRepository = new MockAuthRepository();
 const realAuthRepository = new RealAuthRepository();
 const realCommunityRepository = new RealCommunityRepository();
+const realConversationRepository = new RealConversationRepository();
+const mockConversationRepository = new MockConversationRepository();
 const mockCommunityRepository = new MockCommunityRepository();
 const mockFavoriteRepository = new MockFavoriteRepository();
 const mockWorksiteTipRepository = new MockWorksiteTipRepository();
@@ -42,6 +48,12 @@ export function getAuthRepository(): AuthRepository {
 
 export function getCommunityRepository(): CommunityRepository {
   return getCommunityDataMode() === "real" ? realCommunityRepository : mockCommunityRepository;
+}
+
+export function getConversationRepository(): ConversationRepository {
+  return getConversationDataMode() === "real"
+    ? realConversationRepository
+    : mockConversationRepository;
 }
 
 export function getWorksiteTipRepository(): WorksiteTipRepository {
@@ -64,6 +76,10 @@ export function getFavoriteRepository(): FavoriteRepository {
 
 export function resetMockWorksiteTipsForTests(): void {
   mockWorksiteTipRepository.resetForTests();
+}
+
+export function resetMockConversationsForTests(): void {
+  mockConversationRepository.resetForTests();
 }
 
 export function resetMockFavoritesForTests(): void {

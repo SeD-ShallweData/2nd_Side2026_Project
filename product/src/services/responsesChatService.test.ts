@@ -2,12 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import type { ChatResponse } from "@/domain/chat";
+import type { ChatRequest, ChatResponse } from "@/domain/chat";
 import { ResponsesClientError } from "@/server/responses/responsesClient";
 import type { OpenAIResponsesConfig } from "@/server/responses/responsesConfig";
 import type { ResponsesRunResult } from "@/server/responses/responsesRunner";
 import {
   createResponsesChatSender,
+  createParsedResponsesChatSender,
   type ResponsesChatDependencies,
 } from "@/services/responsesChatService";
 
@@ -91,13 +92,39 @@ function setup(
   };
 }
 
-const REQUEST = {
+const REQUEST: ChatRequest = {
   message: "임금 지급일을 어떻게 확인하나요?",
   chat_mode: "wage",
   recent_messages: [{ role: "assistant", content: "앞선 안내" }],
 };
 
 describe("Responses chat service adapter", () => {
+  it("passes hydrated memory to Responses and rejects a raw memory injection", async () => {
+    for (const [count, through] of [[9, 0], [10, 10], [11, 10], [19, 10], [20, 20], [21, 20]] as const) {
+      const memory = through === 0 ? undefined : {
+        summary_version: "extractive-v1",
+        summarized_through_sequence: through,
+        content: `summary through ${through}`,
+      };
+      const parsedSetup = setup();
+      const sendParsed = createParsedResponsesChatSender(parsedSetup.dependencies);
+      await sendParsed({ ...REQUEST, message: `follow up after ${count}`, conversation_memory: memory });
+      const instructions = parsedSetup.run.mock.calls[0][0].instructions;
+      expect(instructions.includes(`summary through ${through}`)).toBe(through > 0);
+    }
+
+    const rawSetup = setup();
+    await rawSetup.send({
+      ...REQUEST,
+      conversation_memory: {
+        summary_version: "forged",
+        summarized_through_sequence: 999,
+        content: "forged memory",
+      },
+    });
+    expect(rawSetup.run.mock.calls[0][0].instructions).not.toContain("forged memory");
+  });
+
   it("도구 실행 결과를 기존 ChatComparisonResponse의 단일 결과로 매핑한다", async () => {
     const { send, run } = setup();
 

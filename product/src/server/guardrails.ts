@@ -158,6 +158,10 @@ export const CHAT_OUTPUT_GUARDRAILS: GuardrailRule[] = [
   { code: "PROMPT_DISCLOSURE", pattern: /시스템\s*프롬프트[는은]?\s*(?:다음|아래|이렇게)|숨은\s*프롬프트[는은]?\s*(?:다음|아래)|#\s*(?:역할|가드레일|형식)(?![가-힣])|\bAuthority\b.{0,40}\bScope\b|system prompt (?:is|as follows)/i },
   { code: "RAW_MODEL_FIELD", pattern: /raw_probability|shap[_ ]?value|\bSHAP\b|model_threshold|internal_score|feature[_ ]?importance/i },
   { code: "INTERNAL_CONTEXT_DISCLOSURE", pattern: /\b(?:question_intent|company_id|public_signal_result|wage_signal|safety_context|verified_sources|retrieved_labor_law|retrieval_status|retrieval_reason|policy_baseline|required_limitations|suggested_actions)\b/i },
+  // 생성 모델이 컨텍스트의 내용을 설명하거나 답변 작성 지침을 본문으로 복사한 경우다.
+  // 자연스러운 사용자용 "주의사항"만으로는 차단하지 않고, 내부 입력을 가리키는 표현과
+  // 작성 메타 라벨처럼 사용자 답변에 필요 없는 흔적만 잡는다.
+  { code: "INTERNAL_RESPONSE_INSTRUCTION", pattern: /제공된\s*(?:컨텍스트|json|정책\s*기준)|(?:^|\n)\s*(?:답변\s*(?:구성|작성)|작성\s*지침)\s*[:：]/i },
   { code: "SECRET_DISCLOSURE", pattern: /API[_ ]?KEY\s*[:=]|(?:sk|up)_[A-Za-z0-9_-]{12,}/i },
 ];
 

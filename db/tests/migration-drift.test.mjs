@@ -25,6 +25,8 @@ const ALL_TAGS = [
   "0011_lumpy_proteus",
   "0012_v_region_industry_signal",
   "0013_illegal_sir_ram",
+  "0014_conversation_memory",
+  "0015_conversation_summaries",
 ];
 
 function migrations(count = ALL_TAGS.length) {
@@ -88,6 +90,8 @@ describe("migration drift predeploy 판정", () => {
       "0011_lumpy_proteus",
       "0012_v_region_industry_signal",
       "0013_illegal_sir_ram",
+      "0014_conversation_memory",
+      "0015_conversation_summaries",
     ]);
     assert.equal(result.blocked, true);
   });

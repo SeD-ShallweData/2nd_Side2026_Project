@@ -359,6 +359,190 @@ export const sessions = pgTable(
   ],
 );
 
+/*
+ * 상담 원문은 모델 입력·추론 trace와 분리한다. 여기에는 사용자가 화면에서 실제로
+ * 보낸 질문과 최종적으로 표시된 답변, 그리고 그 답변에 표시된 근거만 남긴다.
+ *
+ * 삭제는 conversation_threads 한 행을 지우는 hard delete다. 하위 turn/message/source가
+ * cascade 되고, 늦게 끝난 모델 작업은 더 이상 참조할 부모가 없어 되살릴 수 없다.
+ */
+export const conversationThreads = pgTable(
+  "conversation_threads",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    activeCompanyId: text("active_company_id").references(() => firms.firmId, {
+      onDelete: "set null",
+    }),
+    title: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    index("conversation_threads_owner_activity_idx").on(t.ownerUserId, t.lastActivityAt.desc()),
+    index("conversation_threads_expires_idx").on(t.expiresAt),
+    index("conversation_threads_active_company_idx").on(t.activeCompanyId),
+    check("conversation_threads_title_ck", sql`char_length(btrim(${t.title})) between 1 and 120`),
+  ],
+);
+
+export const conversationTurns = pgTable(
+  "conversation_turns",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversationThreads.id, { onDelete: "cascade" }),
+    /* client-generated retry key: same user send/retry must never duplicate a turn */
+    idempotencyKey: text("idempotency_key").notNull(),
+    turnIndex: integer("turn_index").notNull(),
+    companyId: text("company_id").references(() => firms.firmId, { onDelete: "set null" }),
+    answerType: text("answer_type").notNull(),
+    guardrailStatus: text("guardrail_status").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("conversation_turns_idempotency_uq").on(t.conversationId, t.idempotencyKey),
+    uniqueIndex("conversation_turns_sequence_uq").on(t.conversationId, t.turnIndex),
+    index("conversation_turns_conversation_created_idx").on(t.conversationId, t.createdAt),
+    check("conversation_turns_index_ck", sql`${t.turnIndex} > 0`),
+    check(
+      "conversation_turns_answer_type_ck",
+      sql`${t.answerType} in ('general_guidance','company_context','clarification','insufficient_evidence','refusal','emergency_guidance')`,
+    ),
+    check(
+      "conversation_turns_guardrail_status_ck",
+      sql`${t.guardrailStatus} in ('passed','limited','refused','escalated')`,
+    ),
+  ],
+);
+
+export const conversationMessages = pgTable(
+  "conversation_messages",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    turnId: uuid("turn_id")
+      .notNull()
+      .references(() => conversationTurns.id, { onDelete: "cascade" }),
+    role: text().notNull(),
+    messageIndex: smallint("message_index").notNull(),
+    content: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("conversation_messages_turn_role_uq").on(t.turnId, t.role),
+    uniqueIndex("conversation_messages_turn_sequence_uq").on(t.turnId, t.messageIndex),
+    index("conversation_messages_turn_created_idx").on(t.turnId, t.createdAt),
+    check("conversation_messages_role_ck", sql`${t.role} in ('user','assistant')`),
+    check("conversation_messages_sequence_ck", sql`${t.messageIndex} in (1, 2)`),
+    check("conversation_messages_content_ck", sql`char_length(${t.content}) between 1 and 20000`),
+  ],
+);
+
+/* 답변에 실제 표시된 source만 저장한다. 검색 후보·prompt·모델 내부 trace는 저장하지 않는다. */
+export const conversationSources = pgTable(
+  "conversation_sources",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    turnId: uuid("turn_id")
+      .notNull()
+      .references(() => conversationTurns.id, { onDelete: "cascade" }),
+    position: integer().notNull(),
+    name: text().notNull(),
+    category: text(),
+    citation: text(),
+    organization: text(),
+    asOf: text("as_of"),
+    url: text(),
+    documentId: text("document_id"),
+  },
+  (t) => [
+    uniqueIndex("conversation_sources_turn_position_uq").on(t.turnId, t.position),
+    check("conversation_sources_position_ck", sql`${t.position} >= 0`),
+    check("conversation_sources_category_ck", sql`${t.category} is null or ${t.category} in ('wage','safety','labor_law')`),
+  ],
+);
+
+/* 한 대화방의 현재 선택 사업장과 각 turn의 당시 사업장 연결을 구분할 수 있게 한다. */
+export const conversationCompanyEvents = pgTable(
+  "conversation_company_events",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversationThreads.id, { onDelete: "cascade" }),
+    turnId: uuid("turn_id")
+      .references(() => conversationTurns.id, { onDelete: "set null" }),
+    eventKind: text("event_kind").notNull().default("turn"),
+    previousCompanyId: text("previous_company_id").references(() => firms.firmId, {
+      onDelete: "set null",
+    }),
+    nextCompanyId: text("next_company_id").references(() => firms.firmId, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("conversation_company_events_turn_uq").on(t.turnId),
+    index("conversation_company_events_conversation_created_idx").on(t.conversationId, t.createdAt),
+    check("conversation_company_events_kind_ck", sql`${t.eventKind} in ('turn','manual')`),
+  ],
+);
+
+/* 최신 누적 요약 하나만 유지한다. 원문은 삭제하지 않고 LLM 문맥에서만 압축한다. */
+export const conversationSummaries = pgTable(
+  "conversation_summaries",
+  {
+    conversationId: uuid("conversation_id")
+      .primaryKey()
+      .references(() => conversationThreads.id, { onDelete: "cascade" }),
+    summary: jsonb().notNull().default(sql`'{}'::jsonb`),
+    summarizedThroughSequence: integer("summarized_through_sequence").notNull().default(0),
+    pendingThroughSequence: integer("pending_through_sequence"),
+    summaryVersion: text("summary_version").notNull().default("extractive-v1"),
+    status: text().notNull().default("pending"),
+    retryCount: integer("retry_count").notNull().default(0),
+    lastErrorCode: text("last_error_code"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("conversation_summaries_status_updated_idx").on(t.status, t.updatedAt),
+    check("conversation_summaries_status_ck", sql`${t.status} in ('pending','ready','failed')`),
+    check("conversation_summaries_sequence_ck", sql`${t.summarizedThroughSequence} >= 0 and (${t.pendingThroughSequence} is null or ${t.pendingThroughSequence} > ${t.summarizedThroughSequence})`),
+    check("conversation_summaries_retry_ck", sql`${t.retryCount} >= 0`),
+    check("conversation_summaries_payload_ck", sql`jsonb_typeof(${t.summary}) = 'object'`),
+  ],
+);
+
+/* A request is claimed before generation. The stored completed payload makes retries replay-only. */
+export const conversationRequests = pgTable(
+  "conversation_requests",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requestId: text("request_id").notNull(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversationThreads.id, { onDelete: "cascade" }),
+    status: text().notNull().default("pending"),
+    responsePayload: jsonb("response_payload"),
+    failureCode: text("failure_code"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("conversation_requests_owner_request_uq").on(t.ownerUserId, t.requestId),
+    index("conversation_requests_conversation_status_idx").on(t.conversationId, t.status),
+    check("conversation_requests_status_ck", sql`${t.status} in ('pending','completed','failed','cancelled')`),
+    check("conversation_requests_payload_ck", sql`${t.responsePayload} is null or jsonb_typeof(${t.responsePayload}) = 'object'`),
+  ],
+);
+
 /* ── posts: API 계약에 맞춘 상태값 + 카테고리 + 수정/삭제/숨김 이력 ────── */
 export const posts = pgTable(
   "posts",

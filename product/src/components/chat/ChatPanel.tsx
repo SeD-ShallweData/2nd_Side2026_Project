@@ -2,10 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useId, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import { DataSourceList } from "@/components/common/DataSourceList";
 import { SafeMarkdown } from "@/components/common/SafeMarkdown";
 import type { ChatMode, RecentMessage } from "@/domain/chat";
+import type {
+  ConversationDetailDto,
+  ImportGuestConversationResponse,
+  ConversationListResponse,
+  ConversationSummaryDto,
+} from "@/app/api/conversations/conversationApiContract";
 import type {
   ChatComparisonResponse,
   ConfiguredChatExecutionMode,
@@ -14,6 +20,11 @@ import type {
 } from "@/domain/chatComparison";
 import { executionModeCopy, providerRunStatusLabel } from "@/components/chat/runLabels";
 import { readApiResponse } from "@/utils/clientApi";
+import {
+  appendGuestConversationTurn,
+  clearGuestConversation,
+  readGuestConversation,
+} from "@/services/guestConversationClient";
 
 const COMPANY_QUESTIONS = [
   "왜 추가 확인이 필요한가요?",
@@ -53,9 +64,23 @@ const MAX_CONTRACT_FILE_SIZE = 10 * 1024 * 1024;
 
 interface UiMessage {
   id: string;
+  requestId?: string;
   role: "user" | "assistant";
   content: string;
   comparison?: ChatComparisonResponse;
+  sources?: import("@/domain/risk").SourceReference[];
+  companyId?: string | null;
+}
+
+function welcomeContent(company: string | undefined, executionMode: ConfiguredChatExecutionMode): string {
+  if (company) {
+    return executionMode === "dual_api"
+      ? `${company}의 공개 컨텍스트와 공식 근거를 Upstage Solar에 전달해 답변합니다. 필요할 때만 SKT A.X 비교를 켤 수 있습니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
+      : `${company}을 선택했습니다. 필요한 경우 허용된 사업장·위험·법령 조회 도구를 사용해 답변합니다.`;
+  }
+  return executionMode === "dual_api"
+    ? "기본적으로 Upstage Solar 하나에 질문을 보내고, 비교를 켠 질문에만 SKT A.X 답변을 함께 표시합니다."
+    : "OpenAI Responses가 질문에 필요한 공식 정보 도구만 선택적으로 호출해 노동 상담 답변을 만듭니다.";
 }
 
 function metric(value: number | null, suffix = ""): string {
@@ -256,31 +281,64 @@ export function ChatPanel({
     {
       id: "welcome",
       role: "assistant",
-      content: companyName
-        ? executionMode === "dual_api"
-          ? `${companyName}의 공개 컨텍스트와 공식 근거를 Upstage Solar에 전달해 답변합니다. 필요할 때만 SKT A.X 비교를 켤 수 있습니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
-          : `${companyName}을 선택했습니다. 필요한 경우 허용된 사업장·위험·법령 조회 도구를 사용해 답변합니다.`
-        : executionMode === "dual_api"
-          ? "기본적으로 Upstage Solar 하나에 질문을 보내고, 비교를 켠 질문에만 SKT A.X 답변을 함께 표시합니다."
-          : "OpenAI Responses가 질문에 필요한 공식 정보 도구만 선택적으로 호출해 노동 상담 답변을 만듭니다.",
+      content: welcomeContent(companyName, executionMode),
     },
   ]);
   const [conversationId, setConversationId] = useState<string>();
+  const [conversationTitle, setConversationTitle] = useState<string>();
+  const [activeCompanyId, setActiveCompanyId] = useState(companyId);
+  const [activeCompanyName, setActiveCompanyName] = useState(companyName);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<Record<string, LlmProviderId | "tie">>({});
   const [compare, setCompare] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<ConversationSummaryDto[]>([]);
+  const [historyAvailable, setHistoryAvailable] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [persistenceNotice, setPersistenceNotice] = useState<string | null>(null);
+  const [guestImportAvailable, setGuestImportAvailable] = useState(false);
+
+  const refreshConversationHistory = useCallback(async () => {
+    const response = await fetch("/api/conversations?limit=20", { cache: "no-store" });
+    if (response.status === 401) {
+      setHistoryAvailable(false);
+      setConversationHistory([]);
+      return;
+    }
+    if (!response.ok) throw new Error("대화 기록을 불러오지 못했습니다.");
+    const data = await readApiResponse<ConversationListResponse>(response);
+    setHistoryAvailable(true);
+    setConversationHistory(data.items);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages, loading]);
 
-  async function sendMessage(value: string) {
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void refreshConversationHistory().catch(() => {
+        // 현재 상담 자체는 계속 가능하다. 저장소 장애는 답변 뒤 상태로만 알린다.
+        setHistoryAvailable(false);
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refreshConversationHistory]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setGuestImportAvailable(readGuestConversation() !== null);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  async function sendMessage(value: string, retryRequestId?: string) {
     const message = value.trim();
     if (!message || loading) return;
     const submittedContractFile = contractFile;
     const requestedComparison = executionMode === "dual_api" && compare;
+    const requestId = retryRequestId ?? crypto.randomUUID();
 
     const recentMessages: RecentMessage[] = messages
       .filter((item) => item.id !== "welcome")
@@ -291,7 +349,9 @@ export function ChatPanel({
           ? comparisonHistoryContent(item.comparison, feedback[item.comparison.comparison_id])
           : item.content,
       }));
-    setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: message }]);
+    setMessages((current) => [...current, {
+      id: crypto.randomUUID(), requestId, role: "user", content: message, companyId: activeCompanyId ?? null,
+    }]);
     setDraft("");
     setError(null);
     setLoading(true);
@@ -306,17 +366,19 @@ export function ChatPanel({
         const form = new FormData();
         form.append("file", submittedContractFile, submittedContractFile.name);
         form.append("message", message);
+        form.append("request_id", requestId);
         form.append("chat_mode", chatMode);
         form.append("recent_messages", JSON.stringify(recentMessages));
         if (conversationId) form.append("conversation_id", conversationId);
-        if (companyId) form.append("company_id", companyId);
+        if (activeCompanyId) form.append("company_id", activeCompanyId);
         requestInit.body = form;
       } else {
         requestInit.headers = { "Content-Type": "application/json" };
         requestInit.body = JSON.stringify({
           message,
+          request_id: requestId,
           conversation_id: conversationId,
-          company_id: companyId,
+          company_id: activeCompanyId,
           compare: requestedComparison,
           chat_mode: chatMode,
           recent_messages: recentMessages,
@@ -324,7 +386,19 @@ export function ChatPanel({
       }
       const response = await fetch("/api/chat", requestInit);
       const data = await readApiResponse<ChatComparisonResponse>(response);
-      setConversationId(data.conversation_id);
+      if (data.conversation_persistence !== "guest") setConversationId(data.conversation_id);
+      if (data.conversation_persistence === "saved") {
+        setPersistenceNotice("상담과 표시된 답변이 저장되었습니다.");
+        void refreshConversationHistory().catch(() => setHistoryAvailable(false));
+      } else if (data.conversation_persistence === "unavailable") {
+        setHistoryAvailable(false);
+        setError("답변은 표시했지만 대화 기록 저장소에 연결하지 못했습니다.");
+        setPersistenceNotice("저장에 실패했습니다. 같은 질문의 재전송 버튼으로 저장을 다시 시도할 수 있습니다.");
+      } else if (data.conversation_persistence === "guest") {
+        appendGuestConversationTurn(message, activeCompanyId ?? null, data);
+        setGuestImportAvailable(true);
+        setPersistenceNotice("이 익명 상담은 현재 탭에만 임시 보관됩니다.");
+      }
       const completedContractReview = data.results.some(
         (result) =>
           result.status === "success" &&
@@ -375,6 +449,123 @@ export function ChatPanel({
     }
   }
 
+  async function restoreConversation(nextConversationId: string) {
+    if (loading || nextConversationId === conversationId) return;
+    setHistoryLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/conversations/${encodeURIComponent(nextConversationId)}`, {
+        cache: "no-store",
+      });
+      const detail = await readApiResponse<ConversationDetailDto>(response);
+      setConversationId(detail.conversation_id);
+      setConversationTitle(detail.title);
+      setActiveCompanyId(detail.active_company_id ?? undefined);
+      setActiveCompanyName(detail.active_company_id === companyId ? companyName : undefined);
+      setMessages([
+        { id: "welcome", role: "assistant", content: welcomeContent(
+          detail.active_company_id === companyId ? companyName : detail.active_company_id ?? undefined,
+          executionMode,
+        ) },
+        ...detail.turns.flatMap((turn) => turn.messages.map((message) => message.role === "assistant" && turn.response
+          ? { id: `${turn.turn_id}-assistant`, role: "assistant" as const, content: "상담 결과", comparison: turn.response }
+          : {
+              id: `${turn.turn_id}-${message.role}`,
+              role: message.role,
+              content: message.content,
+              companyId: turn.company_id,
+              ...(message.role === "assistant" ? { sources: turn.sources } : {}),
+            })),
+      ]);
+      setPersistenceNotice("저장된 상담을 복원했습니다. 현재 사업장 문맥도 함께 적용되었습니다.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "대화 기록을 불러오지 못했습니다.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function deleteConversation(conversation: ConversationSummaryDto) {
+    if (loading) return;
+    setHistoryLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/conversations/${encodeURIComponent(conversation.conversation_id)}`, {
+        method: "DELETE",
+      });
+      await readApiResponse(response);
+      if (conversation.conversation_id === conversationId) {
+        setConversationId(undefined);
+        setConversationTitle(undefined);
+        setActiveCompanyId(companyId);
+        setActiveCompanyName(companyName);
+        setMessages((current) => current.slice(0, 1));
+      }
+      await refreshConversationHistory();
+      setPersistenceNotice("저장된 상담을 삭제했습니다. 늦게 끝난 응답도 다시 저장되지 않습니다.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "대화 기록을 삭제하지 못했습니다.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function updateConversationMetadata(patch: { title?: string; active_company_id?: string | null }) {
+    if (!conversationId || loading) return;
+    setHistoryLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const updated = await readApiResponse<ConversationSummaryDto>(response);
+      setConversationTitle(updated.title);
+      setActiveCompanyId(updated.active_company_id ?? undefined);
+      setActiveCompanyName(updated.active_company_id === companyId ? companyName : undefined);
+      setMessages((current) => current.map((message) => message.id === "welcome"
+        ? { ...message, content: welcomeContent(updated.active_company_id === companyId ? companyName : updated.active_company_id ?? undefined, executionMode) }
+        : message));
+      await refreshConversationHistory();
+      setPersistenceNotice(patch.title !== undefined ? "상담 제목을 수정했습니다." : updated.active_company_id ? "사업장 문맥을 변경했습니다." : "사업장 문맥을 해제했습니다.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "상담 정보를 수정하지 못했습니다.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  function editConversationTitle() {
+    if (!conversationId) return;
+    const title = window.prompt("새 상담 제목을 입력해 주세요.", conversationTitle ?? "");
+    if (title !== null && title.trim()) void updateConversationMetadata({ title });
+  }
+
+  async function importCurrentGuestConversation() {
+    const guest = readGuestConversation();
+    if (!guest || loading) return;
+    setHistoryLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/conversations/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(guest),
+      });
+      const imported = await readApiResponse<ImportGuestConversationResponse>(response);
+      clearGuestConversation();
+      setGuestImportAvailable(false);
+      await refreshConversationHistory();
+      await restoreConversation(imported.conversation_id);
+      setPersistenceNotice(imported.reused ? "이미 가져온 익명 상담을 복원했습니다." : "동의한 현재 익명 상담 하나를 계정으로 가져왔습니다.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "익명 상담을 가져오지 못했습니다.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void sendMessage(draft);
@@ -402,14 +593,15 @@ export function ChatPanel({
     setContractFile(next);
   }
 
-  const questions = companyId ? COMPANY_QUESTIONS : GENERAL_QUESTIONS;
+  const questions = activeCompanyId ? COMPANY_QUESTIONS : GENERAL_QUESTIONS;
+  const activeCompanyLabel = activeCompanyName ?? activeCompanyId;
 
   return (
     <div className="chat-experience-layout">
       <div className="chat-panel comparison-chat-panel">
       <div className="chat-topbar">
         <div><span className="online-dot" aria-hidden="true" /><strong>{executionMode === "dual_api" ? compare ? "Upstage·SKT 답변 비교" : "Upstage Solar 단일 상담" : "OpenAI 도구 연결 상담"}</strong></div>
-        <span>{companyName ? `${companyName} 컨텍스트 연결됨` : chatMode === "contract" ? "계약서 후속 상담" : "일반 노동 상담"}</span>
+        <span>{activeCompanyLabel ? `${activeCompanyLabel} 컨텍스트 연결됨` : chatMode === "contract" ? "계약서 후속 상담" : "일반 노동 상담"}</span>
       </div>
 
       <div className="chat-body comparison-chat-body" aria-live="polite" aria-busy={loading}>
@@ -426,12 +618,13 @@ export function ChatPanel({
               {message.role === "assistant" ? <Image className="chat-avatar" src="/brand/donworry-avatar.png" alt="" width={192} height={192} /> : null}
               {message.role === "user" ? (
                 <div className="user-message-wrap">
-                  <button type="button" className="message-retry" onClick={() => void sendMessage(message.content)} disabled={loading} aria-label={`질문 다시 보내기: ${message.content}`}>
+                  <button type="button" className="message-retry" onClick={() => void sendMessage(message.content, message.requestId)} disabled={loading} aria-label={`질문 다시 보내기: ${message.content}`}>
                     <span aria-hidden="true">↻</span> 재전송
                   </button>
                   <div className="chat-message chat-message-user"><p>{message.content}</p></div>
+                  {message.companyId ? <small className="turn-company-label">당시 사업장: {message.companyId}</small> : null}
                 </div>
-              ) : <div className="chat-message chat-message-assistant"><p>{message.content}</p></div>}
+              ) : <div className="chat-message chat-message-assistant"><p>{message.content}</p>{message.sources?.length ? <DataSourceList sources={message.sources} /> : null}</div>}
             </div>
           )
         ))}
@@ -470,6 +663,34 @@ export function ChatPanel({
         ))}
       </div>
 
+      {historyAvailable ? (
+        <section className="chat-history" aria-label="저장된 대화">
+          <div><strong>저장된 대화</strong><small>마지막 활동 후 30일이 지나면 원문과 표시 근거가 삭제됩니다.</small></div>
+          {conversationHistory.length ? <ul>
+            {conversationHistory.map((conversation) => <li key={conversation.conversation_id}>
+              <button type="button" disabled={historyLoading || loading} onClick={() => void restoreConversation(conversation.conversation_id)}>
+                {conversation.title}
+              </button>
+              <button type="button" disabled={historyLoading || loading} onClick={() => void deleteConversation(conversation)} aria-label={`${conversation.title} 삭제`}>삭제</button>
+            </li>)}
+          </ul> : <p className="muted-text">아직 저장된 대화가 없습니다.</p>}
+          {conversationId ? <div className="conversation-controls">
+            <button type="button" disabled={historyLoading || loading} onClick={editConversationTitle}>제목 수정</button>
+            {companyId && companyId !== activeCompanyId ? <button type="button" disabled={historyLoading || loading} onClick={() => void updateConversationMetadata({ active_company_id: companyId })}>현재 화면 사업장으로 변경</button> : null}
+            {activeCompanyId ? <button type="button" disabled={historyLoading || loading} onClick={() => void updateConversationMetadata({ active_company_id: null })}>사업장 연결 해제</button> : null}
+          </div> : null}
+        </section>
+      ) : null}
+
+      {historyAvailable && guestImportAvailable ? <section className="guest-import-consent" aria-label="익명 상담 가져오기">
+        <strong>로그인 전에 진행한 현재 익명 상담이 있습니다.</strong>
+        <p>동의하면 이 상담 하나만 계정의 30일 대화 기록으로 가져옵니다.</p>
+        <div>
+          <button type="button" disabled={historyLoading || loading} onClick={() => void importCurrentGuestConversation()}>동의하고 가져오기</button>
+          <button type="button" disabled={historyLoading || loading} onClick={() => { clearGuestConversation(); setGuestImportAvailable(false); setPersistenceNotice("익명 상담 임시 기록을 삭제했습니다."); }}>가져오지 않고 삭제</button>
+        </div>
+      </section> : null}
+
       {executionMode === "dual_api" ? (
         <label className="chat-compare-toggle">
           <input
@@ -486,6 +707,7 @@ export function ChatPanel({
       ) : null}
 
       {error ? <p className="chat-error" role="alert">{error}</p> : null}
+      {persistenceNotice ? <p className="chat-persistence-status" role="status">{persistenceNotice}</p> : null}
 
       <form className="chat-form" onSubmit={handleSubmit}>
         {executionMode === "openai_responses" && chatMode === "contract" ? (
@@ -510,7 +732,7 @@ export function ChatPanel({
           id={inputId}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder={companyId ? `${companyName}에 관해 궁금한 점을 입력하세요` : "노동 관련 질문을 입력하세요"}
+          placeholder={activeCompanyId ? `${activeCompanyLabel ?? "선택 사업장"}에 관해 궁금한 점을 입력하세요` : "노동 관련 질문을 입력하세요"}
           rows={2}
           maxLength={2_000}
           onKeyDown={(event) => {
@@ -522,7 +744,7 @@ export function ChatPanel({
         />
         <button type="submit" className="chat-send" disabled={loading || !draft.trim()} aria-label="질문 보내기"><span aria-hidden="true">↑</span></button>
       </form>
-      {!companyId ? (
+      {!activeCompanyId ? (
         <p className="chat-company-help">
           특정 회사에 관해 질문하려면 <Link href="/companies">사업장을 먼저 검색해 선택</Link>하세요.
         </p>
@@ -539,8 +761,8 @@ export function ChatPanel({
           />
           <div><strong>AI 질문 가이드</strong><small>무엇부터 물을지 막막하다면</small></div>
         </div>
-        {companyName ? (
-          <div className="guide-context"><strong>{companyName}</strong><span>사업장 공개 컨텍스트 연결</span></div>
+        {activeCompanyLabel ? (
+          <div className="guide-context"><strong>{activeCompanyLabel}</strong><span>사업장 공개 컨텍스트 연결</span></div>
         ) : null}
         {GUIDE_GROUPS.map((group) => (
           <div className="guide-group" key={group.title}>

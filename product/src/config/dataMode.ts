@@ -29,6 +29,11 @@ export function getWorksiteTipDataMode(): DataMode {
   return parseDataMode(process.env.WORKSITE_TIP_DATA_MODE) ?? getDataMode();
 }
 
+/* 대화 원문은 인증·커뮤니티와 보존 기간, 삭제권, 접근 대상이 달라 독립 전환한다. */
+export function getConversationDataMode(): DataMode {
+  return parseDataMode(process.env.CONVERSATION_DATA_MODE) ?? getDataMode();
+}
+
 export function getFavoriteDataMode(): DataMode {
   return parseDataMode(process.env.FAVORITE_DATA_MODE) ?? getDataMode();
 }
