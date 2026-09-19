@@ -12,6 +12,7 @@ import type {
   StoredConversationDetail,
   StoredConversationSummary,
   StoredConversationTurn,
+  UpdateConversationInput,
 } from "@/domain/conversation";
 import type { ConversationStructuredSummary, StoredConversationSummaryState } from "@/domain/conversationSummary";
 
@@ -74,6 +75,7 @@ function cloneTurn(turn: StoredConversationTurn): StoredConversationTurn {
     ...turn,
     messages: turn.messages.map((message) => ({ ...message })),
     sources: turn.sources.map((source) => ({ ...source })),
+    response: turn.response ? structuredClone(turn.response) : null,
   };
 }
 
@@ -155,6 +157,10 @@ export class MockConversationRepository implements ConversationRepository {
     }
     if (request.status !== "pending") throw new Error("conversation request is not pending");
     await this.recordCompletedTurn({ ...input, conversation_id: request.conversation_id });
+    const thread = threads.get(request.conversation_id);
+    const turnId = thread?.idempotency.get(input.idempotency_key);
+    const turn = turnId ? thread?.turns.find((candidate) => candidate.turn_id === turnId) : undefined;
+    if (turn) turn.response = structuredClone(input.response);
     request.status = "completed";
     request.response = structuredClone(input.response);
     requests.set(key, request);
@@ -212,6 +218,7 @@ export class MockConversationRepository implements ConversationRepository {
         { message_id: randomUUID(), role: "assistant", content: input.assistant_message },
       ],
       sources: input.sources.map((source) => ({ ...source })),
+      response: null,
     });
     // Mock에도 회사 전환은 현재값과 turn별 company_id로 재현된다. 별도 이벤트는 DB에서 감사용으로 저장한다.
     void previousCompanyId;
@@ -227,6 +234,16 @@ export class MockConversationRepository implements ConversationRepository {
     summaries.delete(conversationId);
     for (const [key, request] of requests) if (request.conversation_id === conversationId) requests.delete(key);
     return true;
+  }
+
+  async updateConversation(input: UpdateConversationInput): Promise<StoredConversationSummary | null> {
+    const thread = threads.get(input.conversation_id);
+    if (!thread || thread.owner_user_id !== input.owner_user_id || Date.parse(thread.expires_at) <= Date.now()) return null;
+    if (input.title !== undefined) thread.title = input.title;
+    if (input.active_company_id !== undefined) thread.active_company_id = input.active_company_id;
+    thread.last_activity_at = new Date().toISOString();
+    thread.expires_at = new Date(Date.now() + RETENTION_MS).toISOString();
+    return cloneSummary(thread);
   }
 
   async deleteExpiredConversations(now: Date): Promise<number> {

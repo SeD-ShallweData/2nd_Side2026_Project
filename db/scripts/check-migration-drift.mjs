@@ -688,6 +688,20 @@ SELECT json_build_object(
       SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='public' AND c.relname='conversation_requests' AND con.conname='conversation_requests_payload_ck'
     )
+  ),
+  '0017_conversation_context_events', json_build_object(
+    'column:public.conversation_company_events.event_kind', EXISTS (
+      SELECT 1 FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_company_events' AND a.attname='event_kind' AND NOT a.attisdropped
+    ),
+    'constraint:public.conversation_company_events.conversation_company_events_turn_id_conversation_turns_id_fk', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_company_events' AND con.conname='conversation_company_events_turn_id_conversation_turns_id_fk'
+    ),
+    'constraint:public.conversation_company_events.conversation_company_events_kind_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_company_events' AND con.conname='conversation_company_events_kind_ck'
+    )
   )
 )::text;
 COMMIT;

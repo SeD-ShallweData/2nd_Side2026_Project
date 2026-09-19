@@ -7,8 +7,12 @@ import {
   deleteUserConversation,
   getUserConversation,
   hydrateConversationRequest,
+  importGuestConversation,
   listUserConversations,
   persistCompletedChat,
+  updateUserConversation,
+  claimConversationRequest,
+  completeClaimedConversationRequest,
 } from "@/services/conversationService";
 import { summaryTargetForMessageCount } from "@/services/conversationSummaryService";
 import {
@@ -190,5 +194,52 @@ describe("로그인 대화 원문 저장", () => {
     }, USER);
     expect(hydrated.conversation_memory?.content).toContain("사용자 정정");
     expect(hydrated.conversation_memory?.content).toContain("회사 ID: COMPANY_B");
+  });
+
+  it("복원용 최종 응답을 보존하고 현재 회사 변경·해제가 과거 turn 회사를 바꾸지 않는다", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    const request = {
+      message: "회사 A 임금 질문",
+      request_id: "restore_request_0000000001",
+      chat_mode: "wage" as const,
+      recent_messages: [],
+      company_id: "COMPANY_A",
+    };
+    const claim = await claimConversationRequest(request, USER);
+    const storedResponse = response("복원할 최종 답변");
+    storedResponse.results[0]!.limitations = ["개별 사실관계 확인 필요"];
+    storedResponse.results[0]!.suggested_actions = [{ code: "collect", label: "자료 모으기", priority: "now" }];
+    await completeClaimedConversationRequest({ ...request, conversation_id: claim.conversation_id }, storedResponse, USER);
+
+    await updateUserConversation(claim.conversation_id, { title: "수정한 제목", active_company_id: "COMPANY_B" }, USER);
+    await updateUserConversation(claim.conversation_id, { active_company_id: null }, USER);
+    const detail = await getUserConversation(claim.conversation_id, USER);
+    expect(detail).toMatchObject({ title: "수정한 제목", active_company_id: null });
+    expect(detail.turns[0]).toMatchObject({ company_id: "COMPANY_A" });
+    expect(detail.turns[0]?.response?.results[0]).toMatchObject({
+      answer: "복원할 최종 답변",
+      limitations: ["개별 사실관계 확인 필요"],
+      suggested_actions: [{ code: "collect", label: "자료 모으기", priority: "now" }],
+    });
+  });
+
+  it("현재 익명 상담 하나를 사용자 세션 소유로만 가져오고 재시도해도 중복하지 않는다", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    const body = {
+      import_id: "guest_import_000000000001",
+      turns: [
+        { user_message: "익명 첫 질문", company_id: null, response: response("첫 답변") },
+        { user_message: "익명 후속 질문", company_id: "COMPANY_B", response: response("후속 답변") },
+      ],
+      owner_user_id: OTHER.user_id,
+    };
+    const first = await importGuestConversation(body, USER);
+    const duplicate = await importGuestConversation(body, USER);
+    expect(first.imported).toBe(true);
+    expect(duplicate).toMatchObject({ conversation_id: first.conversation_id, reused: true });
+    const detail = await getUserConversation(first.conversation_id, USER);
+    expect(detail.turns).toHaveLength(2);
+    expect(detail.active_company_id).toBe("COMPANY_B");
+    await expect(getUserConversation(first.conversation_id, OTHER)).rejects.toMatchObject({ code: "CONVERSATION_NOT_FOUND" });
   });
 });

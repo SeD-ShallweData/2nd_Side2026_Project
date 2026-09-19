@@ -425,8 +425,8 @@ export const conversationMessages = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     turnId: uuid("turn_id")
-      .notNull()
-      .references(() => conversationTurns.id, { onDelete: "cascade" }),
+      .references(() => conversationTurns.id, { onDelete: "set null" }),
+    eventKind: text("event_kind").notNull().default("turn"),
     role: text().notNull(),
     messageIndex: smallint("message_index").notNull(),
     content: text().notNull(),
@@ -488,6 +488,7 @@ export const conversationCompanyEvents = pgTable(
   (t) => [
     uniqueIndex("conversation_company_events_turn_uq").on(t.turnId),
     index("conversation_company_events_conversation_created_idx").on(t.conversationId, t.createdAt),
+    check("conversation_company_events_kind_ck", sql`${t.eventKind} in ('turn','manual')`),
   ],
 );
 
