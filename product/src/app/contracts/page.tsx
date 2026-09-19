@@ -17,7 +17,7 @@ export default function ContractsPage() {
         <div className={`mode-banner mode-banner-${dataMode}`} role="status">
           <span>{dataMode === "real" ? "안심하세요!" : "DEMO"}</span>
           {dataMode === "real"
-            ? "파일은 내부 계약서 분석 서비스로 전달되며 원문을 제품 서버나 Git에 저장하지 않습니다."
+            ? "업로드한 파일은 계약서 분석에만 쓰이고, 별도의 저장소에 남지 않습니다."
             : "데모 모드에서는 파일 내용을 분석하지 않고 명시된 시나리오 결과만 제공합니다."}
         </div>
         <ContractReviewPanel dataMode={dataMode} />

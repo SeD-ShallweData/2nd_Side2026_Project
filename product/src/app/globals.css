@@ -3733,8 +3733,11 @@ summary:focus-visible {
 
 /* 로고와 첫 메뉴 사이에 선다. */
 .consumer-header-lead { display: flex; align-items: center; gap: 16px; }
-.consumer-mode-switch { flex-shrink: 0; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink-soft); font-size: .78rem; font-weight: 800; padding: 8px 14px; white-space: nowrap; }
-.consumer-mode-switch:hover { border-color: var(--ink); background: var(--surface); color: var(--ink); }
+/* '돈워리 AI에게 상담하기'(.button-ai)와 같은 배경·글꼴색을 쓴다.
+   테두리는 그 버튼처럼 안 보이게(투명) 둔다 — 노란 배경 위에 테두리선이
+   또 있으면 이중 테두리처럼 보인다. */
+.consumer-mode-switch { flex-shrink: 0; border: 1px solid transparent; border-radius: 999px; background: var(--brand); color: var(--ink); font-size: .78rem; font-weight: 800; padding: 8px 14px; white-space: nowrap; }
+.consumer-mode-switch:hover { background: #f1c900; }
 
 /* 시연장에서 멀리서도 눈에 들어오도록 기존 크기의 1.5배로 키운다. */
 .consumer-floating-chat { position: fixed; right: 28px; bottom: 26px; z-index: 90; display: flex; align-items: center; gap: 15px; border: 3px solid var(--ink); border-radius: 999px; background: var(--brand); box-shadow: 0 13px 0 rgb(8 31 58 / 12%); padding: 12px 23px 12px 12px; font-size: 1.2rem; font-weight: 900; }
@@ -4839,9 +4842,9 @@ summary:focus-visible {
 .contract-upload .upload-copy {
   width: calc(var(--upload-control-width) * 2 + var(--upload-control-gap));
   max-width: 100%;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 18px;
-  text-align: left;
+  text-align: center;
 }
 
 .contract-upload .upload-icon {
