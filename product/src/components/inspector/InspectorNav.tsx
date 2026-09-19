@@ -46,7 +46,7 @@ export async function InspectorNav({ current }: { current: "dashboard" | "chat" 
             </Link>
           ) : null}
           <Link href="/inspector/ml-dashboard" aria-current={current === "ml-dashboard" ? "page" : undefined}>
-            ML 대시보드
+            Machine Learning 대시보드
           </Link>
         </nav>
         <span className="inspector-private-badge">

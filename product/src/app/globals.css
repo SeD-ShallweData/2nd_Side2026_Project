@@ -719,11 +719,13 @@ summary:focus-visible {
   font-size: 0.88rem;
 }
 
-.footer-links {
-  display: flex;
-  gap: 24px;
-  font-size: 0.88rem;
-  font-weight: 750;
+/* Co끼리 로고(.brand-mark, 60px)와 같은 높이로 맞춘다. 실제 파일은
+   6000x6000 정사각형이라 width는 auto 로 비율만 따라간다. */
+.footer-club-logo {
+  display: block;
+  height: 60px;
+  width: auto;
+  object-fit: contain;
 }
 
 .footer-note {
@@ -3480,10 +3482,6 @@ summary:focus-visible {
 
   .footer-grid {
     grid-template-columns: 1fr;
-  }
-
-  .footer-links {
-    flex-wrap: wrap;
   }
 
   .footer-note {

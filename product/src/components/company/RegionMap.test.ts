@@ -106,3 +106,37 @@ describe("지도 여백", () => {
     expect(KOREA_MAP_VIEWBOX.width - maxX).toBeLessThan(10);
   });
 });
+
+describe("라벨이 도형 밖으로 나가지 않는다", () => {
+  // 짝수 개의 교차 규칙(ray casting)으로 점이 다각형 안에 있는지 본다.
+  // 지역 하나가 여러 조각(섬 등)으로 나뉘어 있으면 그중 하나에라도 들어가면
+  // 통과시킨다 — 라벨이 반드시 가장 큰 조각 안에 있어야 할 이유는 없다.
+  function isInsideAnySubpath(path: string, point: [number, number]): boolean {
+    const subpaths = path.split("M").slice(1).map((body) => `M${body}`);
+    return subpaths.some((sub) => {
+      const pts = [...sub.matchAll(/(-?\d+\.?\d*) (-?\d+\.?\d*)/g)].map(
+        (m) => [Number(m[1]), Number(m[2])] as [number, number],
+      );
+      if (pts.length < 3) return false;
+      const [x, y] = point;
+      let inside = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const [xi, yi] = pts[i];
+        const [xj, yj] = pts[j];
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+      }
+      return inside;
+    });
+  }
+
+  it("이름 라벨과 그 아래 수치 위치가 모두 자기 지역 도형 안에 있다", () => {
+    // 충북에서 실제로 터졌던 문제: 라벨 자체는 도형 안인데 그 11 아래(수치
+    // 자리)가 대전이 파고든 좁은 목을 벗어나 도형 밖으로 나갔다. 지도를
+    // 다시 손볼 때 같은 실수를 하면 여기서 바로 드러난다.
+    const offenders = KOREA_REGIONS.filter(
+      (region) => !isInsideAnySubpath(region.path, [region.labelX, region.labelY + 11]),
+    );
+
+    expect(offenders.map((r) => r.name)).toEqual([]);
+  });
+});
