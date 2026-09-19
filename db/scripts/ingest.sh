@@ -162,6 +162,34 @@ for f in scored_active_full.csv 감독관_위험큐_full.csv safe_recommendation
   [[ ! -L "$OUT/$f" ]] || { echo "CSV 파일은 symlink일 수 없습니다: $OUT/$f" >&2; exit 1; }
 done
 
+# ── UTF-8 BOM 처리 ──────────────────────────────────────────────────
+# ML 산출 측은 AGENT_GUIDE 의 "CSV 인코딩은 utf-8-sig" 지시에 따라 BOM 을 붙여 쓴다.
+# 사람이 Excel 로 여는 파일(감독관 위험큐)의 한글이 깨지지 않게 하려는 것이라 타당하다.
+# 그러나 HEADER MATCH 는 BOM 을 첫 컬럼명의 일부로 읽어 적재를 실패시킨다.
+#   실측: column name mismatch in header line field 1: got "﻿순위", expected "순위"
+#   눈으로는 같은 글자로 보여 원인 진단이 어렵다.
+# 따라서 적재 직전에 BOM 만 벗긴 사본을 만들어 그것을 읽는다.
+#   - 원본은 건드리지 않는다.
+#   - SOURCE_LABEL 은 아래에서 원본 "$OUT" 기준으로 만들어지므로
+#     batches.source 프로버넌스 기록은 그대로 유지된다.
+#   - BOM 이 없으면 SRC="$OUT" 이라 기존 동작과 완전히 같다.
+# 재현 절차는 docs/data-contract/verification.md 17.2 참고.
+SRC="$OUT"
+for f in scored_active_full.csv 감독관_위험큐_full.csv safe_recommendation_full.csv; do
+  [[ "$(head -c 3 "$OUT/$f" | od -An -tx1 | tr -d ' \n')" == "efbbbf" ]] || continue
+  SRC="$(mktemp -d)"
+  trap 'rm -rf "$SRC"' EXIT
+  for g in scored_active_full.csv 감독관_위험큐_full.csv safe_recommendation_full.csv; do
+    if [[ "$(head -c 3 "$OUT/$g" | od -An -tx1 | tr -d ' \n')" == "efbbbf" ]]; then
+      tail -c +4 "$OUT/$g" > "$SRC/$g"
+    else
+      cp "$OUT/$g" "$SRC/$g"
+    fi
+  done
+  echo "  BOM        : 제거한 사본으로 적재합니다 (원본 불변)"
+  break
+done
+
 # .env.local 의 DB_PASSWORD 를 psql 에 넘긴다.
 # 이게 없으면 ~/.pgpass 가 있는 사람만 동작하고, 새로 clone 한 사람은 비밀번호 입력을 요구받는다.
 export PGPASSWORD="${DB_PASSWORD}"
@@ -295,9 +323,9 @@ CREATE UNLOGGED TABLE stg_safe (
 );
 
 -- HEADER MATCH: CSV 첫 줄의 컬럼명이 staging 테이블 컬럼명과 순서·이름 모두 같아야 한다. 다르면 적재가 즉시 실패한다(순서가 밀린 채 조용히 들어가는 사고 방지).
-\copy stg_scored FROM '$OUT/scored_active_full.csv' WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')
-\copy stg_queue  FROM '$OUT/감독관_위험큐_full.csv' WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')
-\copy stg_safe   FROM '$OUT/safe_recommendation_full.csv' WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')
+\copy stg_scored FROM '$SRC/scored_active_full.csv' WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')
+\copy stg_queue  FROM '$SRC/감독관_위험큐_full.csv' WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')
+\copy stg_safe   FROM '$SRC/safe_recommendation_full.csv' WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')
 
 -- ── batch 확보 (같은 as_of+model 이면 재적재) ───────────────
 DELETE FROM batches

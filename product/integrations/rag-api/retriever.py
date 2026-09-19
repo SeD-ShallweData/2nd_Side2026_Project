@@ -162,6 +162,22 @@ NARROW_RULES = (
 
 OUT_OF_SCOPE_TOPICS = (
     {
+        "name": "부동산",
+        "keywords": ("부동산 시세", "아파트 시세", "집값", "매매가", "실거래가", "전세 시세"),
+    },
+    {
+        "name": "세금",
+        "keywords": ("종합소득세", "양도소득세", "상속세", "증여세", "부가가치세 신고"),
+    },
+    {
+        "name": "투자",
+        "keywords": ("주식 투자", "주가 전망", "주식 매수", "코인 투자", "가상자산 투자"),
+    },
+    {
+        "name": "프로그래밍",
+        "keywords": ("파이썬 코딩", "파이썬 코드", "파이썬 프로그램", "파이썬 배우", "Python 코드", "Python programming"),
+    },
+    {
         "name": "산업재해·산업안전",
         "keywords": (
             "산재보험", "산업재해보상", "근로복지공단", "산업안전보건", "중대재해",
@@ -181,6 +197,8 @@ OUT_OF_SCOPE_TOPICS = (
         "keywords": ("파견근로", "파견직", "파견업체", "기간제", "정규직 전환"),
     },
 )
+
+NON_LABOR_TOPICS = frozenset(("부동산", "세금", "투자", "프로그래밍"))
 
 _lock = threading.Lock()
 _model = None
@@ -467,7 +485,26 @@ def _expand_query(query):
     if any(keyword in query for keyword in ("임금", "월급", "급여", "수당", "체불")):
         if any(keyword in query for keyword in ("자료", "증거", "증빙", "준비", "신고", "진정")):
             expansions.append("임금체불 진정 입증자료 근로계약서 급여자료 근로시간 자료")
+    if _looks_like_unpaid_late_work(query):
+        expansions.append("연장 야간 근로 가산임금 지급 근로기준법 제56조")
     return f"{query} {' '.join(expansions)}" if expansions else query
+
+
+def _looks_like_unpaid_late_work(query):
+    return (
+        any(keyword in query for keyword in ("밤", "늦게", "야근", "초과근무", "연장근로"))
+        and any(keyword in query for keyword in ("시키", "남으", "일하", "근무"))
+        and any(keyword in query for keyword in ("돈은 더 안", "돈을 더 안", "돈 더 안", "수당을 안", "수당은 안", "추가 수당"))
+    )
+
+
+def _has_labor_request_signal(query):
+    if any(keyword in query for keyword in (
+        "임금체불", "임금이 밀", "월급이 밀", "월급을 안", "급여를 안", "수당을 안",
+        "근로계약", "연차", "휴게시간", "해고", "퇴직금", "야근수당", "연장근로",
+    )):
+        return True
+    return _looks_like_unpaid_late_work(query)
 
 
 def _narrow_allowed(meta, query):
@@ -490,6 +527,12 @@ def _out_of_scope_topic(query, top_distance):
         return None
     for topic in OUT_OF_SCOPE_TOPICS:
         if any(keyword in query for keyword in topic["keywords"]):
+            # Topic hints must not discard otherwise eligible labor evidence.
+            if topic["name"] in NON_LABOR_TOPICS and _has_labor_request_signal(query):
+                continue
+            if (topic["name"] in NON_LABOR_TOPICS and top_distance is not None
+                    and top_distance <= NO_MATCH_DISTANCE_THRESHOLD):
+                continue
             return topic["name"]
     return None
 
@@ -533,7 +576,7 @@ def retrieve(query, limit=5):
     top_distance = candidates[0][2] if candidates else None
     guide_candidates = _guide_candidates(query)
 
-    topic = _out_of_scope_topic(query, top_distance)
+    topic = None if guide_candidates else _out_of_scope_topic(query, top_distance)
     if topic:
         return {
             "query": query,

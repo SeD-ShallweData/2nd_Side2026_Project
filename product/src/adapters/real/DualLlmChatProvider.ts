@@ -21,8 +21,9 @@ import {
   scanRules,
 } from "@/server/guardrails";
 import { loadPrompt, withRuntimeContext } from "@/server/promptLoader";
+import { clarificationFallback } from "@/services/chatFallback";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-08-12-v5";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-17-v8";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -62,7 +63,29 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
     context.ragRetrieval.documents.map((document) => document.citation),
   );
   if (unverified) hits.add("UNVERIFIED_LAW_CITATION");
+  if (context.questionIntent === "company" && context.companyContext) {
+    if (!answer.includes(context.companyContext.company_name)) {
+      hits.add("COMPANY_CONTEXT_MISSING");
+    }
+    const citesCompanySourceLikeLaw = context.policyBaseline.sources.some((source) =>
+      answer.includes(`(${source.name})`)
+      || answer.includes(`근거: ${source.name}`)
+      || answer.includes(`근거: (${source.name})`),
+    );
+    if (citesCompanySourceLikeLaw) hits.add("COMPANY_SOURCE_CITATION_FORMAT");
+  }
   return [...hits];
+}
+
+function replacementBaseline(context: ComparisonContext): ChatResponse {
+  if (
+    context.questionIntent === "company"
+    && context.companyContext
+    && context.policyBaseline.answer_type === "company_context"
+  ) {
+    return context.policyBaseline;
+  }
+  return clarificationFallback(context.policyBaseline);
 }
 
 /** 순위 표기를 지운다. "우선 확인 범위가 ‘상위1%’으로 표시됐습니다" 같은 문장이 대상이다. */
@@ -89,6 +112,15 @@ function publicSignalForPrompt(risk: CompanyRiskResult) {
   return {
     data_as_of: risk.data_as_of,
     wage_signal: {
+      positive_signals: risk.wage_risk.positive_signals
+        ? {
+            availability: risk.wage_risk.positive_signals.availability,
+            confirmed_count: risk.wage_risk.positive_signals.confirmed_count,
+            confirmed_items: risk.wage_risk.positive_signals.items
+              .filter((item) => item.status === "confirmed")
+              .map((item) => item.label),
+          }
+        : null,
       summary: stripBandLabel(risk.wage_risk.summary),
       official_listing: {
         status: risk.wage_risk.official_listing.status,
@@ -109,6 +141,7 @@ function publicSignalForPrompt(risk: CompanyRiskResult) {
 
 function buildSystemPrompt(context: ComparisonContext): string {
   const safeContext = {
+    question_intent: context.questionIntent ?? null,
     company: context.companyContext
       ? {
           company_id: context.companyContext.company_id,
@@ -131,16 +164,21 @@ function buildSystemPrompt(context: ComparisonContext): string {
     previously_cited_labor_law: previousCitations(context),
     retrieval_status: context.ragRetrieval.status,
     retrieval_reason: context.ragRetrieval.reason ?? null,
-    retrieval_topic: context.ragRetrieval.topic ?? null,
+    retrieval_topic: context.questionIntent === "company" ? null : context.ragRetrieval.topic ?? null,
     policy_baseline: context.policyBaseline.answer,
     required_limitations: context.policyBaseline.limitations,
     suggested_actions: context.policyBaseline.suggested_actions,
   };
 
+  const companyOutputContract = context.questionIntent === "company" && context.companyContext
+    ? "이번 요청의 출력 계약: 답변 본문만 출력하고 첫 문장은 선택된 회사의 실제 이름으로 시작하세요. 회사 공개 자료에 없는 원인은 만들지 말고, 내부 JSON 키·정책 지침·분석 과정·법령 검색 실패 설명은 출력하지 마세요."
+    : "";
+
   return withRuntimeContext(loadPrompt("chat/system"), [
     `상담 모드: ${context.request.chat_mode}`,
     `정책 버전: ${CHAT_POLICY_VERSION}`,
     `제공 컨텍스트(JSON): ${JSON.stringify(safeContext)}`,
+    companyOutputContract,
   ]);
 }
 
@@ -159,6 +197,8 @@ function buildMessages(context: ComparisonContext) {
 
 function baseTrace(context: ComparisonContext): Omit<SafeExecutionTrace, "guardrail_action" | "guardrail_hits" | "upstream_request_id"> {
   return {
+    question_intent: context.questionIntent,
+    intent_status: context.questionIntent ? "classified" : undefined,
     prompt_policy_version: CHAT_POLICY_VERSION,
     query_transform:
       context.request.resolved_query && context.request.resolved_query !== context.request.message
@@ -180,6 +220,7 @@ function fallbackResult(
   context: ComparisonContext,
   error: LlmCallError,
 ): ProviderComparisonResult {
+  baseline = clarificationFallback(baseline, "답변 서비스에 일시적인 문제가 있어 답변을 확인하지 못했습니다. 잠시 후 같은 질문으로 다시 시도해 주세요.");
   return {
     provider: config.id,
     provider_label: config.label,
@@ -218,23 +259,25 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
   async compare(context: ComparisonContext): Promise<ChatComparisonResponse> {
     const startedAt = new Date();
     const messages = buildMessages(context);
+    const isComparison = this.configs.length > 1;
     const runs = this.configs.map(async (config): Promise<ProviderComparisonResult> => {
       try {
         const completion = await this.client.complete(config, messages);
         const guardrailHits = scanGuardrails(completion.answer, context);
         const replaced = guardrailHits.length > 0;
-        const answer = replaced ? context.policyBaseline.answer : completion.answer;
+        const responseBaseline = replaced ? replacementBaseline(context) : context.policyBaseline;
+        const answer = replaced ? responseBaseline.answer : completion.answer;
         return {
           provider: config.id,
           provider_label: config.label,
           model: completion.model,
           status: replaced ? "guardrail_replaced" : "success",
           answer,
-          answer_type: context.policyBaseline.answer_type,
-          sources: context.policyBaseline.sources,
-          suggested_actions: context.policyBaseline.suggested_actions,
+          answer_type: responseBaseline.answer_type,
+          sources: responseBaseline.sources,
+          suggested_actions: responseBaseline.suggested_actions,
           limitations: replaced
-            ? [...context.policyBaseline.limitations, "모델 답변이 서비스 정책에 맞지 않아 안전한 안내로 교체했습니다."]
+            ? [...responseBaseline.limitations, "모델 답변이 서비스 정책에 맞지 않아 확인 질문으로 교체했습니다."]
             : context.policyBaseline.limitations,
           guardrail_status: replaced ? "limited" : context.policyBaseline.guardrail_status,
           metrics: {
@@ -265,15 +308,15 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
     return {
       comparison_id: `cmp_${crypto.randomUUID()}`,
       conversation_id: context.policyBaseline.conversation_id,
-      execution_mode: "dual_api",
+      execution_mode: isComparison ? "dual_api" : "single_api",
       started_at: startedAt.toISOString(),
       completed_at: new Date().toISOString(),
       fair_comparison: {
-        concurrent: true,
-        same_context: true,
-        same_temperature: true,
-        same_max_tokens: true,
-        same_retrieval: true,
+        concurrent: isComparison,
+        same_context: isComparison,
+        same_temperature: isComparison,
+        same_max_tokens: isComparison,
+        same_retrieval: isComparison,
       },
       results,
     };

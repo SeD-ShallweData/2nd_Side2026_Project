@@ -4,9 +4,15 @@ vi.mock("server-only", () => ({}));
 
 import { MockAuthRepository } from "@/adapters/mock/MockAuthRepository";
 import { MockCommunityRepository } from "@/adapters/mock/MockCommunityRepository";
+import { MockWorksiteTipRepository } from "@/adapters/mock/MockWorksiteTipRepository";
 import { RealAuthRepository } from "@/adapters/real/RealAuthRepository";
 import { RealCommunityRepository } from "@/adapters/real/RealCommunityRepository";
-import { getAuthRepository, getCommunityRepository } from "@/services/userDataProviders";
+import { RealWorksiteTipRepository } from "@/adapters/real/RealWorksiteTipRepository";
+import {
+  getAuthRepository,
+  getCommunityRepository,
+  getWorksiteTipRepository,
+} from "@/services/userDataProviders";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -16,9 +22,11 @@ describe("사용자 데이터 저장소 선택", () => {
   it("mock 모드에서는 메모리 저장소를 쓴다", () => {
     vi.stubEnv("AUTH_DATA_MODE", "mock");
     vi.stubEnv("COMMUNITY_DATA_MODE", "mock");
+    vi.stubEnv("WORKSITE_TIP_DATA_MODE", "mock");
 
     expect(getAuthRepository()).toBeInstanceOf(MockAuthRepository);
     expect(getCommunityRepository()).toBeInstanceOf(MockCommunityRepository);
+    expect(getWorksiteTipRepository()).toBeInstanceOf(MockWorksiteTipRepository);
   });
 
   it("기능별 설정이 없으면 전체 모드를 따라간다", () => {
@@ -26,6 +34,7 @@ describe("사용자 데이터 저장소 선택", () => {
 
     expect(getAuthRepository()).toBeInstanceOf(MockAuthRepository);
     expect(getCommunityRepository()).toBeInstanceOf(MockCommunityRepository);
+    expect(getWorksiteTipRepository()).toBeInstanceOf(MockWorksiteTipRepository);
   });
 
   it("인증은 실제 모드에서 실제 DB 저장소를 쓴다", () => {
@@ -36,6 +45,11 @@ describe("사용자 데이터 저장소 선택", () => {
   it("커뮤니티도 실제 모드에서 실제 DB 저장소를 쓴다", () => {
     vi.stubEnv("COMMUNITY_DATA_MODE", "real");
     expect(getCommunityRepository()).toBeInstanceOf(RealCommunityRepository);
+  });
+
+  it("현장 제보도 실제 모드에서 전용 DB·파일 저장소를 쓴다", () => {
+    vi.stubEnv("WORKSITE_TIP_DATA_MODE", "real");
+    expect(getWorksiteTipRepository()).toBeInstanceOf(RealWorksiteTipRepository);
   });
 
   /*
@@ -79,6 +93,21 @@ describe("저장소 교체 가능성", () => {
       expect(typeof repository[method]).toBe("function");
     }
     expect(repository.source).toBe("mock_memory");
+  });
+
+  it("현장 제보 저장소는 실저장 전환에 필요한 동작을 모두 제공한다", () => {
+    const repository = new MockWorksiteTipRepository();
+    for (const method of [
+      "assertAvailable",
+      "isReady",
+      "findCompanyContext",
+      "insertTip",
+      "listTips",
+      "findTipById",
+      "readAttachment",
+    ] as const) {
+      expect(typeof repository[method]).toBe("function");
+    }
   });
 
   it("인증 저장소는 포트가 요구하는 동작을 모두 제공한다", () => {

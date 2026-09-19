@@ -435,6 +435,117 @@ SELECT json_build_object(
       WHERE n.nspname='public' AND c.relname='users'
         AND con.conname='users_firm_id_firms_firm_id_fk'
     )
+  ),
+  '0012_v_region_industry_signal', json_build_object(
+    'view:public.v_region_industry_signal', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='v_region_industry_signal' AND c.relkind='v'
+    ),
+    'column:public.v_region_industry_signal.sido', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='sido'
+    ),
+    'column:public.v_region_industry_signal.industry', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='industry'
+    ),
+    'column:public.v_region_industry_signal.firm_count', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='firm_count'
+    ),
+    'column:public.v_region_industry_signal.normal_count', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='normal_count'
+    ),
+    'column:public.v_region_industry_signal.watch_count', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='watch_count'
+    ),
+    'column:public.v_region_industry_signal.review_count', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='review_count'
+    ),
+    'column:public.v_region_industry_signal.unknown_count', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='unknown_count'
+    ),
+    -- 부재 확인은 **뷰가 있을 때만** 의미가 있다.
+    -- NOT EXISTS 만 쓰면 뷰 자체가 없을 때도 참이 되어, 미적용(0/11)이
+    -- "부분 적용(3/11)"으로 보인다. 2026-09-13 운영 DB 에서 실제로 그렇게
+    -- 나왔고, 멀쩡한 DB 를 "부분 적용 — DEPLOY BLOCKED" 로 읽게 만들었다.
+    -- 후조건은 migration 이 끝난 뒤의 상태를 기술해야 하므로 존재를 함께 건다.
+    'view_column_absent:public.v_region_industry_signal.firm_id', (
+      EXISTS (
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname='v_region_industry_signal' AND c.relkind='v'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='firm_id'
+      )
+    ),
+    'view_column_absent:public.v_region_industry_signal.risk_full', (
+      EXISTS (
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname='v_region_industry_signal' AND c.relkind='v'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='risk_full'
+      )
+    ),
+    'view_column_absent:public.v_region_industry_signal.rank', (
+      EXISTS (
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname='v_region_industry_signal' AND c.relkind='v'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='v_region_industry_signal' AND column_name='rank'
+      )
+    )
+  ),
+  '0013_illegal_sir_ram', json_build_object(
+    'column:public.worksite_tips.status', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='worksite_tips' AND column_name='status'
+    ),
+    'index:public.worksite_tips_status_submitted_idx', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips_status_submitted_idx'
+        AND c.relkind IN ('i','I')
+    ),
+    'constraint:public.worksite_tips.worksite_tips_status_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips'
+        AND con.conname='worksite_tips_status_ck'
+    ),
+    'constraint_definition:public.worksite_tips.worksite_tips_category_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips'
+        AND con.conname='worksite_tips_category_ck'
+        AND pg_get_constraintdef(con.oid) ~* '''wage'''
+        AND pg_get_constraintdef(con.oid) ~* '''safety'''
+        AND pg_get_constraintdef(con.oid) !~* '''worksite_tip'''
+    ),
+    'constraint_definition:public.worksite_tips.worksite_tips_status_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='worksite_tips'
+        AND con.conname='worksite_tips_status_ck'
+        AND pg_get_constraintdef(con.oid) ~* '''received'''
+        AND pg_get_constraintdef(con.oid) ~* '''in_progress'''
+        AND pg_get_constraintdef(con.oid) ~* '''completed'''
+    ),
+    'column_default:public.worksite_tips.status_received', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='worksite_tips' AND column_name='status'
+        AND column_default ~* '''received''::text'
+    ),
+    'column_default_absent:public.worksite_tips.category', EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='worksite_tips' AND column_name='category'
+        AND column_default IS NULL
+    )
   )
 )::text;
 COMMIT;

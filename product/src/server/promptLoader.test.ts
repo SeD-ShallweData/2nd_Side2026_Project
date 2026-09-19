@@ -87,6 +87,8 @@ describe("빠지면 안 되는 정책 문장", () => {
     expect(prompt).toContain("normal은 안전 인증이 아니며");
     expect(prompt).toContain("1350");
     expect(prompt).toContain("SHAP");
+    expect(prompt).toContain("retrieval_status는 노동법 검색 상태일 뿐");
+    expect(prompt).toContain("question_intent가 company가 아니고 company 공개 자료도 쓸 수 없는 경우");
   });
 
   it("감독관 프롬프트가 내부 값 취급 기준을 담고 있다", () => {

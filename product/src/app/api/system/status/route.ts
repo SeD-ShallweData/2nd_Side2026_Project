@@ -6,7 +6,7 @@ import {
 } from "@/config/dataMode";
 import { isContractHealthReady } from "@/server/contractHealth";
 import { getLlmProviderConfigs } from "@/server/llmConfig";
-import { probeDualLlmStatus } from "@/server/llmHealth";
+import { probeChatLlmStatuses } from "@/server/llmHealth";
 import { isDatabaseConfigured, isDatabaseReady } from "@/server/postgres";
 import { isRagHealthReady } from "@/server/ragHealth";
 import {
@@ -46,7 +46,7 @@ export async function GET(): Promise<NextResponse> {
   const openAIResponses = getOpenAIResponsesReadiness(
     getOpenAIResponsesConfig(),
   );
-  const [databaseReady, rag, contractAnalysis, dualLlm] = await Promise.all([
+  const [databaseReady, rag, contractAnalysis, chatLlm] = await Promise.all([
     isDatabaseReady(),
     probe(process.env.RAG_API_URL, process.env.RAG_INTERNAL_TOKEN, isRagHealthReady),
     probe(
@@ -54,10 +54,10 @@ export async function GET(): Promise<NextResponse> {
       process.env.CONTRACT_INTERNAL_TOKEN,
       isContractHealthReady,
     ),
-    probeDualLlmStatus(llmConfigs),
+    probeChatLlmStatuses(llmConfigs),
   ]);
   const activeChatLlm = getActiveChatLlmStatus(chatExecutionMode, {
-    dualLlm,
+    primaryLlm: chatLlm.primary,
     openAIResponses,
   });
 
@@ -73,7 +73,8 @@ export async function GET(): Promise<NextResponse> {
       database: !isDatabaseConfigured() ? "unavailable" : databaseReady ? "ready" : "configured_unreachable",
       rag,
       contract_analysis: contractAnalysis,
-      dual_llm: dualLlm,
+      primary_llm: chatLlm.primary,
+      dual_llm: chatLlm.comparison,
       openai_responses: openAIResponses,
       active_chat_llm: activeChatLlm,
     },

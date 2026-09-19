@@ -11,6 +11,16 @@ const NO_MATCH = ["RAG_NO_MATCH"];
 const OUT_OF_SCOPE = ["RAG_NO_MATCH", "RAG_OUT_OF_SCOPE"];
 
 describe("상담 실행 라벨", () => {
+  it("의도 확인·범위 안내·검색 장애를 근거 없음과 구별한다", () => {
+    for (const [hit, label] of [
+      ["INTENT_CLARIFICATION", "질문 확인 필요"],
+      ["INTENT_OUT_OF_SCOPE", "상담 범위 안내"],
+      ["RAG_UNAVAILABLE", "근거 검색 연결 제한"],
+    ]) {
+      expect(providerRunStatusLabel("policy_short_circuit", [hit])).toBe(label);
+      expect(executionModeCopy("policy_short_circuit", [hit]).kicker).toBe(label);
+    }
+  });
   it("긴급 경로에만 긴급 문구를 붙인다", () => {
     expect(providerRunStatusLabel("policy_short_circuit", EMERGENCY)).toBe("긴급정책 즉시 응답");
     expect(executionModeCopy("policy_short_circuit", EMERGENCY).kicker).toBe("긴급 안전정책 우선");
@@ -38,6 +48,7 @@ describe("상담 실행 라벨", () => {
 
   it("모델을 실제로 부른 실행 모드는 가드레일 표식과 무관하게 그대로 둔다", () => {
     // 긴급 표식이 섞여 들어와도 병렬 비교·도구 연결 문구를 바꾸면 안 된다.
+    expect(executionModeCopy("single_api", EMERGENCY).kicker).toBe("Upstage Solar 단일 상담");
     expect(executionModeCopy("dual_api", EMERGENCY).kicker).toBe("동일 조건 병렬 비교");
     expect(executionModeCopy("openai_responses", EMERGENCY).kicker).toBe("도구 연결형 단일 상담");
   });

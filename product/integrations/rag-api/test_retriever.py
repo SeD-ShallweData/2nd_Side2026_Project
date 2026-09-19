@@ -28,6 +28,14 @@ class RetrievalPolicyTest(unittest.TestCase):
         )
         self.assertIn("서면 명시 교부", retriever._expand_query("근로계약서를 아직 못 받았어요"))
         self.assertIn("가산임금 지급", retriever._expand_query("포괄임금제면 야근수당을 못 받나요?"))
+        self.assertIn(
+            "연장 야간 근로 가산임금 지급",
+            retriever._expand_query("파이썬 코딩을 밤 10시까지 시키고 돈은 더 안 준대요"),
+        )
+        self.assertEqual(
+            "파이썬 코딩을 밤 10시까지 배우고 싶어요",
+            retriever._expand_query("파이썬 코딩을 밤 10시까지 배우고 싶어요"),
+        )
         self.assertIn("임금체불 진정 입증자료", retriever._expand_query("월급이 밀렸는데 어떤 자료를 준비할까요?"))
 
     def test_filters_special_worker_rules_until_the_query_mentions_them(self):
@@ -63,6 +71,43 @@ class RetrievalPolicyTest(unittest.TestCase):
             retriever._out_of_scope_topic("노동조합을 만들고 싶어요", 0.41),
         )
         self.assertIsNone(retriever._out_of_scope_topic("노동조합과 관련된 임금 질문", 0.20))
+
+    def test_routes_common_non_labor_topics_without_classifying_employment_questions(self):
+        cases = (
+            ("부동산 시세가 어떻게 되나요?", "부동산"),
+            ("종합소득세 신고는 어떻게 하나요?", "세금"),
+            ("주식 투자 전망은 어떤가요?", "투자"),
+            ("파이썬 코딩을 배우고 싶어요", "프로그래밍"),
+        )
+        for query, topic in cases:
+            with self.subTest(query=query):
+                self.assertEqual(topic, retriever._out_of_scope_topic(query, 0.60))
+                self.assertIsNone(retriever._out_of_scope_topic(query, 0.35))
+                self.assertIsNone(retriever._out_of_scope_topic(query, 0.41))
+                self.assertIsNone(retriever._out_of_scope_topic(query, 0.20))
+
+        for query in ("부동산 회사의 임금체불", "주식회사 근로계약", "파이썬 개발자의 연차"):
+            with self.subTest(query=query):
+                self.assertIsNone(retriever._out_of_scope_topic(query, 0.41))
+
+        for query in (
+            "부동산 시세를 묻는 직원의 임금체불 상담",
+            "주식 투자 회사의 근로계약서 문제",
+            "파이썬 코딩을 하는 직원의 연차",
+        ):
+            with self.subTest(query=query):
+                self.assertIsNone(retriever._out_of_scope_topic(query, 0.41))
+
+        self.assertIsNone(
+            retriever._out_of_scope_topic(
+                "파이썬 코딩을 밤 10시까지 시키고 돈은 더 안 준대요",
+                0.60,
+            ),
+        )
+        self.assertEqual(
+            "프로그래밍",
+            retriever._out_of_scope_topic("파이썬 코딩을 밤 10시까지 배우고 싶어요", 0.60),
+        )
 
     def test_filters_every_vector_candidate_by_the_distance_threshold(self):
         candidates = [

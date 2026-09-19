@@ -4,7 +4,10 @@ import sharp from "sharp";
 vi.mock("server-only", () => ({}));
 
 import type { SessionUserDto } from "@/app/api/auth/authApiContract";
-import { WORKSITE_TIP_MAX_PHOTO_BYTES } from "@/app/api/worksite-tips/worksiteTipApiContract";
+import {
+  WORKSITE_TIP_MAX_PHOTO_BYTES,
+  WORKSITE_TIP_PRIVACY_NOTICE,
+} from "@/app/api/worksite-tips/worksiteTipApiContract";
 import { GET as getTip } from "@/app/api/worksite-tips/[tipId]/route";
 import { GET as getAttachment } from "@/app/api/worksite-tips/[tipId]/attachments/[attachmentId]/route";
 import { GET as listTips, POST as createTip } from "@/app/api/worksite-tips/route";
@@ -30,9 +33,21 @@ const ADMIN: SessionUserDto = {
   role: "admin",
 };
 
+/*
+ * 제보 목록을 읽는 계정. 근로감독 화면은 admin 이 연다 — 배치·ML 운영 기능이
+ * 같은 화면에 있어서다(server/auth/inspectorAccess.ts 참고).
+ */
 const INSPECTOR: SessionUserDto = {
   user_id: "10000000-0000-4000-8000-000000000003",
   email: "inspector@mock.donworry.local",
+  display_name: "운영 관리자(근로감독 화면)",
+  role: "admin",
+};
+
+/** 근로감독관 계정. 제보 확인은 이 역할의 일이라 목록을 읽을 수 있다. */
+const LABOR_INSPECTOR: SessionUserDto = {
+  user_id: "10000000-0000-4000-8000-000000000004",
+  email: "legacy-inspector@mock.donworry.local",
   display_name: "근로감독관",
   role: "inspector",
 };
@@ -74,8 +89,33 @@ async function generatedImageFile(format: "jpeg" | "webp"): Promise<File> {
   return new File([Uint8Array.from(bytes)], `evidence.${format}`, { type: `image/${format}` });
 }
 
+async function metadataRichJpegFile(): Promise<File> {
+  const bytes = await sharp({
+    create: {
+      width: 2,
+      height: 2,
+      channels: 3,
+      background: { r: 255, g: 0, b: 0 },
+    },
+  })
+    .jpeg()
+    .withExif({
+      IFD0: { Make: "TestCam", Model: "SecretDevice" },
+      IFD2: { DateTimeOriginal: "2026:09:12 12:34:56" },
+      IFD3: {
+        GPSLatitude: "37/1 34/1 0/1",
+        GPSLatitudeRef: "N",
+        GPSLongitude: "126/1 58/1 0/1",
+        GPSLongitudeRef: "E",
+      },
+    })
+    .toBuffer();
+  return new File([Uint8Array.from(bytes)], "local-secret-name.jpg", { type: "image/jpeg" });
+}
+
 function submissionRequest(options: {
   cookie?: string;
+  category?: string | null;
   title?: string;
   body?: string;
   companyId?: string;
@@ -85,6 +125,8 @@ function submissionRequest(options: {
 } = {}): Request {
   const url = "http://localhost/api/worksite-tips";
   const form = new FormData();
+  const category = options.category === undefined ? "safety" : options.category;
+  if (category !== null) form.set("category", category);
   if (options.title !== undefined) form.set("title", options.title);
   if (options.body !== undefined) form.set("body", options.body);
   if (options.companyId !== undefined) form.set("company_id", options.companyId);
@@ -129,6 +171,12 @@ afterEach(() => {
 });
 
 describe("현장 제보 작성 계약", () => {
+  it("K5 접수 화면의 익명성·프라이버시 고지 문구를 공용 계약으로 제공한다", () => {
+    expect(WORKSITE_TIP_PRIVACY_NOTICE).toBe(
+      "본 제보함은 신고자의 익명성과 프라이버시를 철저히 보호하며, 입력된 정보는 공공 노동 정보 서비스의 확인 및 점검 참고용으로만 안전하게 활용됩니다.",
+    );
+  });
+
   it("일반 사용자가 글 제보를 접수하고 감독관만 목록과 상세를 본다", async () => {
     const createdResponse = await createTip(submissionRequest({
       cookie: await cookieFor(USER),
@@ -140,8 +188,10 @@ describe("현장 제보 작성 계약", () => {
 
     expect(createdResponse.status).toBe(201);
     expect(receipt).toMatchObject({
-      category: "worksite_tip",
+      category: "safety",
+      status: "received",
       title: "안전난간이 없는 작업 구역",
+      body: "작업 구역 가장자리에 안전난간이 설치되어 있지 않습니다.",
       attachment_count: 0,
     });
     expect(JSON.stringify(receipt)).not.toContain(USER.user_id);
@@ -159,7 +209,8 @@ describe("현장 제보 작성 계약", () => {
       total: 1,
       items: [{
         tip_id: receipt.tip_id,
-        category: "worksite_tip",
+        category: "safety",
+        status: "received",
         company_context: {
           company_id: "COMPANY_DEMO_001",
           region: "인천광역시",
@@ -179,14 +230,33 @@ describe("현장 제보 작성 계약", () => {
     expect(detailResponse.status).toBe(200);
     expect(await detailResponse.json()).toMatchObject({
       tip_id: receipt.tip_id,
+      category: "safety",
+      status: "received",
       body: "작업 구역 가장자리에 안전난간이 설치되어 있지 않습니다.",
       attachments: [],
     });
   });
 
-  it("본문 없이 사진만 첨부한 제보를 받고 감독관에게 인증된 사진을 제공한다", async () => {
-    const photo = validImageFile("local-secret-name.png");
+  it("임금 제보를 구분해 접수하고 접수완료 상태를 영수증에 표시한다", async () => {
+    const response = await createTip(submissionRequest({
+      cookie: await cookieFor(USER),
+      category: "wage",
+      title: "임금 지급 지연",
+      body: "약정된 임금 지급일이 지났지만 임금을 받지 못했습니다.",
+    }));
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      category: "wage",
+      status: "received",
+      body: "약정된 임금 지급일이 지났지만 임금을 받지 못했습니다.",
+    });
+  });
+
+  it("본문 없이 사진만 첨부하고 감독관에게 위치·시간·기기 정보가 제거된 사본을 제공한다", async () => {
+    const photo = await metadataRichJpegFile();
     const originalBytes = new Uint8Array(await photo.arrayBuffer());
+    expect((await sharp(originalBytes).metadata()).exif).toBeDefined();
     const createdResponse = await createTip(submissionRequest({
       cookie: await cookieFor(USER),
       title: "현장 사진 제보",
@@ -209,8 +279,8 @@ describe("현장 제보 작성 계약", () => {
     };
     expect(detail.body).toBeNull();
     expect(detail.attachments).toHaveLength(1);
-    expect(detail.attachments[0]).toMatchObject({ media_type: "image/png" });
-    expect(JSON.stringify(detail)).not.toContain("local-secret-name.png");
+    expect(detail.attachments[0]).toMatchObject({ media_type: "image/jpeg" });
+    expect(JSON.stringify(detail)).not.toContain("local-secret-name.jpg");
 
     const attachmentId = detail.attachments[0].attachment_id;
     const attachmentResponse = await getAttachment(
@@ -220,11 +290,17 @@ describe("현장 제보 작성 계약", () => {
       attachmentContext(receipt.tip_id, attachmentId),
     );
     expect(attachmentResponse.status).toBe(200);
-    expect(attachmentResponse.headers.get("content-type")).toBe("image/png");
+    expect(attachmentResponse.headers.get("content-type")).toBe("image/jpeg");
     expect(attachmentResponse.headers.get("cache-control")).toBe("private, no-store");
     expect(attachmentResponse.headers.get("x-content-type-options")).toBe("nosniff");
-    expect(attachmentResponse.headers.get("content-disposition")).not.toContain("local-secret-name.png");
-    expect(new Uint8Array(await attachmentResponse.arrayBuffer())).toEqual(originalBytes);
+    expect(attachmentResponse.headers.get("content-disposition")).not.toContain("local-secret-name.jpg");
+    const inspectorBytes = new Uint8Array(await attachmentResponse.arrayBuffer());
+    expect(inspectorBytes).not.toEqual(originalBytes);
+    expect(Number(attachmentResponse.headers.get("content-length"))).toBe(inspectorBytes.byteLength);
+    const inspectorMetadata = await sharp(inspectorBytes).metadata();
+    expect(inspectorMetadata.exif).toBeUndefined();
+    expect(inspectorMetadata.xmp).toBeUndefined();
+    expect(inspectorMetadata.iptc).toBeUndefined();
   });
 
   it("현장 제보를 일반 커뮤니티 게시글과 완전히 분리한다", async () => {
@@ -258,17 +334,18 @@ describe("현장 제보 작성 계약", () => {
     expect(inspectorCreate.status).toBe(403);
 
     const anonymousList = await listTips(new Request("http://localhost/api/worksite-tips"));
-    expect(anonymousList.status).toBe(401);
+    expect(anonymousList.status).toBe(403);
 
     const userList = await listTips(new Request("http://localhost/api/worksite-tips", {
       headers: { cookie: await cookieFor(USER) },
     }));
     expect(userList.status).toBe(403);
 
-    const adminList = await listTips(new Request("http://localhost/api/worksite-tips", {
-      headers: { cookie: await cookieFor(ADMIN) },
+    // 근로감독관은 제보를 확인하는 역할이라 막지 않는다.
+    const inspectorList = await listTips(new Request("http://localhost/api/worksite-tips", {
+      headers: { cookie: await cookieFor(LABOR_INSPECTOR) },
     }));
-    expect(adminList.status).toBe(403);
+    expect(inspectorList.status).toBe(200);
   });
 
   it("다른 출처의 작성 요청을 저장 전에 차단한다", async () => {
@@ -292,6 +369,31 @@ describe("현장 제보 작성 계약", () => {
 });
 
 describe("현장 제보 입력·조회 안전장치", () => {
+  it("임금·산재 외 유형이나 누락된 유형을 거부한다", async () => {
+    const cookie = await cookieFor(USER);
+    const unsupported = await createTip(submissionRequest({
+      cookie,
+      category: "worksite_tip",
+      title: "지원하지 않는 유형",
+      body: "과거 고정 분류값은 더 이상 접수할 수 없습니다.",
+    }));
+    expect(unsupported.status).toBe(400);
+    expect(await unsupported.json()).toMatchObject({
+      error: { code: "VALIDATION_ERROR", details: [{ field: "category" }] },
+    });
+
+    const missing = await createTip(submissionRequest({
+      cookie,
+      category: null,
+      title: "유형이 없는 제보",
+      body: "사용자가 임금 또는 산재를 선택해야 합니다.",
+    }));
+    expect(missing.status).toBe(400);
+    expect(await missing.json()).toMatchObject({
+      error: { code: "VALIDATION_ERROR", details: [{ field: "category" }] },
+    });
+  });
+
   it("본문과 사진이 모두 없거나 multipart가 아닌 요청을 거부한다", async () => {
     const empty = await createTip(submissionRequest({
       cookie: await cookieFor(USER),
@@ -586,7 +688,7 @@ describe("현장 제보 입력·조회 안전장치", () => {
     }));
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
-      error: { code: "WORKSITE_TIP_PROVIDER_UNAVAILABLE", retryable: true },
+      error: { code: "WORKSITE_TIP_DATABASE_NOT_CONFIGURED", retryable: true },
     });
   });
 });

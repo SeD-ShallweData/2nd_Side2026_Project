@@ -5,6 +5,29 @@ import { RiskInformationCard } from "@/components/risk/RiskInformationCard";
 import { UNCONNECTED_WAGE_OBSERVATION_LABELS } from "@/domain/riskPresentation";
 
 describe("RiskInformationCard 임금 공개 경계", () => {
+  it.each(["ready", "unavailable"] as const)("긍정 항목의 %s 상태와 중립 설명을 표시한다", (availability) => {
+    const html = renderToStaticMarkup(createElement(RiskInformationCard, {
+      kind: "wage",
+      data: {
+        availability: "ready", level: "watch", summary: "확인 정보", confidence: "sufficient",
+        evidence_codes: [], evidence_items: [], official_listing: { status: "listed", as_of: null },
+        positive_signals: { availability, confirmed_count: availability === "ready" ? 1 : null,
+          items: [{ label: "고용 안정", status: "confirmed" }, { label: "성실 납부", status: "unconfirmed" }] },
+      },
+      dataAsOf: null, sources: [], onAsk: vi.fn(),
+    }));
+    expect(html).toContain("이 기업에 문제가 있다는 뜻은 아닙니다");
+    expect(html).toContain("공개 명단 일치 결과 있음");
+    if (availability === "ready") {
+      expect(html).toContain("확인된 긍정 신호 1개");
+      expect(html).toContain("고용 안정");
+      expect(html).toContain("성실 납부");
+      expect(html).toContain("미확인");
+    } else {
+      expect(html).not.toContain("확인된 긍정 신호 0개");
+      expect(html).not.toContain("✓");
+    }
+  });
   it("공식 명단 1개와 미연결 추가 지표 3개만 표시한다", () => {
     const html = renderToStaticMarkup(createElement(RiskInformationCard, {
       kind: "wage",
@@ -59,5 +82,7 @@ describe("RiskInformationCard 임금 공개 경계", () => {
     expect(html).toContain("연계 데이터 내 일치 결과 없음");
     expect(html).toContain("명단 공표 기준일 미수록");
     expect(html).not.toContain("공개 명단 일치 결과 없음");
+    expect(html).toContain("AI에게 묻기: 이 임금 지급 카드에서 무엇을 확인해야 하나요?");
+    expect(html).not.toContain("왜 임금 관련 추가 확인이 필요한가요?");
   });
 });

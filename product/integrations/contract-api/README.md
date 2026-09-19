@@ -32,7 +32,7 @@ RAG 서비스 token과 공유하지 않는다.
 [`config/contract_assets.v1.json`](config/contract_assets.v1.json)은 `registry.json`과 registry가
 실제로 참조하는 system prompt 7개, few-shot JSONL 3개, knowledge 13개 및 rewrite·contract extract
 prompt를 byte size와 SHA-256으로 고정한다. manifest 자체 SHA-256도 애플리케이션과 Next readiness에
-`1df5825a76b24c961f8a8f49f72c07d0e1f70a06c6f3e0912c265f91e7af4a1a`로 고정되어 있다.
+`f5db5e6e358df956755b530265aaa7799290247a5f25efdc3306bbb2fd566e64`로 고정되어 있다.
 
 ```bash
 .venv/bin/python verify_contract_assets.py

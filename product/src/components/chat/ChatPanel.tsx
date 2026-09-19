@@ -258,10 +258,10 @@ export function ChatPanel({
       role: "assistant",
       content: companyName
         ? executionMode === "dual_api"
-          ? `${companyName}의 공개 컨텍스트를 두 실제 LLM에 동일하게 전달해 비교합니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
+          ? `${companyName}의 공개 컨텍스트와 공식 근거를 Upstage Solar에 전달해 답변합니다. 필요할 때만 SKT A.X 비교를 켤 수 있습니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
           : `${companyName}을 선택했습니다. 필요한 경우 허용된 사업장·위험·법령 조회 도구를 사용해 답변합니다.`
         : executionMode === "dual_api"
-          ? "Upstage Solar와 SKT A.X에 같은 노동 상담 질문을 동시에 보내 답변과 성능 지표를 비교합니다."
+          ? "기본적으로 Upstage Solar 하나에 질문을 보내고, 비교를 켠 질문에만 SKT A.X 답변을 함께 표시합니다."
           : "OpenAI Responses가 질문에 필요한 공식 정보 도구만 선택적으로 호출해 노동 상담 답변을 만듭니다.",
     },
   ]);
@@ -270,6 +270,7 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<Record<string, LlmProviderId | "tie">>({});
+  const [compare, setCompare] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -279,6 +280,7 @@ export function ChatPanel({
     const message = value.trim();
     if (!message || loading) return;
     const submittedContractFile = contractFile;
+    const requestedComparison = executionMode === "dual_api" && compare;
 
     const recentMessages: RecentMessage[] = messages
       .filter((item) => item.id !== "welcome")
@@ -315,6 +317,7 @@ export function ChatPanel({
           message,
           conversation_id: conversationId,
           company_id: companyId,
+          compare: requestedComparison,
           chat_mode: chatMode,
           recent_messages: recentMessages,
         });
@@ -342,6 +345,7 @@ export function ChatPanel({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "상담 답변을 불러오지 못했습니다.");
     } finally {
+      if (requestedComparison) setCompare(false);
       setLoading(false);
     }
   }
@@ -404,7 +408,7 @@ export function ChatPanel({
     <div className="chat-experience-layout">
       <div className="chat-panel comparison-chat-panel">
       <div className="chat-topbar">
-        <div><span className="online-dot" aria-hidden="true" /><strong>{executionMode === "dual_api" ? "실제 LLM 동시 비교" : "OpenAI 도구 연결 상담"}</strong></div>
+        <div><span className="online-dot" aria-hidden="true" /><strong>{executionMode === "dual_api" ? compare ? "Upstage·SKT 답변 비교" : "Upstage Solar 단일 상담" : "OpenAI 도구 연결 상담"}</strong></div>
         <span>{companyName ? `${companyName} 컨텍스트 연결됨` : chatMode === "contract" ? "계약서 후속 상담" : "일반 노동 상담"}</span>
       </div>
 
@@ -431,7 +435,7 @@ export function ChatPanel({
             </div>
           )
         ))}
-        {loading ? executionMode === "dual_api" ? (
+        {loading ? executionMode === "dual_api" && compare ? (
           <div className="dual-loading" role="status">
             <strong>두 모델에 같은 요청을 동시에 보냈습니다</strong>
             <div>
@@ -439,6 +443,14 @@ export function ChatPanel({
               <span><i className="provider-dot provider-dot-skt" />SKT A.X 응답 대기</span>
             </div>
             <small>한쪽이 실패해도 다른 모델의 결과는 유지합니다. 최대 45초까지 기다릴 수 있습니다.</small>
+          </div>
+        ) : executionMode === "dual_api" ? (
+          <div className="dual-loading" role="status">
+            <strong>Upstage Solar에 공식 근거와 함께 질문을 보냈습니다</strong>
+            <div>
+              <span><i className="provider-dot provider-dot-upstage" />Upstage Solar 응답 대기</span>
+            </div>
+            <small>기본 단일 모델 호출이며, SKT A.X는 비교를 켠 질문에서만 호출합니다.</small>
           </div>
         ) : (
           <div className="dual-loading" role="status">
@@ -457,6 +469,21 @@ export function ChatPanel({
           <button key={question} type="button" onClick={() => void sendMessage(question)} disabled={loading}>{question}</button>
         ))}
       </div>
+
+      {executionMode === "dual_api" ? (
+        <label className="chat-compare-toggle">
+          <input
+            type="checkbox"
+            checked={compare}
+            onChange={(event) => setCompare(event.target.checked)}
+            disabled={loading}
+          />
+          <span>
+            <strong>SKT A.X 답변도 함께 비교</strong>
+            <small>켜면 다음 질문만 두 모델에 같은 조건으로 병렬 전송합니다.</small>
+          </span>
+        </label>
+      ) : null}
 
       {error ? <p className="chat-error" role="alert">{error}</p> : null}
 
@@ -495,12 +522,6 @@ export function ChatPanel({
         />
         <button type="submit" className="chat-send" disabled={loading || !draft.trim()} aria-label="질문 보내기"><span aria-hidden="true">↑</span></button>
       </form>
-      <p className="dual-api-note">
-        {executionMode === "dual_api"
-          ? "동일 질문을 실제 Upstage Solar·SKT A.X API에 병렬 전송합니다."
-          : "질문에 따라 허용된 도구만 서버에서 실행하며, 단일 OpenAI Responses 답변을 표시합니다."}{" "}
-        API 키와 숨은 프롬프트는 브라우저로 전송하지 않습니다.
-      </p>
       {!companyId ? (
         <p className="chat-company-help">
           특정 회사에 관해 질문하려면 <Link href="/companies">사업장을 먼저 검색해 선택</Link>하세요.
@@ -509,8 +530,14 @@ export function ChatPanel({
       </div>
       <aside className="question-guide" aria-label="AI 질문 가이드">
         <div className="guide-title">
-          <span aria-hidden="true">AI</span>
-          <div><strong>질문 가이드</strong><small>무엇부터 물을지 막막하다면</small></div>
+          <Image
+            className="guide-avatar"
+            src="/brand/donworry-avatar.png"
+            alt=""
+            width={192}
+            height={192}
+          />
+          <div><strong>AI 질문 가이드</strong><small>무엇부터 물을지 막막하다면</small></div>
         </div>
         {companyName ? (
           <div className="guide-context"><strong>{companyName}</strong><span>사업장 공개 컨텍스트 연결</span></div>
@@ -523,7 +550,7 @@ export function ChatPanel({
             ))}
           </div>
         ))}
-        <p className="guide-scope-note">현재 공식 근거 검색 범위에 맞춘 질문입니다. 수록 범위 밖 주제는 해당 이유와 공식 확인 창구를 안내합니다.</p>
+        <p className="guide-scope-note">현재 공식 근거 검색 범위에 맞춘 질문입니다.<br />수록 범위 밖 주제는 해당 이유와 공식 확인 창구를 안내합니다.</p>
       </aside>
     </div>
   );

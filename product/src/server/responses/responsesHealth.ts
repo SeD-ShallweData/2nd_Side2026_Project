@@ -39,9 +39,9 @@ export function getOpenAIResponsesReadiness(
 export function getActiveChatLlmStatus(
   mode: ConfiguredChatExecutionMode,
   statuses: {
-    dualLlm: LlmIntegrationStatus;
+    primaryLlm: LlmIntegrationStatus;
     openAIResponses: LlmIntegrationStatus;
   },
 ): LlmIntegrationStatus {
-  return mode === "openai_responses" ? statuses.openAIResponses : statuses.dualLlm;
+  return mode === "openai_responses" ? statuses.openAIResponses : statuses.primaryLlm;
 }

@@ -9,14 +9,14 @@
 
 ## 1. 현재 브랜치의 범위
 
-이 구현은 AI 루키 제출 기준본 뒤에 추가하는 플랫폼 승인 전 Mock 백엔드다.
+이 문서는 인증·커뮤니티의 Mock·실제 DB 공통 계약을 정리한다.
 
-- `AUTH_DATA_MODE=mock`, `COMMUNITY_DATA_MODE=mock`에서만 메모리 저장소로 동작한다.
-- `real` 모드에서 실제 사용자 DB가 없으면 `503`을 반환하며 Mock 성공으로 자동 전환하지 않는다.
-- 회원가입, 비밀번호 변경, 이메일 인증, 댓글 작성, 공감, 리뷰·별점은 이번 범위가 아니다.
-- 세션·게시글·신고는 프로세스를 재시작하면 초기화되며 다중 인스턴스 간 공유되지 않는다.
+- `mock` 모드는 메모리, `real` 모드는 PostgreSQL 저장소를 사용한다.
+- `real` 모드에서 전용 DB 연결이 없으면 `503`을 반환하며 Mock 성공으로 자동 전환하지 않는다.
+- 비밀번호 변경, 이메일 인증, 댓글 작성, 공감, 리뷰·별점은 이번 범위가 아니다.
+- Mock의 세션·게시글·신고는 프로세스를 재시작하면 초기화되며 다중 인스턴스 간 공유되지 않는다.
 - 기존 `DEMO_BASIC_AUTH_*`는 시연 사이트 외곽 보호이고, 새 사용자 세션과 역할이 다르다.
-- Mock `inspector` 역할은 권한 계약 시험용이며 `/api/inspector/*` 접근 권한을 부여하지 않는다.
+- Mock `inspector` 계정도 실제 계정과 같은 감독관 권한 계약을 로컬에서 검증하는 데 사용한다.
 
 커뮤니티 게시물은 사용자 경험이다. 공식 데이터, 법률 근거, 위험카드 또는 RAG 출처로 사용하지 않는다.
 
@@ -46,10 +46,15 @@ Mock 이메일은 각각 `user@mock.donworry.local`, `admin@mock.donworry.local`
 
 | 메서드·경로 | 인증 | 설명 |
 | --- | --- | --- |
+| `POST /api/auth/signup` | 없음 | 일반 사용자 가입 후 HttpOnly 세션 쿠키 발급 |
 | `POST /api/auth/login` | 없음 | 이메일·비밀번호 검증 후 HttpOnly 세션 쿠키 발급 |
 | `POST /api/auth/logout` | 선택 | 현재 세션 폐기 및 쿠키 삭제, 반복 호출 가능 |
 | `GET /api/auth/session` | 선택 | 로그인 여부·현재 사용자·만료 시각 반환 |
 | `GET /api/users/me` | 필수 | 로그인 사용자 정보 반환 |
+
+회원가입에서 이미 등록된 이메일은 `409 EMAIL_ALREADY_REGISTERED`로 안내한다. 사용자가 로그인
+경로를 선택할 수 있게 하는 의도된 정책이며, 이 응답으로 계정 존재 여부가 드러난다는 점을 수용한다.
+로그인은 존재하지 않는 계정과 잘못된 비밀번호를 계속 같은 `401 INVALID_CREDENTIALS`로 처리한다.
 
 ### 커뮤니티
 
@@ -77,7 +82,7 @@ Mock 이메일은 각각 `user@mock.donworry.local`, `admin@mock.donworry.local`
 | 타인 공개 글 신고 | 가능 | 가능 | 가능 |
 | 타인 글 수정·삭제 | 불가 | 불가 | 불가 |
 | 신고 목록·승인·기각 | 불가 | 가능 | 불가 |
-| `/api/inspector/*` 접근 | 별도 정책 | 별도 정책 | 이 Mock 역할만으로는 불가 |
+| `/api/inspector/*` 접근 | 불가 | 불가 | 가능 |
 
 오류 응답은 기존 제품의 `errorPayload` 구조를 그대로 사용한다. 주요 상태는 다음과 같다.
 
@@ -85,9 +90,10 @@ Mock 이메일은 각각 `user@mock.donworry.local`, `admin@mock.donworry.local`
 - `401 AUTHENTICATION_REQUIRED`, `INVALID_CREDENTIALS`: 로그인 필요 또는 로그인 실패
 - `403 FORBIDDEN`, `RESOURCE_OWNERSHIP_REQUIRED`, `CROSS_SITE_REQUEST_REJECTED`: 역할·작성자·출처 오류
 - `404 COMPANY_NOT_FOUND`, `COMMUNITY_POST_NOT_FOUND`, `COMMUNITY_REPORT_NOT_FOUND`: 대상 없음
-- `409 DUPLICATE_REPORT`, `SELF_REPORT_NOT_ALLOWED`, `COMMUNITY_POST_NOT_EDITABLE`,
+- `409 EMAIL_ALREADY_REGISTERED`, `DUPLICATE_REPORT`, `SELF_REPORT_NOT_ALLOWED`, `COMMUNITY_POST_NOT_EDITABLE`,
   `COMMUNITY_POST_NOT_REPORTABLE`, `COMMUNITY_REPORT_ALREADY_REVIEWED`: 상태 충돌
 - `413 REQUEST_BODY_TOO_LARGE`, `415 UNSUPPORTED_MEDIA_TYPE`
+- `429 LOGIN_TEMPORARILY_LOCKED`: 로그인 5회 실패로 인한 15분 잠금, `Retry-After` 확인
 - `500 INTERNAL_ERROR`: 예상하지 못한 서버 오류
 - `503 AUTH_PROVIDER_UNAVAILABLE`, `COMMUNITY_PROVIDER_UNAVAILABLE`, `MOCK_AUTH_NOT_CONFIGURED`,
   `MOCK_AUTH_PERIMETER_REQUIRED`: 저장소 또는 Mock 보안 설정 미연결
@@ -111,7 +117,8 @@ Mock 이메일은 각각 `user@mock.donworry.local`, `admin@mock.donworry.local`
 - 첫 진입 때 `GET /api/auth/session`으로 로그인 상태를 복원한다.
 - `source=mock_memory`이면 현재 DEMO 배너를 유지한다.
 - `capabilities`는 현재 로그인 사용자가 쓸 수 있는 기능을 나타낸다. `moderation=true`일 때만 관리 HUD를 노출한다.
-- 로딩, 빈 목록, `401`, `403`, `404`, `409`, `500/503` 화면을 구분한다.
+- 로딩, 빈 목록, `401`, `403`, `404`, `409`, `429`, `500/503` 화면을 구분한다. 로그인 `429`는
+  `Retry-After`의 남은 시간 동안 재시도를 안내한다.
 - 로그인·로그아웃 후 세션과 게시글 목록을 다시 조회한다.
 - 공개 DTO에 없는 `author_id`, 이메일 또는 역할을 추정하거나 저장하지 않는다.
 

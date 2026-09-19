@@ -43,11 +43,21 @@ export function parseChatRequest(value: unknown): ChatRequest {
       [{ field: "chat_mode", reason: "지원하지 않는 상담 모드입니다." }],
     );
   }
+  if (input.compare !== undefined && typeof input.compare !== "boolean") {
+    throw new ServiceError(
+      "VALIDATION_ERROR",
+      "비교 요청 형식을 확인해 주세요.",
+      400,
+      false,
+      [{ field: "compare", reason: "compare는 true 또는 false여야 합니다." }],
+    );
+  }
 
   return {
     message,
     conversation_id: typeof input.conversation_id === "string" ? input.conversation_id : undefined,
     company_id: typeof input.company_id === "string" ? input.company_id : undefined,
+    compare: input.compare === true,
     chat_mode: chatMode as ChatMode,
     recent_messages: normalizeMessages(input.recent_messages),
   };

@@ -399,7 +399,7 @@ export const POLICY_ROUTING_CASES: PolicyRoutingCase[] = [
     expect_answer_type: "company_context",
     expect_guardrail: "limited",
     expect_sources: "none",
-    expect_contains: ["세부 확인 신호가 제공되지 않았습니다"],
+    expect_contains: ["개별적인 추가 확인 신호가 제공되지 않았습니다"],
     note: "자료가 없으면 근거를 지어내지 않고 없다고 밝히며 출처도 비운다.",
   },
   {

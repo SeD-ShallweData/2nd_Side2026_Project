@@ -21,7 +21,7 @@
 | posts.status 값 | 공개/신고접수/블라인드/삭제 | published/hidden/deleted |
 | reports 구조 | target_type/target_id 다형적 | post_id 전용, snapshot 필드 추가 |
 | users.auth_role | 없음 | 신규(user/admin/inspector) |
-| v_posts | 존재(필터 없음) | 삭제, v_posts_public으로 대체 |
+| v_posts | 존재(필터 없음) | 최종 0009는 v_posts 이름 유지. 문장 수정. |
 
 ## 3. 시험 절차
 

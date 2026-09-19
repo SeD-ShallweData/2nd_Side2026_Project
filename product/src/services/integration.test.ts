@@ -40,6 +40,22 @@ describe("사업장 검색", () => {
     expect(byIndustry.items[0]?.industry).toBe("전문직별 공사업");
   });
 
+  it("검색어 없이 지역만으로도 찾는다", async () => {
+    // 지도에서 지역을 고르는 길이 생기면서 필요해졌다.
+    const byRegion = await searchCompanies("", 10, 1, { region: "경기도" });
+
+    expect(byRegion.total).toBe(2);
+    expect(byRegion.query).toBe("");
+    for (const item of byRegion.items) {
+      expect(item.region).toBe("경기도");
+    }
+  });
+
+  it("검색어도 필터도 없으면 명부 전체를 내주지 않는다", async () => {
+    await expect(searchCompanies("", 10, 1)).rejects.toThrow();
+    await expect(searchCompanies("   ", 10, 1, {})).rejects.toThrow();
+  });
+
   it("DB 모드에 맞는 지역·업종 필터 옵션과 건수를 제공한다", async () => {
     const options = await getCompanyFilterOptions();
     expect(options.regions).toContainEqual({ value: "경기도", count: 2 });
@@ -144,7 +160,36 @@ describe("Mock 챗봇", () => {
     expect(response.answer_type).toBe("company_context");
     expect(response.guardrail_status).toBe("limited");
     expect(response.answer).toContain("미래산업");
-    expect(response.answer).toContain("세부 확인 신호가 제공되지 않았습니다");
+    expect(response.answer).toContain("개별적인 추가 확인 신호가 제공되지 않았습니다");
+  });
+
+  it("한빛테크의 임금 표시 질문은 임금 자료만 자연스럽게 설명한다", async () => {
+    const request = parseChatRequest({
+      message: "왜 임금 관련 추가 확인이 필요한가요?",
+      company_id: "COMPANY_DEMO_008",
+      chat_mode: "general",
+      recent_messages: [],
+    });
+    const response = await sendChatMessage(request);
+    expect(response.answer_type).toBe("company_context");
+    expect(response.answer).toContain("한빛테크");
+    expect(response.answer).toContain("개별적인 추가 확인 신호가 제공되지 않았습니다");
+    expect(response.answer).toContain("뚜렷한 이상 신호가 확인되지 않았습니다");
+    expect(response.answer).not.toContain("산업재해 카드");
+    expect(response.sources.every((source) => source.category === "wage")).toBe(true);
+  });
+
+  it("회사 임금 신호를 미래 체불 확정으로 해석하지 않고 임금 자료만 제시한다", async () => {
+    const request = parseChatRequest({
+      message: "한빛테크는 임금이 밀린다는 뜻인가요?",
+      company_id: "COMPANY_DEMO_008",
+      chat_mode: "general",
+      recent_messages: [],
+    });
+    const response = await sendChatMessage(request);
+    expect(response.answer_type).toBe("company_context");
+    expect(response.answer).toContain("향후 임금체불이 발생할지는 현재 정보만으로 확정할 수 없습니다");
+    expect(response.sources.every((source) => source.category === "wage")).toBe(true);
   });
 
   it("즉각적인 사고 질문은 긴급 안내를 우선한다", async () => {

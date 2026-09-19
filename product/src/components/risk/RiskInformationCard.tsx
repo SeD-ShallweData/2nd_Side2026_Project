@@ -47,7 +47,11 @@ export function RiskInformationCard(props: CardProps) {
     : validatedFirmSafety
       ? "검증된 사업장 연결 · 사고확률 아님"
       : "개별 사업장 판정 아님";
-  const question = isWage ? "왜 임금 관련 추가 확인이 필요한가요?" : "산업재해 정보는 무엇을 확인해야 하나요?";
+  const question = isWage
+    ? props.data.level === "normal"
+      ? "이 임금 지급 카드에서 무엇을 확인해야 하나요?"
+      : "왜 임금 관련 추가 확인이 필요한가요?"
+    : "산업재해 정보는 무엇을 확인해야 하나요?";
   const unknown = props.data.level === "unknown";
   const unavailable = props.data.availability === "unavailable";
 
@@ -58,7 +62,7 @@ export function RiskInformationCard(props: CardProps) {
           <span className="card-kicker">{kicker}</span>
           <h2>{title}</h2>
         </div>
-        <StatusBadge level={props.data.level} />
+        <StatusBadge level={props.data.level} verdict={isWage ? props.data.verdict : undefined} />
       </div>
 
       <p className={`risk-summary ${unknown ? "risk-summary-unknown" : ""}`}>{props.data.summary}</p>
@@ -102,6 +106,28 @@ export function RiskInformationCard(props: CardProps) {
           <p>자료가 부족하다는 사실만 표시하며, 이를 정상이나 안전으로 바꾸지 않습니다.</p>
         </div>
       )}
+
+      {isWage ? (
+        props.data.positive_signals ? (
+          <section className="risk-section" aria-label="긍정 신호 확인 항목">
+            <h3>긍정 신호 확인 항목</h3>
+            {props.data.positive_signals.availability === "ready" && !unknown && !unavailable ? (
+              <>
+                <p>확인된 긍정 신호 {props.data.positive_signals.confirmed_count}개</p>
+                <ul className="evidence-list">
+                  {props.data.positive_signals.items.map((item) => (
+                    <li key={item.label}>
+                      <span aria-hidden="true">{item.status === "confirmed" ? "✓" : "—"}</span>
+                      <div><strong>{item.label}</strong><p>{item.status === "confirmed" ? "확인" : "미확인"}</p></div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : <p>항목별 긍정 신호를 현재 확인할 수 없습니다.</p>}
+            <p className="observation-note">긍정 신호가 확인되지 않았다는 것은 이 기업에 문제가 있다는 뜻은 아닙니다. 확인 개수는 안전 점수나 입사 권고가 아니며, 공식 명단 등재 여부는 별도로 확인하세요.</p>
+          </section>
+        ) : null
+      ) : null}
 
       {isWage ? (
         <div className="wage-indicator-coverage" role="status">
@@ -163,7 +189,7 @@ export function RiskInformationCard(props: CardProps) {
         <DataSourceList sources={props.sources} />
       </details>
 
-      <button type="button" className="button button-outline card-action" onClick={() => props.onAsk(question)}>
+      <button type="button" className="button button-outline card-action" aria-label={`AI에게 묻기: ${question}`} onClick={() => props.onAsk(question)}>
         자세히 물어보기 <span aria-hidden="true">→</span>
       </button>
     </article>

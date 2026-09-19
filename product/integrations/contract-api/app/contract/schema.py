@@ -20,6 +20,7 @@ CLAUSE_CODES = {
     "wage_offset": "손해·대여금을 임금에서 공제·상계하는 조항",
     "forced_saving": "급여 일부를 회사가 적립·관리하는 조항",
     "severance_waived": "퇴직금을 지급하지 않거나 월급에 포함한다는 조항",
+    "overtime_premium_waived": "연장·야간·휴일근로 가산수당을 명시적으로 지급하지 않는다는 조항",
     "at_will_dismissal": "회사 판단으로 언제든 해고할 수 있다는 조항",
     "marriage_retirement": "혼인·임신·출산 시 퇴직을 예정한 조항",
     "no_annual_leave": "연차휴가를 부여하지 않는다는 조항",
@@ -356,6 +357,11 @@ CLAUSE_SIGNATURES: dict[str, tuple[re.Pattern, ...]] = {
     "severance_waived": (re.compile(r"퇴직금|퇴직급여"),
                          re.compile(r"지급하지|주지\s*않|청구할\s*수\s*없|포함하여\s*지급"
                                     r"|포함해\s*지급|없는\s*것으로|포기")),
+    "overtime_premium_waived": (
+        re.compile(r"연장(?:근로)?|야간(?:근로)?|휴일(?:근로)?|가산수당|초과근무"),
+        re.compile(r"가산\s*수당|(?:연장|야간|휴일)(?:근로)?\s*수당|초과근무\s*수당"),
+        re.compile(r"지급하지|주지\s*않|수당.{0,16}(?:없다|없음)|가산.{0,16}(?:적용하지|포기)"),
+    ),
     "at_will_dismissal": (re.compile(r"해고|해지|퇴사시|계약을\s*종료"),
                           re.compile(r"언제든|예고\s*없이|필요하다고\s*인정|임의로|즉시")),
     "marriage_retirement": (re.compile(r"혼인|결혼|임신|출산|육아"), re.compile(r"퇴직|퇴사|사직")),
@@ -423,6 +429,12 @@ def verify_quotes(contract: dict, source: str) -> tuple[dict, list[dict]]:
             continue
 
         # ③ 코드 요건. 인용이 진짜라도 코드가 엉뚱하면 위반이 되어서는 안 됩니다.
+        # 명백한 가산수당 지급 배제를 모델이 other 로 분류한 경우만 코드로 승격합니다.
+        if code == "other" and all(
+            pattern.search(quote) for pattern in CLAUSE_SIGNATURES["overtime_premium_waived"]
+        ):
+            clause = {**clause, "code": "overtime_premium_waived"}
+            code = clause["code"]
         required = CLAUSE_SIGNATURES.get(code)
         if required and not all(pattern.search(quote) for pattern in required):
             dropped.append({**clause, "reason": f"인용 내용이 '{code}' 요건과 맞지 않음"})

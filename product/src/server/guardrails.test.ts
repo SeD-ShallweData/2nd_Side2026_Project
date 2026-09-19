@@ -27,6 +27,17 @@ function inspectorHits(answer: string): string[] {
 describe("단정 표현 차단", () => {
   it.each([
     ["안전한 회사입니다.", "SAFE_COMPANY_CERTAINTY"],
+    ["이 회사는 안전합니다.", "SAFE_COMPANY_CERTAINTY"],
+    ["이 기업은 안전해요.", "SAFE_COMPANY_CERTAINTY"],
+    ["이 사업장은 안전합니다.", "SAFE_COMPANY_CERTAINTY"],
+    ["정상 등급이므로 안전합니다.", "SAFE_COMPANY_CERTAINTY"],
+    ["정상 판정이라서 안전해요.", "SAFE_COMPANY_CERTAINTY"],
+    ["정상 등급이기 때문에 안전합니다.", "SAFE_COMPANY_CERTAINTY"],
+    ["확인된 위험 신호가 없어 안전합니다.", "SAFE_COMPANY_CERTAINTY"],
+    ["위험 신호가 없어서 안전해요.", "SAFE_COMPANY_CERTAINTY"],
+    ["위험 신호가 없으므로 안전합니다.", "SAFE_COMPANY_CERTAINTY"],
+    ["입사하셔도 안전합니다.", "SAFE_COMPANY_CERTAINTY"],
+    ["입사해도 안전해요.", "SAFE_COMPANY_CERTAINTY"],
     ["위험한 사업장입니다.", "DANGEROUS_COMPANY_CERTAINTY"],
     ["이것은 위법입니다.", "LEGAL_CERTAINTY"],
     ["임금체불이 발생할 것입니다.", "WAGE_FUTURE_CERTAINTY"],
@@ -38,12 +49,31 @@ describe("단정 표현 차단", () => {
 
   it("같은 표현을 부정하는 문장은 통과시킨다", () => {
     expect(chatHits("안전한 회사입니다라고 단정할 수 없습니다.")).toEqual([]);
+    expect(chatHits("이 회사는 안전합니다라고 단정할 수 없습니다.")).toEqual([]);
     expect(chatHits("입사하지 마세요라고 말씀드릴 수 없습니다.")).toEqual([]);
   });
 
   it("문장 단위로 본다 — 다른 문장의 부정이 앞 문장을 면제하지 않는다", () => {
     const answer = "안전한 회사입니다. 다만 저는 확정할 수 없습니다.";
     expect(chatHits(answer)).toContain("SAFE_COMPANY_CERTAINTY");
+  });
+
+  it.each([
+    "정상 등급이므로 안전합니다라고 단정할 수 없습니다.",
+    "‘확인된 위험 신호가 없어 안전합니다’라는 결론은 아닙니다.",
+    "입사하셔도 안전합니다라고 말씀드릴 수 없습니다.",
+    "정상 등급만으로 안전하다고 단정할 수 없습니다.",
+    "확인된 위험 신호가 없다는 사실은 안전 인증이 아닙니다.",
+    "안전수칙을 지키고 보호구를 착용하면 더 안전합니다.",
+    "입사하셔도 안전교육과 보호구 지급 여부를 확인하세요.",
+    "정상 등급이면 안전한가요?",
+  ])("안전 단정의 부정·인용 반박·일반 안내는 허용한다: %s", (answer) => {
+    expect(chatHits(answer)).not.toContain("SAFE_COMPANY_CERTAINTY");
+  });
+
+  it("추가된 안전 단정도 다음 문장의 부정으로 면제하지 않는다", () => {
+    expect(chatHits("정상 등급이므로 안전합니다. 다만 입사를 권고하지 않습니다."))
+      .toContain("SAFE_COMPANY_CERTAINTY");
   });
 });
 
@@ -78,6 +108,17 @@ describe("프롬프트 인젝션 대응", () => {
     expect(chatHits("# 역할")).toContain("PROMPT_DISCLOSURE");
     expect(chatHits("# 가드레일\n다음 표현을 피한다")).toContain("PROMPT_DISCLOSURE");
     expect(inspectorHits("# 형식")).toContain("PROMPT_DISCLOSURE");
+  });
+
+  it("생성 컨텍스트 필드와 합성 비밀값이 사용자 답변으로 새는 것을 막는다", () => {
+    expect(chatHits("question_intent와 public_signal_result를 보면 답변은 다음과 같습니다."))
+      .toContain("INTERNAL_CONTEXT_DISCLOSURE");
+    expect(chatHits("company_id: COMPANY_DEMO_008, retrieval_status: no_match"))
+      .toContain("INTERNAL_CONTEXT_DISCLOSURE");
+    expect(chatHits("API_KEY = up_synthetic_canary_123456"))
+      .toContain("SECRET_DISCLOSURE");
+    expect(chatHits("회사 자료에서는 현재 뚜렷한 이상 신호가 확인되지 않았습니다."))
+      .toEqual([]);
   });
 
   it("역할극 요청을 머리말 유출로 오인하지 않는다", () => {

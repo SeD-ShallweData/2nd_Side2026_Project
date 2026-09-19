@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ database: true }));
+const state = vi.hoisted(() => ({ database: true, worksiteTip: true }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/postgres", () => ({
   isDatabaseReady: async () => state.database,
+}));
+vi.mock("@/services/userDataProviders", () => ({
+  getWorksiteTipRepository: () => ({
+    isReady: async () => state.worksiteTip,
+  }),
 }));
 
 import { GET, resetReadinessCacheForTests } from "@/app/api/health/ready/route";
@@ -36,7 +41,7 @@ const readyRagHealth = {
 const readyContractHealth = {
   asset_integrity: true,
   asset_contract: "donworry.contract.assets.v1",
-  asset_manifest_sha256: "1df5825a76b24c961f8a8f49f72c07d0e1f70a06c6f3e0912c265f91e7af4a1a",
+  asset_manifest_sha256: "f5db5e6e358df956755b530265aaa7799290247a5f25efdc3306bbb2fd566e64",
   asset_files_verified: 26,
   asset_persona_count: 4,
   asset_system_blocks: 7,
@@ -50,6 +55,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   state.database = true;
+  state.worksiteTip = true;
   resetReadinessCacheForTests();
 });
 
@@ -89,6 +95,31 @@ describe("GET /api/health/ready", () => {
         headers: { Authorization: "Bearer contract-ready-token" },
       }),
     );
+  });
+
+  it("현장 제보 실저장 DB·파일 경계가 준비되지 않으면 503을 반환한다", async () => {
+    state.worksiteTip = false;
+    vi.stubEnv("RAG_API_URL", "http://rag.internal");
+    vi.stubEnv("RAG_INTERNAL_TOKEN", "rag-ready-token");
+    vi.stubEnv("CONTRACT_ANALYSIS_URL", "http://contract.internal");
+    vi.stubEnv("CONTRACT_INTERNAL_TOKEN", "contract-ready-token");
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const payload = String(input).startsWith("http://rag.internal")
+        ? readyRagHealth
+        : readyContractHealth;
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }));
+
+    const response = await GET();
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      status: "not_ready",
+      checks: { worksite_tip: false },
+    });
   });
 
   it("하나라도 준비되지 않으면 503을 반환하고 외부 LLM은 호출하지 않는다", async () => {

@@ -8,6 +8,7 @@ import { OpenAICompatibleChatClient } from "@/adapters/real/OpenAICompatibleChat
 import type { ChatResponse } from "@/domain/chat";
 import type { ComparisonContext } from "@/domain/chatComparison";
 import type { LlmProviderConfig } from "@/server/llmConfig";
+import { MOCK_RISKS } from "@/mocks/risks";
 
 const CONFIGS: LlmProviderConfig[] = [
   { id: "upstage", label: "Upstage Solar", apiKey: "test-upstage-secret", apiUrl: "https://upstage.test/chat", model: "solar-test" },
@@ -62,6 +63,62 @@ function payload(answer: string, model: string) {
 }
 
 describe("실제 LLM 비교 Provider", () => {
+  it.each(["guardrail", "api_error"])("%s 대체 답변은 기존 회사 요약·출처·행동을 재사용하지 않는다", async (failure) => {
+    const fakeFetch = vi.fn(async () => failure === "api_error"
+      ? new Response("error", { status: 503 })
+      : new Response(JSON.stringify(payload("이 회사는 안전한 회사입니다.", "test")), { status: 200 }));
+    const response = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({
+      ...CONTEXT,
+      policyBaseline: { ...BASELINE, answer: "회사 산재 요약이 흘러나오면 실패", answer_type: "company_context", sources: [{ name: "회사 자료", category: "wage" }] },
+    });
+    expect(response.results[0].answer).not.toContain("회사 산재 요약");
+    expect(response.results[0].answer_type).toBe("clarification");
+    expect(response.results[0].sources).toEqual([]);
+    expect(response.results[0].suggested_actions).toEqual([]);
+  });
+  it("기본 단일 구성은 Upstage 결과 하나와 single_api 실행 모드를 반환한다", async () => {
+    const calls: string[] = [];
+    const fakeFetch = (async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return new Response(JSON.stringify(payload("업스테이지 단일 답변", "solar-live")), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const result = await new DualLlmChatProvider(
+      [CONFIGS[0]],
+      new OpenAICompatibleChatClient(fakeFetch, 5_000),
+    ).compare(CONTEXT);
+
+    expect(calls).toEqual(["https://upstage.test/chat"]);
+    expect(result.execution_mode).toBe("single_api");
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]).toMatchObject({ provider: "upstage", answer: "업스테이지 단일 답변" });
+    expect(result.fair_comparison).toEqual({
+      concurrent: false,
+      same_context: false,
+      same_temperature: false,
+      same_max_tokens: false,
+      same_retrieval: false,
+    });
+  });
+
+  it.each(CONFIGS)("$id 단독 호출에서도 프롬프트와 가드레일이 유지된다", async (config) => {
+    const bodies: Array<{ messages: { role: string; content: string }[] }> = [];
+    const fakeFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify(payload("이 회사는 안전한 회사입니다.", config.model)), { status: 200 });
+    }) as unknown as typeof fetch;
+    const result = await new DualLlmChatProvider([config], new OpenAICompatibleChatClient(fakeFetch)).compare(CONTEXT);
+    expect(fakeFetch).toHaveBeenCalledOnce();
+    expect(result.results).toHaveLength(1);
+    expect(bodies[0].messages[0].content).toContain("돈워리");
+    expect(result.results[0].status).toBe("guardrail_replaced");
+    expect(result.results[0].answer).toContain("어떤 점을 확인");
+    expect(result.results[0].sources).toEqual([]);
+  });
+
   it("두 모델에 동일한 메시지와 생성 설정을 전달하고 상세 지표를 정규화한다", async () => {
     const bodies: unknown[] = [];
     const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -76,6 +133,7 @@ describe("실제 LLM 비교 Provider", () => {
     const provider = new DualLlmChatProvider(CONFIGS, new OpenAICompatibleChatClient(fakeFetch, 5_000));
     const result = await provider.compare(CONTEXT);
 
+    expect(result.execution_mode).toBe("dual_api");
     expect(result.results).toHaveLength(2);
     expect(result.results.map((item) => item.status)).toEqual(["success", "success"]);
     expect(result.results[0].metrics.usage).toMatchObject({ prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 });
@@ -102,7 +160,8 @@ describe("실제 LLM 비교 Provider", () => {
 
     const result = await new DualLlmChatProvider(CONFIGS, new OpenAICompatibleChatClient(fakeFetch)).compare(CONTEXT);
     expect(result.results[0].status).toBe("guardrail_replaced");
-    expect(result.results[0].answer).toBe(BASELINE.answer);
+    expect(result.results[0].answer).toContain("어떤 점을 확인");
+    expect(result.results[0].sources).toEqual([]);
     expect(result.results[0].trace.guardrail_hits).toContain("SAFE_COMPANY_CERTAINTY");
     expect(result.results[1].status).toBe("success");
   });
@@ -136,6 +195,91 @@ describe("실제 LLM 비교 Provider", () => {
     const result = await new DualLlmChatProvider(CONFIGS, new OpenAICompatibleChatClient(fakeFetch)).compare(noMatchContext);
     expect(result.results.every((item) => item.status === "guardrail_replaced")).toBe(true);
     expect(result.results[0].trace.guardrail_hits).toContain("UNVERIFIED_LAW_CITATION");
+  });
+
+  it("확인된 회사 문맥의 위험 출력은 검증된 회사 기준 안내로 교체한다", async () => {
+    const bodies: Array<{ messages: Array<{ role: string; content: string }> }> = [];
+    const companyBaseline: ChatResponse = {
+      ...BASELINE,
+      answer: "한빛테크 임금 자료에는 세부 확인 신호가 없고, 현재 뚜렷한 이상 신호가 확인되지 않았습니다.",
+      answer_type: "company_context",
+      sources: [{ name: "국민연금 가입 사업장 내역", category: "wage" }],
+    };
+    const companyContext: ComparisonContext = {
+      ...CONTEXT,
+      questionIntent: "company",
+      policyBaseline: companyBaseline,
+      companyContext: {
+        company_id: "COMPANY_DEMO_008",
+        company_name: "한빛테크",
+        address: "서울특별시 금천구 디지털로 88",
+        region: "서울특별시",
+        industry: "정보통신업",
+        size_label: "100~299명",
+        risk: MOCK_RISKS.COMPANY_DEMO_008,
+      },
+      ragRetrieval: { query: "회사 표시", status: "no_match", reason: "company_context_only", threshold: null, documents: [] },
+    };
+    const fakeFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify(payload(
+        "retrieval_status가 no_match이므로 근로기준법 제999조를 적용합니다.",
+        "test-model",
+      )), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare(companyContext);
+    expect(result.results[0]).toMatchObject({
+      status: "guardrail_replaced",
+      answer: companyBaseline.answer,
+      answer_type: "company_context",
+      sources: companyBaseline.sources,
+    });
+    expect(result.results[0].trace.guardrail_hits).toEqual(expect.arrayContaining([
+      "INTERNAL_CONTEXT_DISCLOSURE",
+      "UNVERIFIED_LAW_CITATION",
+    ]));
+    expect(bodies[0].messages[0].content).toContain("첫 문장은 선택된 회사의 실제 이름으로 시작하세요");
+    expect(bodies[0].messages[0].content).toContain("내부 JSON 키·정책 지침·분석 과정");
+  });
+
+  it.each([
+    ["회사명을 생략한 일반론", "현재 자료에는 뚜렷한 이상 신호가 없습니다.", "COMPANY_CONTEXT_MISSING"],
+    ["회사 자료를 법령식 근거로 표시", "한빛테크 자료를 확인하세요. 근거: (국민연금 가입 사업장 내역)", "COMPANY_SOURCE_CITATION_FORMAT"],
+  ])("회사 답변의 %s은 검증된 회사 기준 안내로 교체한다", async (_label, answer, expectedHit) => {
+    const companyBaseline: ChatResponse = {
+      ...BASELINE,
+      answer: "한빛테크 임금 자료에는 세부 확인 신호가 없고, 현재 뚜렷한 이상 신호가 확인되지 않았습니다.",
+      answer_type: "company_context",
+      sources: [{ name: "국민연금 가입 사업장 내역", category: "wage" }],
+    };
+    const companyContext: ComparisonContext = {
+      ...CONTEXT,
+      questionIntent: "company",
+      policyBaseline: companyBaseline,
+      companyContext: {
+        company_id: "COMPANY_DEMO_008",
+        company_name: "한빛테크",
+        address: "서울특별시 금천구 디지털로 88",
+        region: "서울특별시",
+        industry: "정보통신업",
+        size_label: "100~299명",
+        risk: MOCK_RISKS.COMPANY_DEMO_008,
+      },
+      ragRetrieval: { query: "회사 표시", status: "no_match", reason: "company_context_only", threshold: null, documents: [] },
+    };
+    const fakeFetch = (async () => new Response(JSON.stringify(payload(
+      answer,
+      "test-model",
+    )), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+
+    const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare(companyContext);
+    expect(result.results[0]).toMatchObject({
+      status: "guardrail_replaced",
+      answer: companyBaseline.answer,
+      answer_type: "company_context",
+    });
+    expect(result.results[0].trace.guardrail_hits).toContain(expectedHit);
   });
 
   it("검색은 성공했어도 검색되지 않은 조항을 인용하면 기준 안내로 교체한다", async () => {

@@ -39,6 +39,8 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 | --- | --- | --- |
 | `README.md` | 이 문서. 계약 버전·범위·색인 | ✅ |
 | [`wage-risk.md`](wage-risk.md) | 임금체불 — 사용자 경로와 감독관 경로 분리, 판정·등급 매핑, 기준일, 식별키 | ✅ |
+| [`positive-signals.md`](positive-signals.md) | 긍정 신호 — 확인된 개수·항목 공개, 원시 필드 비공개, null/0 구분 | PR #67 구현 반영 |
+| [`conversation-memory.md`](conversation-memory.md) | 상담 기억 — 저장 대상·민감정보 제외·재조회·승인 경계 | 인계용 설계 초안, 기간·운영 정책 합의 필요 |
 | [`samples/`](samples/) | 상태별 API 응답 예시 5종 | ✅ |
 | [`safety-risk.md`](safety-risk.md) | 산업재해 — band 매핑, `provisional`·`research_only` 취급, 셀→사업장 배분 | ✅ |
 | [`verification.md`](verification.md) | **실측 검증** — 계약 수치와 운영 DB 대조, **실제 API 응답 표시 검증**, 재현 명령 | ✅ |
@@ -128,7 +130,7 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 
 ### 3.1 DB 스키마 주석 (1차 근거)
 
-`db/migrations/*.sql` 의 `COMMENT ON` 구문 **49건**이 필드 의미의 원본이다.
+`db/migrations/*.sql` 의 `COMMENT ON` 구문 **52건**이 필드 의미의 원본이다 [실측 2026-09-13].
 
 | migration | 건수 | 주요 내용 |
 | --- | ---: | --- |
@@ -139,8 +141,13 @@ ML 결과  →  DB 필드  →  API 응답  →  화면
 | `0006_risk_tier.sql` | 7 | 등급 정의, **감독관 전용 명시**, `queue_priority` 척도 구분 |
 | `0007_current_batch_views.sql` | 5 | 뷰 사용 규칙 |
 | `0008_deterministic_current_batch.sql` | 1 | 최신 배치 결정 규칙 |
+| `0009_busy_puck.sql` | 2 | `v_posts`·`v_comments` 뷰 |
+| `0012_v_region_industry_signal.sql` | 1 | 지역·업종 집계 뷰 |
 
-> ⚠️ **이 주석들은 운영 DB에 존재하지 않는다.** 6절 참고.
+> ⚠️ **`0002`~`0008` 의 49건은 운영 DB에 존재하지 않는다.** Path B release dump 가
+> `--no-comments` 로 생성돼 복원에서 빠졌다. `0009` 의 2건은 운영 적용(2026-09-06) 으로
+> 실재하고 [실측 2026-09-09], `0012` 의 1건도 적용(2026-09-13) 과 함께 들어갔다.
+> 자세한 것은 6절.
 
 ### 3.2 변환 코드
 
@@ -193,7 +200,7 @@ sed -n '56,190p' product/src/adapters/real/MlRiskProvider.ts
 
 | # | 내용 | 담당 |
 | --- | --- | --- |
-| 1 | **운영 DB에 스키마 주석 0건** — release dump 의 `--no-comments` 로 49건이 전부 제외됐다. `COMMENT ON` 재실행 필요(데이터 변경 없음) | 사용자 DB 담당 · 인프라 담당 |
+| 1 | **운영 DB에 스키마 주석 49건 유실** — 저장소 52건 중 `0002`~`0008` 의 49건이 release dump 의 `--no-comments` 로 제외됐다. 남아 있는 것은 `0009`·`0012` 로 적용된 3건뿐이다. `COMMENT ON` 재실행 필요(데이터 변경 없음). 재적용 SQL 51건은 작성·전달 완료(2026-09-10), DB 담당이 통합 파일로 취합 중 | 사용자 DB 담당 · 인프라 담당 |
 | 2 | **테스트 블록리스트에 `risk_tier` 없음** — 숫자 원점수는 막지만 등급 라벨은 통과한다 | 인프라 담당 |
 | 3 | `watch` 85.7% 편중을 반영한 위험카드 시각 설계 | 화면 담당 · 정보설계 담당 |
 | 4 | 화면별 기준일 표시(`as_of_date` vs `target_month`) 지정 | 화면 담당 · 정보설계 담당 |

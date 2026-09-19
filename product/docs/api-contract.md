@@ -65,6 +65,16 @@ interface SourceReference {
 사업장 위험카드 출처는 표시 이름이 아니라 `category`로 임금(`wage`)과 산업안전(`safety`)을 분리한다.
 RAG에서 정규화한 공식 법령·안내 출처는 `labor_law`로 표시한다.
 
+### 2.1 인증·회원가입 정책
+
+`POST /api/auth/signup`은 이메일·비밀번호·이름으로 일반 사용자를 생성하고, 성공 시 `201`과 함께
+HttpOnly 세션 쿠키를 발급한다. 이미 등록된 이메일은 `409 EMAIL_ALREADY_REGISTERED`로 안내한다.
+
+회원가입의 `409`는 사용자가 가입할 수 없는 이유를 알고 기존 계정의 로그인 경로를 선택할 수 있게
+하는 의도된 정책이다. 이 응답으로 계정 존재 여부가 드러나는 절충점을 수용하되, 이메일 외의 회원 정보는
+반환하지 않는다. 로그인은 존재하지 않는 계정과 잘못된 비밀번호를 동일한
+`401 INVALID_CREDENTIALS`로 처리해 계정 존재 여부를 구분할 수 없게 유지한다.
+
 ## 3. 사업장 검색
 
 ### `GET /api/companies/search?q={query}&limit={1..20}&page={1..}&region={region}&industry={industry}`
@@ -172,6 +182,7 @@ interface ChatRequest {
   message: string;                 // 1..2000자
   conversation_id?: string;
   company_id?: string;
+  compare?: boolean;               // 기본 false. true일 때만 Upstage + SKT 비교
   chat_mode: "general" | "wage" | "safety" | "contract";
   recent_messages: Array<{ role: "user" | "assistant"; content: string }>;
 }
@@ -181,8 +192,10 @@ Next 서버는 회사 컨텍스트를 `company_id`로 다시 조회한다. 클�
 클라이언트는 `resolved_query`를 지정할 수 없다. `CHAT_EXECUTION_MODE`에 따라 응답 wrapper는 유지하면서
 내부 실행만 달라진다.
 
-- `dual_api`(기본): 후속 질문을 독립 질문으로 바꾸고 HB 검색 근거를 한 번 조회해 Upstage와 SKT에
-  동일하게 병렬 전달한다. 결과는 2개다.
+- `CHAT_EXECUTION_MODE=dual_api`(기본): 후속 질문을 독립 질문으로 바꾸고 HB 검색 근거를 한 번 조회한다.
+  요청에서 `compare`를 생략하거나 `false`로 보내면 Upstage 결과 하나와 `execution_mode=single_api`를
+  반환한다. `compare=true`일 때만 같은 컨텍스트를 Upstage와 SKT에 병렬 전달하고 결과 2개와
+  `execution_mode=dual_api`를 반환한다.
 - `openai_responses`: OpenAI Responses가 허용된 function tool만 필요에 따라 순차 호출한다. 결과는
   `provider=openai` 한 개다. Upstage/SKT 장애 우회는 하지 않고 실패 시 정책 baseline으로 대체한다.
 
@@ -307,10 +320,11 @@ interface ContractReviewResponse {
 
 비밀값 없이 계약 버전, 전체 및 기능별 `mock | real`과 통합 상태만 반환한다.
 DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`로 표시한다. 응답에는
-`chat_execution_mode`, 기존 `dual_llm`, 구성 기반 `openai_responses`, 현재 선택 경로인 `active_chat_llm`이
+`chat_execution_mode`, 기본 Upstage 상태인 `primary_llm`, 비교 모드 상태인 `dual_llm`, 구성 기반
+`openai_responses`, 현재 기본 요청 경로인 `active_chat_llm`이
 함께 들어간다. DB의 `ready`는
-읽기 전용 연결에서 `SELECT 1`이 성공했다는 뜻이다. LLM의 `ready`는 키 문자열 존재 여부가 아니라 두
-공급자에 대한 최소 실제 요청이 모두 성공했다는 뜻이며 결과는 60초 캐시한다. OpenAI Responses의
+읽기 전용 연결에서 `SELECT 1`이 성공했다는 뜻이다. LLM의 `ready`는 키 문자열 존재 여부가 아니라 대상
+공급자에 대한 최소 실제 요청이 성공했다는 뜻이며 결과는 60초 캐시한다. OpenAI Responses의
 `ready`는 상태 조회 비용 없이 키·모델·URL 구성이 존재한다는 뜻이며 실제 credential 성공은 smoke test에서
 확인한다. 이 상태 API는 비밀값이나 질문·답변 원문을 반환하지 않는다.
 
@@ -321,6 +335,8 @@ DB·RAG·계약서 분석·LLM은 `ready | configured_unreachable | unavailable`
 `DEMO_BASIC_AUTH_PASSWORD`를 반드시 설정해 페이지와 `/api/inspector/*` 전체를 Basic 인증으로 보호한다.
 
 - `GET /api/inspector/overview?limit=10&page=1`: 최신 배치 요약, 큐 우선순위별 건수와 최상위 100위 안의 위험큐 페이지를 반환한다. 기본값은 페이지당 10개이며 응답의 `queue_pagination`에 현재 페이지, 전체 페이지, 이전·다음 여부가 포함된다.
+- `GET /api/inspector/batches`: 실제 `public.batches` 전체 이력과 현재 서비스 중인 배치를 읽기 전용으로 반환한다.
+- `GET /api/admin/batches`: 관리자 배치 현황 화면에 같은 실제 `public.batches` 결과를 반환한다. 운영 관리자 역할만 접근할 수 있으며 응답은 저장하지 않는다.
 - `GET /api/inspector/companies/search?q=...`: 실제 `firms`에서 동명 사업장을 검색한다.
 - `GET /api/inspector/companies/{companyId}`: 최신 `risk_full`, 큐 순위·`grade`, 실제
   `reasons`, G1~G6 지표와 별도 산업안전 공표 구간을 반환한다.
@@ -349,10 +365,11 @@ API도 `confirm_external_context: true`가 없으면 호출을 거부한다. 응
 | `200` | 성공, 결과 없음, 일부 자료 없음 |
 | `400` | 요청 검증 실패 |
 | `404` | 사업장 없음 |
+| `409` | 이미 등록된 이메일 등 현재 상태와 충돌 |
 | `413` | 계약서 크기 초과 |
 | `415` | 계약서 형식 미지원 |
 | `422` | 근로계약서로 확인할 수 없는 문서 |
-| `429` | 외부 공급자 요청 제한 |
+| `429` | 로그인 임시 잠금 또는 외부 공급자 요청 제한. 로그인 잠금은 `Retry-After` 포함 |
 | `500` | 내부 오류 |
 | `502` | 내부 분석 서비스의 잘못된 응답 |
 | `503` | DB·RAG·분석 공급자 사용 불가 |

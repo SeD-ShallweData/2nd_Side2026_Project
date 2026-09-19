@@ -26,13 +26,15 @@ AI Rookie · 창의종합설계 경진대회 팀 프로젝트 저장소.
 | ML 결과를 DB에 넣는 규격·배치 운영 | [`docs/mlops/`](docs/mlops/) |
 | DB 변경(migration)·복구·드리프트 검사 | [`db/docs/MIGRATION_OPERATIONS.md`](db/docs/MIGRATION_OPERATIONS.md) · [`db/docs/DRIFT_CHECK_COVERAGE.md`](db/docs/DRIFT_CHECK_COVERAGE.md) |
 | 서버 배포·롤백·접속 | [`infra/OPERATIONS.md`](infra/OPERATIONS.md) · 공개 진입점 문서 |
+| 배포 이력·관문 승인 감사 | [`infra/DEPLOY_HISTORY.md`](infra/DEPLOY_HISTORY.md) |
+| 자동 배포(pull 방식)·켜고 끄기 | [`infra/AUTODEPLOY.md`](infra/AUTODEPLOY.md) |
 | QA 항목·페르소나·시연 대본 | [`docs/qa/`](docs/qa/) · [`docs/persona/`](docs/persona/) · [`docs/demo/`](docs/demo/) |
 
 ## 시연 서버
 
 - 주소: 팀 공유 문서 참조(Basic Auth). 매일 07:00~다음 날 01:00(KST) 가동.
 - 상태 확인: `/api/health/live`, `/api/health/ready`(인증 불필요), `/api/system/status`(인증 필요).
-- 배포는 [`infra/scripts/deploy-from-git.sh`](infra/scripts/) 로만. migration은 배포와 분리해 적용한다.
+- 배포는 [`infra/scripts/deploy-run.sh`](infra/scripts/) 로만(이력이 남는다). migration은 배포와 분리해 적용한다.
 
 ## 개발 흐름
 
@@ -53,3 +55,11 @@ AI Rookie · 창의종합설계 경진대회 팀 프로젝트 저장소.
 ## 프로토타입
 
 8월 개인 작업본은 [`prototypes/`](prototypes/)에 원형대로 보존한다(jcu·csh·hb·hss·shyun_64). 실행법은 각 폴더 README 참조. 운영 코드로 간주하지 않는다.
+
+## 라이선스
+
+이 저장소는 학습·심사 목적의 열람만 허용합니다. 복제·수정·배포·상업적 이용을
+허용하지 않습니다. 전문은 [`LICENSE`](LICENSE)를 보세요.
+
+지도 경계 자료 등 제3자 자료는 각자의 원래 조건을 따릅니다. `LICENSE` 아래쪽에
+정리해 두었습니다.

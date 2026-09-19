@@ -1,0 +1,87 @@
+[Unit]
+Description=MoneyWorry pull-based auto deploy (poll origin/main, deploy if new)
+Documentation=file://@PROJECT_ROOT@/infra/AUTODEPLOY.md
+After=network-online.target moneyworry-web.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# 배포기가 systemctl restart 와 chown 을 부르므로 root 여야 한다.
+# 대신 나머지 권한은 아래에서 최대한 깎는다.
+User=root
+ExecStart=/usr/local/sbin/moneyworry-autodeploy
+
+# 최대 배포 소요는 빌드 25분 + ready 5분 + rag 재시작 15분 = 45분이다.
+# 여기서 타임아웃이 나면 systemd 가 SIGTERM 을 보내고 배포기가 그 신호에
+# 종료 코드를 만들어 되돌린다(deploy-from-git.sh 의 on_signal). 그래도 빌드
+# 한가운데라면 되돌리기까지 시간이 걸리므로 5분 여유를 더 둔다.
+TimeoutStartSec=50min
+
+# 배포기가 npm ci 를 돌린다. ProtectHome=yes 아래에서는 ~/.npm 을 못 쓰고,
+# npm 이 캐시에 못 쓰면 빌드가 실패한다. systemd 가 만들어 주는 캐시 디렉터리를
+# 쓰게 해서 ReadWritePaths 를 하나 덜 연다.
+Environment=npm_config_cache=/var/cache/moneyworry-npm
+CacheDirectory=moneyworry-npm
+
+# 배포 상태(previous-sha, 무장 파일)와 휘발 상태(배포 깃발).
+StateDirectory=moneyworry-deploy
+RuntimeDirectory=moneyworry
+RuntimeDirectoryPreserve=yes
+
+# 배포기는 verify_access 에서 runuser 로 각 서비스 계정을 가장해 "이 계정이 제 파일을
+# 실제로 읽고 쓸 수 있는가" 를 확인한다. 모드 비트만 보면 ACL 을 놓치기 때문이다.
+# NoNewPrivileges=yes 는 단독으로는 무해하지만, 아래 마운트 네임스페이스 옵션들과
+# 함께 걸리면 runuser 의 setuid 가 EPERM 으로 막힌다. 2026-09-15 시연 VM 실측:
+#
+#   전부 적용                  runuser: cannot set user id: Operation not permitted
+#   NoNewPrivileges 만 제거    통과
+#   나머지를 하나씩 제거        여전히 실패
+#
+# 사람이 SSH 에서 돌리는 배포는 샌드박스 밖이라 통과했고 로봇만 죽었다. #74 와
+# 같은 자리에서 같은 방식으로 드러났다.
+NoNewPrivileges=no
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+# ProtectSystem=strict 는 /dev·/proc·/sys 를 뺀 전부를 읽기 전용으로 만든다.
+# 배포기가 실제로 쓰는 곳만 되돌려 연다.
+#   @PROJECT_ROOT@  git checkout 과 npm 빌드 산출물
+#   /srv/moneyworry 배포 원장·전문·롤백 백업
+#   /var/lock       배포 잠금 (사람 배포와의 상호 배제)
+ReadWritePaths=@PROJECT_ROOT@
+ReadWritePaths=/srv/moneyworry
+ReadWritePaths=/var/lock
+# ★ 여기만 'no' 다. 나머지 다섯 유닛은 전부 yes 다.
+#
+# 배포기는 web 이 런타임에 쓰는 product/.next/cache 를 **setgid(2775)** 로 만든다
+# (deploy-from-git.sh 의 fix_ownership). setgid 가 없으면 web 이 만든 하위 파일의
+# 그룹이 흘러 다음 배포의 chgrp 와 어긋난다.
+#
+# RestrictSUIDSGID=yes 는 mode 에 S_ISUID/S_ISGID 가 있는 mkdir·chmod 를 seccomp 로
+# 막는다. 그래서 이 유닛 아래에서는 배포기가 두 곳에서 EPERM 으로 즉사했다:
+#   1. 롤백 백업의 `cp -a product/.next ...` — cache 를 2775 로 재생성하려다
+#   2. fix_ownership 의 `install -d -m 2775 .../cache`
+# 둘 다 `|| die` 가 없어 set -e 로 조용히 죽었고, 원장에는 사유가 안 남아
+# "강제 종료일 수 있습니다" 로만 찍혔다.
+#
+# 사람이 SSH 에서 돌리는 배포는 샌드박스 밖이라 멀쩡했다. **로봇만 죽었다** —
+# 2026-09-13 22:25 부터 09-15 09:31 까지 세 번, 전부 같은 줄에서.
+# 재현: systemd-run -p RestrictSUIDSGID=yes install -d -m 2775 /tmp/x  → 실패
+#
+# 되돌리려면 배포기가 setgid 디렉터리를 만들지 않게 먼저 바꿔야 한다.
+# test_deploy_automation.py 가 둘을 묶어 놨다.
+RestrictSUIDSGID=no
+RestrictRealtime=yes
+LockPersonality=yes
+UMask=0022
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moneyworry-autodeploy
+
+# [Install] 절이 없는 것은 **일부러다.**
+#
+# 이 유닛은 타이머가 부르는 oneshot 이라 직접 enable 할 대상이 아니다. 절을
+# 두면 `systemctl enable moneyworry-autodeploy.service` 가 조용히 성공해서
+# "켠 줄 알았는데 실제로는 아무것도 안 도는" 상태가 생긴다.
+# 무장은 `moneyworry-autodeploy --arm` 하나뿐이다.
