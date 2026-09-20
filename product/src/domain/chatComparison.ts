@@ -5,6 +5,7 @@ import type {
   GuardrailStatus,
   SuggestedAction,
 } from "@/domain/chat";
+import type { AnswerPlan } from "@/domain/answerPlan";
 import type { CompanyRiskResult, SourceReference } from "@/domain/risk";
 import type { RagRetrievalResult } from "@/domain/rag";
 
@@ -85,6 +86,8 @@ export interface ChatComparisonResponse {
     same_max_tokens: boolean;
     same_retrieval: boolean;
   };
+  /* 로그인 원문 저장 결과. guest는 현재 탭 history만 유지한다. */
+  conversation_persistence?: "saved" | "unavailable" | "guest";
   results: ProviderComparisonResult[];
 }
 
@@ -102,6 +105,8 @@ export interface ComparisonContext {
     risk: CompanyRiskResult;
   };
   ragRetrieval: RagRetrievalResult;
+  /** Internal routing contract. It is never returned as a user-facing answer. */
+  answerPlan?: AnswerPlan;
 }
 
 export interface ChatComparisonProvider {

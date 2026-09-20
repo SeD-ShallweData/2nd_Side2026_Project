@@ -122,9 +122,20 @@ export function SiteHeader() {
             <Link href="/" className="brand-link">
               <Brand />
             </Link>
-            {!isInspector && user?.role === "admin" ? (
-              <Link href="/inspector" className="consumer-mode-switch" aria-label="일반 사용자 모드에서 관리자 모드로 전환">
-                관리자 모드 <span aria-hidden="true">↗</span>
+            {/* 감독관도 ML 대시보드를 읽기 전용으로 봐야 하므로 admin 과 함께 노출한다.
+                라벨만 역할에 맞게 갈린다 — 실제 화면 범위는 InspectorNav 가 이미 나눠서 보여준다. */}
+            {/* server/auth/inspectorAccess.ts 의 INSPECTION_ROLES 와 같은 값이다.
+                그 파일은 "server-only" 라 클라이언트 컴포넌트에서 가져올 수 없어 여기 그대로 둔다. */}
+            {!isInspector && (user?.role === "admin" || user?.role === "inspector") ? (
+              <Link
+                /* 관리자는 이 화면에서 배치·프롬프트를 직접 운영하므로 곧바로
+                   LLM 프롬프트 탭으로 보낸다. 감독관은 자기 업무 화면인
+                   사업장 대시보드로 그대로 간다. */
+                href={user?.role === "admin" ? "/inspector/prompts" : "/inspector"}
+                className="consumer-mode-switch"
+                aria-label={`일반 사용자 모드에서 ${user?.role === "admin" ? "관리자" : "감독관"} 모드로 전환`}
+              >
+                {user?.role === "admin" ? "관리자 모드" : "감독관 모드"} <span aria-hidden="true">↗</span>
               </Link>
             ) : null}
           </div>
@@ -142,6 +153,17 @@ export function SiteHeader() {
                 </Link>
               );
             })}
+            {/* 즐겨찾기는 일반 사용자 전용 기능이라 admin/inspector에게는 보이지 않는다.
+                NAV_ITEMS는 로그인 여부와 무관한 공통 메뉴라 여기에 넣지 않는다. */}
+            {user?.role === "user" ? (
+              <Link
+                href="/favorites"
+                className={isCurrentNavPath(pathname, "/favorites") ? "is-current" : undefined}
+                aria-current={isCurrentNavPath(pathname, "/favorites") ? "page" : undefined}
+              >
+                즐겨찾기
+              </Link>
+            ) : null}
           </nav>
           <div className="consumer-header-side" style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {sessionState.status === "loading" ? null : user ? (
@@ -170,7 +192,7 @@ export function SiteHeader() {
       ) : null}
       {!isInspector && pathname !== "/chat" ? (
         <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리 AI에게 상담하기">
-          <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />
+          <Image src="/brand/donworry-mascot.png" alt="" width={192} height={192} />
           <span className="consumer-floating-chat-label">돈워리 AI에게 상담하기</span>
         </Link>
       ) : null}
@@ -188,6 +210,15 @@ export function SiteHeader() {
             </Link>
           );
         })}
+        {user?.role === "user" ? (
+          <Link
+            href="/favorites"
+            className={isCurrentNavPath(pathname, "/favorites") ? "is-current" : undefined}
+            aria-current={isCurrentNavPath(pathname, "/favorites") ? "page" : undefined}
+          >
+            즐겨찾기
+          </Link>
+        ) : null}
       </nav>
     </>
   );

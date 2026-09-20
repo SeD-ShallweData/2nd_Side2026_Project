@@ -63,6 +63,13 @@ export function buildTipDatabaseUrl(values: Record<string, string>): string | un
   );
 }
 
+export function buildConversationDatabaseUrl(values: Record<string, string>): string | undefined {
+  return (
+    validDirectUrl(values.CONVERSATION_DATABASE_URL) ??
+    buildRoleUrl(values, values.CONVERSATION_USER, values.CONVERSATION_PASSWORD)
+  );
+}
+
 export function getDatabaseConnectionString(): string | undefined {
   return (
     validDirectUrl(process.env.BOT_DATABASE_URL) ??
@@ -90,4 +97,12 @@ export function getCommunityDatabaseConnectionString(): string | undefined {
 
 export function getTipDatabaseConnectionString(): string | undefined {
   return validDirectUrl(process.env.TIP_DATABASE_URL) ?? buildTipDatabaseUrl(readDatabaseValues());
+}
+
+/* 대화 원문 쓰기는 소유자·읽기 전용·다른 기능 롤로 절대 대체하지 않는다. */
+export function getConversationDatabaseConnectionString(): string | undefined {
+  return (
+    validDirectUrl(process.env.CONVERSATION_DATABASE_URL) ??
+    buildConversationDatabaseUrl(readDatabaseValues())
+  );
 }

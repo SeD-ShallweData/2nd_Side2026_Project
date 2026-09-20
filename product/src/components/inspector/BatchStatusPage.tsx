@@ -22,9 +22,9 @@ interface BatchStatusPageProps {
 
 export function BatchStatusPage({
   endpoint = "/api/inspector/batches",
-  eyebrow = "ML 운영 상태",
+  eyebrow = "Machine Learning 운영 상태",
   title = "배치 현황",
-  description = "서비스가 참조하는 ML 배치와 과거 적재 이력을 확인합니다.",
+  description = "서비스가 참조하는 Machine Learning 배치와 과거 적재 이력을 확인합니다.",
 }: BatchStatusPageProps = {}) {
   const [batches, setBatches] = useState<BatchStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,13 +53,12 @@ export function BatchStatusPage({
           <h1>{title}</h1>
           <p>{description}</p>
         </div>
-        <span className="inspector-private-badge">DB 변경 없음</span>
       </div>
       {loading ? <div className="batch-state-card">배치 목록을 불러오는 중입니다.</div> : null}
       {error ? <div className="batch-state-card batch-state-error" role="alert"><strong>배치 현황을 확인하지 못했습니다.</strong><span>{error}</span></div> : null}
       {!loading && !error && batches.length === 0 ? <div className="batch-state-card">적재된 배치가 없습니다.</div> : null}
       {!loading && !error && batches.length > 0 ? (
-        <section className="batch-table-panel" aria-label="ML 배치 목록">
+        <section className="batch-table-panel" aria-label="Machine Learning 배치 목록">
           <div className="batch-table-scroll">
             <table className="batch-status-table">
               <thead><tr><th>상태</th><th>배치 ID</th><th>기준월</th><th>예측 대상월</th><th>모델 버전</th><th>적재 시각</th><th>규모</th></tr></thead>

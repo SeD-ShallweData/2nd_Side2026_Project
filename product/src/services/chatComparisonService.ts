@@ -9,6 +9,11 @@ import { getCompanyRisk } from "@/services/riskService";
 import { retrieveLaborLawContext } from "@/services/ragService";
 import { rewriteFollowupQuery } from "@/services/queryRewriteService";
 import { classifyChatIntent, type IntentDecision } from "@/services/chatIntentService";
+import {
+  createAnswerPlan,
+  evidenceStateForPlan,
+  primaryAnswerScope,
+} from "@/services/answerPlanService";
 import { clarificationFallback } from "@/services/chatFallback";
 import {
   getLlmProviderConfigs,
@@ -58,6 +63,40 @@ function outOfScopeResponse(policyBaseline: ChatResponse, topic: string): ChatRe
     }] : [],
     limitations: ["질문 의도에 따른 범위 안내이며 회사에 대한 평가가 아닙니다."],
     guardrail_status: "limited",
+  };
+}
+
+function generalCompanyIndicatorResponse(policyBaseline: ChatResponse): ChatResponse {
+  return {
+    ...clarificationFallback(policyBaseline),
+    answer: "긍정 지표가 0개라는 것은 현재 공개 자료에서 긍정 신호가 확인되지 않았다는 뜻일 뿐, 회사가 나쁘거나 위험하다는 판단은 아닙니다. 반대로 안전 인증도 아니므로, 특정 회사의 표시를 해석하려면 그 사업장을 선택한 뒤 임금 지급일·급여명세서·근로계약 조건을 함께 확인해 보세요.",
+    answer_type: "general_guidance",
+    limitations: ["특정 사업장의 실제 상태나 향후 근로조건을 이 일반 설명만으로 판단할 수 없습니다."],
+  };
+}
+
+function laborEvidenceFallback(
+  policyBaseline: ChatResponse,
+  state: "not_found" | "not_relevant" | "unavailable",
+  hasOutOfScopePart: boolean,
+): ChatResponse {
+  const evidenceMessage = state === "unavailable"
+    ? "공식 노동법 검색 서비스에 현재 연결하지 못했습니다."
+    : state === "not_relevant"
+      ? "검색 결과가 현재 질문에 직접 적용할 근거로는 맞지 않았습니다."
+      : "현재 질문에 직접 맞는 공식 노동법 근거를 찾지 못했습니다.";
+  const scopeMessage = hasOutOfScopePart
+    ? " 근무 조건과 임금 문제는 지급일·실제 지급 내역·근로시간 기록을 정리해 고용노동부 1350 또는 관할 노동관서에 문의해 보세요. 투자 추천이나 매수 시점은 이 상담에서 안내할 수 없습니다."
+    : " 근무 조건과 임금 문제는 지급일·실제 지급 내역·근로시간 기록을 정리해 고용노동부 1350 또는 관할 노동관서에 문의해 보세요.";
+  return {
+    ...clarificationFallback(policyBaseline, `${evidenceMessage}${scopeMessage}`),
+    answer_type: "general_guidance",
+    suggested_actions: [
+      { code: "CALL_1350", label: "고용노동부 1350 확인", priority: "next" },
+      ...(hasOutOfScopePart
+        ? [{ code: "OUT_OF_SCOPE_REFERRAL", label: "금융감독원 안내", url: "https://www.fss.or.kr/", priority: "optional" as const }]
+        : []),
+    ],
   };
 }
 
@@ -122,7 +161,7 @@ function policyShortCircuitResponse({
         query_transform: rewritten ? "llm_rewrite" : "none",
         context_mode: request.company_id ? "company" : "general",
         company_context_attached: Boolean(request.company_id && policyBaseline.answer_type === "company_context"),
-        recent_message_count: request.recent_messages.slice(-6).length,
+        recent_message_count: request.recent_messages.slice(-10).length,
         guardrail_action: "short_circuit",
         guardrail_hits: guardrailHits,
         upstream_request_id: null,
@@ -135,8 +174,15 @@ function policyShortCircuitResponse({
   };
 }
 
+/** Public/raw-request entry point; client payloads cannot add server-owned memory. */
 export async function sendComparedChatMessage(value: unknown): Promise<ChatComparisonResponse> {
-  const parsedRequest = parseChatRequest(value);
+  return sendParsedComparedChatRequest(parseChatRequest(value));
+}
+
+/** Server-internal entry point for an already parsed and hydrated request. */
+export async function sendParsedComparedChatRequest(
+  parsedRequest: ChatRequest,
+): Promise<ChatComparisonResponse> {
   const policyBaseline = await sendChatMessage(parsedRequest);
   const configs = selectProviderConfigs(
     getLlmProviderConfigs(),
@@ -167,13 +213,29 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
     ? { ...parsedRequest, resolved_query: rewrite.query }
     : parsedRequest;
   const intentDecision = await classifyChatIntent(request, configs);
-  const companyMismatch = intentDecision.intent === "company" && Boolean(request.company_id)
+  const answerPlan = createAnswerPlan(request, intentDecision);
+  const primaryScope = primaryAnswerScope(answerPlan);
+  const hasOutOfScopePart = answerPlan.parts.some((part) => part.scope === "out_of_scope");
+  const companyMismatch = primaryScope === "company_specific" && Boolean(request.company_id)
     && policyBaseline.answer_type === "clarification"
     && policyBaseline.suggested_actions.some((action) => action.code === "SEARCH_COMPANY");
-  if (intentDecision.intent === "off_topic" || intentDecision.intent === "unclear"
-    || companyMismatch || (intentDecision.intent === "company" && !request.company_id)) {
-    const baseline = intentDecision.intent === "off_topic"
-      ? outOfScopeResponse(policyBaseline, intentDecision.topic)
+  if (primaryScope === "company_general") {
+    return policyShortCircuitResponse({
+      request,
+      policyBaseline: generalCompanyIndicatorResponse(policyBaseline),
+      configs,
+      intentDecision,
+      ragRetrieval: {
+        query: request.message, status: "no_match", reason: "general_company_explanation", topic: null, threshold: null, documents: [],
+      },
+      guardrailStatus: "limited",
+      guardrailHits: ["GENERAL_COMPANY_EXPLANATION"],
+    });
+  }
+  if (primaryScope === "out_of_scope" || primaryScope === "clarification" || companyMismatch) {
+    const outOfScope = answerPlan.parts.find((part) => part.scope === "out_of_scope");
+    const baseline = primaryScope === "out_of_scope"
+      ? outOfScopeResponse(policyBaseline, outOfScope?.out_of_scope_topic ?? intentDecision.topic)
       : clarificationFallback(policyBaseline, companyMismatch ? policyBaseline.answer : intentDecision.intent === "company"
         ? "어느 회사의 정보인지 확인할 수 있도록 사업장을 먼저 선택해 주세요."
         : undefined);
@@ -181,14 +243,14 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
       request, policyBaseline: baseline, configs, intentDecision,
       ragRetrieval: { query: request.message, status: "unavailable", reason: "intent_short_circuit", topic: null, threshold: null, documents: [] },
       guardrailStatus: "limited",
-      guardrailHits: [intentDecision.intent === "off_topic" ? "INTENT_OUT_OF_SCOPE" : "INTENT_CLARIFICATION"],
+      guardrailHits: [primaryScope === "out_of_scope" ? "INTENT_OUT_OF_SCOPE" : "INTENT_CLARIFICATION"],
     });
   }
-  if (intentDecision.intent !== "company") {
+  if (primaryScope !== "company_specific") {
     Object.assign(policyBaseline, clarificationFallback(policyBaseline));
   }
-  policyBaseline.answer_type = intentDecision.intent === "company" ? "company_context" : "general_guidance";
-  const ragRetrieval: RagRetrievalResult = intentDecision.intent === "company"
+  policyBaseline.answer_type = primaryScope === "company_specific" ? "company_context" : "general_guidance";
+  const ragRetrieval: RagRetrievalResult = primaryScope === "company_specific"
     ? {
         query: rewrite.query,
         status: "no_match",
@@ -199,19 +261,24 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
       }
     : await retrieveLaborLawContext(rewrite.query);
 
-  if (ragRetrieval.status === "matched") {
+  const evidenceState = evidenceStateForPlan(answerPlan, ragRetrieval);
+  if (evidenceState === "ready") {
     policyBaseline.sources = ragRetrieval.documents.map((document) => document.source);
     policyBaseline.guardrail_status = "passed";
-  } else if (intentDecision.intent !== "company") {
+  } else if (primaryScope === "labor" && evidenceState !== "not_needed") {
+    const hit = evidenceState === "unavailable"
+      ? "RAG_UNAVAILABLE"
+      : evidenceState === "not_relevant"
+        ? "RAG_EVIDENCE_NOT_RELEVANT"
+        : "RAG_EVIDENCE_NOT_FOUND";
     return policyShortCircuitResponse({
       request,
-      policyBaseline: clarificationFallback(policyBaseline,
-        "현재 질문에 직접 관련된 공식 노동법 근거를 확인하지 못했습니다. 어떤 근무 조건이나 회사의 조치 때문에 어려움을 겪고 계신지 조금 더 구체적으로 알려주시겠어요?"),
+      policyBaseline: laborEvidenceFallback(policyBaseline, evidenceState, hasOutOfScopePart),
       configs,
       ragRetrieval,
       intentDecision,
       guardrailStatus: "limited",
-      guardrailHits: [ragRetrieval.status === "no_match" ? "RAG_NO_MATCH" : "RAG_UNAVAILABLE"],
+      guardrailHits: [hit],
     });
   } else {
     policyBaseline.limitations = [
@@ -225,7 +292,7 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
   }
   let companyContext;
 
-  if (request.company_id && intentDecision.intent === "company") {
+  if (request.company_id && primaryScope === "company_specific") {
     const [company, risk] = await Promise.all([
       getCompanyById(request.company_id),
       getCompanyRisk(request.company_id),
@@ -245,5 +312,12 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
     configs,
     new OpenAICompatibleChatClient(fetch, getLlmTimeoutMs()),
   );
-  return provider.compare({ request, policyBaseline, companyContext, ragRetrieval, questionIntent: intentDecision.intent });
+  return provider.compare({
+    request,
+    policyBaseline,
+    companyContext,
+    ragRetrieval,
+    answerPlan,
+    questionIntent: primaryScope === "company_specific" ? "company" : "labor",
+  });
 }

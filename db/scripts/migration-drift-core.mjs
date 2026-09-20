@@ -91,11 +91,56 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "column_default:public.worksite_tips.status_received",
     "column_default_absent:public.worksite_tips.category",
   ]),
-  // 0014 는 즐겨찾기 테이블을 만든다. 복합 PK 와 두 FK 모두 ON DELETE CASCADE 로
+  "0014_conversation_memory": Object.freeze([
+    "table:public.conversation_threads",
+    "table:public.conversation_turns",
+    "table:public.conversation_messages",
+    "table:public.conversation_sources",
+    "table:public.conversation_company_events",
+    "index:public.conversation_threads_owner_activity_idx",
+    "index:public.conversation_threads_expires_idx",
+    "index:public.conversation_turns_idempotency_uq",
+    "index:public.conversation_turns_sequence_uq",
+    "index:public.conversation_messages_turn_role_uq",
+    "constraint:public.conversation_threads.conversation_threads_owner_user_id_users_id_fk",
+    "constraint:public.conversation_turns.conversation_turns_conversation_id_conversation_threads_id_fk",
+    "constraint:public.conversation_messages.conversation_messages_turn_id_conversation_turns_id_fk",
+    "constraint:public.conversation_sources.conversation_sources_turn_id_conversation_turns_id_fk",
+    "constraint:public.conversation_company_events.conversation_company_events_conversation_id_conversation_threads_id_fk",
+    "constraint:public.conversation_threads.conversation_threads_title_ck",
+    "constraint:public.conversation_turns.conversation_turns_answer_type_ck",
+    "constraint:public.conversation_messages.conversation_messages_role_ck",
+  ]),
+  "0015_conversation_summaries": Object.freeze([
+    "table:public.conversation_summaries",
+    "index:public.conversation_summaries_status_updated_idx",
+    "constraint:public.conversation_summaries.conversation_summaries_conversation_id_conversation_threads_id_fk",
+    "constraint:public.conversation_summaries.conversation_summaries_status_ck",
+    "constraint:public.conversation_summaries.conversation_summaries_sequence_ck",
+    "constraint:public.conversation_summaries.conversation_summaries_payload_ck",
+  ]),
+  "0016_conversation_request_lifecycle": Object.freeze([
+    "column:public.conversation_messages.message_index",
+    "index:public.conversation_messages_turn_sequence_uq",
+    "constraint:public.conversation_messages.conversation_messages_sequence_ck",
+    "table:public.conversation_requests",
+    "index:public.conversation_requests_owner_request_uq",
+    "index:public.conversation_requests_conversation_status_idx",
+    "constraint:public.conversation_requests.conversation_requests_owner_user_id_users_id_fk",
+    "constraint:public.conversation_requests.conversation_requests_conversation_id_conversation_threads_id_fk",
+    "constraint:public.conversation_requests.conversation_requests_status_ck",
+    "constraint:public.conversation_requests.conversation_requests_payload_ck",
+  ]),
+  "0017_conversation_context_events": Object.freeze([
+    "column:public.conversation_company_events.event_kind",
+    "constraint:public.conversation_company_events.conversation_company_events_turn_id_conversation_turns_id_fk",
+    "constraint:public.conversation_company_events.conversation_company_events_kind_ck",
+  ]),
+  // 0018 은 즐겨찾기 테이블을 만든다. 복합 PK 와 두 FK 모두 ON DELETE CASCADE 로
   // 정의되는 게 계약이라, 존재 확인과 별개로 constraint_definition 으로 그
   // cascade 여부까지 고정한다 — 그냥 FK 존재만 보면 no-action 으로 잘못
   // 만들어져도 aligned 로 오판한다.
-  "0014_real_hitman": Object.freeze([
+  "0018_real_hitman": Object.freeze([
     "table:public.user_favorite_firms",
     "column:public.user_favorite_firms.user_id",
     "column:public.user_favorite_firms.firm_id",

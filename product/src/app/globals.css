@@ -719,11 +719,13 @@ summary:focus-visible {
   font-size: 0.88rem;
 }
 
-.footer-links {
-  display: flex;
-  gap: 24px;
-  font-size: 0.88rem;
-  font-weight: 750;
+/* Co끼리 로고(.brand-mark, 60px)와 같은 높이로 맞춘다. 실제 파일은
+   6000x6000 정사각형이라 width는 auto 로 비율만 따라간다. */
+.footer-club-logo {
+  display: block;
+  height: 60px;
+  width: auto;
+  object-fit: contain;
 }
 
 .footer-note {
@@ -737,9 +739,11 @@ summary:focus-visible {
 
 /* Shared pages */
 
+/* 배경은 모든 탭이 같다. 서비스 소개(랜딩)와 같은 흰 바탕을 쓴다. 탭마다
+   바탕색이 다르면 같은 서비스 안에서 이동한 것인지 헷갈린다. */
 .page-section {
   min-height: 70vh;
-  background: linear-gradient(180deg, #f9fcff 0, #fff 340px);
+  background: var(--white);
   padding: 74px 0 100px;
 }
 
@@ -771,6 +775,7 @@ summary:focus-visible {
 .mock-banner {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   margin: 0 0 22px;
   border: 1px solid #e8d47e;
@@ -784,6 +789,7 @@ summary:focus-visible {
 .mode-banner {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   margin: 0 0 22px;
   border: 1px solid #e8d47e;
@@ -2213,6 +2219,37 @@ summary:focus-visible {
   flex: 0 0 auto;
 }
 
+.chat-history {
+  border-top: 1px solid var(--line);
+  background: var(--surface-warm);
+  padding: 10px 16px;
+}
+
+.chat-history > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.chat-history strong { font-size: 0.76rem; }
+.chat-history small, .chat-history .muted-text { color: var(--muted); font-size: 0.66rem; }
+.chat-history ul { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
+.chat-history li { display: flex; gap: 6px; }
+.chat-history li button:first-child { overflow: hidden; flex: 1; border: 0; background: transparent; color: var(--ink); cursor: pointer; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.chat-history li button:last-child { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 0.68rem; }
+.chat-history button:disabled { cursor: not-allowed; opacity: 0.45; }
+.conversation-controls { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.conversation-controls button,
+.guest-import-consent button { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 6px 9px; color: var(--ink); cursor: pointer; font-size: .68rem; font-weight: 700; }
+.conversation-controls button:disabled,
+.guest-import-consent button:disabled { cursor: not-allowed; opacity: .45; }
+.guest-import-consent { margin: 10px 0; border: 1px solid #d8c56c; border-radius: 12px; background: #fffbea; padding: 12px; }
+.guest-import-consent strong { font-size: .78rem; }
+.guest-import-consent p { margin: 5px 0 9px; color: var(--muted); font-size: .68rem; }
+.guest-import-consent > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.chat-persistence-status { margin: 8px 0; color: var(--muted); font-size: .7rem; }
+.turn-company-label { display: block; margin-top: 4px; color: var(--muted); font-size: .62rem; text-align: right; }
+
 .chat-form {
   position: relative;
   border-top: 1px solid var(--line);
@@ -3447,10 +3484,6 @@ summary:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .footer-links {
-    flex-wrap: wrap;
-  }
-
   .footer-note {
     grid-column: auto;
   }
@@ -3700,8 +3733,11 @@ summary:focus-visible {
 
 /* 로고와 첫 메뉴 사이에 선다. */
 .consumer-header-lead { display: flex; align-items: center; gap: 16px; }
-.consumer-mode-switch { flex-shrink: 0; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink-soft); font-size: .78rem; font-weight: 800; padding: 8px 14px; white-space: nowrap; }
-.consumer-mode-switch:hover { border-color: var(--ink); background: var(--surface); color: var(--ink); }
+/* '돈워리 AI에게 상담하기'(.button-ai)와 같은 배경·글꼴색을 쓴다.
+   테두리는 그 버튼처럼 안 보이게(투명) 둔다 — 노란 배경 위에 테두리선이
+   또 있으면 이중 테두리처럼 보인다. */
+.consumer-mode-switch { flex-shrink: 0; border: 1px solid transparent; border-radius: 999px; background: var(--brand); color: var(--ink); font-size: .78rem; font-weight: 800; padding: 8px 14px; white-space: nowrap; }
+.consumer-mode-switch:hover { background: #f1c900; }
 
 /* 시연장에서 멀리서도 눈에 들어오도록 기존 크기의 1.5배로 키운다. */
 .consumer-floating-chat { position: fixed; right: 28px; bottom: 26px; z-index: 90; display: flex; align-items: center; gap: 15px; border: 3px solid var(--ink); border-radius: 999px; background: var(--brand); box-shadow: 0 13px 0 rgb(8 31 58 / 12%); padding: 12px 23px 12px 12px; font-size: 1.2rem; font-weight: 900; }
@@ -3709,15 +3745,21 @@ summary:focus-visible {
 .consumer-floating-chat-label { text-align: center; line-height: 1.3; }
 .consumer-mobile-nav { display: none; }
 
-.consumer-footer { border-top: 1px solid #1c3a5c; background: #081f3a; color: #fff; padding: 48px 0 34px; }
+/* 아래 여백을 넉넉히 둔다. 오른쪽 아래에 고정된 '돈워리와 상담하기' 버튼이
+   높이 80px + 바닥에서 26px 띄워져 있어, 여백이 34px 뿐이면 문서 맨 아래로
+   스크롤했을 때 방금 추가한 동아리 로고를 완전히 덮어 버린다. */
+.consumer-footer { border-top: 1px solid #1c3a5c; background: #081f3a; color: #fff; padding: 48px 0 130px; }
 .consumer-footer-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 25px 70px; align-items: end; }
 .consumer-footer-grid > div > p { max-width: 480px; margin: 16px 0 0; color: rgb(255 255 255 / 56%); font-size: .79rem; }
 .consumer-footer nav { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 24px; align-content: start; font-size: .78rem; font-weight: 750; }
 .consumer-footer nav a { color: rgb(255 255 255 / 72%); }
 .consumer-footer nav a:hover { color: var(--brand); }
 .consumer-footer nav .inspector-footer-link { color: var(--brand); }
-/* 하단 메뉴를 걷어내면서 두 문장만 남았다. 같은 줄 양끝에 세워 한눈에 읽히게 한다. */
-.consumer-footer-note { align-self: end; margin: 16px 0 0; text-align: right; color: rgb(255 255 255 / 56%); font-size: .79rem; }
+/* 오른쪽 칸에 면책 문구와 동아리 로고를 위아래로 쌓는다. 로고가 그 칸의
+   가장 아래에 와서 페이지 전체로 보면 가장 아래·오른쪽 끝 자리를 차지한다. */
+.consumer-footer-right { display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
+.consumer-footer-note { margin: 16px 0 0; text-align: right; color: rgb(255 255 255 / 56%); font-size: .79rem; }
+.consumer-footer-right .footer-club-logo { margin: 0; }
 
 .refresh-hero { position: relative; overflow: hidden; background: radial-gradient(circle at 82% 28%, rgb(255 214 0 / 26%), transparent 27%), linear-gradient(180deg, #fbfdff 0%, #fff 100%); padding: 88px 0 62px; }
 .refresh-hero::before { position: absolute; top: -160px; right: -120px; width: 420px; height: 420px; border: 1px solid rgb(25 31 40 / 6%); border-radius: 50%; content: ""; }
@@ -4000,19 +4042,18 @@ summary:focus-visible {
   margin-right: auto;
 }
 
-.inspector-identity > span {
-  align-items: center;
+/* 예전엔 'DW' 글자 배지였다. 이제 공구를 든 코끼리 이미지를 같은 자리·
+   같은 크기(34px)에 넣는다. 테두리·그림자는 그대로 두어 헤더 톤을 지킨다. */
+.inspector-identity-mascot {
   background: var(--brand);
   border: 1px solid #fff;
   border-radius: 10px 10px 10px 3px;
   box-shadow: 2px 2px 0 #fff;
-  color: var(--ink);
-  display: flex;
-  font-size: 0.68rem;
-  font-weight: 950;
+  display: block;
+  flex: 0 0 34px;
   height: 34px;
-  justify-content: center;
   width: 34px;
+  object-fit: cover;
 }
 
 .inspector-identity div {
@@ -4476,8 +4517,11 @@ summary:focus-visible {
 .inspector-chat-page { padding-bottom: 90px; }
 .inspector-chat-shell { padding-top: 50px; }
 .inspector-chat-heading { max-width: 780px; margin-bottom: 28px; }
-.inspector-chat-heading h1 { font-size: clamp(2rem, 4vw, 3.35rem); }
-.inspector-chat-heading p { color: var(--muted); margin: 0; }
+/* .inspector-page-heading(배치 현황 등)과 같은 크기로 맞춘다. 위쪽의
+   .inspector-hero h1 과 공유하던 규칙(최대 4.15rem)이 여기서도 적용되고
+   있어 글자가 배치 현황보다 훨씬 컸다. */
+.inspector-chat-heading h1 { font-size: clamp(1.7rem, 3vw, 2.35rem); margin: 5px 0 8px; }
+.inspector-chat-heading p { color: var(--muted); font-size: .85rem; margin: 0; }
 .inspector-chat-layout { align-items: start; display: grid; gap: 16px; grid-template-columns: 280px minmax(0, 1fr); }
 .inspector-chat-context,
 .inspector-chat-panel,
@@ -4500,7 +4544,8 @@ summary:focus-visible {
 .inspector-chat-topbar > span { color: rgb(255 255 255 / 58%); font-size: 0.65rem; }
 .inspector-chat-body { height: min(670px, 68vh); overflow-y: auto; padding: 20px; }
 .inspector-chat-row { display: flex; gap: 9px; margin-bottom: 15px; }
-.inspector-chat-row > span { align-items: center; background: var(--brand); border-radius: 9px 9px 9px 3px; display: flex; flex: 0 0 30px; font-size: 0.56rem; font-weight: 950; height: 30px; justify-content: center; }
+/* AI 점검 보조 대화창의 'DW' 배지도 같은 이미지로 바꾼다. */
+.inspector-chat-mascot { background: var(--brand); border-radius: 9px 9px 9px 3px; display: block; flex: 0 0 30px; height: 30px; width: 30px; object-fit: cover; }
 .inspector-chat-row p { background: #f4f5f6; border-radius: 4px 12px 12px 12px; font-size: 0.78rem; margin: 0; max-width: 75%; padding: 11px 13px; }
 .inspector-chat-row-user { justify-content: flex-end; }
 .inspector-chat-row-user p { background: var(--inspector-navy); border-radius: 12px 12px 4px 12px; color: #fff; }
@@ -4537,10 +4582,14 @@ summary:focus-visible {
 .inspector-question-chips button:hover:not(:disabled) { background: var(--brand-soft); border-color: #dbc43b; }
 .inspector-chat-error { background: var(--danger-bg); color: var(--review); font-size: 0.7rem; margin: 0; padding: 8px 16px; }
 
-.worksite-page { background: var(--surface); }
+
 /* 커뮤니티·계약서 안내 박스와 같은 모양을 쓴다. 성격이 같은 안내를 화면마다
    다른 색으로 두면 색이 무슨 뜻인지 배우게 만든다. */
-.worksite-privacy-strip { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; border: 1px solid #e8d47e; border-radius: 13px; background: var(--brand-soft); padding: 12px 16px; color: #081f3a; font-size: .84rem; }
+/* 로그인 안내를 겸하는 박스라 통째로 누를 수 있게 <a> 로 그린다. 다른 안내
+   박스와 같은 규칙을 쓰되 justify-content:center 를 추가하고, 링크라서
+   생기는 밑줄·기본 색을 지운다. */
+.worksite-privacy-strip { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 0 0 18px; border: 1px solid #e8d47e; border-radius: 13px; background: var(--brand-soft); padding: 12px 16px; color: #081f3a; font-size: .84rem; text-decoration: none; transition: box-shadow 160ms ease; }
+.worksite-privacy-strip:hover, .worksite-privacy-strip:focus-visible { box-shadow: 0 4px 14px rgb(232 212 126 / 45%); }
 .worksite-privacy-strip > strong { display: inline-flex; flex: 0 0 auto; align-items: center; border-radius: 999px; background: var(--ink); color: var(--brand); padding: 3px 9px; font-size: .68rem; font-weight: 950; letter-spacing: .06em; }
 .worksite-tip-form, .worksite-inspector-view { border: 1px solid var(--line); border-radius: 16px; background: var(--white); padding: 22px; box-shadow: 0 8px 24px rgb(36 35 28 / 4%); }
 .worksite-form-intro, .worksite-list-toolbar, .worksite-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
@@ -4710,14 +4759,14 @@ summary:focus-visible {
 
 .region-map-label {
   fill: var(--ink);
-  font-size: 11px;
+  font-size: 8.5px;
   font-weight: 850;
   text-anchor: middle;
   pointer-events: none;
 }
 .region-map-count {
   fill: var(--ink-soft);
-  font-size: 9px;
+  font-size: 7px;
   font-weight: 700;
   text-anchor: middle;
   pointer-events: none;
@@ -4735,11 +4784,7 @@ summary:focus-visible {
    돈워리와 이야기하는 화면이라 다른 탭보다 부드러워야 한다. 바탕과 테두리에만
    브랜드 노랑을 옅게 깔고, 글자는 파란 계열(--ink / --ink-soft / --muted)을
    그대로 둔다. 색으로 정보를 나르지 않으므로 읽기에 영향이 없다. */
-/* 페이지 바탕은 흰색으로 둔다. 따뜻함은 안쪽 카드가 맡는다. */
-.conversation-page,
-.search-page {
-  background: transparent;
-}
+/* 따뜻함은 안쪽 카드가 맡는다. 바탕은 .page-section 의 흰색 그대로다. */
 
 .conversation-page .chat-panel {
   border-color: #f0dfa0;
@@ -4801,16 +4846,39 @@ summary:focus-visible {
   text-align: center;
 }
 
+/* 아래 버튼 두 개(14rem + 0.75rem 간격 + 14rem)와 같은 폭으로 세운다. */
+.contract-upload {
+  --upload-control-width: 14rem;
+  --upload-control-gap: 0.75rem;
+}
+
+/* 아이콘+글자 묶음 자체는 아래 버튼 두 개와 같은 폭으로 가운데 세우되,
+   그 폭 안에서는 첨부 사진처럼 왼쪽 정렬한다 — 아이콘이 왼쪽 끝에 서고
+   글자가 그 오른쪽에 붙는다. 버튼 두 개도 같은 폭이라 왼쪽 끝이 서로
+   맞는다. */
 .contract-upload .upload-copy {
-  justify-content: center;
+  width: calc(var(--upload-control-width) * 2 + var(--upload-control-gap));
+  max-width: 100%;
+  justify-content: flex-start;
+  gap: 18px;
   text-align: left;
 }
+
+.contract-upload .upload-icon {
+  width: 60px;
+  height: 60px;
+  flex: 0 0 60px;
+  font-size: 1.5rem;
+}
+
+.contract-upload .upload-copy h3 { font-size: 1.2rem; }
+.contract-upload .upload-copy p { font-size: 0.82rem; }
 
 /* '파일 찾아보기' 와 '선택한 파일 검토' 는 같은 크기로 위아래에 선다.
    하나는 label, 하나는 button 이라 크기를 따로 맞춰 줘야 한다. */
 .contract-upload .contract-actions > .button,
 .contract-upload .contract-actions > label.button {
-  width: 14rem;
+  width: var(--upload-control-width);
   height: 3.25rem;
   padding-block: 0;
 }
@@ -4878,4 +4946,72 @@ summary:focus-visible {
   .consumer-header-side > .button {
     width: 7.375rem;
   }
+}
+
+
+/* 로그인 전 현장 신고 안내. 화면에 이 카드 하나뿐이라 가운데로 모으고
+   제목을 키운다. 지금은 글씨가 작아 안내가 아니라 각주처럼 읽힌다. */
+.worksite-page .worksite-state-card {
+  text-align: center;
+  padding: 34px 24px;
+}
+
+.worksite-page .worksite-state-card strong {
+  font-size: 1.35rem;
+  line-height: 1.4;
+}
+
+.worksite-page .worksite-state-card p {
+  margin: 12px auto 0;
+  max-width: 44rem;
+  font-size: 0.92rem;
+}
+
+/* ── 모델 운영 패널 (운영 관리자 전용) ─────────────────────
+   집계 화면 위에 얹는다. 보는 화면과 바꾸는 화면을 한 자리에 두어야
+   무엇을 보고 무엇을 눌렀는지가 이어진다. */
+.ml-ops-panel { margin-bottom: 26px; border: 1px solid var(--line); border-left: 4px solid var(--inspector-navy); border-radius: 14px; background: var(--white); box-shadow: var(--shadow-sm); padding: 20px 22px; }
+.ml-ops-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.ml-ops-head h2 { margin: 4px 0 0; color: var(--inspector-navy); font-size: 1.15rem; }
+.ml-ops-scope { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--muted); padding: 5px 11px; font-size: .68rem; font-weight: 800; }
+
+.ml-ops-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 14px; }
+.ml-ops-card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 16px; }
+.ml-ops-card h3 { margin: 0 0 6px; color: var(--inspector-navy); font-size: .92rem; }
+.ml-ops-card p { margin: 0 0 12px; color: var(--muted); font-size: .76rem; line-height: 1.6; }
+.ml-ops-state { color: var(--ink-soft) !important; font-weight: 750; }
+.ml-ops-state strong { color: var(--inspector-navy); }
+
+.ml-ops-cuts { display: grid; gap: 8px; margin: 0 0 14px; }
+.ml-ops-cuts > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ml-ops-cuts dt { color: var(--ink-soft); font-size: .78rem; font-weight: 800; }
+.ml-ops-cuts dd { display: flex; align-items: center; gap: 5px; margin: 0; color: var(--muted); font-size: .72rem; }
+.ml-ops-cuts input { width: 5.5rem; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--white); color: var(--ink); padding: 6px 8px; font-size: .78rem; font-weight: 800; text-align: right; }
+
+.ml-ops-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ml-ops-log { display: grid; gap: 4px; margin: 16px 0 0; border-top: 1px solid var(--line); padding: 12px 0 0 18px; color: var(--muted); font-size: .72rem; }
+
+/* ── 프롬프트 화면 ─────────────────────────────────────── */
+.prompt-studio-layout { display: grid; grid-template-columns: minmax(0, 17rem) minmax(0, 1fr); gap: 16px; align-items: start; }
+.prompt-studio-list { display: grid; gap: 8px; }
+.prompt-studio-list button { display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); padding: 13px 14px; text-align: left; cursor: pointer; }
+.prompt-studio-list button:hover { border-color: var(--inspector-navy); }
+.prompt-studio-list button.is-active { border-color: var(--inspector-navy); background: var(--surface); }
+.prompt-studio-list strong { color: var(--inspector-navy); font-size: .85rem; }
+.prompt-studio-list small { color: var(--ink-soft); font-size: .72rem; }
+.prompt-studio-list span { color: var(--muted); font-size: .68rem; }
+
+.prompt-studio-editor { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); box-shadow: var(--shadow-sm); padding: 18px; }
+.prompt-studio-editor > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.prompt-studio-editor header strong { display: block; color: var(--inspector-navy); font-size: .95rem; }
+.prompt-studio-editor header small { color: var(--muted); font-size: .72rem; }
+.prompt-saved-mark { border-radius: 999px; background: var(--brand-soft); color: var(--ink); padding: 4px 10px; font-size: .68rem; font-weight: 850; }
+.prompt-studio-editor textarea { width: 100%; min-height: 26rem; resize: vertical; border: 1px solid var(--line-strong); border-radius: 10px; background: #fbfdff; color: var(--ink); padding: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; line-height: 1.7; }
+.prompt-studio-editor textarea:focus { border-color: var(--inspector-navy); outline: 0; }
+.prompt-studio-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.prompt-studio-note { flex: 1 1 18rem; margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.6; }
+
+@media (max-width: 900px) {
+  .prompt-studio-layout { grid-template-columns: 1fr; }
+  .prompt-studio-editor textarea { min-height: 18rem; }
 }

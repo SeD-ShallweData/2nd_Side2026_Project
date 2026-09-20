@@ -44,8 +44,8 @@ const INSPECTOR: SessionUserDto = {
   role: "admin",
 };
 
-/** 감독 화면 권한이 없는 계정. 예전에는 이 역할이 목록을 읽었다. */
-const LEGACY_INSPECTOR: SessionUserDto = {
+/** 근로감독관 계정. 제보 확인은 이 역할의 일이라 목록을 읽을 수 있다. */
+const LABOR_INSPECTOR: SessionUserDto = {
   user_id: "10000000-0000-4000-8000-000000000004",
   email: "legacy-inspector@mock.donworry.local",
   display_name: "근로감독관",
@@ -341,10 +341,11 @@ describe("현장 제보 작성 계약", () => {
     }));
     expect(userList.status).toBe(403);
 
-    const legacyList = await listTips(new Request("http://localhost/api/worksite-tips", {
-      headers: { cookie: await cookieFor(LEGACY_INSPECTOR) },
+    // 근로감독관은 제보를 확인하는 역할이라 막지 않는다.
+    const inspectorList = await listTips(new Request("http://localhost/api/worksite-tips", {
+      headers: { cookie: await cookieFor(LABOR_INSPECTOR) },
     }));
-    expect(legacyList.status).toBe(403);
+    expect(inspectorList.status).toBe(200);
   });
 
   it("다른 출처의 작성 요청을 저장 전에 차단한다", async () => {

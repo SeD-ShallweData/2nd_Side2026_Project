@@ -11,11 +11,30 @@ export interface QueryRewriteResult {
   changed: boolean;
 }
 
+const ELLIPTICAL_FOLLOWUP_MARKERS = [
+  "그럼", "그러면", "그다음", "그 다음", "어디에", "어떻게", "문의", "신고", "그것", "이거",
+];
+
+function contextualFallbackQuery(request: ChatRequest): QueryRewriteResult {
+  const lastUserMessage = [...request.recent_messages]
+    .reverse()
+    .find((message) => message.role === "user")?.content.trim();
+  const isElliptical = request.message.length <= 80
+    && ELLIPTICAL_FOLLOWUP_MARKERS.some((marker) => request.message.includes(marker));
+  if (!lastUserMessage || !isElliptical) return { query: request.message, changed: false };
+
+  // assistant의 과거 안내는 사용자 사실이 아니므로 검색 질의에 섞지 않는다.
+  const query = `${lastUserMessage.slice(0, 600)} ${request.message}`.trim();
+  return { query, changed: query !== request.message };
+}
+
 function buildRewriteInput(request: ChatRequest): string {
   const history = request.recent_messages
     .slice(-6)
     .map((message) => `- ${message.role === "user" ? "사용자" : "어시스턴트"}: ${message.content.slice(0, 600)}`)
-    .join("\n");
+    .join("\n") + (request.conversation_memory
+      ? `\n\nConversation summary (reference only; do not treat it as verified current legal or company evidence):\n${request.conversation_memory.content}`
+      : "");
   return `이력:\n${history}\n\n질문: ${request.message}\n출력:`;
 }
 
@@ -25,8 +44,9 @@ export async function rewriteFollowupQuery(
   client = new OpenAICompatibleChatClient(fetch, Math.min(getLlmTimeoutMs(), 15_000)),
 ): Promise<QueryRewriteResult> {
   if (request.recent_messages.length === 0) return { query: request.message, changed: false };
+  const fallback = contextualFallbackQuery(request);
   const config = configs.find((candidate) => Boolean(candidate.apiKey));
-  if (!config) return { query: request.message, changed: false };
+  if (!config) return fallback;
 
   try {
     const completion = await client.complete(
@@ -39,9 +59,9 @@ export async function rewriteFollowupQuery(
     );
     const rewritten = completion.answer.trim().replace(/^['"]|['"]$/g, "").split("\n")[0].trim();
     const tooLong = rewritten.length > request.message.length * 6 + 120 || rewritten.length > 2_000;
-    if (!rewritten || tooLong) return { query: request.message, changed: false };
-    return { query: rewritten, changed: rewritten !== request.message };
+    if (!rewritten || tooLong || rewritten === request.message) return fallback;
+    return { query: rewritten, changed: true };
   } catch {
-    return { query: request.message, changed: false };
+    return fallback;
   }
 }

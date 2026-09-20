@@ -61,7 +61,9 @@ export function CommunityPostDetail({ postId }: { postId: string }) {
             <div>
               <span>{post.category_label}</span>
               <small>
-                {companyContextLabel(post.company_context)} · {post.author_label ?? "익명"} · {relativeTimeLabel(post.created_at)}
+                {[companyContextLabel(post.company_context), post.author_label ?? "익명", relativeTimeLabel(post.created_at)]
+                  .filter((part): part is string => Boolean(part))
+                  .join(" · ")}
                 {post.updated_at === post.created_at ? "" : ` · ${relativeTimeLabel(post.updated_at)} 수정됨`}
               </small>
             </div>

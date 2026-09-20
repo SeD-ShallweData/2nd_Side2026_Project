@@ -163,11 +163,17 @@ beforeEach(() => {
   });
 });
 
-describe.each(protectedEndpoints)("M2 $name 권한", ({ invoke, service }) => {
+/*
+ * 이 파일이 검사하는 경로는 모두 '감독 업무' 묶음이다 — 근로감독관과 운영
+ * 관리자가 함께 연다(server/auth/inspectorAccess.ts).
+ *
+ * '플랫폼 운영' 묶음(배치 현황)은 여기 없다. 배치는 route 와 페이지 두 곳에서
+ * admin 으로 좁히며 각자의 자리에서 검사한다.
+ */
+describe.each(protectedEndpoints)("M2 $name 권한 (감독 업무)", ({ invoke, service }) => {
   it.each([
     ["비로그인", null],
     ["일반 사용자", "user-token"],
-    ["근로감독관", "inspector-token"],
   ])("%s 요청을 서비스 실행 전에 403으로 차단한다", async (_label, token) => {
     const response = await invoke(token);
 
@@ -178,9 +184,11 @@ describe.each(protectedEndpoints)("M2 $name 권한", ({ invoke, service }) => {
     expect(service).not.toHaveBeenCalled();
   });
 
-  it("운영 관리자 요청만 서비스로 전달한다", async () => {
-    // 이 화면은 배치·ML 운영 기능이라 admin 이 연다. 근로감독관 계정은 막힌다.
-    const response = await invoke("admin-token");
+  it.each([
+    ["근로감독관", "inspector-token"],
+    ["운영 관리자", "admin-token"],
+  ])("%s 요청은 서비스로 전달한다", async (_label, token) => {
+    const response = await invoke(token);
 
     expect(response.status).toBe(200);
     expect(service).toHaveBeenCalledOnce();

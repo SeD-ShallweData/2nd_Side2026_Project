@@ -5,11 +5,15 @@ import { useRouter } from "next/navigation";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { CompanySearchResultCard } from "@/components/company/CompanySearchResultCard";
 import { RegionMap } from "@/components/company/RegionMap";
+import { getFavoriteEligibility } from "@/components/favorite/favoriteAuth";
+import type { SessionResponse } from "@/app/api/auth/authApiContract";
 import type {
   CompanyFilterOptions,
   CompanySearchFilters,
   CompanySearchResponse,
 } from "@/domain/company";
+import { getSession } from "@/services/authClient";
+import { getFavorites } from "@/services/favoriteClient";
 import { readApiResponse } from "@/utils/clientApi";
 
 const RECOMMENDED_QUERIES = ["건설", "한빛", "테크"] as const;
@@ -32,6 +36,8 @@ export function CompanySearch() {
   const [editingPage, setEditingPage] = useState(false);
   const [pageDraft, setPageDraft] = useState("");
   const [pageValidation, setPageValidation] = useState<string | null>(null);
+  const [session, setSession] = useState<SessionResponse | "loading">("loading");
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
 
   // 지도를 첫 화면에 띄우려면 지역별 사업장 수가 먼저 있어야 한다. 필터 패널을
   // 열 때까지 기다리지 않고 들어오자마자 한 번 불러온다.
@@ -40,6 +46,43 @@ export function CompanySearch() {
     // 화면에 처음 들어올 때 한 번이면 된다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 즐겨찾기 선택 상태는 화면 진입 시 한 번만 조회해 로컬 Set으로 들고 있는다.
+  // 로그인하지 않았거나 일반 사용자가 아니면 어차피 401/403이 나므로 조회를 건너뛴다.
+  useEffect(() => {
+    let ignore = false;
+    const controller = new AbortController();
+    getSession({ signal: controller.signal })
+      .then((sessionResult) => {
+        if (ignore) return;
+        setSession(sessionResult);
+        if (sessionResult.authenticated && sessionResult.user.role === "user") {
+          return getFavorites({ signal: controller.signal }).then((favorites) => {
+            if (!ignore) setFavoriteIds(new Set(favorites.items.map((item) => item.company_id)));
+          });
+        }
+        return undefined;
+      })
+      .catch((error: unknown) => {
+        if (ignore || (error instanceof DOMException && error.name === "AbortError")) return;
+        setSession({ authenticated: false, user: null, expires_at: null });
+      });
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
+  }, []);
+
+  const favoriteEligibility = getFavoriteEligibility(session);
+
+  function handleFavoriteChange(companyId: string, isFavorite: boolean) {
+    setFavoriteIds((current) => {
+      const next = new Set(current);
+      if (isFavorite) next.add(companyId);
+      else next.delete(companyId);
+      return next;
+    });
+  }
 
   async function search(nextQuery: string, page = 1, nextFilters = appliedFilters) {
     const trimmed = nextQuery.trim();
@@ -166,7 +209,6 @@ export function CompanySearch() {
               aria-controls={`${inputId}-filters`}
               onClick={toggleFilters}
             >
-              <span aria-hidden="true">☷</span>
               필터{appliedFilters.region || appliedFilters.industry ? ` (${Number(Boolean(appliedFilters.region)) + Number(Boolean(appliedFilters.industry))})` : ""}
               <span className="filter-toggle-caret" aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
             </button>
@@ -294,6 +336,9 @@ export function CompanySearch() {
                   company={company}
                   query={result.query}
                   onSelect={(companyId) => router.push(`/companies/${encodeURIComponent(companyId)}`)}
+                  isFavorite={favoriteIds.has(company.company_id)}
+                  favoriteEligibility={favoriteEligibility}
+                  onFavoriteChange={handleFavoriteChange}
                 />
               ))}
             </div>
@@ -358,7 +403,9 @@ export function CompanySearch() {
         {!loading && !error && result === null ? (
           <div className="search-placeholder">
             <h2>어느 지역부터 볼까요?</h2>
-            <p>지도에서 지역을 고르면 그 지역의 사업장을 바로 보여드립니다. 회사명을 알고 있다면 위에서 바로 검색하세요.</p>
+            <p>지도에서 지역을 고르면 그 지역의 사업장을 바로 보여드립니다.
+            <br />
+            회사명을 알고 있다면 위에서 바로 검색하세요.</p>
             {filterOptionsError ? (
               <p className="field-error" role="alert">{filterOptionsError}</p>
             ) : filterOptions ? (
