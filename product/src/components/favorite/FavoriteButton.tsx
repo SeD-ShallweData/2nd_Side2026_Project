@@ -60,10 +60,10 @@ export function FavoriteButton({
         className={["button", isFavorite ? "button-outline" : "button-dark", className].filter(Boolean).join(" ")}
         disabled={pending}
         aria-pressed={isFavorite}
-        aria-label={`${companyName} ${isFavorite ? "관심 해제" : "관심 추가"}`}
+        aria-label={`${companyName} ${isFavorite ? "관심 해제" : "관심 사업장 추가"}`}
         onClick={() => void handleClick()}
       >
-        {pending ? "처리 중" : isFavorite ? "관심 해제" : "관심 추가"}
+        {pending ? "처리 중" : isFavorite ? "관심 해제" : "관심 사업장 추가"}
       </button>
       {error ? (
         <p className="field-error" role="alert">

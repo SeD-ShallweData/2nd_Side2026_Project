@@ -15,7 +15,7 @@ export default function CompaniesPage() {
         <div className="page-heading">
           <span className="eyebrow">AI 분석 기반 사업장 신뢰 정보</span>
           <h1>궁금한 업장을 검색해주세요!</h1>
-          <p>회사명을 검색한 뒤 지역과 업종을 비교해 정확한 사업장을 직접 선택하세요.</p>
+          <p>회사명을 검색한 뒤 지역과 업종을 비교해 정확한 사업장을 직접 조회하고<br />추가로 궁금한 점은 자세히 물어보기 버튼을 통해 돈워리에게 질문하세요.</p>
         </div>
         <DataModeNotice
           dataMode={dataMode}

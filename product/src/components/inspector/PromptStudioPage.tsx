@@ -57,7 +57,6 @@ export function PromptStudioPage() {
           <h1>LLM 프롬프트</h1>
           <p>지금 서비스에 적용 중인 시스템 프롬프트입니다. 문구를 고치면 답변의 태도와 금지 표현이 함께 바뀝니다.</p>
         </div>
-        <span className="inspector-private-badge">운영 관리자 전용</span>
       </div>
 
       {error ? <div className="batch-state-card" role="alert"><strong>프롬프트를 불러오지 못했습니다.</strong><p>{error}</p></div> : null}
