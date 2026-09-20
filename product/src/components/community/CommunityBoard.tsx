@@ -87,9 +87,11 @@ export function CommunityBoard() {
               {categoryFilterLabel(item)}
             </button>
           ))}
+        </div>
+        <div className="community-search-actions">
+          <label className="community-search-field"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="게시글 검색" aria-label="게시글 검색" /></label>
           {result?.capabilities.write ? <Link href="/community/new" className="button button-dark">글쓰기</Link> : null}
         </div>
-        <label className="community-search-field"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="게시글 검색" aria-label="게시글 검색" /></label>
       </div>
       <section className="community-post-list" aria-label="커뮤니티 게시물" aria-live="polite" aria-busy={loading}>
         {loading ? <LoadingSkeleton label="커뮤니티 게시물을 불러오고 있습니다." /> : null}

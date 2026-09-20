@@ -49,11 +49,11 @@ export async function InspectorNav({ current }: { current: "dashboard" | "chat" 
           {/* 배치는 플랫폼 운영이다. 근로감독관에게는 보이지 않는다. */}
           {isOperator ? (
             <Link href="/inspector/batches" aria-current={current === "batches" ? "page" : undefined}>
-              배치 현황
+              ML 배치 현황
             </Link>
           ) : null}
           <Link href="/inspector/ml-dashboard" aria-current={current === "ml-dashboard" ? "page" : undefined}>
-            Machine Learning 대시보드
+            ML 대시보드
           </Link>
         </nav>
         <span className="inspector-private-badge">

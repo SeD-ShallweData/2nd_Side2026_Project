@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import type { SessionResponse } from "@/app/api/auth/authApiContract";
 import type {
@@ -204,7 +203,11 @@ export function WorksiteTipPage() {
     return () => controller.abort();
   }, [retry]);
 
+  const role = session?.authenticated ? session.user.role : null;
+  const isAdmin = role === "admin";
+  const isInspector = role === "inspector";
+
   return (
-    <div className="page-section worksite-page"><div className="shell narrow-shell"><div className="page-heading"><span className="eyebrow">현장 위험 요소 제보</span><h1>현장의 목소리를 안전하게 전달하세요</h1><p>제보는 공개 커뮤니티와 분리되어 근로감독관 확인용으로만 전달됩니다.</p></div><Link href="/login" className="worksite-privacy-strip" aria-label="안심하세요! 제보자의 이메일과 내부 식별정보는 화면에 표시하지 않습니다. 로그인하러 가기"><strong>안심하세요!</strong><span>제보자의 이메일과 내부 식별정보는 화면에 표시하지 않습니다.</span></Link>{error ? <div className="worksite-state-card"><strong>로그인 상태를 확인하지 못했습니다.</strong><p>{error}</p><button type="button" className="button button-outline" onClick={() => { setError(null); setRetry((value) => value + 1); }}>다시 시도</button></div> : session ? <SessionGate session={session} onRetry={() => setRetry((value) => value + 1)} /> : <div className="worksite-state-card">로그인 상태를 확인하는 중입니다.</div>}</div></div>
+    <div className="page-section worksite-page"><div className="shell narrow-shell"><div className="page-heading"><span className="eyebrow">현장 위험 요소 제보</span><h1>현장의 목소리를 안전하게 전달하세요</h1>{!isAdmin ? <p>제보는 공개 커뮤니티와 분리되어 근로감독관 확인용으로만 전달됩니다.</p> : null}</div>{!isAdmin && !isInspector ? <div className="worksite-privacy-strip"><strong>안심하세요!</strong><span>제보자의 이메일과 내부 식별정보는 화면에 표시하지 않습니다.</span></div> : null}{error ? <div className="worksite-state-card"><strong>로그인 상태를 확인하지 못했습니다.</strong><p>{error}</p><button type="button" className="button button-outline" onClick={() => { setError(null); setRetry((value) => value + 1); }}>다시 시도</button></div> : session ? <SessionGate session={session} onRetry={() => setRetry((value) => value + 1)} /> : <div className="worksite-state-card">로그인 상태를 확인하는 중입니다.</div>}</div></div>
   );
 }
