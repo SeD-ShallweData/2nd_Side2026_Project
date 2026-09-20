@@ -41,10 +41,11 @@ function errorResponse(
   code: string,
   message: string,
   extra: Record<string, unknown> = {},
+  headers: Record<string, string> = {},
 ): Response {
-  return jsonResponse(
-    { error: { code, message, retryable: status >= 500, request_id: "req_test_0001", ...extra } },
-    status,
+  return new Response(
+    JSON.stringify({ error: { code, message, retryable: status >= 500, request_id: "req_test_0001", ...extra } }),
+    { status, headers: { "content-type": "application/json", ...headers } },
   );
 }
 
@@ -91,6 +92,27 @@ describe("로그인", () => {
 
     expect(caught).toBeInstanceOf(AuthApiError);
     expect(caught).toMatchObject({ status: 401, code: "INVALID_CREDENTIALS", retryable: false });
+  });
+
+  it("LOGIN_TEMPORARILY_LOCKED는 Retry-After 헤더를 초 단위로 담는다", async () => {
+    const fetchImpl = createFetchMock(
+      errorResponse(429, "LOGIN_TEMPORARILY_LOCKED", "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.", {}, {
+        "Retry-After": "900",
+      }),
+    );
+
+    const caught = await captureError(login({ email: "worker@example.com", password: "wrong" }, { fetchImpl }));
+
+    expect(caught).toBeInstanceOf(AuthApiError);
+    expect(caught).toMatchObject({ status: 429, code: "LOGIN_TEMPORARILY_LOCKED", retryAfterSeconds: 900 });
+  });
+
+  it("Retry-After 헤더가 없으면 retryAfterSeconds는 null이다", async () => {
+    const fetchImpl = createFetchMock(errorResponse(401, "INVALID_CREDENTIALS", "이메일 또는 비밀번호를 확인해 주세요."));
+
+    const caught = await captureError(login({ email: "worker@example.com", password: "wrong" }, { fetchImpl }));
+
+    expect(caught).toMatchObject({ retryAfterSeconds: null });
   });
 });
 
