@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { FavoriteEligibility } from "@/components/favorite/favoriteAuth";
+import { performFavoriteToggle } from "@/components/favorite/favoriteAuth";
 import { describeFavoriteError, favoriteErrorRequiresLogin } from "@/components/favorite/favoriteErrorMessage";
-import { addFavorite, removeFavorite } from "@/services/favoriteClient";
 
 interface FavoriteButtonProps {
   companyId: string;
   companyName: string;
   initialIsFavorite: boolean;
-  /** 세션 조회 결과를 바탕으로 부모가 한 번만 계산해 내려주는 값. */
+  /** 세션 조회 결과를 바탕으로 부모가 한 번만 계산해 내려주는 값. 오래됐을 수 있어
+   *  eligible이 아니면 클릭 시점에 한 번 더 재확인한다(performFavoriteToggle). */
   eligibility: FavoriteEligibility;
   className?: string;
   onChange?: (companyId: string, isFavorite: boolean) => void;
@@ -24,6 +26,7 @@ export function FavoriteButton({
   className,
   onChange,
 }: FavoriteButtonProps) {
+  const pathname = usePathname();
   const [isFavorite, setIsFavorite] = useState(initialIsFavorite);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<{ message: string; requiresLogin: boolean } | null>(null);
@@ -31,23 +34,15 @@ export function FavoriteButton({
   async function handleClick() {
     if (pending) return;
     setError(null);
-
-    if (!eligibility.eligible) {
-      if (eligibility.reason) setError(eligibility.reason);
-      return;
-    }
-
     setPending(true);
     try {
-      if (isFavorite) {
-        await removeFavorite(companyId);
-        setIsFavorite(false);
-        onChange?.(companyId, false);
-      } else {
-        await addFavorite(companyId);
-        setIsFavorite(true);
-        onChange?.(companyId, true);
+      const result = await performFavoriteToggle(companyId, isFavorite, eligibility);
+      if (result.status === "blocked") {
+        setError(result.reason);
+        return;
       }
+      setIsFavorite(result.isFavorite);
+      onChange?.(companyId, result.isFavorite);
     } catch (caught) {
       setError({
         message: describeFavoriteError(caught),
@@ -76,7 +71,7 @@ export function FavoriteButton({
           {error.requiresLogin ? (
             <>
               {" "}
-              <Link href="/login">로그인하기</Link>
+              <Link href={`/login?next=${encodeURIComponent(pathname)}`}>로그인하기</Link>
             </>
           ) : null}
         </p>
