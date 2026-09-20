@@ -18,6 +18,7 @@ import json
 import os
 import sys
 from collections import Counter, defaultdict
+from datetime import datetime, timedelta, timezone
 
 # ── 상수 ───────────────────────────────────────────────
 # 큐 risk_full 은 소수 4자리로 반올림돼 있다. 등호 비교하면 98.9% 가 실패한다.
@@ -156,6 +157,34 @@ class Report:
             out.append("")
         out.append(f"✅ 통과 {len(self.passed)}건")
         return "\n".join(out)
+
+    def to_dict(self, target):
+        """기계가 읽을 형태. --json 일 때만 쓴다.
+
+        키 이름이 snake_case 가 아닌 이유: 이 JSON 의 소비자는 배치 현황 화면이고,
+        그 화면이 기대하는 필드명이 이미 정해져 있다
+        (product/src/adapters/mock/MockBatchStatusProvider.ts 의 drift 객체).
+        파이썬 관례보다 소비자 계약을 따른다.
+
+        status 는 오류 유무로만 정한다 — 경고가 있어도 적재는 가능하다는 것이
+        docs/mlops/self-check-spec.md 의 정의이고, 종료 코드 규칙과도 같다.
+        """
+        return {
+            "target": target,
+            "checkedAt": datetime.now(timezone.utc)
+            .astimezone(timezone(timedelta(hours=9)))
+            .isoformat(timespec="seconds"),
+            "status": "불일치" if self.errors else "정상",
+            "errorCount": len(self.errors),
+            "warningCount": len(self.warnings),
+            "notCheckableCount": len(self.skipped),
+            "passedCount": len(self.passed),
+            "errors": list(self.errors),
+            "warnings": list(self.warnings),
+            "notCheckable": list(self.skipped),
+            "passed": list(self.passed),
+            "exitCode": 1 if self.errors else 0,
+        }
 
 
 def stream_csv(path):
@@ -513,6 +542,8 @@ def main():
     ap = argparse.ArgumentParser(description="ML 제출물 CSV 자가 검증기")
     ap.add_argument("--outputs", required=True, help="CSV 3개가 있는 디렉터리")
     ap.add_argument("--manifest", default=None, help="manifest.json 경로 (없으면 --outputs 안에서 찾음)")
+    ap.add_argument("--json", action="store_true",
+                    help="사람이 읽는 표 대신 JSON 한 덩어리를 낸다 (기록·화면 연동용)")
     args = ap.parse_args()
 
     if not os.path.isdir(args.outputs):
@@ -544,12 +575,17 @@ def main():
     rep.skip("V9", "사업자번호 앞자리 0 보존 — CSV만으로 판정 불가 (길이 일관성만 확인)")
     rep.skip("V10", "sido_code·industry_category 문자열 여부 — CSV에 타입 정보 없음")
 
+    code = 1 if rep.errors else 0
+
+    if args.json:
+        print(json.dumps(rep.to_dict(args.outputs), ensure_ascii=False, indent=2))
+        return code
+
     print("자가 검증 결과")
     print(f"대상: {args.outputs}")
     print()
     print(rep.render())
     print()
-    code = 1 if rep.errors else 0
     print(f"종료 코드 {code}")
     return code
 
