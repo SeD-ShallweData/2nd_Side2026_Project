@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { DataSourceList } from "@/components/common/DataSourceList";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { SafetyContextPublic, SourceReference, WageRiskPublic } from "@/domain/risk";
@@ -190,6 +191,7 @@ export function RiskInformationCard(props: CardProps) {
       </details>
 
       <button type="button" className="button button-outline card-action" aria-label={`AI에게 묻기: ${question}`} onClick={() => props.onAsk(question)}>
+        <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />
         자세히 물어보기 <span aria-hidden="true">→</span>
       </button>
     </article>
