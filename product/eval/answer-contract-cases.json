@@ -492,7 +492,7 @@
       "company_id": "COMPANY_DEMO_008"
     },
     "contract": {
-      "required_all": [],
+      "required_all": ["안전 신호 미확인", "지역", "업종"],
       "required_any": [
         [
           "확인",
@@ -654,9 +654,30 @@
       "recent_messages": [{ "role": "user", "content": "급여일은 매월 10일이고 이번 달 월급을 받지 못했다. 계약서와 통장 내역이 있다. 무엇부터 해야 하나?" }]
     },
     "contract": {
-      "required_any": [["문자", "메시지"], ["금액", "지급일", "예정일"]],
+      "required_any": [["문자", "메시지"], ["원문", "원본"], ["발신", "보낸 사람"], ["수신", "받은 시각"], ["금액"], ["지급일", "지급 날짜", "예정일"]],
       "forbidden": ["지급 예정일을 기준으로 14일", "약속일부터 14일", "약속일로부터 14일"]
     },
     "human_review": ["후속07 실제 로그인 브라우저에서 발견한 개발 실패. 고정 이력은 재현을 위한 최소 합성이며 실제 서버 이력 전체와 동일하지 않음", "퇴직·사망 진술 없이 제36조의 14일을 회사 지급 약속일부터 적용하면 FAIL. 금품청산과 재직 중 정기 임금 지급을 구분", "자동 금지 구문 외 변형과 표시 출처의 조건·관련성은 공식 원문으로 별도 검토"]
+  },
+  {
+    "id": "AQ31-settlement-trigger",
+    "split": "development",
+    "request": { "message": "퇴직한 근로자의 미지급 임금은 언제까지 청산해야 하나요? 회사가 다음 주 지급한다고 문자만 보냈습니다.", "chat_mode": "wage", "recent_messages": [] },
+    "contract": { "required_all": ["퇴직", "14일"], "required_any": [["발생", "퇴직일부터", "퇴직한 날"]], "forbidden": ["약속일부터 14일", "약속일로부터 14일"] },
+    "human_review": ["후속08 수정용 개발 사례. 제36조 조건과 지급 사유 발생 기산점, 일방 통보와 연장 합의 구분을 공식 원문으로 검토"]
+  },
+  {
+    "id": "AQ32-settlement-extension",
+    "split": "development",
+    "request": { "message": "퇴직 후 임금 지급기일을 연장하는 데 합의하면 제36조의 14일은 어떻게 되나요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": { "required_all": ["특별한 사정", "합의", "14일"], "required_any": [["당사자", "쌍방"]], "forbidden": ["약속일부터 14일", "약속일로부터 14일"] },
+    "human_review": ["후속08 개발 사례. 연장 합의의 특별한 사정·당사자 합의와 원래 지급 사유 발생 기산점을 보존. 없는 합의 날짜를 만들지 않음"]
+  },
+  {
+    "id": "AQ33-employed-no-settlement",
+    "split": "development",
+    "request": { "message": "퇴직하지 않고 재직 중인데 월급이 미지급입니다. 회사가 다음 주 준다는 문자만 보냈으면 제36조 때문에 14일을 더 기다려야 하나요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": { "required_all": ["진정"], "required_any": [["정기", "급여일"]], "forbidden": ["약속일부터 14일", "약속일로부터 14일", "14일을 더 기다려야 합니다"] },
+    "human_review": ["후속08 개발 음성 사례. 퇴직 부정 문장을 퇴직 사실로 승격하지 않는지, 재직자 지급일 경과와 진정을 연결하는지 검토"]
   }
 ]

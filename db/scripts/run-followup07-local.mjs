@@ -12,7 +12,9 @@ import { analyzeMigrationState } from './migration-drift-core.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const product = resolve(root, 'product');
-const runtime = resolve(product, '.runtime/followup07');
+const stage = process.argv.includes('--followup08') ? 'followup08' : 'followup07';
+const runtimeRelative = `.runtime/${stage}`;
+const runtime = resolve(product, runtimeRelative);
 const container = 'mw-followup06-1789983829982-e8d9a9';
 const database = 'mw_followup06';
 const owner = 'mw_followup06_owner';
@@ -121,6 +123,11 @@ try {
       const raw = await upstream.text(); let usage = null;
       try { usage = JSON.parse(raw).usage ?? null; } catch {}
       calls.push({ duration_ms: Date.now() - began, status: upstream.status, usage });
+      if (stage === 'followup08') {
+        // This stage is restricted to synthetic inputs. Keep raw model answers separate
+        // from guarded public output, without request prompts or authorization headers.
+        try { writeFileSync(resolve(runtime, `model-output-${calls.length}.json`), JSON.stringify(JSON.parse(raw).choices ?? [], null, 2)); } catch {}
+      }
       res.writeHead(upstream.status, { 'content-type': 'application/json' }); res.end(raw);
     } catch { calls.push({ duration_ms: Date.now() - began, status: 'network_error', usage: null }); res.writeHead(502); res.end('{"error":{"code":"LOCAL_UPSTREAM_FAILURE"}}'); }
   });
@@ -154,19 +161,19 @@ try {
   }
   assert(ragReady, 'RAG_NOT_READY');
   phase = 'app'; await startApp();
-  output({ ready: true, base, control_directory: '.runtime/followup07', provider_metrics: 'counts-latency-usage-only' });
+  output({ ready: true, base, control_directory: runtimeRelative, provider_metrics: 'counts-latency-usage-only' });
   while (!existsSync(resolve(runtime, 'stop'))) {
     for (const action of ['evaluate', 'continuity', 'restart', 'worker', 'metrics']) {
       const marker = resolve(runtime, action); if (!existsSync(marker)) continue;
       const selection = readFileSync(marker, 'utf8').trim();
       unlinkSync(marker); phase = action; const before = calls.length;
-      if (action === 'evaluate') await run(['--experimental-strip-types', 'scripts/run-answer-quality-eval.ts', '--base-url', base, '--runs', '1', '--output', `.runtime/followup07/anonymous-${Date.now()}.jsonl`, ...(selection.startsWith('AQ') ? ['--cases', selection] : [])]);
+      if (action === 'evaluate') await run(['--experimental-strip-types', 'scripts/run-answer-quality-eval.ts', '--base-url', base, '--runs', '1', '--output', `${runtimeRelative}/anonymous-${Date.now()}.jsonl`, ...(selection.startsWith('AQ') ? ['--cases', selection] : [])]);
       if (action === 'continuity') {
-        const email = `followup07-${randomBytes(8).toString('hex')}@example.invalid`;
+        const email = `${stage}-${randomBytes(8).toString('hex')}@example.invalid`;
         const password = randomBytes(12).toString('hex');
         const signup = await fetch(base + '/api/auth/signup', { method: 'POST', headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' }, body: JSON.stringify({ email, password, name: '후속7 합성 평가' }) });
         assert.equal(signup.status, 201);
-        await run(['--experimental-strip-types', 'scripts/run-conversation-continuity-eval.ts', '--base-url', base, '--output', `.runtime/followup07/continuity-${Date.now()}.jsonl`], { ...env, ANSWER_EVAL_EMAIL: email, ANSWER_EVAL_PASSWORD: password, ANSWER_EVAL_ISOLATED_PG16: '1' });
+        await run(['--experimental-strip-types', 'scripts/run-conversation-continuity-eval.ts', '--base-url', base, '--output', `${runtimeRelative}/continuity-${Date.now()}.jsonl`], { ...env, ANSWER_EVAL_EMAIL: email, ANSWER_EVAL_PASSWORD: password, ANSWER_EVAL_ISOLATED_PG16: '1' });
       }
       if (action === 'restart') { await stop(app); await startApp(); output({ app_restart: 'ready' }); }
       if (action === 'worker') { await run(['scripts/build-conversation-worker.mjs']); await run(['.runtime/conversation-worker.mjs']); }

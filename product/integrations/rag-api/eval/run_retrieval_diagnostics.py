@@ -22,12 +22,20 @@ from questions import (  # noqa: E402
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--group", choices=("development", "validation", "negative", "all"), default="all")
+    parser.add_argument("--group", choices=("development", "validation", "negative", "all", "followup08"), default="all")
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--candidate-limit", type=int, default=5)
     return parser.parse_args()
 
 
 def selected(group):
+    if group == "followup08":
+        return [{"id": f"F08-D{index + 1}", "q": query, "group": "development"} for index, query in enumerate([
+            "월급을 받지 못했다", "월급이 안 들어왔다", "급여 미입금", "월급을 두 달째 안 줬다",
+            "퇴직 후 월급을 못 받았다", "사망 후 미지급 임금", "임금 지연이자는?", "퇴직금을 못 받았어요",
+            "건설 현장에서 일했는데 하청업체가 임금을 안 줬어요", "산업안전 신호 미확인은 무슨 뜻인가요?",
+            "정정한 급여일은 언제였나요?", "코인 매수 추천",
+        ])]
     groups = {
         "development": FOLLOWUP04_DEVELOPMENT,
         "validation": FOLLOWUP04_VALIDATION,
@@ -81,7 +89,12 @@ def main():
                 })
         finally:
             retriever._reset_for_tests()
-    print(json.dumps(rows, ensure_ascii=False, indent=2))
+    serialized = json.dumps(rows, ensure_ascii=False, indent=2)
+    if args.output:
+        args.output.write_text(serialized + "\n", encoding="utf-8")
+        print(json.dumps({"rows": len(rows), "output": str(args.output)}))
+    else:
+        print(serialized)
     return 0
 
 

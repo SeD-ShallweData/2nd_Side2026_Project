@@ -18,6 +18,9 @@ export function wageArrearsFallback(
   if (!hasUnpaidWageQuestion(query) || retrieval.status !== "matched" || retrieval.documents.length === 0) {
     return null;
   }
+  // A matched but unrelated article (e.g. delayed interest alone) cannot support filing advice.
+  if (!retrieval.documents.some(doc => doc.citation === "근로기준법 제43조")
+    || !retrieval.documents.some(doc => doc.source.url?.startsWith("https://labor.moel.go.kr/"))) return null;
 
   const periodNote = /두\s*(?:달|개월)|2\s*(?:달|개월)/.test(query)
     ? "두 달분은 각 월의 약정 지급일, 약정액, 실제 입금액을 나눠 미지급액을 합산하세요."
@@ -34,7 +37,7 @@ export function wageArrearsFallback(
     answer: [
       `급여일이 지났는데 임금이 입금되지 않았다면 먼저 지급일과 미지급액을 기록으로 고정하세요. ${periodNote}`,
       `${evidenceNote} 회사가 지급을 약속했다면 금액과 지급 예정일을 문자나 이메일처럼 남는 방식으로 다시 확인하세요.`,
-      `약속일까지 지급되지 않으면 1350에서 절차를 상담할 수 있습니다. 정식 임금체불 진정은 전화 상담과 별개로 고용노동부 노동포털에서 온라인 신청하거나 사업장 소재지 관할 고용노동관서를 방문해 접수하고, 준비한 지급일·미지급액·근무 및 입금 자료를 제출하세요.${outOfScopeNote}`,
+      `재직 중 정기 임금은 원칙적으로 매월 1회 이상 정한 날짜에 지급해야 합니다(근로기준법 제43조). 정기 급여일이 이미 지났다면 회사가 새로 약속한 날까지 기다려야만 진정할 수 있는 것은 아닙니다. 1350에서 절차를 상담할 수 있습니다. 정식 임금체불 진정은 전화 상담과 별개로 고용노동부 노동포털에서 온라인 신청하거나 사업장 소재지 관할 고용노동관서를 방문해 접수하고, 준비한 지급일·미지급액·근무 및 입금 자료를 제출하세요(고용노동부 노동포털 「체불임금 해결 방법」).${outOfScopeNote}`,
     ].join("\n\n"),
     answer_type: "general_guidance",
     sources: retrieval.documents.map((document) => document.source),

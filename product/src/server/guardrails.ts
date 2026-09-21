@@ -158,6 +158,7 @@ export const CHAT_OUTPUT_GUARDRAILS: GuardrailRule[] = [
   { code: "LEGAL_CERTAINTY", pattern: /(?:위법|불법)(?:입니다|이다)|처벌(?:됩니다|받습니다)|반드시\s*승소/i, allowNegated: true },
   { code: "WAGE_FUTURE_CERTAINTY", pattern: /임금체불(?:이|은)?\s*발생할\s*것입니다|임금체불\s*가능성이\s*확실합니다|체불할\s*것입니다/i, allowNegated: true },
   { code: "SAFETY_FUTURE_CERTAINTY", pattern: /산재(?:가|는)?\s*발생할\s*것입니다|사고(?:가|는)?\s*(?:발생합니다|날\s*것입니다)/i, allowNegated: true },
+  { code: "SAFETY_SIGNAL_CERTIFICATION", pattern: /(?:산업안전|산업재해)[^.\n]{0,25}이상(?:이|은|\s)*없(?:습니다|다는\s*뜻|다고\s*확인)|안전\s*인증(?:을\s*받았|이\s*확인|입니다)/i, allowNegated: true },
   { code: "ADMISSION_DECISION", pattern: /입사하지\s*마세요|입사해도\s*됩니다/i, allowNegated: true },
   { code: "PUBLIC_RISK_VALUE", pattern: /(?:체불|산재|사고|위험)\s*(?:확률|점수|지수|등급|순위|랭킹)\s*(?:은|는|이|가|:|：)?\s*[A-Fa-f가-힣\d.]+|\d+(?:\.\d+)?\s*%[^.\n]{0,20}(?:위험|확률|체불)/i, allowNegated: true },
   { code: "PROMPT_DISCLOSURE", pattern: /시스템\s*프롬프트[는은]?\s*(?:다음|아래|이렇게)|숨은\s*프롬프트[는은]?\s*(?:다음|아래)|#\s*(?:역할|가드레일|형식)(?![가-힣])|\bAuthority\b.{0,40}\bScope\b|system prompt (?:is|as follows)/i },

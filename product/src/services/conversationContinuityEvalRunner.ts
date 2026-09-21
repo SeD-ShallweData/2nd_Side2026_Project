@@ -31,6 +31,7 @@ export interface ContinuityEvaluationRow {
   conversation_persistence: "saved";
   restored_turn_count: number;
   answer: string;
+  evidence: { citations: string[]; source_urls: string[]; rag_reason: string | null; guardrail_action: string | null; guardrail_hits: string[] };
   failures: string[];
   checks: string[];
   human_review: string[];
@@ -269,6 +270,8 @@ export async function runContinuityEvaluationCase(input: {
       expectedAnswer: answer.answer,
     });
     const result = Array.isArray(payload.results) ? asRecord(payload.results[0]) : null;
+    const trace = asRecord(result?.trace);
+    const sources = Array.isArray(result?.sources) ? result.sources.map(asRecord) : [];
     const memory = asRecord(asRecord(result?.trace)?.memory);
     const safeMemory: Record<string, string | number | boolean | null> = {};
     for (const key of ["summary_status", "summary_version", "summarized_through_sequence", "stored_message_count", "hydrated_recent_count", "summary_included", "recall_fact_count", "legacy_recall_rebuilt"]) {
@@ -288,6 +291,13 @@ export async function runContinuityEvaluationCase(input: {
       conversation_persistence: "saved",
       restored_turn_count: index + 1,
       answer: answer.answer,
+      evidence: {
+        citations: sources.map(source => source?.citation ?? source?.name).filter((value): value is string => typeof value === "string").map(value => value.slice(0, 300)),
+        source_urls: sources.map(source => source?.url).filter((value): value is string => typeof value === "string").map(value => value.slice(0, 1000)),
+        rag_reason: typeof trace?.rag_reason === "string" ? trace.rag_reason.slice(0, 100) : null,
+        guardrail_action: typeof trace?.guardrail_action === "string" ? trace.guardrail_action.slice(0, 40) : null,
+        guardrail_hits: Array.isArray(trace?.guardrail_hits) ? trace.guardrail_hits.filter((value): value is string => typeof value === "string" && /^[A-Z0-9_]+$/.test(value)) : [],
+      },
       failures: evaluation.failures,
       checks: evaluation.checks,
       human_review: step.human_review,
