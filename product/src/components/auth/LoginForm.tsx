@@ -47,13 +47,21 @@ export function resolveLoginRedirect(options: { hasGuestConversation: boolean; n
 }
 
 // 로그인 자체 실패의 원인은 노출하지 않는다 — 계정 존재 여부가 드러나면 안 된다.
-function submitErrorMessage(error: AuthApiError): string {
+export function submitErrorMessage(error: AuthApiError): string {
   switch (error.code) {
     case "VALIDATION_ERROR":
     case "INVALID_CREDENTIALS":
     case "AUTH_ROLE_UNSUPPORTED":
     case "CROSS_SITE_REQUEST_REJECTED":
       return error.message;
+    case "LOGIN_TEMPORARILY_LOCKED": {
+      // "잠시 후"는 몇 분인지 알 수 없어 재시도 타이밍을 못 잡는다.
+      // 서버가 Retry-After로 보내는 정확한 남은 시간을 분 단위로 알려준다.
+      const minutes = error.retryAfterSeconds === null ? null : Math.ceil(error.retryAfterSeconds / 60);
+      return minutes === null
+        ? error.message
+        : `로그인 시도가 너무 많습니다. ${minutes}분 후 다시 시도해 주세요.`;
+    }
     default:
       return error.retryable
         ? "인증 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."
