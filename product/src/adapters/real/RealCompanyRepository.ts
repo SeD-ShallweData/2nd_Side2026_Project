@@ -8,6 +8,7 @@ import type {
 } from "@/domain/company";
 import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
 import { queryReadOnly } from "@/server/postgres";
+import { toPublicIndustry } from "@/services/publicCompanyFields";
 
 interface FirmRow {
   firm_id: string;
@@ -36,7 +37,7 @@ function toCompany(row: FirmRow): Company {
     company_name: row.name,
     address: null,
     region: row.sido,
-    industry: row.industry,
+    industry: toPublicIndustry(row.industry),
     size_label: null,
     aliases: [],
     data_as_of: row.as_of_date ?? null,
@@ -69,7 +70,7 @@ export class RealCompanyRepository implements CompanyRepository {
       company_name: row.name,
       address: null,
       region: row.sido,
-      industry: row.industry,
+      industry: toPublicIndustry(row.industry),
       size_label: null,
       matched_name: row.name,
       match_type: matchType(row.name, query),

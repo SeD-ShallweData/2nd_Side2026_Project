@@ -24,10 +24,30 @@ The JSONL file is a sanitized trace summary, not a raw provider log. It intentio
 
 `answer-contract-cases.json` is a small, explicit set of answer obligations derived from the reproduced QA cases. It is intentionally separate from the 60-case routing corpus: its purpose is to evaluate the displayed final answer, not just intent fields or fixture shape.
 
-Run a bounded live batch against a started local app (default: eight cases, one attempt each):
+Run a bounded live batch against a started local app (default: all registered cases, one attempt each):
 
 ```powershell
 npm.cmd run eval:answer-quality
 ```
 
-Use `-- --cases AQ01-selected-company-reason,AQ02-general-positive-indicator --runs 3` for the mandatory repeated checks of a changed case. Raw final answers and safe response traces are written only to the ignored `.runtime/answer-quality/` directory. The evaluator returns `PASS`, `FAIL`, or `ORACLE_UNCERTAIN`; API/runtime failures are `BLOCKED`. Legal correctness and source relevance remain listed as required human/source review rather than being falsely promoted to string-match success.
+Use `-- --cases AQ01-selected-company-reason,AQ02-general-positive-indicator --runs 3` for the mandatory repeated checks of a changed case. Raw final answers and safe response traces are written only to the ignored `.runtime/answer-quality/` directory. The runner sends the same `Sec-Fetch-Site: same-origin` compatibility signal as the other trusted local HTTP scripts; this does not authenticate the script or prove that a real browser was used.
+
+Each JSONL row records transport and answer quality separately:
+
+- `request_status`: `ok`, `http_error`, `network_error`, `parse_error`, or `missing_result`.
+- `contract_status`: `PASS`, `FAIL`, `ORACLE_UNCERTAIN`, or `NOT_EVALUATED`.
+- `guardrail_status` appears only after a valid provider result was received. A request failure is never treated as a guardrail or answer-contract result.
+
+The process preserves the JSONL and then exits `2` when any request/infrastructure failure occurred, `1` when all requests arrived but at least one answer contract failed, and `0` otherwise. Legal correctness and source relevance remain listed as required human/source review rather than being falsely promoted to string-match success.
+
+The manual-QA regressions added after the 2026-09-21 review are development cases. They were used to define and repair behavior and must not be described as an independent evaluation set.
+
+## Authenticated continuous-conversation evaluation
+
+Fixed-history replay above is deliberately separate from real continuity. To verify server persistence and restoration, start the app against a new isolated local PostgreSQL database, set `ANSWER_EVAL_EMAIL` and `ANSWER_EVAL_PASSWORD` in the current shell for a local test account, and run:
+
+```powershell
+npm.cmd run eval:conversation-continuity
+```
+
+The continuity runner refuses non-local URLs, reads credentials only from process environment, keeps the returned `donworry_session` cookie in memory, and never writes it to its JSONL. It carries the server-returned `conversation_id` into later `/api/chat` calls, fetches `/api/conversations/{id}` after every turn, requires `source: "database"`, and logs in again before the final restore check. Cases contain at most three model calls. Missing credentials, unavailable persistence, Mock conversation storage, response/restore mismatch, or a missing local database are `blocked` and exit `2`; contract failures exit `1`.
