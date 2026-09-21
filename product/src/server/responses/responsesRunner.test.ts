@@ -60,6 +60,7 @@ function runner(
       query: "한빛",
       items: [],
       total: 0,
+      total_is_capped: false,
       has_more: false,
       page: 1,
       page_size: 10,

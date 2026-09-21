@@ -31,12 +31,18 @@ export interface ChatRequest {
   resolved_query?: string;
   /** 기본 false. true일 때만 Upstage와 SKT를 같은 조건으로 비교한다. */
   compare?: boolean;
+  /** Per-request consent; never persisted as a reusable consent record. */
+  external_processing_consent?: boolean;
+  /** The compare toggle is a separate consent to send the same context to a second provider. */
+  external_compare_consent?: boolean;
   chat_mode: ChatMode;
   recent_messages: RecentMessage[];
   /** 서버 소유 대화방의 ready 요약만 붙는다. 클라이언트 입력은 신뢰하지 않는다. */
   conversation_memory?: ConversationMemoryContext;
   /** Server-only, owner-checked provenance. Raw request parsing drops this field. */
   conversation_recall?: ConversationRecallContext;
+  /** Server-only request lease. Raw request parsing intentionally drops this field. */
+  conversation_request_lease_token?: string;
 }
 
 export interface SuggestedAction {

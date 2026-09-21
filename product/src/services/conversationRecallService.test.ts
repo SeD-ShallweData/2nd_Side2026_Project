@@ -71,4 +71,24 @@ describe("user statement recall without law retrieval", () => {
     expect(parsed.conversation_recall).toBeUndefined();
     expect(recallAnswer(parsed)?.answer).not.toContain("29일");
   });
+  it("recalls ordered server-owned company display names without invoking a provider", () => {
+    const input = request([], "앞선 두 답변에서 사용한 회사 이름을 순서대로 말해 줘.");
+    input.conversation_recall = {
+      facts: [],
+      company_history: [
+        { company_id: "A", company_name: "한빛테크", turn_index: 1 },
+        { company_id: "A", company_name: "한빛테크", turn_index: 2 },
+        { company_id: "B", company_name: "푸른건설", turn_index: 3 },
+      ],
+      diagnostics: {
+        summary_status: "absent", summary_version: null, summarized_through_sequence: 0,
+        stored_message_count: 6, hydrated_recent_count: 6, summary_included: false,
+        recall_fact_count: 0, legacy_recall_rebuilt: false,
+      },
+    };
+    const output = recallResponse(input, [{ id: "upstage", label: "Upstage", model: "not-invoked" }])!.results[0];
+    expect(output.answer).toContain("1. 한빛테크\n2. 푸른건설");
+    expect(output.sources).toEqual([]);
+    expect(output.trace).toMatchObject({ recall_mode: "conversation_context", upstream_request_id: null });
+  });
 });

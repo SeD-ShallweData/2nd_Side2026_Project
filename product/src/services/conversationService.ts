@@ -252,6 +252,7 @@ export async function importGuestConversation(
       guardrail_status: primary.guardrail_status,
       sources: primary.sources,
       response: { ...turn.response, conversation_id: conversationId, conversation_persistence: "saved" },
+      lease_token: claim.lease_token!,
     });
   }
   if (!conversationId) throw new ServiceError("GUEST_IMPORT_FAILED", "익명 상담을 가져오지 못했습니다.", 503, true);
@@ -285,6 +286,13 @@ export async function hydrateConversationRequest(
         sequence, company_id: turn.company_id ?? null }) : [];
   }));
   const recallFacts = [...(legacyRecallRebuilt ? [] : summary?.summary.recall_facts ?? []), ...originals];
+  const companyNames = await companyNamesForDetail(detail);
+  const companyHistory = detail.turns.flatMap((turn) => {
+    const companyName = turn.company_id ? companyNames.get(turn.company_id) : undefined;
+    return turn.company_id && companyName
+      ? [{ company_id: turn.company_id, company_name: companyName, turn_index: turn.turn_index }]
+      : [];
+  }).slice(-64);
   return {
     ...request,
     company_id: request.company_id ?? detail.active_company_id ?? undefined,
@@ -292,6 +300,7 @@ export async function hydrateConversationRequest(
     conversation_memory: memory,
     conversation_recall: {
       facts: recallFacts,
+      company_history: companyHistory,
       diagnostics: {
         summary_status: summary?.status ?? "absent", summary_version: summary?.summary_version ?? null,
         summarized_through_sequence: through, stored_message_count: allMessages.length,
@@ -345,6 +354,8 @@ export async function completeClaimedConversationRequest(
   user: SessionUserDto,
 ): Promise<{ conversation_id: string; response: ChatComparisonResponse; reused: boolean }> {
   const requestId = requireRequestId(request);
+  const leaseToken = request.conversation_request_lease_token;
+  if (!leaseToken) throw new ServiceError("CONVERSATION_REQUEST_LEASE_MISSING", "Conversation request lease is missing.", 409, true);
   if (!request.conversation_id) throw new ServiceError("CONVERSATION_NOT_FOUND", "Conversation request was not claimed.", 404, false);
   response = publicAnswerContext(response);
   const primary = response.results[0];
@@ -360,6 +371,7 @@ export async function completeClaimedConversationRequest(
     guardrail_status: primary.guardrail_status,
     sources: primary.sources,
     response,
+    lease_token: leaseToken,
   });
   generatedRecovery.delete(recoveryKey(user.user_id, requestId));
   try {
@@ -378,7 +390,9 @@ export async function failClaimedConversationRequest(
   errorCode: string,
 ): Promise<void> {
   const requestId = requireRequestId(request);
-  await getConversationRepository().failRequest(user.user_id, requestId, status, errorCode);
+  const leaseToken = request.conversation_request_lease_token;
+  if (!leaseToken) return;
+  await getConversationRepository().failRequest(user.user_id, requestId, leaseToken, status, errorCode);
 }
 
 export async function persistCompletedChat(

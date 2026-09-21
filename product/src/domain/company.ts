@@ -26,6 +26,7 @@ export interface CompanySearchResponse {
   query: string;
   items: CompanySearchResult[];
   total: number;
+  total_is_capped: boolean;
   has_more: boolean;
   page: number;
   page_size: number;
@@ -39,7 +40,9 @@ export interface CompanySearchFilters {
 
 export interface CompanyFilterOption {
   value: string;
+  /** Lower bound used only for ordering/map shading; never an exact public count. */
   count: number;
+  count_label: string;
 }
 
 export interface CompanyFilterOptions {

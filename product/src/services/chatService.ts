@@ -54,6 +54,12 @@ export function parseChatRequest(value: unknown): ChatRequest {
       [{ field: "compare", reason: "compare는 true 또는 false여야 합니다." }],
     );
   }
+  if (input.external_processing_consent !== undefined && typeof input.external_processing_consent !== "boolean") {
+    throw new ServiceError("VALIDATION_ERROR", "외부 AI 전송 동의 형식을 확인해 주세요.", 400, false);
+  }
+  if (input.external_compare_consent !== undefined && typeof input.external_compare_consent !== "boolean") {
+    throw new ServiceError("VALIDATION_ERROR", "비교 전송 동의 형식을 확인해 주세요.", 400, false);
+  }
   if (
     input.request_id !== undefined
     && (typeof input.request_id !== "string" || !REQUEST_ID_PATTERN.test(input.request_id))
@@ -73,9 +79,25 @@ export function parseChatRequest(value: unknown): ChatRequest {
     conversation_id: typeof input.conversation_id === "string" ? input.conversation_id : undefined,
     company_id: typeof input.company_id === "string" ? input.company_id : undefined,
     compare: input.compare === true,
+    external_processing_consent: input.external_processing_consent === true,
+    external_compare_consent: input.compare === true && input.external_compare_consent === true,
     chat_mode: chatMode as ChatMode,
     recent_messages: normalizeMessages(input.recent_messages),
   };
+}
+
+export function assertExternalProcessingConsent(request: ChatRequest): void {
+  if (request.external_processing_consent !== true) {
+    throw new ServiceError(
+      "EXTERNAL_PROCESSING_CONSENT_REQUIRED",
+      "외부 AI 전송 안내를 확인하고 이번 질문 전송에 동의해 주세요.",
+      409,
+      false,
+    );
+  }
+  if (request.compare === true && request.external_compare_consent !== true) {
+    throw new ServiceError("EXTERNAL_COMPARE_CONSENT_REQUIRED", "두 공급자 비교 전송에 동의해 주세요.", 409, false);
+  }
 }
 
 export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {

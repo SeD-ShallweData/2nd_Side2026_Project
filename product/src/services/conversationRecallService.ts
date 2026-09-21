@@ -6,6 +6,28 @@ const PAYDAY = /(?:급여일|월급날|(?:급여|월급|임금)\s*지급일)/;
 const PROMISE = /(?:지급\s*약속|회사\s*(?:답변|응답)|입금\s*약속)/;
 const RECALL = /(?:말한|말했던|정정한(?!다)|알려\s*준|기억|회상|다시\s*(?:말|알려|정리)|지금까지|앞서|아까|였나|였죠|였지|정리해)/;
 const LEGAL = /(?:법적|법률|신고|진정|신청|청구|문의|어디|어떻게|무엇부터|뭘\s*해야|해야\s*하|할\s*수|가산|계산|위법|투자|주식|추천)/;
+const COMPANY_NAME_RECALL = /(?:회사|사업장)\s*(?:이름|명)|어느\s*(?:회사|사업장)|사용한\s*(?:회사|사업장)|연결한\s*(?:회사|사업장)/;
+const COMPANY_CONTEXT_RECALL = /(?:앞선|이전|앞서|아까|순서대로|다시|말해|알려)/;
+
+function companyContextRecall(request: ChatRequest): { answer: string; found: boolean } | null {
+  if (!COMPANY_CONTEXT_RECALL.test(request.message) || !COMPANY_NAME_RECALL.test(request.message) || LEGAL.test(request.message)) return null;
+  const ordered = (request.conversation_recall?.company_history ?? [])
+    .toSorted((a, b) => a.turn_index - b.turn_index)
+    .reduce<Array<{ company_id: string; company_name: string; turn_index: number }>>((items, item) => {
+      if (items.at(-1)?.company_id !== item.company_id) items.push(item);
+      return items;
+    }, []);
+  const requested = /(?:앞선|이전)\s*두|두\s*(?:답변|회사|사업장)/.test(request.message)
+    ? ordered.slice(-2)
+    : ordered;
+  if (requested.length === 0) {
+    return { answer: "저장된 앞선 상담에서 사용한 회사 이름을 확인하지 못했습니다.", found: false };
+  }
+  return {
+    answer: `앞선 저장 상담에서 사용한 회사 이름은 순서대로 다음과 같습니다.\n\n${requested.map((item, index) => `${index + 1}. ${item.company_name}`).join("\n")}`,
+    found: true,
+  };
+}
 
 /** Only normalized dates/time phrases leave this extractor, never arbitrary raw text. */
 export function extractRecallFacts(input: {
@@ -75,7 +97,8 @@ export function recallAnswer(request: ChatRequest, allowMixed = false): { answer
 export function recallResponse(request: ChatRequest, providers: Array<{
   id: ChatResultProviderId; label: string; model: string;
 }>): ChatComparisonResponse | null {
-  const recall = recallAnswer(request);
+  const companyRecall = companyContextRecall(request);
+  const recall = companyRecall ?? recallAnswer(request);
   if (!recall) return null;
   const now = new Date().toISOString();
   return {
@@ -85,7 +108,9 @@ export function recallResponse(request: ChatRequest, providers: Array<{
     results: providers.map((provider) => ({
       provider: provider.id, provider_label: provider.label, model: provider.model,
       status: "policy_short_circuit", answer: recall.answer, answer_type: "general_guidance",
-      sources: [], suggested_actions: [], limitations: ["사용자 진술을 회상한 것이며 회사·법률 사실을 검증한 답변은 아닙니다."],
+      sources: [], suggested_actions: [], limitations: [companyRecall
+        ? "저장된 상담 턴의 공개 회사 표시명을 회상한 것이며 현재 회사 상태나 법률 사실을 검증한 답변은 아닙니다."
+        : "사용자 진술을 회상한 것이며 회사·법률 사실을 검증한 답변은 아닙니다."],
       guardrail_status: recall.found ? "passed" : "limited",
       metrics: { latency_ms: 0, time_to_first_token_ms: null, streaming: false, finish_reason: null,
         answer_chars: recall.answer.length, usage: { prompt_tokens: null, completion_tokens: null, total_tokens: null, cached_tokens: null, reasoning_tokens: null } },
@@ -93,7 +118,8 @@ export function recallResponse(request: ChatRequest, providers: Array<{
         company_context_attached: false, recent_message_count: request.recent_messages.length,
         guardrail_action: "short_circuit", guardrail_hits: [], upstream_request_id: null,
         rag_status: "no_match", rag_reason: "conversation_recall_no_retrieval", rag_topic: null, retrieved_document_count: 0,
-        recall_mode: recall.found ? "user_statement" : "missing_user_statement",
+        recall_mode: companyRecall && recall.found ? "conversation_context"
+          : recall.found ? "user_statement" : "missing_user_statement",
         ...(request.conversation_recall ? { memory: request.conversation_recall.diagnostics } : {}),
       },
     })),

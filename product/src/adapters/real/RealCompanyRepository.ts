@@ -111,6 +111,7 @@ export class RealCompanyRepository implements CompanyRepository {
     const toOptions = (rows: FilterOptionRow[]) => rows.map((row) => ({
       value: row.value,
       count: Number(row.count),
+      count_label: row.count,
     }));
     return { regions: toOptions(regionRows), industries: toOptions(industryRows) };
   }

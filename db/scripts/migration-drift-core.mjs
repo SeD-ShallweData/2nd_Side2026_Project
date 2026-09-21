@@ -157,6 +157,12 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "column_type:public.conversation_summaries.lease_token_uuid",
     "column_type:public.conversation_summaries.lease_expires_at_timestamptz",
   ]),
+  "0020_violet_robin_chapel": Object.freeze([
+    "column_type:public.conversation_requests.lease_token_uuid",
+    "column_type:public.conversation_requests.lease_expires_at_timestamptz",
+    "index:public.conversation_requests_pending_lease_idx",
+    "constraint:public.conversation_requests.conversation_requests_lease_ck",
+  ]),
 });
 
 function migrationLabel(migration) {

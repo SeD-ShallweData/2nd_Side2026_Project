@@ -235,6 +235,7 @@ export async function runContinuityEvaluationCase(input: {
         message: step.message,
         chat_mode: step.chat_mode,
         recent_messages: [],
+        external_processing_consent: true,
         request_id: requestId(input.item.id, index + 1),
         ...(step.company_id ? { company_id: step.company_id } : {}),
         ...(conversationId ? { conversation_id: conversationId } : {}),

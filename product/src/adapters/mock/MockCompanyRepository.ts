@@ -93,7 +93,7 @@ export class MockCompanyRepository implements CompanyRepository {
       for (const value of values) {
         if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
       }
-      return [...counts.entries()].map(([value, count]) => ({ value, count }));
+      return [...counts.entries()].map(([value, count]) => ({ value, count, count_label: String(count) }));
     }
 
     return {

@@ -15,6 +15,7 @@ import type {
 import { getSession } from "@/services/authClient";
 import { getFavorites } from "@/services/favoriteClient";
 import { readApiResponse } from "@/utils/clientApi";
+import { publicClientHeaders } from "@/utils/publicClientId";
 
 const RECOMMENDED_QUERIES = ["건설", "한빛", "테크"] as const;
 const EMPTY_FILTERS: CompanySearchFilters = {};
@@ -100,7 +101,7 @@ export function CompanySearch() {
       const searchParams = new URLSearchParams({ q: trimmed, limit: "10", page: String(page) });
       if (nextFilters.region) searchParams.set("region", nextFilters.region);
       if (nextFilters.industry) searchParams.set("industry", nextFilters.industry);
-      const response = await fetch(`/api/companies/search?${searchParams.toString()}`);
+      const response = await fetch(`/api/companies/search?${searchParams.toString()}`, { headers: publicClientHeaders() });
       setResult(await readApiResponse<CompanySearchResponse>(response));
       setAppliedFilters(nextFilters);
     } catch (caught) {
@@ -132,7 +133,7 @@ export function CompanySearch() {
     setFilterOptionsLoading(true);
     setFilterOptionsError(null);
     try {
-      const response = await fetch("/api/companies/filters");
+      const response = await fetch("/api/companies/filters", { headers: publicClientHeaders() });
       setFilterOptions(await readApiResponse<CompanyFilterOptions>(response));
     } catch (caught) {
       setFilterOptionsError(caught instanceof Error ? caught.message : "필터 목록을 불러오지 못했습니다.");
@@ -246,7 +247,7 @@ export function CompanySearch() {
                     <option value="">전체 지역</option>
                     {filterOptions.regions.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.value} ({option.count.toLocaleString("ko-KR")})
+                        {option.value} ({option.count_label})
                       </option>
                     ))}
                   </select>
@@ -263,7 +264,7 @@ export function CompanySearch() {
                     <option value="">전체 업종</option>
                     {filterOptions.industries.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.value} ({option.count.toLocaleString("ko-KR")})
+                        {option.value} ({option.count_label})
                       </option>
                     ))}
                   </select>
@@ -316,7 +317,7 @@ export function CompanySearch() {
                   {result.query
                     ? `‘${result.query}’ 관련 사업장 `
                     : `${[appliedFilters.region, appliedFilters.industry].filter(Boolean).join(" · ")} 사업장 `}
-                  <strong>{result.total}</strong>곳
+                  <strong>{result.total.toLocaleString("ko-KR")}{result.total_is_capped ? "+" : ""}</strong>곳
                 </h2>
               </div>
               <p>첫 번째 결과가 자동 선택되지 않습니다.</p>

@@ -29,6 +29,8 @@ interface StoredRequest {
   conversation_id: string;
   status: ClaimConversationRequest["status"];
   response: CompleteConversationRequestInput["response"] | null;
+  lease_token: string | null;
+  lease_expires_at: number | null;
 }
 
 const mockGlobal = globalThis as typeof globalThis & {
@@ -116,11 +118,21 @@ export class MockConversationRepository implements ConversationRepository {
       const live = threads.get(existingRequest.conversation_id);
       if (!live || Date.parse(live.expires_at) <= Date.now()
         || (input.conversation_id && input.conversation_id !== existingRequest.conversation_id)) throw new Error("conversation not found");
+      if (existingRequest.status === "pending" && (existingRequest.lease_expires_at ?? 0) <= Date.now()) {
+        existingRequest.lease_token = randomUUID();
+        existingRequest.lease_expires_at = Date.now() + 120_000;
+        requests.set(key, existingRequest);
+        return {
+          conversation_id: existingRequest.conversation_id, status: "pending", reused: false,
+          response: null, lease_token: existingRequest.lease_token,
+        };
+      }
       return {
         conversation_id: existingRequest.conversation_id,
         status: existingRequest.status,
         reused: true,
         response: existingRequest.response ? structuredClone(existingRequest.response) : null,
+        lease_token: existingRequest.status === "pending" ? existingRequest.lease_token : null,
       };
     }
     const now = new Date();
@@ -140,14 +152,17 @@ export class MockConversationRepository implements ConversationRepository {
       idempotency: new Map<string, string>(),
     };
     threads.set(thread.conversation_id, thread);
+    const leaseToken = randomUUID();
     requests.set(key, {
       owner_user_id: input.owner_user_id,
       request_id: input.request_id,
       conversation_id: thread.conversation_id,
       status: "pending",
       response: null,
+      lease_token: leaseToken,
+      lease_expires_at: Date.now() + 120_000,
     });
-    return { conversation_id: thread.conversation_id, status: "pending", reused: false, response: null };
+    return { conversation_id: thread.conversation_id, status: "pending", reused: false, response: null, lease_token: leaseToken };
   }
 
   async completeRequest(input: CompleteConversationRequestInput): Promise<{
@@ -161,7 +176,8 @@ export class MockConversationRepository implements ConversationRepository {
     if (request.status === "completed" && request.response) {
       return { conversation_id: request.conversation_id, response: structuredClone(request.response), reused: true };
     }
-    if (request.status !== "pending") throw new Error("conversation request is not pending");
+    if (request.status !== "pending" || request.lease_token !== input.lease_token
+      || (request.lease_expires_at ?? 0) <= Date.now()) throw new Error("conversation request is not pending");
     await this.recordCompletedTurn({ ...input, conversation_id: request.conversation_id });
     const thread = threads.get(request.conversation_id);
     const turnId = thread?.idempotency.get(input.idempotency_key);
@@ -169,6 +185,8 @@ export class MockConversationRepository implements ConversationRepository {
     if (turn) turn.response = structuredClone(input.response);
     request.status = "completed";
     request.response = structuredClone(input.response);
+    request.lease_token = null;
+    request.lease_expires_at = null;
     requests.set(key, request);
     return { conversation_id: request.conversation_id, response: structuredClone(input.response), reused: false };
   }
@@ -176,12 +194,15 @@ export class MockConversationRepository implements ConversationRepository {
   async failRequest(
     ownerUserId: string,
     requestId: string,
+    leaseToken: string,
     status: "failed" | "cancelled",
     _errorCode: string,
   ): Promise<void> {
     const request = requests.get(requestKey(ownerUserId, requestId));
-    if (!request || request.status !== "pending") return;
+    if (!request || request.status !== "pending" || request.lease_token !== leaseToken) return;
     request.status = status;
+    request.lease_token = null;
+    request.lease_expires_at = null;
     requests.set(requestKey(ownerUserId, requestId), request);
   }
 

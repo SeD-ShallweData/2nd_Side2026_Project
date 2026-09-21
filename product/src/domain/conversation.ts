@@ -62,6 +62,7 @@ export interface RecordedConversationTurn {
 
 export interface CompleteConversationRequestInput extends RecordCompletedConversationTurn {
   response: ChatComparisonResponse;
+  lease_token: string;
 }
 
 export type ConversationRequestStatus = "pending" | "completed" | "failed" | "cancelled";
@@ -71,6 +72,7 @@ export interface ClaimConversationRequest {
   status: ConversationRequestStatus;
   reused: boolean;
   response: ChatComparisonResponse | null;
+  lease_token: string | null;
 }
 
 export interface ClaimConversationRequestInput {
@@ -92,7 +94,7 @@ export interface ConversationRepository {
     response: ChatComparisonResponse;
     reused: boolean;
   }>;
-  failRequest(ownerUserId: string, requestId: string, status: "failed" | "cancelled", errorCode: string): Promise<void>;
+  failRequest(ownerUserId: string, requestId: string, leaseToken: string, status: "failed" | "cancelled", errorCode: string): Promise<void>;
   recordCompletedTurn(input: RecordCompletedConversationTurn): Promise<RecordedConversationTurn>;
   updateConversation(input: UpdateConversationInput): Promise<StoredConversationSummary | null>;
   deleteConversation(conversationId: string, ownerUserId: string): Promise<boolean>;

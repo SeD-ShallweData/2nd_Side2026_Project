@@ -1,7 +1,7 @@
 # 드리프트 검사기 후조건 커버리지
 
 > **한 줄 요약**
-> `npm run check:migration-drift` 는 이제 **0006~0019를 모두 검사한다(111개 후조건).**
+> `npm run check:migration-drift` 는 이제 **0006~0020을 모두 검사한다(115개 후조건).**
 > 2026-09-09 에 0009·0010·0011 키 28개를 등록해 공백을 메웠고,
 > 2026-09-13 에 0012 키 11개를 같은 PR 에서 등록했고,
 > 2026-09-14 에 K5 현장 신고 분류·상태를 검증하는 0013 키 7개를 추가했고,
@@ -47,6 +47,7 @@
 | `0017_conversation_context_events` | ✓ | 3개 — 수동 회사 변경 이벤트 |
 | `0018_real_hitman` | ✓ | **11개 키** — user_favorite_firms 테이블·컬럼·PK·FK(cascade)·인덱스 존재 확인 |
 | `0019_conversation_summary_leases` | ✓ | 2개 — nullable UUID lease token·timestamptz expiry |
+| `0020_violet_robin_chapel` | ✓ | 4개 — request lease UUID·expiry·index·상태 제약 |
 
 0012 에 부재 확인을 함께 넣은 이유: 이 뷰의 규격(N6)이 *"개별 기업 점수·순위
 컬럼은 넣지 않음"* 이다. `CREATE OR REPLACE VIEW` 는 컬럼을 조용히 더할 수 있으므로,
@@ -59,7 +60,7 @@
 > 읽게 만들었다. 후조건은 migration 이 **끝난 뒤의 상태**를 기술해야 한다.
 > `db/tests/migration-drift.test.mjs` 가 이 형태를 고정한다.
 
-**현재 합계 111개 키** (0013까지 61 + 대화 37 + 즐겨찾기 11 + lease 2). 2026-09-21 새 격리 PG16에서 20개 migration/111개 후조건을 확인했다. 아래는 이전 검증 이력이다.
+**현재 합계 115개 키** (0013까지 61 + 대화 37 + 즐겨찾기 11 + summary lease 2 + request lease 4). 작업 10의 새 격리 PG16 결과는 후속 10 QA 문서에 기록한다. 아래는 이전 검증 이력이다.
 
 2026-09-09 에 PostgreSQL 16 에 migration 12개를 순서대로 적용한 뒤
 `POSTCONDITIONS_SQL` 을 실행해 **43/43 통과**를 실측했다. 이어서 `users.role` 을 되살려
@@ -211,6 +212,6 @@ shebang 스크립트)를 찾지 못하기 때문이다. 이번 후조건 내용�
 `db/scripts/migration-drift-core.mjs`/`check-migration-drift.mjs` 에 이미 있다.
 
 2026-09-21 후속 06에서 위 과거 누락 표를 보완했고 누적 0018 snapshot도 복구했다.
-새 격리 PostgreSQL 16.15에 0000~0019 전체 적용 후 동일 SQL 상수로 **111/111** 및
+작업 9에서 새 격리 PostgreSQL 16.15에 0000~0019 전체 적용 후 당시 SQL 상수로 **111/111** 및
 ledger20행 aligned를 확인했다. 기존 Windows psql CLI 부재는 컨테이너의 PG16 psql로
 실행한 acceptance 경로에서 해소했다. 운영/GCP/복원 DB 확인으로 해석하지 않는다.

@@ -50,11 +50,15 @@ function response(): ChatComparisonResponse {
   };
 }
 async function claim(id?: string, requestId = randomUUID(), who = user) {
-  return repository.claimRequest({ owner_user_id: who.user_id, conversation_id: id, request_id: requestId, company_id: null, user_message: "합성 질문" });
+  const result = await repository.claimRequest({ owner_user_id: who.user_id, conversation_id: id, request_id: requestId, company_id: null, user_message: "합성 질문" });
+  if (result.lease_token) requestLeases.set(`${who.user_id}:${requestId}`, result.lease_token);
+  return result;
 }
+const requestLeases = new Map<string, string>();
 function completed(id: string, key: string, text = "합성 질문", who = user): CompleteConversationRequestInput {
   return { owner_user_id: who.user_id, conversation_id: id, idempotency_key: key, company_id: null, user_message: text,
-    assistant_message: "합성 저장 검증 답변", answer_type: "general_guidance", guardrail_status: "passed", sources: [{ name: "합성 출처" }], response: response() };
+    assistant_message: "합성 저장 검증 답변", answer_type: "general_guidance", guardrail_status: "passed", sources: [{ name: "합성 출처" }],
+    response: response(), lease_token: requestLeases.get(`${who.user_id}:${key}`)! };
 }
 async function thread(turns = 5, who = user) {
   let id: string | undefined;
@@ -184,13 +188,31 @@ try {
     await assert.rejects(claim(second, key), { code: "CONVERSATION_NOT_FOUND" });
     assert.equal((await repository.listConversations(other.user_id, 50)).length, 0);
     const request = randomUUID(); await claim(second, request);
-    await repository.failRequest(user.user_id, request, "failed", "SYNTHETIC_FAILURE");
+    await repository.failRequest(user.user_id, request, requestLeases.get(`${user.user_id}:${request}`)!, "failed", "SYNTHETIC_FAILURE");
     assert.equal((await claim(second, request)).status, "failed");
     await assert.rejects(repository.completeRequest(completed(second, request)), { code: "CONVERSATION_REQUEST_NOT_PENDING" });
   });
+  await check("expired-request-lease-reclaim-and-stale-writer-fence", async () => {
+    const key = randomUUID();
+    const first = await claim(undefined, key);
+    const staleToken = first.lease_token!;
+    await owner.query(
+      "UPDATE conversation_requests SET lease_expires_at = now() - interval '1 second' WHERE owner_user_id = $1::uuid AND request_id = $2",
+      [user.user_id, key],
+    );
+    const reclaimed = await claim(first.conversation_id, key);
+    assert.equal(reclaimed.reused, false);
+    assert.notEqual(reclaimed.lease_token, staleToken);
+    await assert.rejects(
+      repository.completeRequest({ ...completed(first.conversation_id, key), lease_token: staleToken }),
+      { code: "CONVERSATION_REQUEST_NOT_PENDING" },
+    );
+    await repository.completeRequest(completed(first.conversation_id, key));
+  });
   await check("atomic-save-failure-and-cached-save-only-retry", async () => {
     const key = randomUUID(); const id = (await claim(undefined, key)).conversation_id;
-    const request = { conversation_id: id, request_id: key, message: "합성 질문", chat_mode: "wage" as const, recent_messages: [] };
+    const request = { conversation_id: id, request_id: key, message: "합성 질문", chat_mode: "wage" as const, recent_messages: [],
+      conversation_request_lease_token: requestLeases.get(`${user.user_id}:${key}`)! };
     const generated = response(); rememberGeneratedResponse(user, key, generated);
     await owner.query("REVOKE INSERT ON conversation_sources FROM wg_conversation");
     try { await assert.rejects(completeClaimedConversationRequest(request, generated, user)); }
@@ -284,20 +306,20 @@ try {
     assert((await http("/api/conversations", cookie)).data.items.some((item: { conversation_id: string }) => item.conversation_id === id));
     cookie = (await http("/api/auth/login", "", { email, password })).cookie;
     const key = randomUUID();
-    const continued = (await http("/api/chat", cookie, { conversation_id: id, request_id: key, chat_mode: "wage", message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라." })).data;
+    const continued = (await http("/api/chat", cookie, { conversation_id: id, request_id: key, chat_mode: "wage", message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라.", external_processing_consent: true })).data;
     assert.equal(continued.conversation_persistence, "saved"); assert.equal(continued.conversation_id, id);
     assert.match(continued.results[0].answer, /15일.*다음 주/);
     assert.equal(continued.results[0].trace.memory.summary_included, true);
     assert.equal(continued.results[0].trace.memory.summarized_through_sequence, 20);
     assert.equal((await http(`/api/conversations/${id}`, cookie)).data.turns.length, 11);
-    const replay = (await http("/api/chat", cookie, { conversation_id: id, request_id: key, chat_mode: "wage", message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라." })).data;
+    const replay = (await http("/api/chat", cookie, { conversation_id: id, request_id: key, chat_mode: "wage", message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라.", external_processing_consent: true })).data;
     assert.equal(replay.idempotent_replay, true);
     assert.equal((await http(`/api/conversations/${id}`, cookie)).data.turns.length, 11);
     // Real PG fault injection: a connection-class failure during save, after generation.
     // Only this newly created synthetic database receives the temporary trigger.
     await owner.query("CREATE FUNCTION acceptance_fail_save() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic connection failure' USING ERRCODE='08006'; END $$");
     await owner.query("CREATE TRIGGER acceptance_fail_save BEFORE INSERT ON conversation_messages FOR EACH ROW EXECUTE FUNCTION acceptance_fail_save()");
-    const retryBody = { conversation_id: id, request_id: randomUUID(), chat_mode: "wage", message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라." };
+    const retryBody = { conversation_id: id, request_id: randomUUID(), chat_mode: "wage", message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라.", external_processing_consent: true };
     let unsaved;
     try {
       unsaved = (await http("/api/chat", cookie, retryBody)).data;

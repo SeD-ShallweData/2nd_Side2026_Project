@@ -5,6 +5,7 @@ import type {
   SessionResponse,
   SignupRequest,
   SignupResponse,
+  DeleteAccountResponse,
 } from "@/app/api/auth/authApiContract";
 import type { ErrorDetail } from "@/utils/errors";
 
@@ -12,6 +13,7 @@ const LOGIN_PATH = "/api/auth/login";
 const SIGNUP_PATH = "/api/auth/signup";
 const LOGOUT_PATH = "/api/auth/logout";
 const SESSION_PATH = "/api/auth/session";
+const ACCOUNT_PATH = "/api/auth/account";
 const UNEXPECTED_ERROR_CODE = "UNEXPECTED_ERROR_RESPONSE";
 const INVALID_RESPONSE_BODY_CODE = "INVALID_RESPONSE_BODY";
 const DEFAULT_ERROR_MESSAGE = "요청을 처리하지 못했습니다.";
@@ -142,4 +144,12 @@ export async function logout(options: AuthRequestOptions = {}): Promise<LogoutRe
 
 export async function getSession(options: AuthRequestOptions = {}): Promise<SessionResponse> {
   return requestAuthApi<SessionResponse>(SESSION_PATH, { method: "GET" }, options);
+}
+
+export async function deleteAccount(options: AuthRequestOptions = {}): Promise<DeleteAccountResponse> {
+  return requestAuthApi<DeleteAccountResponse>(
+    ACCOUNT_PATH,
+    { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmation: "계정 삭제" }) },
+    options,
+  );
 }

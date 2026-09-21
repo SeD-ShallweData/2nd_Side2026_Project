@@ -17,8 +17,8 @@ export async function POST(request: Request) {
         false,
       );
     }
-    await saveComparisonFeedback(feedback);
-    return noStoreJson({ saved: true });
+    const persisted = await saveComparisonFeedback(feedback);
+    return noStoreJson({ accepted: true, persisted });
   } catch (error) {
     return noStoreError(error);
   }

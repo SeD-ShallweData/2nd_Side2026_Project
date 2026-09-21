@@ -27,7 +27,7 @@ export function isEmergencyRun(guardrailHits: readonly string[] | undefined | nu
 export function providerRunStatusLabel(
   status: ProviderRunStatus,
   guardrailHits: readonly string[] | undefined | null,
-  recallMode?: "user_statement" | "missing_user_statement",
+  recallMode?: "user_statement" | "missing_user_statement" | "conversation_context",
 ): string {
   switch (status) {
     case "success":
@@ -35,7 +35,9 @@ export function providerRunStatusLabel(
     case "guardrail_replaced":
       return "정책 교체";
     case "policy_short_circuit":
-      if (recallMode) return recallMode === "user_statement" ? "사용자 진술 정리" : "대화 내용 확인 필요";
+      if (recallMode) return recallMode === "conversation_context"
+        ? "대화 문맥 회상"
+        : recallMode === "user_statement" ? "사용자 진술 정리" : "대화 내용 확인 필요";
       if (guardrailHits?.includes("INTENT_OUT_OF_SCOPE")) return "상담 범위 안내";
       if (guardrailHits?.includes("INTENT_CLARIFICATION")) return "질문 확인 필요";
       if (guardrailHits?.includes("RAG_UNAVAILABLE")) return "근거 검색 연결 제한";
@@ -53,7 +55,7 @@ export interface ExecutionModeCopy {
 export function executionModeCopy(
   executionMode: ChatExecutionMode,
   guardrailHits: readonly string[] | undefined | null,
-  recallMode?: "user_statement" | "missing_user_statement",
+  recallMode?: "user_statement" | "missing_user_statement" | "conversation_context",
 ): ExecutionModeCopy {
   if (executionMode === "single_api") {
     return {
@@ -83,6 +85,9 @@ export function executionModeCopy(
     };
   }
   if (recallMode) {
+    if (recallMode === "conversation_context") {
+      return { kicker: "대화 문맥 회상", summary: "저장된 상담 턴의 공개 회사 표시명을 순서대로 정리했습니다." };
+    }
     return { kicker: recallMode === "user_statement" ? "사용자 진술 정리" : "대화 내용 확인 필요",
       summary: "이 상담의 사용자 진술을 정리했습니다. 회사·법률 사실의 검증이나 새로운 법령 검색 결과는 아닙니다." };
   }

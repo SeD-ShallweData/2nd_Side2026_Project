@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import type { SessionResponse } from "@/app/api/auth/authApiContract";
-import { AuthApiError, getSession, logout } from "@/services/authClient";
+import { AuthApiError, deleteAccount, getSession, logout } from "@/services/authClient";
 
 const NAV_ITEMS = [
   { href: "/", label: "서비스 소개" },
@@ -57,6 +57,7 @@ export function SiteHeader() {
   const isInspector = pathname.startsWith("/inspector");
   const [sessionState, setSessionState] = useState<SessionState>({ status: "loading" });
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -104,6 +105,21 @@ export function SiteHeader() {
           ? "로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요."
           : "네트워크 문제로 로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.",
       );
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (deletingAccount) return;
+    const confirmation = window.prompt("상담 원문·요약·근거·요청 기록과 계정을 삭제합니다. 계속하려면 ‘계정 삭제’를 입력하세요.");
+    if (confirmation !== "계정 삭제") return;
+    setDeletingAccount(true);
+    setLogoutError(null);
+    try {
+      await deleteAccount();
+      window.location.assign(`//${window.location.host}/`);
+    } catch {
+      setDeletingAccount(false);
+      setLogoutError("계정을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
     }
   }
 
@@ -171,6 +187,11 @@ export function SiteHeader() {
                 <span className="muted-text">{(user.display_name || "사용자").trim() || "사용자"}님</span>
                 {user.role === "admin" ? (
                   <Link href="/admin" className="button button-outline button-small">신고 관리</Link>
+                ) : null}
+                {user.role === "user" ? (
+                  <button type="button" className="button button-outline button-small" disabled={deletingAccount || loggingOut} onClick={handleDeleteAccount}>
+                    {deletingAccount ? "삭제 중" : "계정 삭제"}
+                  </button>
                 ) : null}
                 <button
                   type="button"

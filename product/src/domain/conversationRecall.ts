@@ -21,5 +21,11 @@ export interface ConversationMemoryDiagnostics {
 
 export interface ConversationRecallContext {
   facts: ConversationRecallFact[];
+  /** Server-hydrated public display names from owned turns, never client supplied. */
+  company_history: Array<{
+    company_id: string;
+    company_name: string;
+    turn_index: number;
+  }>;
   diagnostics: ConversationMemoryDiagnostics;
 }

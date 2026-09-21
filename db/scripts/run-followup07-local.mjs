@@ -184,7 +184,14 @@ try {
   }
   unlinkSync(resolve(runtime, 'stop'));
 } catch (error) {
-  output({ phase, status: 'FAIL', code: typeof error.code === 'string' ? error.code : 'CHECK_FAILED' });
+  output({
+    phase,
+    status: 'FAIL',
+    code: typeof error.code === 'string' ? error.code : 'CHECK_FAILED',
+    check: error instanceof Error ? error.message.split(/\r?\n/, 1)[0].replace(/postgres\S+/gi, '[redacted]') : 'unknown',
+    ...(error && typeof error === 'object' && 'actual' in error ? { actual: error.actual } : {}),
+    ...(error && typeof error === 'object' && 'expected' in error ? { expected: error.expected } : {}),
+  });
   process.exitCode = 1;
 } finally {
   if (metricPath && existsSync(runtime)) writeFileSync(metricPath, JSON.stringify(calls, null, 2));

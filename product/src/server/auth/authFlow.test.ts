@@ -4,6 +4,8 @@ vi.mock("server-only", () => ({}));
 
 import { POST as login } from "@/app/api/auth/login/route";
 import { POST as logout } from "@/app/api/auth/logout/route";
+import { POST as signup } from "@/app/api/auth/signup/route";
+import { DELETE as deleteAccount } from "@/app/api/auth/account/route";
 import { GET as getSession } from "@/app/api/auth/session/route";
 import { GET as getCurrentUser } from "@/app/api/users/me/route";
 import { resetMockSessions } from "@/adapters/mock/MockAuthRepository";
@@ -112,6 +114,27 @@ describe("Mock 사용자 인증 API", () => {
       user: null,
       expires_at: null,
     });
+  });
+
+  it("가입한 일반 사용자가 확인 문구로 계정을 삭제하고 기존 세션과 로그인을 무효화한다", async () => {
+    const email = "delete-me@example.invalid";
+    const password = "deletion-password-1";
+    const created = await signup(jsonRequest("http://localhost/api/auth/signup", { email, password, name: "삭제 검증" }));
+    const cookie = (created.headers.get("set-cookie") ?? "").split(";", 1)[0] ?? "";
+    expect(created.status).toBe(201);
+
+    const deleted = await deleteAccount(new Request("http://localhost/api/auth/account", {
+      method: "DELETE",
+      headers: { cookie, origin: "http://localhost", "content-type": "application/json" },
+      body: JSON.stringify({ confirmation: "계정 삭제" }),
+    }));
+    expect(deleted.status).toBe(200);
+    expect(deleted.headers.get("set-cookie")).toContain("donworry_session=;");
+    await expect(deleted.json()).resolves.toEqual({ deleted: true });
+
+    const oldSession = await getSession(new Request("http://localhost/api/auth/session", { headers: { cookie } }));
+    await expect(oldSession.json()).resolves.toMatchObject({ authenticated: false });
+    expect((await loginAs(email, password)).response.status).toBe(401);
   });
 
   it("계정별 비밀번호를 분리하고 잘못된 자격 증명을 401로 거부한다", async () => {
