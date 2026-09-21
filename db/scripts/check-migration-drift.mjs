@@ -731,7 +731,7 @@ SELECT json_build_object(
         JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='public' AND c.relname='user_favorite_firms'
         AND con.conname='user_favorite_firms_user_id_firm_id_pk'
-        AND pg_get_constraintdef(con.oid) ~* 'PRIMARY KEY \(user_id, firm_id\)'
+        AND pg_get_constraintdef(con.oid) ~* 'PRIMARY KEY \\(user_id, firm_id\\)'
     ),
     'constraint:public.user_favorite_firms.user_favorite_firms_user_id_users_id_fk', EXISTS (
       SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
