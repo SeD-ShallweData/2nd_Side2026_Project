@@ -1,15 +1,25 @@
-import { NextResponse } from "next/server";
 import { parseComparisonFeedback, saveComparisonFeedback } from "@/server/comparisonFeedbackStore";
+import { assertSameOriginRequest, noStoreError, noStoreJson, readJsonBody } from "@/server/auth/http";
+import { ServiceError } from "@/utils/errors";
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: Request) {
   try {
-    const feedback = parseComparisonFeedback(await request.json());
+    assertSameOriginRequest(request);
+    let feedback;
+    try {
+      feedback = parseComparisonFeedback(await readJsonBody(request));
+    } catch (error) {
+      if (error instanceof ServiceError) throw error;
+      throw new ServiceError(
+        "INVALID_FEEDBACK",
+        error instanceof Error ? error.message : "평가를 저장하지 못했습니다.",
+        400,
+        false,
+      );
+    }
     await saveComparisonFeedback(feedback);
-    return NextResponse.json({ saved: true });
+    return noStoreJson({ saved: true });
   } catch (error) {
-    return NextResponse.json(
-      { error: { code: "INVALID_FEEDBACK", message: error instanceof Error ? error.message : "평가를 저장하지 못했습니다." } },
-      { status: 400 },
-    );
+    return noStoreError(error);
   }
 }

@@ -16,6 +16,7 @@
     "check": "npm test && npm run typecheck && npm run lint && npm run build",
     "test:e2e:wire": "node scripts/responses-wire-e2e.mjs",
     "eval:answer-quality": "node --experimental-strip-types scripts/run-answer-quality-eval.ts",
+    "eval:conversation-continuity": "node --experimental-strip-types scripts/run-conversation-continuity-eval.ts",
     "test:e2e:openai-live": "node scripts/openai-responses-live-smoke.mjs",
     "dev:e2e:responses": "node scripts/fake-responses-e2e-server.mjs",
     "check:env-permissions": "node scripts/check-env-permissions.mjs"

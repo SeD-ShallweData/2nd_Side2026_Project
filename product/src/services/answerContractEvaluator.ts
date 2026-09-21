@@ -12,6 +12,7 @@ export interface AnswerContract {
   guardrail_statuses?: GuardrailStatus[];
   action_codes?: string[];
   min_sources?: number;
+  forbid_repeated_ordered_list_numbers?: boolean;
 }
 
 export interface AnswerUnderEvaluation {
@@ -47,7 +48,8 @@ export function evaluateAnswerContract(
   const hasAutomaticCheck = Boolean(
     contract.required_all?.length || contract.required_any?.length || contract.forbidden?.length
     || contract.answer_types?.length || contract.guardrail_statuses?.length
-    || contract.action_codes?.length || contract.min_sources !== undefined,
+    || contract.action_codes?.length || contract.min_sources !== undefined
+    || contract.forbid_repeated_ordered_list_numbers,
   );
 
   if (!hasAutomaticCheck) {
@@ -94,6 +96,15 @@ export function evaluateAnswerContract(
     const accepted = answer.sources.length >= contract.min_sources;
     checks.push(`sources:${answer.sources.length}/${contract.min_sources}:${accepted ? "enough" : "missing"}`);
     if (!accepted) failures.push(`expected at least ${contract.min_sources} sources, received ${answer.sources.length}`);
+  }
+  if (contract.forbid_repeated_ordered_list_numbers) {
+    const markers = answer.answer
+      .split(/\r?\n/)
+      .map((line) => line.match(/^\s*(\d+)\.\s+/)?.[1])
+      .filter((value): value is string => value !== undefined);
+    const repeated = markers.some((value, index) => index > 0 && markers[index - 1] === value);
+    checks.push(`ordered_list_repeated_number:${repeated ? "present" : "absent"}`);
+    if (repeated) failures.push("ordered list repeats the same number on consecutive items");
   }
 
   return { status: failures.length === 0 ? "PASS" : "FAIL", failures, checks };

@@ -1,0 +1,28 @@
+[
+  {
+    "id": "AQ-CONT-01-corrected-payday-recall",
+    "split": "development",
+    "evidence": "synthetic_from_confirmed_manual_failure",
+    "steps": [
+      {
+        "message": "제 급여일은 매월 10일입니다.",
+        "chat_mode": "wage",
+        "human_review": ["사용자 진술을 법적 또는 회사 사실로 확대하지 않는지"]
+      },
+      {
+        "message": "정정할게요. 급여일은 매월 15일입니다.",
+        "chat_mode": "wage",
+        "human_review": ["앞선 10일 진술을 15일로 정정한 사실을 보존하는지"]
+      },
+      {
+        "message": "방금 다른 상담을 봤다가 돌아왔습니다. 여기서 정정한 급여일은 언제였나요?",
+        "chat_mode": "wage",
+        "contract": {
+          "required_all": ["15일"],
+          "forbidden": ["질문에 맞는 답변을 확인하지 못했습니다", "어떤 점을 확인하고 싶으신가요"]
+        },
+        "human_review": ["서버가 저장·복원한 정정 이력을 사용해 15일이라고 답하는지", "10일과 15일을 혼동하지 않는지"]
+      }
+    ]
+  }
+]
