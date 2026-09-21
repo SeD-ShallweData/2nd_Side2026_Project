@@ -11,7 +11,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/services/chatExecutionService", () => ({ sendConfiguredChatMessage: mocks.send }));
 vi.mock("@/server/chatHttpRequest", () => ({ parseChatHttpRequest: mocks.parseHttp }));
 vi.mock("@/services/authService", () => ({ getOptionalSessionUser: mocks.getUser }));
-vi.mock("@/services/chatService", () => ({ parseChatRequest: mocks.parseRequest }));
+vi.mock("@/services/chatService", () => ({
+  parseChatRequest: mocks.parseRequest,
+  assertExternalProcessingConsent: vi.fn((value) => {
+    if (!(value as { external_processing_consent?: boolean }).external_processing_consent) throw new Error("consent required");
+  }),
+}));
 vi.mock("@/services/conversationService", () => ({
   cachedGeneratedResponse: mocks.cached,
   claimConversationRequest: mocks.claim,
@@ -26,9 +31,10 @@ vi.mock("@/server/auth/sessionCookie", () => ({ getSessionTokenFromRequest: vi.f
 vi.mock("@/server/responses/responsesConfig", () => ({ getChatExecutionMode: () => "dual_api" }));
 
 import { POST } from "@/app/api/chat/route";
+import { ServiceError } from "@/utils/errors";
 
 const USER = { user_id: "00000000-0000-4000-8000-000000000021", email: "user@example.com", display_name: "User", role: "user" as const };
-const CHAT_REQUEST = { message: "Question", request_id: "request_0000000000000201", chat_mode: "wage" as const, recent_messages: [] };
+const CHAT_REQUEST = { message: "Question", request_id: "request_0000000000000201", chat_mode: "wage" as const, recent_messages: [], external_processing_consent: true };
 const RESULT = {
   comparison_id: "comparison", conversation_id: "provider", execution_mode: "single_api",
   started_at: "2026-09-18T00:00:00.000Z", completed_at: "2026-09-18T00:00:01.000Z",
@@ -56,6 +62,16 @@ beforeEach(() => {
 });
 
 describe("chat request lifecycle route", () => {
+  it.each(["claim", "hydrate"] as const)("never uses injected authenticated history when %s fails", async (failure) => {
+    mocks.parseRequest.mockReturnValue({ ...CHAT_REQUEST, recent_messages: [{ role: "user", content: "다른 방 급여일은 29일입니다." }] });
+    mocks.claim.mockResolvedValue({ conversation_id: "00000000-0000-4000-8000-000000000031", status: "pending", reused: false });
+    mocks[failure].mockRejectedValueOnce(new ServiceError("DATABASE_UNAVAILABLE", "Unavailable", 503, true));
+    const response = await POST(request());
+    expect(mocks.send.mock.calls[0][0]).toMatchObject({ recent_messages: [], conversation_memory: undefined, conversation_recall: undefined });
+    expect(await response.json()).toMatchObject({ conversation_persistence: "unavailable" });
+    expect(mocks.complete).not.toHaveBeenCalled();
+  });
+
   it("claims before generation and completes the claimed request", async () => {
     mocks.claim.mockResolvedValue({ conversation_id: "00000000-0000-4000-8000-000000000031", status: "pending", reused: false, response: null });
     const response = await POST(request());

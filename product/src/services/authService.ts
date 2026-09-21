@@ -227,3 +227,15 @@ export async function logoutUser(token: string | null): Promise<void> {
   if (!token) return;
   await getAuthRepository().revokeSession(token);
 }
+
+export async function deleteCurrentAccount(token: string | null, input: unknown): Promise<void> {
+  const confirmation = input && typeof input === "object" && !Array.isArray(input)
+    ? (input as Record<string, unknown>).confirmation
+    : undefined;
+  if (confirmation !== "계정 삭제") {
+    throw new ServiceError("ACCOUNT_DELETE_CONFIRMATION_REQUIRED", "계정 삭제 문구를 정확히 입력해 주세요.", 400, false);
+  }
+  if (!token || !(await getAuthRepository().deleteAccount(token))) {
+    throw new ServiceError("ACCOUNT_DELETE_NOT_ALLOWED", "일반 사용자 본인 계정만 삭제할 수 있습니다.", 403, false);
+  }
+}

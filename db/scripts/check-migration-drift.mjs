@@ -230,7 +230,7 @@ FROM drizzle.__drizzle_migrations AS ledger;
 COMMIT;
 `;
 
-const POSTCONDITIONS_SQL = `
+export const POSTCONDITIONS_SQL = `
 BEGIN TRANSACTION READ ONLY;
 SELECT json_build_object(
   '0006_risk_tier', json_build_object(
@@ -763,6 +763,36 @@ SELECT json_build_object(
       SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='public' AND c.relname='user_favorite_firms_user_created_idx' AND c.relkind IN ('i','I')
     )
+  ),
+  '0019_conversation_summary_leases', json_build_object(
+    'column_type:public.conversation_summaries.lease_token_uuid', EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='conversation_summaries'
+      AND column_name='lease_token' AND udt_name='uuid' AND is_nullable='YES'
+    ),
+    'column_type:public.conversation_summaries.lease_expires_at_timestamptz', EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='conversation_summaries'
+      AND column_name='lease_expires_at' AND udt_name='timestamptz' AND is_nullable='YES'
+    )
+  ),
+  '0020_violet_robin_chapel', json_build_object(
+    'column_type:public.conversation_requests.lease_token_uuid', EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='conversation_requests'
+      AND column_name='lease_token' AND udt_name='uuid' AND is_nullable='YES'
+    ),
+    'column_type:public.conversation_requests.lease_expires_at_timestamptz', EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='conversation_requests'
+      AND column_name='lease_expires_at' AND udt_name='timestamptz' AND is_nullable='YES'
+    ),
+    'index:public.conversation_requests_pending_lease_idx', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests_pending_lease_idx' AND c.relkind IN ('i','I')
+    ),
+    'constraint:public.conversation_requests.conversation_requests_lease_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests'
+        AND con.conname='conversation_requests_lease_ck' AND con.contype='c'
+    )
   )
 )::text;
 COMMIT;
@@ -852,9 +882,11 @@ function main() {
   return result.blocked ? 2 : 0;
 }
 
-try {
-  process.exitCode = main();
-} catch (error) {
-  console.error(`Migration drift 검사 오류: ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    process.exitCode = main();
+  } catch (error) {
+    console.error(`Migration drift 검사 오류: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  }
 }

@@ -83,6 +83,9 @@ def main():
         regressions = [evaluate_positive(retriever, item) for item in USER_LANGUAGE_REGRESSIONS]
         negatives = [retriever.retrieve(question, limit=5)["status"] == "no_match" for question in NEGATIVES]
         narrow = [evaluate_narrow(retriever, case) for case in NARROW_CASES]
+        # Chroma keeps Windows file handles open until the persistent client is
+        # explicitly closed; release the temporary DB before cleanup.
+        retriever._reset_for_tests()
 
     top1 = score(core, 1)
     top5 = score(core, 5)

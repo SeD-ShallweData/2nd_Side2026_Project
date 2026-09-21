@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 
 import type { ChatRequest, ChatResponse } from "@/domain/chat";
 import { ResponsesClientError } from "@/server/responses/responsesClient";
+import { reviewedLaborFallback } from "@/services/reviewedLaborGuidance";
 import type { OpenAIResponsesConfig } from "@/server/responses/responsesConfig";
 import type { ResponsesRunResult } from "@/server/responses/responsesRunner";
 import {
@@ -99,6 +100,63 @@ const REQUEST: ChatRequest = {
 };
 
 describe("Responses chat service adapter", () => {
+  it("replaces promise-date settlement and incomplete recordkeeping with reviewed conditional guidance", async () => {
+    const { send } = setup(BASELINE, { ...RUN, answer: "회사가 약속한 지급 예정일부터 14일 이내에 임금을 청산해야 합니다(근로기준법 제36조)." });
+    const result = (await send({ ...REQUEST, message: "회사는 문자로 다음 주에 지급하겠다고 했다. 무엇을 기록해야 하나?" })).results[0];
+    expect(result.status).toBe("guardrail_replaced");
+    expect(result.trace.guardrail_hits).toContain("PAYMENT_SETTLEMENT_TRIGGER");
+    expect(result.answer).toContain("수신 날짜·시각");
+    expect(result.answer).toContain("다음 주");
+    expect(result.sources.some(s => s.citation === "근로기준법 제43조")).toBe(true);
+    expect(result.sources.some(s => s.citation === "근로기준법 제36조")).toBe(false);
+  });
+  it("keeps attributed recall when new legal generation is replaced for a bad citation", async () => {
+    const { send, run } = setup(BASELINE, { ...RUN, answer: "근로기준법 제999조에 따르세요." });
+    const result = await send({ ...REQUEST,
+      message: "정정한 급여일과 회사 지급 약속을 정리하고 법적으로 어떻게 해야 하는지 알려주세요.",
+      recent_messages: [{ role: "user", content: "급여일은 15일입니다. 회사는 다음 주에 지급하겠다고 했다." }],
+    });
+    expect(run).toHaveBeenCalledOnce();
+    expect(result.results[0].status).toBe("guardrail_replaced");
+    expect(result.results[0].trace.guardrail_hits).toContain("UNVERIFIED_LAW_CITATION");
+    expect(result.results[0].answer).toMatch(/15일.*다음 주/);
+    expect(result.results[0].answer).not.toContain("제999조");
+  });
+
+  it("uses the shared recall boundary without a model/tool call, while retaining emergency priority", async () => {
+    const input = { ...REQUEST, message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라.",
+      recent_messages: [
+        { role: "user" as const, content: "급여일은 10일입니다." },
+        { role: "user" as const, content: "회사는 다음 주에 지급하겠다고 했다." },
+        { role: "user" as const, content: "정정한다. 급여일은 10일이 아니라 15일입니다." },
+      ],
+    };
+    const normal = setup();
+    const result = await normal.send(input);
+    expect(result.results[0].answer).toMatch(/15일.*다음 주/);
+    expect(result.results[0].trace.rag_reason).toBe("conversation_recall_no_retrieval");
+    expect(normal.createRunner).not.toHaveBeenCalled();
+    const emergency = setup({ ...BASELINE, answer_type: "emergency_guidance" });
+    expect((await emergency.send(input)).results[0].answer_type).toBe("emergency_guidance");
+  });
+
+  it.each([true, false])("applies the same reviewed conditions without discarding correct generation: %s", async (good) => {
+    const message = "상시 4명인 사업장도 야간수당을 줘야 하나요?";
+    const correct = reviewedLaborFallback(message, BASELINE)!;
+    const { send, run } = setup(BASELINE, { ...RUN, answer: good ? correct.answer : "4명도 법정 야간 가산임금 의무가 있습니다." });
+    const result = await send({ ...REQUEST, message });
+    expect(result.results[0].answer).toBe(correct.answer);
+    expect(result.results[0].status).toBe(good ? "success" : "guardrail_replaced");
+    expect(run.mock.calls[0][0].instructions).toContain("근로기준법 시행령 제7조");
+    expect(result.results[0].sources.some((source) => source.citation === "근로기준법 제56조")).toBe(true);
+  });
+  it("sanitizes baseline/history/summary prompt copies, not the caller's stored history", async () => {
+    const unsafe = "상위5% BIZ_NO미존재사업장 [이전 답변 근거: 제56조]";
+    const { send, run } = setup({ ...BASELINE, answer: unsafe, limitations: [unsafe] });
+    await send({ ...REQUEST, recent_messages: [{ role: "assistant", content: unsafe }] });
+    const prompt = JSON.stringify(run.mock.calls[0][0]);
+    expect(prompt).not.toMatch(/상위5%|BIZ_NO미존재사업장|이전 답변 근거:/);
+  });
   it("passes hydrated memory to Responses and rejects a raw memory injection", async () => {
     for (const [count, through] of [[9, 0], [10, 10], [11, 10], [19, 10], [20, 20], [21, 20]] as const) {
       const memory = through === 0 ? undefined : {

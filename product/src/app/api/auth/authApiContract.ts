@@ -27,6 +27,7 @@ export type SessionResponse =
 export interface LogoutResponse {
   logged_out: true;
 }
+export interface DeleteAccountResponse { deleted: true }
 
 /*
  * 가입에서 받는 값은 이 셋뿐이다.

@@ -6,6 +6,25 @@ const REQUEST = { chat_mode: "wage" as const, recent_messages: [] };
 const UNCLEAR = { intent: "unclear" as const, topic: "other" as const, company_scope: "not_applicable" as const, status: "classified" as const };
 
 describe("Answer Plan", () => {
+  it("routes ordinary unpaid-wage paraphrases to labor even when classification is unclear", () => {
+    for (const message of [
+      "월급이 두 달 밀렸는데 무엇부터 해야 하나요?",
+      "급여일이 지났는데 입금이 없어요",
+    ]) {
+      const plan = createAnswerPlan({ ...REQUEST, message }, UNCLEAR);
+      expect(plan.parts).toMatchObject([{ scope: "labor", evidence_needed: ["labor_law"] }]);
+    }
+  });
+
+  it("does not turn a company-indicator interpretation into a personal labor search", () => {
+    const plan = createAnswerPlan({
+      ...REQUEST,
+      message: "이 회사는 임금이 밀린다는 뜻인가요?",
+      company_id: "COMPANY_DEMO_008",
+    }, { ...UNCLEAR, intent: "company", company_scope: "specific" });
+    expect(plan.parts).toMatchObject([{ scope: "company_specific", target_company_id: "COMPANY_DEMO_008" }]);
+  });
+
   it("keeps the answerable labor part when an explicit investment request is mixed in", () => {
     const plan = createAnswerPlan({
       ...REQUEST,

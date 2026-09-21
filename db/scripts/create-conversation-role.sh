@@ -37,9 +37,11 @@ CONVERSATION_USER="${CONVERSATION_USER:-wg_conversation}"
 [[ "$CONVERSATION_USER" =~ ^[a-z_][a-z0-9_]*$ ]] || { echo "CONVERSATION_USER 형식이 안전하지 않습니다" >&2; exit 1; }
 [[ "${DB_NAME:-}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || { echo "DB_NAME 형식이 안전하지 않습니다" >&2; exit 1; }
 export PGPASSWORD="${DB_PASSWORD:-}"
-PSQL=(psql -X --no-psqlrc -w -h 127.0.0.1 -p "${DB_PORT:-5432}" -U "${DB_USER:-}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -q -v "conversation_user=${CONVERSATION_USER}" -v "conversation_password=${CONVERSATION_PASSWORD}" -v "db_name=${DB_NAME}")
+export MW_CONVERSATION_PASSWORD="${CONVERSATION_PASSWORD}"
+PSQL=(psql -X --no-psqlrc -w -h 127.0.0.1 -p "${DB_PORT:-5432}" -U "${DB_USER:-}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -q -v "conversation_user=${CONVERSATION_USER}" -v "db_name=${DB_NAME}")
 
 "${PSQL[@]}" <<'SQL'
+\getenv conversation_password MW_CONVERSATION_PASSWORD
 SELECT format('CREATE ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS CONNECTION LIMIT 20', :'conversation_user')
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'conversation_user') \gexec
 ALTER ROLE :"conversation_user" PASSWORD :'conversation_password';

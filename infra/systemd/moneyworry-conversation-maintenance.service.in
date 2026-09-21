@@ -1,0 +1,24 @@
+[Unit]
+Description=Money Worry expired conversations and summary recovery
+After=network.target
+
+[Service]
+Type=oneshot
+User=@WEB_SERVICE_USER@
+Group=@WEB_SERVICE_GROUP@
+WorkingDirectory=@PROJECT_ROOT@/product
+EnvironmentFile=@CONVERSATION_WORKER_ENV_FILE@
+Environment=NODE_ENV=production
+Environment=CONVERSATION_DATA_MODE=real
+Environment=DATABASE_ENV_FILE=/dev/null
+Environment=SHARED_API_KEY_FILE=/dev/null
+ExecStart=@NODE_BIN@ @PROJECT_ROOT@/product/.runtime/conversation-worker.mjs
+TimeoutStartSec=120
+NoNewPrivileges=yes
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictSUIDSGID=yes
+UMask=0077
+LimitCORE=0
+ReadOnlyPaths=@PROJECT_ROOT@

@@ -66,6 +66,7 @@ async function parseMultipart(request: Request): Promise<ParsedChatHttpRequest> 
       company_id: optionalString(form.get("company_id")),
       chat_mode: optionalString(form.get("chat_mode")) ?? "contract",
       recent_messages: recentMessages(form.get("recent_messages")),
+      external_processing_consent: form.get("external_processing_consent") === "true",
     },
     toolContext: { contractRequest },
   };

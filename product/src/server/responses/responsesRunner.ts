@@ -4,6 +4,8 @@ import type { TokenUsage } from "@/domain/chatComparison";
 import { normalizeContractLegalBasis } from "@/domain/contractLaw";
 import type { RagRetrievalStatus } from "@/domain/rag";
 import type { SourceReference } from "@/domain/risk";
+import type { CompanyRiskResult } from "@/domain/risk";
+import { companySignalForAnswer, publicAnswerContext } from "@/services/publicAnswerContext";
 import type {
   ResponsesClient,
   ResponsesClientResult,
@@ -248,9 +250,9 @@ function reviewContractLimit(): AnyToolExecutionResult {
   };
 }
 
-function safeSerialize(result: AnyToolExecutionResult): string {
+function safeSerialize(result: unknown): string {
   try {
-    return serializeToolResult(result);
+    return JSON.stringify(result);
   } catch {
     return serializeToolResult({
       ok: false,
@@ -449,7 +451,10 @@ export class OpenAIResponsesRunner {
             }
           }
           observeToolResult(ledger, call.name, result);
-          output = safeSerialize(result);
+          // Keep the original evidence ledger; send only a public presentation DTO to the model.
+          output = safeSerialize(result.ok && call.name === "get_company_risk"
+            ? { ...result, data: companySignalForAnswer(result.data as CompanyRiskResult) }
+            : publicAnswerContext(result));
           ok = result.ok;
           errorCode = result.ok ? null : result.error.code;
           cache.set(call.callId, { signature, output, ok, errorCode });

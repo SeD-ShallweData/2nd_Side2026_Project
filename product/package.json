@@ -16,6 +16,9 @@
     "check": "npm test && npm run typecheck && npm run lint && npm run build",
     "test:e2e:wire": "node scripts/responses-wire-e2e.mjs",
     "eval:answer-quality": "node --experimental-strip-types scripts/run-answer-quality-eval.ts",
+    "eval:conversation-continuity": "node --experimental-strip-types scripts/run-conversation-continuity-eval.ts",
+    "worker:conversation:build": "node scripts/build-conversation-worker.mjs",
+    "worker:conversation": "node .runtime/conversation-worker.mjs",
     "test:e2e:openai-live": "node scripts/openai-responses-live-smoke.mjs",
     "dev:e2e:responses": "node scripts/fake-responses-e2e-server.mjs",
     "check:env-permissions": "node scripts/check-env-permissions.mjs"
@@ -32,6 +35,7 @@
     "@types/pg": "^8.21.0",
     "@types/react": "19.1.9",
     "@types/react-dom": "19.1.7",
+    "esbuild": "0.28.1",
     "eslint": "^9.39.1",
     "eslint-config-next": "16.3.0",
     "typescript": "5.8.3",

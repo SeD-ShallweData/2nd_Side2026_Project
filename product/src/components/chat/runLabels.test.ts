@@ -11,6 +11,13 @@ const NO_MATCH = ["RAG_NO_MATCH"];
 const OUT_OF_SCOPE = ["RAG_NO_MATCH", "RAG_OUT_OF_SCOPE"];
 
 describe("상담 실행 라벨", () => {
+  it("does not label server-owned recall as a failed law search", () => {
+    expect(providerRunStatusLabel("policy_short_circuit", [], "user_statement")).toBe("사용자 진술 정리");
+    expect(executionModeCopy("policy_short_circuit", [], "user_statement").summary).not.toContain("찾지 못해");
+    expect(executionModeCopy("policy_short_circuit", [], "missing_user_statement").kicker).toBe("대화 내용 확인 필요");
+    expect(executionModeCopy("single_api", [], "user_statement").kicker).toBe("Upstage Solar 단일 상담");
+    expect(executionModeCopy("policy_short_circuit", EMERGENCY, "user_statement").kicker).toBe("긴급 안전정책 우선");
+  });
   it("의도 확인·범위 안내·검색 장애를 근거 없음과 구별한다", () => {
     for (const [hit, label] of [
       ["INTENT_CLARIFICATION", "질문 확인 필요"],
