@@ -32,12 +32,15 @@ async function main(): Promise<void> {
 
   for (const item of selected) {
     try {
-      const result = await runContinuityEvaluationCase({ baseUrl, email, password, item });
-      rows.push(...result.rows.map((row) => ({
-        ...row,
-        storage_source: result.storage_source,
+      const start = rows.length;
+      const result = await runContinuityEvaluationCase({ baseUrl, email, password, item,
+        isolatedDatabaseConfirmed: process.env.ANSWER_EVAL_ISOLATED_PG16 === "1",
+        onRow: (row) => rows.push({ ...row, storage_source: "database", relogin_restore_verified: false }),
+      });
+      for (const row of rows.slice(start)) Object.assign(row, {
         relogin_restore_verified: result.relogin_restore_verified,
-      })));
+        post_restore_recall_verified: result.post_restore_recall_verified,
+      });
       if (result.rows.some((row) => row.contract_status === "FAIL")) exitCode = Math.max(exitCode, 1) as 1 | 2;
     } catch (error) {
       exitCode = 2;
@@ -47,7 +50,7 @@ async function main(): Promise<void> {
         contract_status: "NOT_EVALUATED",
         error: {
           code: error instanceof ContinuityEvaluationBlocked ? error.code : "CONTINUITY_EVAL_FAILED",
-          message: error instanceof Error ? error.message.slice(0, 500) : "Continuity evaluation failed.",
+          message: error instanceof ContinuityEvaluationBlocked ? error.message : "Continuity evaluation failed; inspect the local environment without logging credentials.",
         },
       });
     }

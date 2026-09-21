@@ -17,6 +17,8 @@ const MANUAL_DEVELOPMENT_IDS = [
   "AQ20-positive-but-unpaid",
   "AQ21-public-context-history",
   "AQ22-online-complaint",
+  "AQ23-payday-and-promise-recall",
+  "AQ24-recall-unknown",
 ];
 
 describe("manual QA regression corpus", () => {
@@ -29,7 +31,7 @@ describe("manual QA regression corpus", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("keeps continuity cases synthetic, development-only, and bounded to three model calls", () => {
+  it("keeps continuity cases synthetic, development-only, and bounded to twelve distinct turns", () => {
     expect(continuityCases.length).toBeGreaterThan(0);
     for (const item of continuityCases) {
       expect(item).toMatchObject({
@@ -37,7 +39,7 @@ describe("manual QA regression corpus", () => {
         evidence: "synthetic_from_confirmed_manual_failure",
       });
       expect(item.steps.length).toBeGreaterThan(0);
-      expect(item.steps.length).toBeLessThanOrEqual(3);
+      expect(item.steps.length).toBeLessThanOrEqual(12);
     }
   });
 });

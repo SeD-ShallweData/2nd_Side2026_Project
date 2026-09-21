@@ -1,0 +1,25 @@
+/** Extracted user statements, never verified legal/company evidence. */
+export interface ConversationRecallFact {
+  kind: "payday" | "payment_promise";
+  value: string | null;
+  source_message_id: string;
+  sequence: number;
+  company_id: string | null;
+  is_correction: boolean;
+}
+
+export interface ConversationMemoryDiagnostics {
+  summary_status: "absent" | "pending" | "ready" | "failed";
+  summary_version: string | null;
+  summarized_through_sequence: number;
+  stored_message_count: number;
+  hydrated_recent_count: number;
+  summary_included: boolean;
+  recall_fact_count: number;
+  legacy_recall_rebuilt: boolean;
+}
+
+export interface ConversationRecallContext {
+  facts: ConversationRecallFact[];
+  diagnostics: ConversationMemoryDiagnostics;
+}

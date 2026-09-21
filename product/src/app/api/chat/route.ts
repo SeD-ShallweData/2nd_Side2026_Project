@@ -71,7 +71,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         chatRequest = await hydrateConversationRequest(chatRequest, user);
         claimedChatRequest = chatRequest;
       } catch (error) {
-        if (error instanceof ServiceError && error.status === 503) persistence = "unavailable";
+        if (error instanceof ServiceError && error.status === 503) {
+          persistence = "unavailable";
+          // Authenticated history must not silently fall back to a client-injected
+          // transcript from another room when owner-scoped hydration is unavailable.
+          chatRequest = { ...chatRequest, recent_messages: [], conversation_memory: undefined, conversation_recall: undefined };
+        }
         else throw error;
       }
     }

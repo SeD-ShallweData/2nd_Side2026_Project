@@ -16,6 +16,7 @@ import {
 } from "@/services/answerPlanService";
 import { clarificationFallback } from "@/services/chatFallback";
 import { reviewedLaborTopics } from "@/services/reviewedLaborGuidance";
+import { finalizeConversationResponse, recallResponse } from "@/services/conversationRecallService";
 import {
   getLlmProviderConfigs,
   getLlmTimeoutMs,
@@ -184,6 +185,10 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
 export async function sendParsedComparedChatRequest(
   parsedRequest: ChatRequest,
 ): Promise<ChatComparisonResponse> {
+  return finalizeConversationResponse(parsedRequest, await sendParsedComparedChatRequestInternal(parsedRequest));
+}
+
+async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest): Promise<ChatComparisonResponse> {
   const policyBaseline = await sendChatMessage(parsedRequest);
   const configs = selectProviderConfigs(
     getLlmProviderConfigs(),
@@ -208,6 +213,9 @@ export async function sendParsedComparedChatRequest(
       guardrailHits: ["EMERGENCY_PRIORITY"],
     });
   }
+
+  const recall = recallResponse(parsedRequest, configs);
+  if (recall) return recall;
 
   const rewrite = await rewriteFollowupQuery(parsedRequest, configs);
   const request = rewrite.changed

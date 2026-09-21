@@ -8,6 +8,7 @@ import type {
 import type { AnswerPlan } from "@/domain/answerPlan";
 import type { CompanyRiskResult, SourceReference } from "@/domain/risk";
 import type { RagRetrievalResult } from "@/domain/rag";
+import type { ConversationMemoryDiagnostics } from "@/domain/conversationRecall";
 
 export type LlmProviderId = "upstage" | "skt";
 export type ChatResultProviderId = LlmProviderId | "openai";
@@ -33,6 +34,8 @@ export interface ProviderMetrics {
 }
 
 export interface SafeExecutionTrace {
+  memory?: ConversationMemoryDiagnostics;
+  recall_mode?: "user_statement" | "missing_user_statement";
   question_intent?: "labor" | "company" | "off_topic" | "unclear";
   intent_status?: "classified" | "unavailable";
   prompt_policy_version: string;

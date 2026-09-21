@@ -7,6 +7,7 @@ import type {
 } from "@/domain/chatComparison";
 import { parseChatRequest, sendChatMessage } from "@/services/chatService";
 import { publicAnswerContext, publicAnswerText } from "@/services/publicAnswerContext";
+import { finalizeConversationResponse, recallResponse } from "@/services/conversationRecallService";
 import { LABOR_REVIEW_DATE, applicabilityGuardrailHits, reviewedLaborFallback, reviewedLaborRetrieval } from "@/services/reviewedLaborGuidance";
 import {
   CHAT_OUTPUT_GUARDRAILS,
@@ -415,7 +416,7 @@ function fallbackResult(
 export function createParsedResponsesChatSender(
   dependencies: ResponsesChatDependencies = DEFAULT_DEPENDENCIES,
 ) {
-  return async function send(
+  async function send(
     request: ChatRequest,
     options: ResponsesChatOptions = {},
   ): Promise<ChatComparisonResponse> {
@@ -425,6 +426,9 @@ export function createParsedResponsesChatSender(
     if (policyBaseline.answer_type === "emergency_guidance") {
       return policyShortCircuit(startedAt, request, policyBaseline);
     }
+    const recall = !hasCurrentContractUpload(options.toolContext ?? {})
+      ? recallResponse(request, [{ id: "openai", label: "OpenAI Responses", model: "not-invoked" }]) : null;
+    if (recall) return recall;
     policyBaseline = reviewedLaborFallback(request.message, policyBaseline) ?? policyBaseline;
 
     const config = dependencies.getConfig();
@@ -472,7 +476,9 @@ export function createParsedResponsesChatSender(
         ),
       );
     }
-  };
+  }
+  return async (request: ChatRequest, options: ResponsesChatOptions = {}) =>
+    finalizeConversationResponse(request, await send(request, options));
 }
 
 /**
