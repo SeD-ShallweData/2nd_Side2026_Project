@@ -3832,7 +3832,7 @@ summary:focus-visible {
    572px vs 필요 약 601px) — 화면 너비와 무관하게 항상 줄바꿈된다는 뜻이라
    미디어 쿼리 없이 항상 한 줄에 하나씩 꽉 채운다. */
 .refresh-hero-copy .refresh-button-row > .button-large {
-  width: 100%;
+  width: 80%;
 }
 .refresh-hero-facts { display: flex; gap: 0; margin: 33px 0 0; }
 .refresh-hero-facts div { display: grid; gap: 1px; border-left: 1px solid rgb(8 31 58 / 16%); padding: 0 21px; }
@@ -4035,7 +4035,7 @@ summary:focus-visible {
   /* 최종 CTA 는 데모 패널과 자리를 나누지 않아 넓은 화면에서는 두 버튼이
      한 줄에 들어간다. 이 너비 아래로는 안 들어가 줄바꿈되므로, 그때부터
      히어로와 같은 규칙(꽉 채운 동일 너비)을 적용한다. */
-  .refresh-final-cta .refresh-button-row > .button-large { width: 100%; }
+  .refresh-final-cta .refresh-button-row > .button-large { width: 80%; }
 }
 
 @media (max-width: 560px) {
