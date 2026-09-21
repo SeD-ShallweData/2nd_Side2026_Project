@@ -1,13 +1,14 @@
 /**
  * 상담 실행 결과에 붙는 라벨.
  *
- * `policy_short_circuit` 은 **두 가지 서로 다른 상황**에서 나온다.
+ * `policy_short_circuit` 은 서로 다른 상황에서 나온다.
  *
  *   ① 긴급     — 사고·부상 표현이 감지되면 모델을 부르지 않고 119·안전 안내를 즉시 반환
  *   ② 근거 없음 — 법령 검색이 no_match 라 모델을 부르지 않고 정책 기준 답변을 반환
+ *   ③ 대화 회상 — 사용자 진술만 정리하며 법령 검색 성공을 요구하지 않음
  *
- * 둘은 `chatComparisonService` 에서 같은 `execution_mode` 를 쓰고, 구분은
- * `trace.guardrail_hits` 에만 남는다. 화면이 실행 모드만 보고 문구를 고르면
+ * 같은 `execution_mode`라도 `trace.guardrail_hits`와 `trace.recall_mode`를
+ * 함께 보아야 한다. 화면이 실행 모드만 보고 문구를 고르면
  * "부동산 시세" 같은 범위 밖 질문에도 「긴급 안전정책 우선」이 붙는다.
  * QA #17-3 에서 실제로 관측됐다(2026-09-11).
  *
@@ -26,6 +27,7 @@ export function isEmergencyRun(guardrailHits: readonly string[] | undefined | nu
 export function providerRunStatusLabel(
   status: ProviderRunStatus,
   guardrailHits: readonly string[] | undefined | null,
+  recallMode?: "user_statement" | "missing_user_statement",
 ): string {
   switch (status) {
     case "success":
@@ -33,6 +35,7 @@ export function providerRunStatusLabel(
     case "guardrail_replaced":
       return "정책 교체";
     case "policy_short_circuit":
+      if (recallMode) return recallMode === "user_statement" ? "사용자 진술 정리" : "대화 내용 확인 필요";
       if (guardrailHits?.includes("INTENT_OUT_OF_SCOPE")) return "상담 범위 안내";
       if (guardrailHits?.includes("INTENT_CLARIFICATION")) return "질문 확인 필요";
       if (guardrailHits?.includes("RAG_UNAVAILABLE")) return "근거 검색 연결 제한";
@@ -50,6 +53,7 @@ export interface ExecutionModeCopy {
 export function executionModeCopy(
   executionMode: ChatExecutionMode,
   guardrailHits: readonly string[] | undefined | null,
+  recallMode?: "user_statement" | "missing_user_statement",
 ): ExecutionModeCopy {
   if (executionMode === "single_api") {
     return {
@@ -77,6 +81,10 @@ export function executionModeCopy(
       kicker: "긴급 안전정책 우선",
       summary: "긴급 상황은 모델 응답을 기다리지 않고 공통 안전 안내를 즉시 표시합니다.",
     };
+  }
+  if (recallMode) {
+    return { kicker: recallMode === "user_statement" ? "사용자 진술 정리" : "대화 내용 확인 필요",
+      summary: "이 상담의 사용자 진술을 정리했습니다. 회사·법률 사실의 검증이나 새로운 법령 검색 결과는 아닙니다." };
   }
   if (guardrailHits?.includes("INTENT_OUT_OF_SCOPE")) {
     return { kicker: "상담 범위 안내", summary: "질문의 요청 목적에 따라 이 상담에서 다루는 범위를 안내합니다." };

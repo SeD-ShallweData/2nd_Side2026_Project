@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import answerCases from "../../eval/answer-contract-cases.json";
 import continuityCases from "../../eval/conversation-continuity-cases.json";
+import { evaluateAnswerContract } from "@/services/answerContractEvaluator";
 
 const MANUAL_DEVELOPMENT_IDS = [
   "AQ07-independent-company-no-certainty",
@@ -21,6 +22,7 @@ const MANUAL_DEVELOPMENT_IDS = [
   "AQ24-recall-unknown",
   "AQ25-wage-payday-passed-with-records",
   "AQ26-two-months-unpaid-first-step",
+  "AQ30-payment-promise-not-termination",
 ];
 
 const FOLLOWUP04_VALIDATION_IDS = [
@@ -30,6 +32,15 @@ const FOLLOWUP04_VALIDATION_IDS = [
 ];
 
 describe("manual QA regression corpus", () => {
+  it("detects the observed payment-promise/termination confusion without calling a model", () => {
+    const item = answerCases.find(item => item.id === "AQ30-payment-promise-not-termination")!;
+    const observed = "회사가 약속한 지급 예정일을 기준으로 14일 이내에 입금되지 않으면 근로기준법 제36조에 따라 금품 청산 의무가 발생합니다.";
+    const result = evaluateAnswerContract({ id: item.id, required_any: item.contract.required_any, forbidden: item.contract.forbidden }, {
+      answer: observed, answer_type: "general_guidance", guardrail_status: "passed", sources: [], suggested_actions: [],
+    });
+    expect(result.status).toBe("FAIL");
+    expect(result.failures.some(value => value.includes("지급 예정일을 기준으로 14일"))).toBe(true);
+  });
   it("keeps every known-failure regression in the development split", () => {
     const byId = new Map(answerCases.map((item) => [item.id, item]));
     for (const id of MANUAL_DEVELOPMENT_IDS) {
