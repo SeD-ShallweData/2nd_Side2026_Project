@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 import type { ChatResponse } from "@/domain/chat";
-import { applicabilityGuardrailHits, reviewedLaborFallback, reviewedLaborRetrieval, reviewedLaborTopics } from "./reviewedLaborGuidance";
+import { applicabilityGuardrailHits, hasUnpaidWageQuestion, reviewedLaborFallback, reviewedLaborRetrieval, reviewedLaborTopics } from "./reviewedLaborGuidance";
 import { retrieveLaborLawContext } from "./ragService";
 import { createAnswerPlan } from "./answerPlanService";
 import { CHAT_OUTPUT_GUARDRAILS, hasUnverifiedCitation, scanRules } from "@/server/guardrails";
@@ -57,6 +57,18 @@ describe("source-reviewed applicability bundles (development, not an independent
       expect(reviewedLaborRetrieval(message)).toBeNull();
       expect(reviewedLaborFallback(message, baseline)).toBeNull();
     }
+  });
+  it("keeps ordinary arrears questions on general retrieval instead of the filing applicability bundle", () => {
+    for (const message of [
+      "급여일이 지났는데 아직 월급을 못 받았습니다. 근로계약서와 통장 내역이 있는데 무엇부터 해야 하나요?",
+      "월급이 두 달 밀렸는데 무엇부터 해야 하나요?",
+      "두 번의 월급날이 지났는데 급여가 들어오지 않았습니다. 첫 단계가 무엇인가요?",
+    ]) {
+      expect(hasUnpaidWageQuestion(message)).toBe(true);
+      expect(reviewedLaborTopics(message)).toEqual([]);
+      expect(reviewedLaborRetrieval(message)).toBeNull();
+    }
+    expect(reviewedLaborTopics("1350에 전화하면 임금체불 진정이 접수돼요?")).toEqual(["filing"]);
   });
   it("explicit applicability question survives unavailable intent classification", () => {
     const plan = createAnswerPlan({ message: query, chat_mode: "wage", recent_messages: [] }, { intent: "unclear", topic: "other", company_scope: "not_applicable", status: "unavailable" });

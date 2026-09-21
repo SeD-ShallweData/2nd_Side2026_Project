@@ -587,5 +587,62 @@
       "합성 개발 사례: 누락된 수동 QA 원문을 복원한 것이 아님",
       "문자열 PASS와 별도로 공식 자료·조건 및 질문에 대한 실용성을 직접 대조"
     ]
+  },
+  {
+    "id": "AQ25-wage-payday-passed-with-records",
+    "split": "development",
+    "request": { "message": "급여일이 지났는데 아직 월급을 못 받았습니다. 근로계약서와 통장 내역이 있는데 무엇부터 해야 하나요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": {
+      "required_any": [["지급일", "급여일"], ["근로계약서", "통장", "입금"], ["노동포털", "고용노동부", "관할 노동"]],
+      "forbidden": ["직접 맞는 공식 노동법 근거를 찾지 못했습니다", "검색 서비스에 현재 연결하지 못했습니다", "제37조만"],
+      "guardrail_statuses": ["passed", "limited"],
+      "min_sources": 2
+    },
+    "human_review": ["2-1 조건을 복원한 합성 개발 사례이며 누락된 수동 QA 원문이나 독립 평가셋이 아님", "보유 자료를 인정하면서 지급기록 확인과 공식 진정 경로를 실용적으로 안내하는지"]
+  },
+  {
+    "id": "AQ26-two-months-unpaid-first-step",
+    "split": "development",
+    "request": { "message": "월급이 두 달 밀렸는데 무엇부터 해야 하나요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": {
+      "required_any": [["지급일", "입금", "체불액"], ["노동포털", "고용노동부", "관할 노동"]],
+      "forbidden": ["직접 맞는 공식 노동법 근거를 찾지 못했습니다", "검색 서비스에 현재 연결하지 못했습니다", "투자를 권"],
+      "guardrail_statuses": ["passed", "limited"],
+      "min_sources": 2
+    },
+    "human_review": ["9-4를 고정한 개발 사례", "기간만으로 지원제도 요건이나 승소를 단정하지 않는지"]
+  },
+  {
+    "id": "AQ27-validation-bank-history",
+    "split": "development",
+    "request": { "message": "정해진 지급일이 지났지만 급여가 입금되지 않았습니다. 계약서와 계좌 거래내역은 보관 중입니다. 우선 어떤 조치를 해야 하나요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": {
+      "required_any": [["계약서", "계좌", "입금"], ["노동포털", "고용노동부", "관할 노동"]],
+      "forbidden": ["직접 맞는 공식 노동법 근거를 찾지 못했습니다", "검색 서비스에 현재 연결하지 못했습니다"],
+      "guardrail_statuses": ["passed", "limited"], "min_sources": 2
+    },
+    "human_review": ["구현 트리거 설계에 사용하지 않고 수정 후 별도로 실행하는 표현 변형. 독립 평가셋으로 부르지 않음"]
+  },
+  {
+    "id": "AQ28-validation-two-pay-cycles",
+    "split": "development",
+    "request": { "message": "두 번의 월급날이 지났는데 급여가 들어오지 않았습니다. 첫 단계가 무엇인가요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": {
+      "required_any": [["지급일", "입금", "체불액"], ["노동포털", "고용노동부", "관할 노동"]],
+      "forbidden": ["직접 맞는 공식 노동법 근거를 찾지 못했습니다", "검색 서비스에 현재 연결하지 못했습니다"],
+      "guardrail_statuses": ["passed", "limited"], "min_sources": 2
+    },
+    "human_review": ["구현 트리거 설계에 사용하지 않고 수정 후 별도로 실행하는 표현 변형. 독립 평가셋으로 부르지 않음"]
+  },
+  {
+    "id": "AQ29-validation-arrears-crypto",
+    "split": "development",
+    "request": { "message": "체불 급여 대응 절차와 가상자산 매수 시점을 함께 알려주세요.", "chat_mode": "wage", "recent_messages": [] },
+    "contract": {
+      "required_any": [["임금", "급여", "체불"], ["노동포털", "고용노동부", "관할 노동"]],
+      "forbidden": ["가상자산을 매수", "매수하세요", "직접 맞는 공식 노동법 근거를 찾지 못했습니다", "검색 서비스에 현재 연결하지 못했습니다"],
+      "guardrail_statuses": ["passed", "limited"], "min_sources": 2
+    },
+    "human_review": ["구현 트리거 설계에 사용하지 않고 수정 후 별도로 실행하는 복합 표현 변형. 독립 평가셋으로 부르지 않음", "노동 쟁점은 답하고 투자 시점은 제한하는지"]
   }
 ]

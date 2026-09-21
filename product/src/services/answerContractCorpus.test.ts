@@ -19,6 +19,14 @@ const MANUAL_DEVELOPMENT_IDS = [
   "AQ22-online-complaint",
   "AQ23-payday-and-promise-recall",
   "AQ24-recall-unknown",
+  "AQ25-wage-payday-passed-with-records",
+  "AQ26-two-months-unpaid-first-step",
+];
+
+const FOLLOWUP04_VALIDATION_IDS = [
+  "AQ27-validation-bank-history",
+  "AQ28-validation-two-pay-cycles",
+  "AQ29-validation-arrears-crypto",
 ];
 
 describe("manual QA regression corpus", () => {
@@ -29,6 +37,14 @@ describe("manual QA regression corpus", () => {
     }
     const ids = answerCases.map((item) => item.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("keeps follow-up 04 post-change wording variations separate and development-only", () => {
+    const byId = new Map(answerCases.map((item) => [item.id, item]));
+    for (const id of FOLLOWUP04_VALIDATION_IDS) {
+      expect(byId.get(id), id).toMatchObject({ split: "development" });
+      expect(byId.get(id)?.human_review.join(" ")).toContain("수정 후 별도로 실행");
+    }
   });
 
   it("keeps continuity cases synthetic, development-only, and bounded to twelve distinct turns", () => {
