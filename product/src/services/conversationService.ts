@@ -20,6 +20,8 @@ import {
 } from "@/services/conversationSummaryService";
 import { ServiceError } from "@/utils/errors";
 import { extractRecallFacts } from "@/services/conversationRecallService";
+import { getCompanyById } from "@/services/companyService";
+import { publicAnswerContext } from "@/services/publicAnswerContext";
 
 const MAX_LIST_LIMIT = 50;
 const HISTORY_MESSAGE_LIMIT = 10;
@@ -103,7 +105,7 @@ function parseGuestImport(value: unknown): ImportGuestConversationRequest {
     return {
       user_message: turn.user_message.trim(),
       company_id: turn.company_id as string | null,
-      response: structuredClone(turn.response) as ChatComparisonResponse,
+      response: publicAnswerContext(structuredClone(turn.response) as ChatComparisonResponse),
     };
   });
   return { import_id: record.import_id, turns };
@@ -120,15 +122,34 @@ function toSummary(value: StoredConversationSummary): ConversationSummaryDto {
   };
 }
 
-function toDetail(value: StoredConversationDetail): ConversationDetailDto {
+async function companyNamesForDetail(value: StoredConversationDetail): Promise<Map<string, string>> {
+  const companyIds = [...new Set([
+    value.active_company_id,
+    ...value.turns.map((turn) => turn.company_id),
+  ].filter((companyId): companyId is string => Boolean(companyId)))];
+  const names = new Map<string, string>();
+  await Promise.all(companyIds.map(async (companyId) => {
+    try {
+      names.set(companyId, (await getCompanyById(companyId)).company_name);
+    } catch {
+      // A deleted/unavailable public company must not make its owned conversation unavailable.
+    }
+  }));
+  return names;
+}
+
+async function toDetail(value: StoredConversationDetail): Promise<ConversationDetailDto> {
   const repository = getConversationRepository();
+  const companyNames = await companyNamesForDetail(value);
   return {
     source: repository.source,
     ...toSummary(value),
+    active_company_name: value.active_company_id ? companyNames.get(value.active_company_id) ?? null : null,
     turns: value.turns.map((turn) => ({
       turn_id: turn.turn_id,
       turn_index: turn.turn_index,
       company_id: turn.company_id,
+      company_name: turn.company_id ? companyNames.get(turn.company_id) ?? null : null,
       answer_type: turn.answer_type,
       guardrail_status: turn.guardrail_status,
       created_at: turn.created_at,
@@ -165,7 +186,7 @@ export async function getUserConversation(
   conversationId: string,
   user: SessionUserDto,
 ): Promise<ConversationDetailDto> {
-  return toDetail(await ownerDetail(conversationId, user));
+  return await toDetail(await ownerDetail(conversationId, user));
 }
 
 export async function deleteUserConversation(
@@ -325,6 +346,7 @@ export async function completeClaimedConversationRequest(
 ): Promise<{ conversation_id: string; response: ChatComparisonResponse; reused: boolean }> {
   const requestId = requireRequestId(request);
   if (!request.conversation_id) throw new ServiceError("CONVERSATION_NOT_FOUND", "Conversation request was not claimed.", 404, false);
+  response = publicAnswerContext(response);
   const primary = response.results[0];
   if (!primary) throw new ServiceError("CONVERSATION_PERSISTENCE_FAILED", "No displayed chat result to save.", 503, true);
   const result = await getConversationRepository().completeRequest({
@@ -368,6 +390,7 @@ export async function persistCompletedChat(
   if (!requestKey || !REQUEST_KEY_PATTERN.test(requestKey)) {
     throw new ServiceError("VALIDATION_ERROR", "대화 요청 식별값을 확인해 주세요.", 400, false);
   }
+  response = publicAnswerContext(response);
   const primary = response.results[0];
   if (!primary) {
     throw new ServiceError("CONVERSATION_PERSISTENCE_FAILED", "표시할 상담 결과가 없습니다.", 503, true);

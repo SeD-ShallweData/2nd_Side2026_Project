@@ -291,10 +291,11 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
     const runs = this.configs.map(async (config): Promise<ProviderComparisonResult> => {
       try {
         const completion = await this.client.complete(config, messages);
-        const guardrailHits = scanGuardrails(completion.answer, context);
+        const generatedAnswer = publicAnswerText(completion.answer);
+        const guardrailHits = scanGuardrails(generatedAnswer, context);
         const replaced = guardrailHits.length > 0;
         const responseBaseline = replaced ? replacementBaseline(context) : context.policyBaseline;
-        const answer = replaced ? responseBaseline.answer : completion.answer;
+        const answer = publicAnswerText(replaced ? responseBaseline.answer : generatedAnswer);
         return {
           provider: config.id,
           provider_label: config.label,

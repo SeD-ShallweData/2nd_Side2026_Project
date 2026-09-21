@@ -17,6 +17,8 @@ export interface ConversationTurnDto {
   turn_id: string;
   turn_index: number;
   company_id: string | null;
+  /** Best-effort public display name. Null never prevents restoring the turn. */
+  company_name: string | null;
   answer_type: AnswerType;
   guardrail_status: GuardrailStatus;
   created_at: string;
@@ -27,6 +29,8 @@ export interface ConversationTurnDto {
 
 export interface ConversationDetailDto extends ConversationSummaryDto {
   source: ConversationApiSource;
+  /** Best-effort public display name for the restored active company. */
+  active_company_name: string | null;
   turns: ConversationTurnDto[];
 }
 

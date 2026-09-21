@@ -20,6 +20,7 @@ import type {
 } from "@/domain/chatComparison";
 import { executionModeCopy, providerRunStatusLabel } from "@/components/chat/runLabels";
 import { readApiResponse } from "@/utils/clientApi";
+import { publicAnswerText } from "@/services/publicAnswerContext";
 import {
   appendGuestConversationTurn,
   clearGuestConversation,
@@ -70,6 +71,7 @@ interface UiMessage {
   comparison?: ChatComparisonResponse;
   sources?: import("@/domain/risk").SourceReference[];
   companyId?: string | null;
+  companyName?: string | null;
 }
 
 function welcomeContent(company: string | undefined, executionMode: ConfiguredChatExecutionMode): string {
@@ -95,7 +97,7 @@ function comparisonHistoryContent(
     ? comparison.results.filter((result) => result.provider === selection)
     : comparison.results;
   return selected
-    .map((result) => `${result.provider_label}: ${result.answer.slice(0, 900)}`)
+    .map((result) => publicAnswerText(result.answer).slice(0, 900))
     .join("\n");
 }
 
@@ -126,7 +128,7 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
         </div>
       ) : null}
 
-      <div className="provider-answer-copy"><SafeMarkdown>{result.answer}</SafeMarkdown></div>
+      <div className="provider-answer-copy"><SafeMarkdown>{publicAnswerText(result.answer)}</SafeMarkdown></div>
 
       <section className="provider-evidence" aria-label={`${result.provider_label} 답변 근거와 한계`}>
         <div>
@@ -350,7 +352,7 @@ export function ChatPanel({
           : item.content,
       }));
     setMessages((current) => [...current, {
-      id: crypto.randomUUID(), requestId, role: "user", content: message, companyId: activeCompanyId ?? null,
+      id: crypto.randomUUID(), requestId, role: "user", content: message, companyId: activeCompanyId ?? null, companyName: activeCompanyName ?? null,
     }]);
     setDraft("");
     setError(null);
@@ -461,10 +463,13 @@ export function ChatPanel({
       setConversationId(detail.conversation_id);
       setConversationTitle(detail.title);
       setActiveCompanyId(detail.active_company_id ?? undefined);
-      setActiveCompanyName(detail.active_company_id === companyId ? companyName : undefined);
+      const restoredCompanyName = detail.active_company_id === companyId
+        ? companyName
+        : detail.active_company_name ?? undefined;
+      setActiveCompanyName(restoredCompanyName);
       setMessages([
         { id: "welcome", role: "assistant", content: welcomeContent(
-          detail.active_company_id === companyId ? companyName : detail.active_company_id ?? undefined,
+          restoredCompanyName,
           executionMode,
         ) },
         ...detail.turns.flatMap((turn) => turn.messages.map((message) => message.role === "assistant" && turn.response
@@ -474,6 +479,7 @@ export function ChatPanel({
               role: message.role,
               content: message.content,
               companyId: turn.company_id,
+              companyName: turn.company_name,
               ...(message.role === "assistant" ? { sources: turn.sources } : {}),
             })),
       ]);
@@ -594,7 +600,7 @@ export function ChatPanel({
   }
 
   const questions = activeCompanyId ? COMPANY_QUESTIONS : GENERAL_QUESTIONS;
-  const activeCompanyLabel = activeCompanyName ?? activeCompanyId;
+  const activeCompanyLabel = activeCompanyName ?? (activeCompanyId ? "선택 사업장" : undefined);
 
   return (
     <div className="chat-experience-layout">
@@ -622,7 +628,7 @@ export function ChatPanel({
                     <span aria-hidden="true">↻</span> 재전송
                   </button>
                   <div className="chat-message chat-message-user"><p>{message.content}</p></div>
-                  {message.companyId ? <small className="turn-company-label">당시 사업장: {message.companyId}</small> : null}
+                  {message.companyId ? <small className="turn-company-label">당시 사업장: {message.companyName ?? "연결된 사업장"}</small> : null}
                 </div>
               ) : <div className="chat-message chat-message-assistant"><p>{message.content}</p>{message.sources?.length ? <DataSourceList sources={message.sources} /> : null}</div>}
             </div>

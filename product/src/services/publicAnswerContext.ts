@@ -1,11 +1,18 @@
 import type { CompanyRiskResult } from "@/domain/risk";
 
+const INTERNAL_HISTORY_LABEL = /(?:^|\n)\s*\[이전 답변 근거:[^\n]*(?:\n|$)/g;
+const PROVIDER_ANSWER_PREFIX = /^(?:Upstage(?:\s+Solar)?|SKT(?:\s+A\.?X)?|OpenAI(?:\s+Responses)?)\s*:\s*/gim;
+
 /** Public chat presentation, not company API policy. Never mutate stored history. */
 export function publicAnswerText(text: string): string {
   return text
     .replace(/(?:상위|하위)\s*\d+(?:\.\d+)?\s*(?:%|퍼센트)/gi, "공표 확인 참고 정보")
     .replace(/BIZ[_\s]?NO\s*미존재\s*사업장/gi, "업종 정보 미확인")
-    .replace(/\[이전 답변 근거:[^\]]*\]/g, "");
+    // These are prompt/history annotations, never part of a user-facing answer.
+    .replace(INTERNAL_HISTORY_LABEL, "\n")
+    .replace(/\[이전 답변 근거:[^\]]*\]/g, "")
+    // Provider identity belongs in the answer card header, not in its answer body.
+    .replace(PROVIDER_ANSWER_PREFIX, "");
 }
 
 export function publicAnswerContext<T>(value: T): T {

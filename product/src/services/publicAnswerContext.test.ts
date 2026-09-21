@@ -31,6 +31,12 @@ describe("public answer context and indicator interpretation", () => {
     expect(JSON.stringify(result)).not.toMatch(/하위5%|상위 5%|이전 답변 근거/);
     expect(result.legal).toBe("50% 이상 가산");
   });
+  it("removes internal history annotations and provider prefixes without removing a source citation", () => {
+    const answer = publicAnswerContext({
+      answer: "Upstage Solar: 먼저 자료를 정리하세요.\n[이전 답변 근거: 근로기준법 제43조]\n출처: 국가법령정보센터",
+    });
+    expect(answer.answer).toBe("먼저 자료를 정리하세요.\n출처: 국가법령정보센터");
+  });
   it.each(["긍정 지표는 임금 체불이나 급격한 변동이 없었다는 사실입니다.", "성실납부이므로 임금체불이 없었습니다.", "이는 과거 체불 기록이 없다는 뜻일 뿐, 지난달 미지급을 부정하는 근거는 아닙니다.", "상위 5%입니다.", "업종은 BIZ_NO미존재사업장입니다."])("rejects unsafe output: %s", (answer) => {
     expect(scanRules(answer, CHAT_OUTPUT_GUARDRAILS).size).toBeGreaterThan(0);
   });

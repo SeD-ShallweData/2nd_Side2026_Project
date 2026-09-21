@@ -260,7 +260,8 @@ function successResult(
   baseline: ChatResponse,
   run: ResponsesRunResult,
 ): ProviderComparisonResult {
-  const guardrailHits = outputGuardrailHits(run, request);
+  const generatedAnswer = publicAnswerText(run.answer);
+  const guardrailHits = outputGuardrailHits({ ...run, answer: generatedAnswer }, request);
   const reviewed = reviewedLaborFallback(request.message, baseline);
   if (reviewed) baseline = reviewed;
   const hasSuccessfulContractReview = run.toolCalls.some(
@@ -280,7 +281,7 @@ function successResult(
     hasSuccessfulContractReview;
   const metadata = contractReviewSucceeded ? CONTRACT_REVIEW_METADATA : baseline;
   const replaced = guardrailHits.length > 0;
-  const answer = toolFailed || replaced ? baseline.answer : run.answer;
+  const answer = publicAnswerText(toolFailed || replaced ? baseline.answer : generatedAnswer);
   const toolNames = [...new Set(run.toolCalls.map((call) => call.name))];
   const result: ProviderComparisonResult = {
     provider: "openai",
