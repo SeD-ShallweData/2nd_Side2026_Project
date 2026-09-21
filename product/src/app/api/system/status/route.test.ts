@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   chatExecutionMode: "openai_responses" as "dual_api" | "openai_responses",
@@ -12,7 +12,16 @@ const state = vi.hoisted(() => ({
     | "unavailable",
 }));
 
+const authState = vi.hoisted(() => ({
+  usersByToken: new Map<string, { user_id: string; email: string; display_name: string; role: "user" | "admin" | "inspector" }>(),
+}));
+
 vi.mock("server-only", () => ({}));
+vi.mock("@/services/authService", () => ({
+  getOptionalSessionUser: async (token: string | null) => (
+    token ? authState.usersByToken.get(token) ?? null : null
+  ),
+}));
 vi.mock("@/config/dataMode", () => ({
   getDataMode: () => "real",
   getCompanyDataMode: () => "real",
@@ -42,12 +51,45 @@ vi.mock("@/server/responses/responsesConfig", () => ({
 
 import { GET } from "@/app/api/system/status/route";
 
+function request(token: string | null): Request {
+  const headers = new Headers();
+  if (token) headers.set("cookie", `donworry_session=${token}`);
+  return new Request("http://localhost/api/system/status", { headers });
+}
+
+beforeEach(() => {
+  authState.usersByToken.set("admin-token", {
+    user_id: "1", email: "admin@example.com", display_name: "운영 관리자", role: "admin",
+  });
+});
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   state.chatExecutionMode = "openai_responses";
   state.primaryLlm = "ready";
   state.dualLlm = "configured_unreachable";
+  authState.usersByToken.clear();
+});
+
+describe("system status 접근 권한", () => {
+  it.each([
+    ["비로그인", null],
+    ["일반 사용자", "user-token"],
+    ["근로감독관", "inspector-token"],
+  ])("%s 요청을 403으로 막는다", async (_label, token) => {
+    authState.usersByToken.set("user-token", {
+      user_id: "2", email: "user@example.com", display_name: "일반 사용자", role: "user",
+    });
+    authState.usersByToken.set("inspector-token", {
+      user_id: "3", email: "inspector@example.com", display_name: "근로감독관", role: "inspector",
+    });
+
+    const response = await GET(request(token));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { code: "FORBIDDEN" } });
+  });
 });
 
 describe("system status의 상담 실행 상태", () => {
@@ -55,7 +97,7 @@ describe("system status의 상담 실행 상태", () => {
     vi.stubEnv("RAG_API_URL", "");
     vi.stubEnv("CONTRACT_ANALYSIS_URL", "");
 
-    const body = await (await GET()).json();
+    const body = await (await GET(request("admin-token"))).json();
 
     expect(body).toMatchObject({
       chat_execution_mode: "openai_responses",
@@ -76,7 +118,7 @@ describe("system status의 상담 실행 상태", () => {
     vi.stubEnv("RAG_API_URL", "");
     vi.stubEnv("CONTRACT_ANALYSIS_URL", "");
 
-    const body = await (await GET()).json();
+    const body = await (await GET(request("admin-token"))).json();
 
     expect(body.integrations).toMatchObject({
       primary_llm: "ready",
@@ -104,7 +146,7 @@ describe("system status의 상담 실행 상태", () => {
     }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const body = await (await GET()).json();
+    const body = await (await GET(request("admin-token"))).json();
 
     expect(body.integrations.contract_analysis).toBe("configured_unreachable");
     expect(fetchMock).toHaveBeenCalledWith(
@@ -121,7 +163,7 @@ describe("system status의 상담 실행 상태", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    const body = await (await GET()).json();
+    const body = await (await GET(request("admin-token"))).json();
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(body.integrations).toMatchObject({
