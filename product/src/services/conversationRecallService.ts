@@ -4,7 +4,7 @@ import type { ConversationRecallFact } from "@/domain/conversationRecall";
 
 const PAYDAY = /(?:급여일|월급날|(?:급여|월급|임금)\s*지급일)/;
 const PROMISE = /(?:지급\s*약속|회사\s*(?:답변|응답)|입금\s*약속)/;
-const RECALL = /(?:말한|말했던|정정한|알려\s*준|기억|회상|다시\s*(?:말|알려|정리)|지금까지|앞서|아까|였나|였죠|였지|정리해)/;
+const RECALL = /(?:말한|말했던|정정한(?!다)|알려\s*준|기억|회상|다시\s*(?:말|알려|정리)|지금까지|앞서|아까|였나|였죠|였지|정리해)/;
 const LEGAL = /(?:법적|법률|신고|진정|신청|청구|문의|어디|어떻게|무엇부터|뭘\s*해야|해야\s*하|할\s*수|가산|계산|위법|투자|주식|추천)/;
 
 /** Only normalized dates/time phrases leave this extractor, never arbitrary raw text. */
@@ -47,13 +47,18 @@ export function extractRecallFacts(input: {
 }
 
 export function recallAnswer(request: ChatRequest, allowMixed = false): { answer: string; found: boolean } | null {
-  if (!RECALL.test(request.message) || (!PAYDAY.test(request.message) && !PROMISE.test(request.message))
+  // A correction is a new user assertion, not a request to repeat the old value.
+  // Normalize only supported facts; do not mutate stored history or trust model text.
+  const currentFacts = extractRecallFacts({ content: request.message, source_message_id: "current_request",
+    sequence: 0, company_id: request.company_id ?? null });
+  const correcting = currentFacts.some((fact) => fact.is_correction);
+  if ((!RECALL.test(request.message) && !correcting) || (!PAYDAY.test(request.message) && !PROMISE.test(request.message))
     || (!allowMixed && LEGAL.test(request.message))) return null;
   const facts = request.conversation_recall?.facts ?? request.recent_messages.flatMap((message, index) =>
     message.role === "user" ? extractRecallFacts({ content: message.content,
       source_message_id: `recent_${index}`, sequence: index + 1, company_id: request.company_id ?? null }) : []);
-  const applicable = facts.filter((fact) => fact.company_id === (request.company_id ?? null))
-    .toSorted((a, b) => a.sequence - b.sequence);
+  const applicable = [...facts.filter((fact) => fact.company_id === (request.company_id ?? null))
+    .toSorted((a, b) => a.sequence - b.sequence), ...currentFacts];
   const payday = applicable.findLast((fact) => fact.kind === "payday");
   const promise = applicable.findLast((fact) => fact.kind === "payment_promise");
   const parts: string[] = [];

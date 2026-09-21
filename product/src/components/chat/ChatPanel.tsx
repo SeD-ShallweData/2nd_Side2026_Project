@@ -108,7 +108,7 @@ function isLegacyProvider(
 }
 
 function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
-  const statusLabel = providerRunStatusLabel(result.status, result.trace.guardrail_hits);
+  const statusLabel = providerRunStatusLabel(result.status, result.trace.guardrail_hits, result.trace.recall_mode);
 
   return (
     <article className={`provider-answer provider-answer-${result.provider}`}>
@@ -205,6 +205,8 @@ function ComparisonBlock({
   const ragToolCalled = retrieval?.tool_names?.includes("retrieve_labor_law") ?? false;
   const ragLabel = !retrieval
     ? "공식 근거 상태 미확인"
+    : comparison.execution_mode === "policy_short_circuit" && retrieval.recall_mode
+      ? "사용자 진술 기반 · 법령 검색 미사용"
     : comparison.execution_mode === "openai_responses" && !ragToolCalled
       ? "이번 답변에서 공식 법령 검색 미사용"
     : retrieval.rag_status === "matched"
@@ -216,7 +218,7 @@ function ComparisonBlock({
         : comparison.execution_mode === "policy_short_circuit"
           ? "긴급 안내 우선"
           : "공식 근거 검색 연결 안 됨";
-  const modeCopy = executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits);
+  const modeCopy = executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits, retrieval?.recall_mode);
   const feedbackResults = comparison.execution_mode === "dual_api"
     ? comparison.results.filter(isLegacyProvider)
     : [];

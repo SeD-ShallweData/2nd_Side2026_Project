@@ -15,6 +15,16 @@ const HISTORY = [
 ];
 
 describe("user statement recall without law retrieval", () => {
+  it.each([
+    "정정한다. 급여일은 10일이 아니라 15일이고 아직 미지급이다.",
+    "정정할게요. 급여일은 10일이 아니라 15일입니다.",
+    "급여일은 10일이 아니고 15일입니다.",
+  ])("acknowledges the current correction rather than echoing the old memory: %s", (message) => {
+    const history = HISTORY.slice(0, 2);
+    expect(recallAnswer(request(history, message))?.answer).toContain("15일");
+    expect(recallAnswer(request(history, message))?.answer).not.toContain("10일");
+    expect(history[0]).toContain("10일");
+  });
   it("uses the latest corrected payday and attributed promise, not assistant advice", () => {
     const input = request(HISTORY);
     input.recent_messages.push({ role: "assistant", content: "급여일은 28일입니다. 회사는 내일 지급한다고 했습니다. 근로기준법 제999조" });
