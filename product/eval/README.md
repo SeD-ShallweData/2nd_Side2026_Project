@@ -44,10 +44,12 @@ The manual-QA regressions added after the 2026-09-21 review are development case
 
 ## Authenticated continuous-conversation evaluation
 
-Fixed-history replay above is deliberately separate from real continuity. To verify server persistence and restoration, start the app against a new isolated local PostgreSQL database, set `ANSWER_EVAL_EMAIL` and `ANSWER_EVAL_PASSWORD` in the current shell for a local test account, and run:
+Fixed-history replay above is deliberately separate from real continuity. To verify server persistence and restoration, start the app against a **new isolated local PG16 database** (never production/restored data), set `ANSWER_EVAL_EMAIL` and `ANSWER_EVAL_PASSWORD` in the current shell for a local test account without printing/saving them, and set `ANSWER_EVAL_ISOLATED_PG16=1` only after confirming the app's database target. Then run:
 
 ```powershell
 npm.cmd run eval:conversation-continuity
 ```
 
-The continuity runner refuses non-local URLs, reads credentials only from process environment, keeps the returned `donworry_session` cookie in memory, and never writes it to its JSONL. It carries the server-returned `conversation_id` into later `/api/chat` calls, fetches `/api/conversations/{id}` after every turn, requires `source: "database"`, and logs in again before the final restore check. Cases contain at most three model calls. Missing credentials, unavailable persistence, Mock conversation storage, response/restore mismatch, or a missing local database are `blocked` and exit `2`; contract failures exit `1`.
+The continuity runner refuses non-local URLs, reads credentials only from process environment, keeps the returned `donworry_session` cookie in memory, and never writes it to its JSONL. It carries the server-returned `conversation_id` into later `/api/chat` calls with empty client history, fetches `/api/conversations/{id}` after every turn, and requires `source: "database"`. The development scenario now contains six distinct questions followed by a seventh recall **after re-login and detail restoration**, plus a final re-login/detail check. The structural limit is twelve turns, not twelve repeated trials; use at most three attempts per core case unless new evidence warrants more. This is an HTTP/storage test, not browser refresh/navigation or process-restart proof.
+
+Rows retain allowlisted summary status/version/checkpoint and hydration counts, never summary text or prompts. Earlier successful rows survive a later blocker, and re-login verification is not marked true prematurely. Missing credentials/isolation confirmation, unavailable persistence, Mock conversation storage, response/restore mismatch, or a missing local database are `blocked` and exit `2`; contract failures exit `1`. Confirmation is an operator precondition, not automatic proof of database isolation. See `docs/qa/2026-09-21-followup-03.md` for the blocked real-DB acceptance and resumption checklist.

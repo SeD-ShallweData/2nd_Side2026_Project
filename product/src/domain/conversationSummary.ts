@@ -3,6 +3,8 @@
  * text는 원문에서 추출·정리한 표시용 문장이고 source_message_ids가 없는 항목은
  * 모델이나 시스템이 새 사실로 만들어서는 안 된다.
  */
+import type { ConversationRecallFact } from "@/domain/conversationRecall";
+
 export interface ConversationSummaryItem {
   text: string;
   source_message_ids: string[];
@@ -11,6 +13,8 @@ export interface ConversationSummaryItem {
 }
 
 export interface ConversationStructuredSummary {
+  /** Optional for pre-v2 summaries; original messages remain unchanged. */
+  recall_facts?: ConversationRecallFact[];
   user_goals: ConversationSummaryItem[];
   user_stated_facts: ConversationSummaryItem[];
   /* 현재 구현은 검증 가능한 DB·도구 snapshot을 별도 연결하기 전까지 비워 둔다. */

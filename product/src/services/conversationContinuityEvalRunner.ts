@@ -5,6 +5,7 @@ import {
 } from "./answerContractEvaluator.ts";
 
 export interface ContinuityEvaluationStep {
+  restore_before?: "relogin";
   message: string;
   chat_mode: "general" | "wage" | "safety" | "contract";
   company_id?: string;
@@ -20,6 +21,8 @@ export interface ContinuityEvaluationCase {
 }
 
 export interface ContinuityEvaluationRow {
+  after_relogin: boolean;
+  memory: Record<string, string | number | boolean | null> | null;
   case_id: string;
   step: number;
   request_status: "ok";
@@ -34,6 +37,7 @@ export interface ContinuityEvaluationRow {
 }
 
 export interface ContinuityEvaluationResult {
+  post_restore_recall_verified: boolean;
   case_id: string;
   storage_source: "database";
   relogin_restore_verified: true;
@@ -74,9 +78,9 @@ async function json(response: Response, fallbackCode: string): Promise<Record<st
   if (!value) throw new ContinuityEvaluationBlocked("INVALID_JSON_RESPONSE", "The local API returned an invalid JSON object.");
   if (!response.ok) {
     const nested = asRecord(value.error);
-    const code = typeof nested?.code === "string" ? nested.code : fallbackCode;
-    const message = typeof nested?.message === "string" ? nested.message : `The local API returned HTTP ${response.status}.`;
-    throw new ContinuityEvaluationBlocked(code, message.slice(0, 500));
+    const code = typeof nested?.code === "string" && /^[A-Z0-9_]{1,80}$/.test(nested.code) ? nested.code : fallbackCode;
+    // Auth endpoints may echo input in error messages. Never persist their raw text.
+    throw new ContinuityEvaluationBlocked(code, `The local API returned HTTP ${response.status}.`);
   }
   return value;
 }
@@ -84,7 +88,8 @@ async function json(response: Response, fallbackCode: string): Promise<Record<st
 export function requireLocalEvaluationUrl(value: string): string {
   const url = new URL(value);
   const localHosts = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
-  if (!localHosts.has(url.hostname)) {
+  if (!localHosts.has(url.hostname) || !["http:", "https:"].includes(url.protocol)
+    || url.username || url.password || url.search || url.hash) {
     throw new ContinuityEvaluationBlocked(
       "LOCAL_ENVIRONMENT_REQUIRED",
       "Continuity evaluation only runs against a local isolated environment.",
@@ -194,6 +199,8 @@ export async function runContinuityEvaluationCase(input: {
   email: string;
   password: string;
   item: ContinuityEvaluationCase;
+  isolatedDatabaseConfirmed?: boolean;
+  onRow?: (row: ContinuityEvaluationRow) => void;
 }): Promise<ContinuityEvaluationResult> {
   if (!input.email || !input.password) {
     throw new ContinuityEvaluationBlocked(
@@ -201,8 +208,12 @@ export async function runContinuityEvaluationCase(input: {
       "Set ANSWER_EVAL_EMAIL and ANSWER_EVAL_PASSWORD for a local test account.",
     );
   }
-  if (input.item.steps.length < 1 || input.item.steps.length > 3) {
-    throw new ContinuityEvaluationBlocked("INVALID_CONTINUITY_CASE", "A continuity case must contain one to three model calls.");
+  if (!input.isolatedDatabaseConfirmed) {
+    throw new ContinuityEvaluationBlocked("ISOLATED_PG16_CONFIRMATION_REQUIRED", "Confirm the local app uses a newly created isolated PG16 database before running.");
+  }
+  // Distinct conversation turns are not repeated attempts of the same case.
+  if (input.item.steps.length < 1 || input.item.steps.length > 12) {
+    throw new ContinuityEvaluationBlocked("INVALID_CONTINUITY_CASE", "A continuity case must contain one to twelve distinct turns.");
   }
   const baseUrl = requireLocalEvaluationUrl(input.baseUrl);
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -211,6 +222,11 @@ export async function runContinuityEvaluationCase(input: {
   const rows: ContinuityEvaluationRow[] = [];
 
   for (const [index, step] of input.item.steps.entries()) {
+    if (step.restore_before) {
+      if (!conversationId) throw new ContinuityEvaluationBlocked("RESTORE_BEFORE_CREATION", "Create the conversation before restoring it.");
+      cookie = await login({ ...input, baseUrl, fetchImpl });
+      await restore({ fetchImpl, baseUrl, cookie, conversationId, expectedTurnCount: index });
+    }
     const response = await fetchImpl(`${baseUrl}/api/chat`, {
       method: "POST",
       headers: requestHeaders(baseUrl, cookie),
@@ -252,7 +268,18 @@ export async function runContinuityEvaluationCase(input: {
       expectedQuestion: step.message,
       expectedAnswer: answer.answer,
     });
-    rows.push({
+    const result = Array.isArray(payload.results) ? asRecord(payload.results[0]) : null;
+    const memory = asRecord(asRecord(result?.trace)?.memory);
+    const safeMemory: Record<string, string | number | boolean | null> = {};
+    for (const key of ["summary_status", "summary_version", "summarized_through_sequence", "stored_message_count", "hydrated_recent_count", "summary_included", "recall_fact_count", "legacy_recall_rebuilt"]) {
+      const value = memory?.[key];
+      if (typeof value === "number" || typeof value === "boolean" || value === null
+        || (key === "summary_status" && typeof value === "string" && /^(absent|pending|ready|failed)$/.test(value))
+        || (key === "summary_version" && typeof value === "string" && /^extractive-v\d+$/.test(value))) safeMemory[key] = value;
+    }
+    const row: ContinuityEvaluationRow = {
+      after_relogin: Boolean(step.restore_before),
+      memory: memory ? safeMemory : null,
       case_id: input.item.id,
       step: index + 1,
       request_status: "ok",
@@ -264,7 +291,9 @@ export async function runContinuityEvaluationCase(input: {
       failures: evaluation.failures,
       checks: evaluation.checks,
       human_review: step.human_review,
-    });
+    };
+    rows.push(row);
+    input.onRow?.(row);
   }
 
   if (!conversationId) throw new ContinuityEvaluationBlocked("CONVERSATION_ID_MISSING", "No conversation was created.");
@@ -277,6 +306,7 @@ export async function runContinuityEvaluationCase(input: {
     expectedTurnCount: input.item.steps.length,
   });
   return {
+    post_restore_recall_verified: rows.some((row) => row.after_relogin && row.contract_status === "PASS"),
     case_id: input.item.id,
     storage_source: "database",
     relogin_restore_verified: true,

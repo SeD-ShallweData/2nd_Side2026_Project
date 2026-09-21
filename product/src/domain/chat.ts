@@ -1,4 +1,5 @@
 import type { SourceReference } from "@/domain/risk";
+import type { ConversationRecallContext } from "@/domain/conversationRecall";
 
 export type ChatMode = "general" | "wage" | "safety" | "contract";
 export type AnswerType =
@@ -34,6 +35,8 @@ export interface ChatRequest {
   recent_messages: RecentMessage[];
   /** 서버 소유 대화방의 ready 요약만 붙는다. 클라이언트 입력은 신뢰하지 않는다. */
   conversation_memory?: ConversationMemoryContext;
+  /** Server-only, owner-checked provenance. Raw request parsing drops this field. */
+  conversation_recall?: ConversationRecallContext;
 }
 
 export interface SuggestedAction {

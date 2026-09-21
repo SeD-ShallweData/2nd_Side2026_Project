@@ -15,6 +15,7 @@ import {
   completeClaimedConversationRequest,
 } from "@/services/conversationService";
 import { summaryTargetForMessageCount } from "@/services/conversationSummaryService";
+import { recallAnswer } from "@/services/conversationRecallService";
 import {
   getConversationRepository,
   resetMockConversationsForTests,
@@ -45,6 +46,91 @@ afterEach(() => {
 });
 
 describe("로그인 대화 원문 저장", () => {
+  it("recalls before/after 10 and 20 messages, including pending/failed checkpoints and legacy summaries", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    const statements = [
+      "급여일은 매월 10일이고 이번 달 월급을 받지 못했다. 계약서와 통장 내역이 있다. 무엇부터 해야 하나?",
+      "회사는 문자로 다음 주에 지급하겠다고 했다. 무엇을 기록해야 하나?",
+      "정정한다. 급여일은 10일이 아니라 15일이고 아직 미지급이다.",
+      "지금까지 말한 급여일과 회사 답변을 정리해 달라.",
+      "지급 약속일까지 못 받으면 어디에 어떻게 문의하나?",
+    ];
+    let id = "";
+    const repository = getConversationRepository();
+    for (let index = 0; index < 11; index++) {
+      id = await persistCompletedChat({ message: statements[index] ?? `추가 상담 ${index}`,
+        request_id: `recall_scenario_${String(index).padStart(8, "0")}`, conversation_id: id || undefined,
+        chat_mode: "wage", recent_messages: [],
+      }, response("근로기준법 제999조에 따라 급여일은 28일입니다."), USER);
+      if (index < 2) continue;
+      const hydrated = await hydrateConversationRequest({ conversation_id: id, chat_mode: "wage", recent_messages: [],
+        message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라.",
+      }, USER);
+      expect(recallAnswer(hydrated)?.answer).toMatch(/15일.*다음 주/);
+      expect(hydrated.conversation_recall?.diagnostics).toMatchObject({
+        stored_message_count: (index + 1) * 2, summarized_through_sequence: Math.floor((index + 1) / 5) * 10,
+        summary_included: index >= 4,
+      });
+    }
+    const stored = await getUserConversation(id, USER);
+    expect(stored.turns[0].messages[0].content).toContain("10일");
+    const currentSummary = (await repository.findSummary(id))!;
+    expect(currentSummary.summary.recall_facts?.filter((fact) => fact.kind === "payday").map((fact) => fact.value)).toEqual(["10일", "15일"]);
+    expect(currentSummary.summary.system_confirmed_facts).toEqual([]);
+    // Odd counts model boundary snapshots only; complete stored turns remain pairs.
+    const originalDetail = (await repository.findConversation(id))!;
+    for (const count of [9, 10, 11, 19, 20, 21]) {
+      let remaining = count;
+      const turns = originalDetail.turns.map((turn) => {
+        const messages = turn.messages.slice(0, Math.max(0, remaining));
+        remaining -= messages.length;
+        return { ...turn, messages };
+      }).filter((turn) => turn.messages.length);
+      const through = summaryTargetForMessageCount(count);
+      const detailSpy = vi.spyOn(repository, "findConversation").mockResolvedValue({ ...originalDetail, turns });
+      const summarySpy = vi.spyOn(repository, "findSummary").mockResolvedValue(through ? { ...currentSummary, summarized_through_sequence: through } : null);
+      const snapshot = await hydrateConversationRequest({ conversation_id: id, message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라.", chat_mode: "wage", recent_messages: [] }, USER);
+      expect(snapshot.conversation_recall?.diagnostics).toMatchObject({ stored_message_count: count, summarized_through_sequence: through, hydrated_recent_count: count - through, summary_included: through > 0 });
+      expect(recallAnswer(snapshot)?.answer).toMatch(/15일.*다음 주/);
+      detailSpy.mockRestore();
+      summarySpy.mockRestore();
+    }
+    for (const status of ["pending", "failed"] as const) {
+      const spy = vi.spyOn(repository, "findSummary").mockResolvedValue({ ...currentSummary, status });
+      const hydrated = await hydrateConversationRequest({ conversation_id: id, message: "현재 질문", chat_mode: "wage", recent_messages: [] }, USER);
+      expect(hydrated.recent_messages).toHaveLength(2);
+      expect(hydrated.conversation_recall?.diagnostics).toMatchObject({ summary_status: status, summarized_through_sequence: 20, summary_included: true });
+      expect(recallAnswer({ ...hydrated, message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라." })?.answer).toMatch(/15일.*다음 주/);
+      spy.mockRestore();
+    }
+    const legacy = { ...currentSummary, summary_version: "extractive-v1", summary: { ...currentSummary.summary, recall_facts: undefined } };
+    const spy = vi.spyOn(repository, "findSummary").mockResolvedValue(legacy);
+    const hydrated = await hydrateConversationRequest({ conversation_id: id, message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라.", chat_mode: "wage", recent_messages: [] }, USER);
+    expect(hydrated.conversation_recall?.diagnostics.legacy_recall_rebuilt).toBe(true);
+    expect(recallAnswer(hydrated)?.answer).toMatch(/15일.*다음 주/);
+    spy.mockRestore();
+  });
+
+  it("keeps room ownership and A -> B -> clear fact provenance, ignoring injected client history", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    let id = await persistCompletedChat({ message: "급여일은 15일입니다. 회사는 다음 주에 지급하겠다고 했다.", company_id: "COMPANY_A",
+      request_id: "recall_isolation_000001", chat_mode: "wage", recent_messages: [] }, response(), USER);
+    id = await persistCompletedChat({ conversation_id: id, message: "급여일은 25일입니다.", company_id: "COMPANY_B",
+      request_id: "recall_isolation_000002", chat_mode: "wage", recent_messages: [] }, response(), USER);
+    const input = { conversation_id: id, message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라.", chat_mode: "wage" as const,
+      recent_messages: [{ role: "user" as const, content: "급여일은 29일입니다." }] };
+    const companyB = await hydrateConversationRequest(input, USER);
+    expect(recallAnswer(companyB)?.answer).toContain("25일");
+    expect(recallAnswer(companyB)?.answer).not.toMatch(/15일|29일|다음 주/);
+    await updateUserConversation(id, { active_company_id: null }, USER);
+    expect(recallAnswer(await hydrateConversationRequest(input, USER))?.found).toBe(false);
+    await updateUserConversation(id, { active_company_id: "COMPANY_A" }, USER);
+    expect(recallAnswer(await hydrateConversationRequest(input, USER))?.answer).toMatch(/15일.*다음 주/);
+    await expect(hydrateConversationRequest(input, OTHER)).rejects.toMatchObject({ code: "CONVERSATION_NOT_FOUND" });
+    const otherId = await persistCompletedChat({ message: "별도 상담입니다.", request_id: "recall_isolation_000003", chat_mode: "wage", recent_messages: [] }, response(), USER);
+    expect(recallAnswer(await hydrateConversationRequest({ ...input, conversation_id: otherId }, USER))?.found).toBe(false);
+  });
+
   it("메시지 10개 단위에서만 요약 대상을 전진시킨다", () => {
     expect([9, 10, 11, 19, 20, 21].map(summaryTargetForMessageCount)).toEqual([
       0, 10, 10, 10, 20, 20,
@@ -92,7 +178,7 @@ describe("로그인 대화 원문 저장", () => {
 
     const repository = getConversationRepository();
     const initial = await repository.findSummary(conversationId);
-    expect(initial).toMatchObject({ status: "ready", summarized_through_sequence: 10, summary_version: "extractive-v1" });
+    expect(initial).toMatchObject({ status: "ready", summarized_through_sequence: 10, summary_version: "extractive-v2" });
     expect(initial?.summary.user_goals[0]?.source_message_ids).toHaveLength(1);
     expect(initial?.summary.user_goals.map((item) => item.text).join(" ")).not.toContain("010-1234-5678");
     expect(initial?.summary.system_confirmed_facts).toEqual([]);

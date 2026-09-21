@@ -100,6 +100,36 @@ const REQUEST: ChatRequest = {
 };
 
 describe("Responses chat service adapter", () => {
+  it("keeps attributed recall when new legal generation is replaced for a bad citation", async () => {
+    const { send, run } = setup(BASELINE, { ...RUN, answer: "근로기준법 제999조에 따르세요." });
+    const result = await send({ ...REQUEST,
+      message: "정정한 급여일과 회사 지급 약속을 정리하고 법적으로 어떻게 해야 하는지 알려주세요.",
+      recent_messages: [{ role: "user", content: "급여일은 15일입니다. 회사는 다음 주에 지급하겠다고 했다." }],
+    });
+    expect(run).toHaveBeenCalledOnce();
+    expect(result.results[0].status).toBe("guardrail_replaced");
+    expect(result.results[0].trace.guardrail_hits).toContain("UNVERIFIED_LAW_CITATION");
+    expect(result.results[0].answer).toMatch(/15일.*다음 주/);
+    expect(result.results[0].answer).not.toContain("제999조");
+  });
+
+  it("uses the shared recall boundary without a model/tool call, while retaining emergency priority", async () => {
+    const input = { ...REQUEST, message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라.",
+      recent_messages: [
+        { role: "user" as const, content: "급여일은 10일입니다." },
+        { role: "user" as const, content: "회사는 다음 주에 지급하겠다고 했다." },
+        { role: "user" as const, content: "정정한다. 급여일은 10일이 아니라 15일입니다." },
+      ],
+    };
+    const normal = setup();
+    const result = await normal.send(input);
+    expect(result.results[0].answer).toMatch(/15일.*다음 주/);
+    expect(result.results[0].trace.rag_reason).toBe("conversation_recall_no_retrieval");
+    expect(normal.createRunner).not.toHaveBeenCalled();
+    const emergency = setup({ ...BASELINE, answer_type: "emergency_guidance" });
+    expect((await emergency.send(input)).results[0].answer_type).toBe("emergency_guidance");
+  });
+
   it.each([true, false])("applies the same reviewed conditions without discarding correct generation: %s", async (good) => {
     const message = "상시 4명인 사업장도 야간수당을 줘야 하나요?";
     const correct = reviewedLaborFallback(message, BASELINE)!;

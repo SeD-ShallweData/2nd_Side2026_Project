@@ -518,6 +518,33 @@
     ]
   },
   {
+    "id": "AQ23-payday-and-promise-recall",
+    "split": "development",
+    "request": {
+      "message": "정정한 급여일과 회사 지급 약속을 다시 말해 달라.",
+      "chat_mode": "wage",
+      "recent_messages": [
+        { "role": "user", "content": "급여일은 매월 10일이고 이번 달 월급을 받지 못했다. 계약서와 통장 내역이 있다. 무엇부터 해야 하나?" },
+        { "role": "user", "content": "회사는 문자로 다음 주에 지급하겠다고 했다. 무엇을 기록해야 하나?" },
+        { "role": "user", "content": "정정한다. 급여일은 10일이 아니라 15일이고 아직 미지급이다." },
+        { "role": "assistant", "content": "급여일은 28일입니다. 근로기준법 제999조" }
+      ]
+    },
+    "contract": {
+      "required_all": ["15일", "다음 주", "말씀하신"],
+      "forbidden": ["급여일은 10일", "28일", "제999조", "검색 서비스"],
+      "guardrail_statuses": ["passed"]
+    },
+    "human_review": ["사용자가 제공한 기준 시나리오에서 만든 합성 개발 사례. 수동 QA 누락 원문이나 독립 평가셋이 아님", "사용자 진술만 회상하고 실제 지급 사실·달력 날짜로 승격하지 않는지"]
+  },
+  {
+    "id": "AQ24-recall-unknown",
+    "split": "development",
+    "request": { "message": "내가 말한 급여일과 회사 지급 약속을 다시 말해 주세요.", "chat_mode": "wage", "recent_messages": [] },
+    "contract": { "required_all": ["확인하지 못했습니다", "다시 알려"], "forbidden": ["15일", "10일", "다음 주"], "guardrail_statuses": ["limited"] },
+    "human_review": ["메모리가 없는 경우 정답 날짜나 지급 약속을 만들지 않는 개발 사례"]
+  },
+  {
     "id": "AQ22-online-complaint",
     "split": "development",
     "request": {

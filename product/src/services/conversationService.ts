@@ -19,6 +19,7 @@ import {
   toConversationMemoryContext,
 } from "@/services/conversationSummaryService";
 import { ServiceError } from "@/utils/errors";
+import { extractRecallFacts } from "@/services/conversationRecallService";
 
 const MAX_LIST_LIMIT = 50;
 const HISTORY_MESSAGE_LIMIT = 10;
@@ -249,16 +250,34 @@ export async function hydrateConversationRequest(
   const detail = await ownerDetail(request.conversation_id, user);
   const summary = await getConversationRepository().findSummary(detail.conversation_id);
   const allMessages = detail.turns.flatMap((turn) => turn.messages);
-  const through = summary?.status === "ready" ? summary.summarized_through_sequence : 0;
+  const memory = toConversationMemoryContext(summary);
+  const through = memory?.summarized_through_sequence ?? 0;
   const history = allMessages
     .slice(through)
     .slice(-HISTORY_MESSAGE_LIMIT)
     .map(({ role, content }) => ({ role, content }));
+  const legacyRecallRebuilt = through > 0 && !summary?.summary.recall_facts;
+  const originals = detail.turns.flatMap((turn) => turn.messages.flatMap((message, index) => {
+    const sequence = (turn.turn_index - 1) * 2 + index + 1;
+    return message.role === "user" && (sequence > through || legacyRecallRebuilt)
+      ? extractRecallFacts({ content: message.content, source_message_id: message.message_id,
+        sequence, company_id: turn.company_id ?? null }) : [];
+  }));
+  const recallFacts = [...(legacyRecallRebuilt ? [] : summary?.summary.recall_facts ?? []), ...originals];
   return {
     ...request,
     company_id: request.company_id ?? detail.active_company_id ?? undefined,
     recent_messages: history,
-    conversation_memory: toConversationMemoryContext(summary),
+    conversation_memory: memory,
+    conversation_recall: {
+      facts: recallFacts,
+      diagnostics: {
+        summary_status: summary?.status ?? "absent", summary_version: summary?.summary_version ?? null,
+        summarized_through_sequence: through, stored_message_count: allMessages.length,
+        hydrated_recent_count: history.length, summary_included: Boolean(memory),
+        recall_fact_count: recallFacts.length, legacy_recall_rebuilt: legacyRecallRebuilt,
+      },
+    },
   };
 }
 
