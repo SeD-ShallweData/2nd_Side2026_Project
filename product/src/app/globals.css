@@ -3814,8 +3814,10 @@ summary:focus-visible {
 .consult-cta:hover:not(:disabled) { box-shadow: 0 11px 26px rgb(8 31 58 / 22%); }
 .consult-cta img { display: block; width: 2.25rem; height: 2.25rem; flex-shrink: 0; border: var(--avatar-ring-width) solid var(--avatar-ring); border-radius: 50%; background: var(--white); object-fit: cover; }
 
-/* 나란히 놓이는 두 버튼은 높이를 맞춘다. 너비까지 묶으면 글자가 긴 쪽이
-   두 줄로 접히면서 오히려 높이가 어긋난다. 너비는 글자에 맡긴다. */
+/* 나란히 놓일 자리가 있으면 너비는 글자에 맡긴다 — 너비까지 묶으면 글자가
+   긴 쪽이 두 줄로 접히면서 오히려 높이가 어긋난다. 자리가 없어 줄바꿈되면
+   반대로 두 버튼 너비가 서로 달라 보이는 쪽이 더 어색하므로, 그때는 아래
+   규칙들로 폭을 맞춘다. */
 .refresh-hero-copy .refresh-button-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .refresh-hero-copy .refresh-button-row > .button-large,
 .refresh-final-cta .refresh-button-row > .button-large {
@@ -3823,6 +3825,14 @@ summary:focus-visible {
   height: 3.5rem;
   padding-block: 0;
   white-space: nowrap;
+}
+
+/* 히어로 문구 칸은 오른쪽 데모 패널과 나란히 2열을 나눠 쓰므로, 창을
+   아무리 넓혀도 두 버튼을 합친 너비보다 좁다(shell 최대 1160px 기준 약
+   572px vs 필요 약 601px) — 화면 너비와 무관하게 항상 줄바꿈된다는 뜻이라
+   미디어 쿼리 없이 항상 한 줄에 하나씩 꽉 채운다. */
+.refresh-hero-copy .refresh-button-row > .button-large {
+  width: 100%;
 }
 .refresh-hero-facts { display: flex; gap: 0; margin: 33px 0 0; }
 .refresh-hero-facts div { display: grid; gap: 1px; border-left: 1px solid rgb(8 31 58 / 16%); padding: 0 21px; }
@@ -4022,12 +4032,16 @@ summary:focus-visible {
   .chat-experience-layout { grid-template-columns: 1fr; }.question-guide { position: static; order: -1; }.question-guide .guide-group { display: inline-block; width: calc(50% - 5px); vertical-align: top; }.question-guide .guide-group:nth-of-type(even) { margin-left: 6px; }
   .community-interaction-row { align-items: stretch; flex-direction: column; }.community-search-actions { flex-direction: column; align-items: stretch; }.community-search-field { width: 100%; }
   .consumer-footer-grid { grid-template-columns: 1fr; }.consumer-footer-note { grid-column: auto; }
+  /* 최종 CTA 는 데모 패널과 자리를 나누지 않아 넓은 화면에서는 두 버튼이
+     한 줄에 들어간다. 이 너비 아래로는 안 들어가 줄바꿈되므로, 그때부터
+     히어로와 같은 규칙(꽉 채운 동일 너비)을 적용한다. */
+  .refresh-final-cta .refresh-button-row > .button-large { width: 100%; }
 }
 
 @media (max-width: 560px) {
   .shell,.refresh-chat-shell { width: min(100% - 26px,1160px); }
   .refresh-hero { padding-top: 48px; }.refresh-hero-copy h1 > span,.refresh-hero-copy h1 mark { font-size: 1.38rem; }.refresh-hero-copy h1 mark .refresh-brand-word { font-size: 2.8rem; }
-  .refresh-button-row .button { width: 100%; }.refresh-hero-facts { display: grid; grid-template-columns: 1fr; gap: 10px; }.refresh-hero-facts div { border: 0; padding: 0; }
+  .refresh-hero-facts { display: grid; grid-template-columns: 1fr; gap: 10px; }.refresh-hero-facts div { border: 0; padding: 0; }
   .refresh-demo-cards { grid-template-columns: 1fr; }.refresh-float-chip { display: none; }.refresh-section-row { align-items: flex-start; flex-direction: column; }
   .refresh-risk-card { padding: 18px; }.refresh-risk-card header { flex-direction: column; }.refresh-risk-card dl,.wage-observation-list { grid-template-columns: 1fr; }
   .wage-indicator-coverage { align-items: flex-start; flex-direction: column; }

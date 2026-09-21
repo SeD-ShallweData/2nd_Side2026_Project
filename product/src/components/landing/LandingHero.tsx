@@ -15,7 +15,7 @@ export function LandingHero() {
           <div className="refresh-button-row">
             <Link href="/chat" className="button button-ai button-large consult-cta">
               <Image src="/brand/donworry-mascot.png" alt="" width={192} height={192} />
-              돈워리 AI에게 상담하기
+              돈워리 AI에게 상담하기 <span aria-hidden="true">→</span>
             </Link>
             <Link href="/companies" className="button button-dark button-large">궁금한 사업장의 위험요소 보러가기 <span aria-hidden="true">→</span></Link>
           </div>
