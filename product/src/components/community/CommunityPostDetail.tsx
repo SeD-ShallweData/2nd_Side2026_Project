@@ -83,7 +83,7 @@ export function CommunityPostDetail({ postId }: { postId: string }) {
             {post.capabilities.reports && post.viewer_permissions.can_report ? (
               <CommunityReportForm key={post.post_id} postId={post.post_id} />
             ) : null}
-            <Link href="/community" className="button button-outline">목록으로</Link>
+            <Link href="/community" className="button button-outline button-small">목록으로</Link>
           </div>
         </>
       ) : null}
