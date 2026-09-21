@@ -49,6 +49,7 @@ export interface AnswerQualityEvaluationRow {
   answer_type?: string;
   guardrail_status?: string;
   source_count?: number;
+  sources?: AnswerUnderEvaluation["sources"];
   action_codes?: string[];
   trace?: Record<string, unknown>;
 }
@@ -194,6 +195,7 @@ export async function evaluateAnswerQualityCase(input: {
     answer_type: answer.answer_type,
     guardrail_status: answer.guardrail_status,
     source_count: answer.sources.length,
+    sources: answer.sources.map(source => ({ name: source.name, citation: source.citation, url: source.url })),
     action_codes: answer.suggested_actions.map((action) => action.code),
     trace: answer.trace,
     human_review: item.human_review,

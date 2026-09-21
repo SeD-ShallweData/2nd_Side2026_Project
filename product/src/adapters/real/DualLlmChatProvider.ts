@@ -21,11 +21,11 @@ import {
 } from "@/server/guardrails";
 import { loadPrompt, withRuntimeContext } from "@/server/promptLoader";
 import { clarificationFallback } from "@/services/chatFallback";
-import { companySignalForAnswer, publicAnswerContext, publicAnswerText } from "@/services/publicAnswerContext";
+import { companySignalForAnswer, companySafetyGuardrailHits, publicAnswerContext, publicAnswerText } from "@/services/publicAnswerContext";
 import { LABOR_REVIEW_DATE, applicabilityGuardrailHits, reviewedLaborFallback } from "@/services/reviewedLaborGuidance";
 import { wageArrearsFallback, wageArrearsGuardrailHits } from "@/services/wageArrearsGuidance";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-21-v9";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-21-v10";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -65,6 +65,7 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   );
   if (unverified) hits.add("UNVERIFIED_LAW_CITATION");
   if (context.questionIntent === "company" && context.companyContext) {
+    for (const hit of companySafetyGuardrailHits(answer, context.companyContext.risk)) hits.add(hit);
     // Company-only evidence cannot support new benefits/filing procedures.
     if (context.ragRetrieval.status !== "matched" && /대지급금|진정서|진정.{0,8}(?:신청|제출)/.test(answer)) {
       hits.add("COMPANY_UNSOURCED_LEGAL_PROCEDURE");
@@ -116,7 +117,7 @@ function replacementBaseline(context: ComparisonContext): ChatResponse {
   ) {
     return {
       ...context.policyBaseline,
-      answer: `${context.policyBaseline.answer}\n\n납부·고용 긍정 신호는 실제 임금 지급이나 과거 체불 부재를 증명하지 않습니다. 공식 명단 미등재도 체불 부재의 증명이 아니며, 자료 부족과 확인된 사실은 구분해야 합니다. 임금 지급일·급여명세서·입금내역·근로계약 조건을 직접 확인하세요.`,
+      answer: `${context.policyBaseline.answer}\n\n산업안전 카드의 공개 표시는 ‘${companySignalForAnswer(context.companyContext.risk).safety_context.display_label}’입니다. ${context.companyContext.risk.safety_context.scope === "region_industry" ? "지역·업종 맥락이며 개별 사업장의 안전 판정이 아닙니다." : "검증된 사업장 연결 신호이며 사고 확률이나 안전 인증이 아닙니다."} 미확인은 산업안전 이상이 없다고 확인된 상태가 아닙니다.\n\n납부·고용 긍정 신호는 실제 임금 지급이나 과거 체불 부재를 증명하지 않습니다. 공식 명단 미등재도 체불 부재의 증명이 아니며, 자료 부족과 확인된 사실은 구분해야 합니다. 임금 지급일·급여명세서·입금내역·근로계약 조건을 직접 확인하세요.`,
     };
   }
 

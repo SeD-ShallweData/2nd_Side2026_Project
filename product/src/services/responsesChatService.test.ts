@@ -100,6 +100,16 @@ const REQUEST: ChatRequest = {
 };
 
 describe("Responses chat service adapter", () => {
+  it("replaces promise-date settlement and incomplete recordkeeping with reviewed conditional guidance", async () => {
+    const { send } = setup(BASELINE, { ...RUN, answer: "회사가 약속한 지급 예정일부터 14일 이내에 임금을 청산해야 합니다(근로기준법 제36조)." });
+    const result = (await send({ ...REQUEST, message: "회사는 문자로 다음 주에 지급하겠다고 했다. 무엇을 기록해야 하나?" })).results[0];
+    expect(result.status).toBe("guardrail_replaced");
+    expect(result.trace.guardrail_hits).toContain("PAYMENT_SETTLEMENT_TRIGGER");
+    expect(result.answer).toContain("수신 날짜·시각");
+    expect(result.answer).toContain("다음 주");
+    expect(result.sources.some(s => s.citation === "근로기준법 제43조")).toBe(true);
+    expect(result.sources.some(s => s.citation === "근로기준법 제36조")).toBe(false);
+  });
   it("keeps attributed recall when new legal generation is replaced for a bad citation", async () => {
     const { send, run } = setup(BASELINE, { ...RUN, answer: "근로기준법 제999조에 따르세요." });
     const result = await send({ ...REQUEST,

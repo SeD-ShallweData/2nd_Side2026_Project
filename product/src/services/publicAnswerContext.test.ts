@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { publicAnswerContext, companySignalForAnswer } from "./publicAnswerContext";
+import { publicAnswerContext, companySignalForAnswer, companySafetyGuardrailHits } from "./publicAnswerContext";
 import { CHAT_OUTPUT_GUARDRAILS, scanRules } from "@/server/guardrails";
 import type { CompanyRiskResult } from "@/domain/risk";
+import { MOCK_RISKS } from "@/mocks/risks";
+import { getSignalStatusLabel, getWageStatusMeta } from "@/domain/riskPresentation";
 
 export const SYNTHETIC_RISK: CompanyRiskResult = {
   company_id: "synthetic", company_name: "합성 사업장", data_as_of: "2026-09-21", generated_at: "2026-09-21", valid_until: null, freshness: "unknown",
@@ -10,6 +12,21 @@ export const SYNTHETIC_RISK: CompanyRiskResult = {
   safety_context: { level: "review", scope: "region_industry", summary: "상위5%", industry: "BIZ_NO미존재사업장", region: "합성지역", evidence_codes: ["INTERNAL_CODE"], evidence_items: [], confidence: "limited", disclaimer: "상위 5퍼센트 BIZ_NO미존재사업장" }, sources: [],
 };
 describe("public answer context and indicator interpretation", () => {
+  it("AQ21 uses the actual Mock card labels and separate wage/safety scopes", () => {
+    const risk = MOCK_RISKS.COMPANY_DEMO_008;
+    const dto = companySignalForAnswer(risk);
+    expect(dto.wage_signal.display_label).toBe(getWageStatusMeta(risk.wage_risk.level).label);
+    expect(dto.safety_context.display_label).toBe(getSignalStatusLabel(risk.safety_context.level));
+    expect(dto.safety_context.display_label).toBe("안전 신호 미확인");
+    expect(dto.safety_context.scope).toBe("region_industry");
+    expect(dto.safety_context.confidence).toBe("limited");
+    expect(dto.safety_context.interpretation).toContain("안전 인증");
+    expect(dto.safety_context.disclaimer).toContain("개별 사업장");
+    expect(companySafetyGuardrailHits("산업안전 이상이 없다는 뜻입니다.", risk)).toContain("SAFETY_PUBLIC_LABEL_MISMATCH");
+    expect(companySafetyGuardrailHits("산업안전 카드는 안전 신호 미확인이며 지역·업종 맥락으로 개별 사업장의 안전 인증이 아닙니다.", risk)).toEqual([]);
+    expect([...scanRules("산업안전 이상이 없다는 뜻입니다.", CHAT_OUTPUT_GUARDRAILS)]).toContain("SAFETY_SIGNAL_CERTIFICATION");
+    expect([...scanRules("안전 신호 미확인은 산업안전 이상이 없다고 확인된 상태가 아닙니다.", CHAT_OUTPUT_GUARDRAILS)]).toEqual([]);
+  });
   it("uses allowlisted fields for both providers without mutating source DTO", () => {
     const dto = companySignalForAnswer(SYNTHETIC_RISK);
     expect(dto.wage_signal.positive_signals?.confirmed_count).toBe(1);

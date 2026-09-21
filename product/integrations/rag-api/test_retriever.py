@@ -19,6 +19,17 @@ def candidate(law, article_id, title, chapter="", distance=0.2):
 
 
 class RetrievalPolicyTest(unittest.TestCase):
+    def test_followup08_unpaid_variants_select_payment_and_filing_not_settlement(self):
+        for query in ("월급을 받지 못했다", "월급이 안 들어왔다", "급여 미입금", "월급을 두 달째 안 줬다"):
+            with self.subTest(query=query):
+                self.assertTrue(retriever._is_wage_arrears_query(query))
+                self.assertIn("제43조", retriever._expand_query(query))
+                guides = retriever._guide_candidates(query)
+                self.assertEqual({"근로기준법 제43조", "고용노동부 노동포털 「체불임금 해결 방법」"}, {g[1]["citation"] for g in guides})
+        for query in ("퇴직 후 월급을 못 받았다", "사망 후 미지급 임금", "임금 지연이자", "퇴직금이 밀렸다", "임금체불 확인서", "산업안전 신호 미확인", "코인 매수 추천"):
+            with self.subTest(query=query):
+                self.assertFalse(retriever._is_wage_arrears_query(query))
+
     def test_expands_only_known_user_phrases(self):
         self.assertIn("구직급여 수급 요건", retriever._expand_query("실업급여 조건이 뭐예요?"))
         self.assertIn("해고의 예고", retriever._expand_query("사장이 다음 주까지만 나오래"))
