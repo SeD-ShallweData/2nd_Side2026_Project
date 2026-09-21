@@ -10,7 +10,15 @@ const PORTAL = "https://labor.moel.go.kr/minwonSysInfo/wagesolway.do";
 const GUIDE = "고용노동부 노동포털 「체불임금 해결 방법」";
 
 export function hasUnpaidWageQuestion(query: string): boolean {
-  return /(?:월급|급여|임금).{0,12}(?:못\s*받|받지\s*못|안\s*(?:들어|줬|주)|미지급)/.test(query);
+  const wage = "(?:월급|급여|임금|수당)";
+  const unpaid = "(?:못\\s*받|받지\\s*못|안\\s*(?:들어|줬|주)|들어오지\\s*않|미지급|체불|밀렸|밀린|지급일.{0,5}(?:지났|넘겼)|월급날.{0,5}(?:지났|넘겼)|입금.{0,7}(?:없|안\\s*됐|되지\\s*않|들어오지\\s*않))";
+  return new RegExp(`${wage}.{0,18}${unpaid}|${unpaid}.{0,18}${wage}`).test(query);
+}
+
+/** An explicit user-side nonpayment report overrides a mistaken company intent. */
+export function hasActualUnpaidWageReport(query: string): boolean {
+  return hasUnpaidWageQuestion(query)
+    && /못\s*받(?:았|았습니다)|받지\s*못(?:했|했습니다)|안\s*들어(?:왔|왔습니다)|들어오지\s*않(?:았|았습니다)|미지급(?:됐|되었|입니다|이다)|(?:지급일|월급날).{0,8}(?:지났|넘겼)/.test(query);
 }
 
 function nightWorkSize(query: string): "under_five" | "five_plus" | "unknown" {
@@ -24,8 +32,8 @@ export function reviewedLaborTopics(query: string): Topic[] {
   if (/야간|야근|(?:22\s*시|밤\s*(?:10|열)\s*시|오후\s*10\s*시)/.test(query)
     && /근로|근무|수당|가산|일하|시키|퇴근|임금|야근/.test(query)) topics.push("night");
   if (/체불.{0,20}확인서|사업주\s*확인서/.test(query)) topics.push("certificate");
-  if ((/\b1350\b|진정(?:서|을|은|\s)|온라인.{0,12}(?:신고|접수)/.test(query)
-    && /체불|임금|월급|급여|노동|진정|상담/.test(query)) || hasUnpaidWageQuestion(query)) topics.push("filing");
+  if (/\b1350\b|진정(?:서|을|은|\s)|온라인.{0,12}(?:신고|접수)/.test(query)
+    && /체불|임금|월급|급여|노동|진정|상담/.test(query)) topics.push("filing");
   return topics;
 }
 

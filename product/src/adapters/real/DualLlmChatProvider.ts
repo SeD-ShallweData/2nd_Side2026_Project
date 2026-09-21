@@ -23,6 +23,7 @@ import { loadPrompt, withRuntimeContext } from "@/server/promptLoader";
 import { clarificationFallback } from "@/services/chatFallback";
 import { companySignalForAnswer, publicAnswerContext, publicAnswerText } from "@/services/publicAnswerContext";
 import { LABOR_REVIEW_DATE, applicabilityGuardrailHits, reviewedLaborFallback } from "@/services/reviewedLaborGuidance";
+import { wageArrearsFallback, wageArrearsGuardrailHits } from "@/services/wageArrearsGuidance";
 
 export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-21-v9";
 const EMPTY_USAGE: TokenUsage = {
@@ -56,6 +57,7 @@ function digestAssistantMessage(content: string): string {
 function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   const hits = scanRules(answer, CHAT_OUTPUT_GUARDRAILS);
   for (const hit of applicabilityGuardrailHits(context.request.message, answer)) hits.add(hit);
+  for (const hit of wageArrearsGuardrailHits(context.request.message, answer)) hits.add(hit);
   const unverified = hasUnverifiedCitation(
     answer,
     context.ragRetrieval.status,
@@ -88,6 +90,13 @@ function replacementBaseline(context: ComparisonContext): ChatResponse {
     }
     return reviewed;
   }
+  const wageArrears = wageArrearsFallback(
+    context.request.message,
+    context.policyBaseline,
+    context.ragRetrieval,
+    Boolean(context.answerPlan?.parts.some((part) => part.scope === "out_of_scope")),
+  );
+  if (wageArrears) return wageArrears;
   if (context.answerPlan?.parts.some((part) => part.scope === "labor")
     && context.answerPlan.parts.some((part) => part.scope === "out_of_scope")) {
     return {
@@ -238,7 +247,7 @@ function fallbackResult(
   context: ComparisonContext,
   error: LlmCallError,
 ): ProviderComparisonResult {
-  baseline = clarificationFallback(baseline, "답변 서비스에 일시적인 문제가 있어 답변을 확인하지 못했습니다. 잠시 후 같은 질문으로 다시 시도해 주세요.");
+  baseline = replacementBaseline({ ...context, policyBaseline: baseline });
   return {
     provider: config.id,
     provider_label: config.label,

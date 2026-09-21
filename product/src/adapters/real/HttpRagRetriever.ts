@@ -9,6 +9,7 @@ interface UpstreamItem {
     organization?: unknown;
     document_id?: unknown;
     url?: unknown;
+    as_of?: unknown;
   };
 }
 
@@ -49,6 +50,7 @@ function parseDocument(value: unknown): RagDocument | null {
       organization: optionalString(item.source?.organization),
       document_id: optionalString(item.source?.document_id),
       url: optionalString(item.source?.url),
+      as_of: optionalString(item.source?.as_of),
     },
   };
 }

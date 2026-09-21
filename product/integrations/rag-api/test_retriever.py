@@ -126,6 +126,57 @@ class RetrievalPolicyTest(unittest.TestCase):
         self.assertEqual([], retriever._guide_candidates("회사 자료를 어디에 저장할까요?"))
         self.assertEqual([], retriever._guide_candidates("해고에 관해 어떤 자료를 준비해야 하나요?"))
 
+    def test_matches_wage_arrears_intent_across_reviewed_paraphrases(self):
+        cases = (
+            "월급이 두 달 밀렸는데 무엇부터 해야 하나요?",
+            "밀린 월급을 받는 방법과 코인 매수 타이밍을 같이 알려줘",
+            "두 번의 월급날이 지났는데 급여가 들어오지 않았습니다. 첫 단계가 무엇인가요?",
+        )
+        for query in cases:
+            with self.subTest(query=query):
+                ids = [item[1]["document_id"] for item in retriever._guide_candidates(query)]
+                self.assertIn("LABOR-PORTAL-WAGE-COMPLAINT", ids)
+                self.assertIn("LABOR-STANDARDS-A43-WAGE-PAYMENT", ids)
+                self.assertIn("근로기준법 제43조", retriever._expand_query(query))
+                self.assertTrue(any(item[1]["suppress_vector_when_matched"] for item in retriever._guide_candidates(query)))
+
+    def test_evidence_intent_uses_specific_guide_without_generic_false_positives(self):
+        query = "급여일이 지났는데 월급을 못 받았습니다. 근로계약서와 통장 내역이 있는데 무엇부터 해야 하나요?"
+        matches = retriever._guide_candidates(query)
+        ids = [item[1]["document_id"] for item in matches]
+        self.assertIn("MOEL-WAGE-EVIDENCE", ids)
+        self.assertTrue(any(item[1]["suppress_vector_when_matched"] for item in matches))
+        for negative in (
+            "긍정 지표 0개면 나쁜 회사인가요?",
+            "여기서 정정한 급여일은 언제였나요?",
+            "돈을 아직 못 받았는데 어떻게 해야 하나요?",
+            "회사 자료를 어디에 저장할까요?",
+        ):
+            with self.subTest(negative=negative):
+                self.assertEqual([], retriever._guide_candidates(negative))
+
+    def test_generic_arrears_guide_does_not_replace_specific_benefit_or_document_topics(self):
+        for query in (
+            "회사가 망했는데 밀린 월급을 나라에서 대신 받을 수 있나요?",
+            "체불 임금 확인서는 어디서 발급받나요?",
+            "임금체불을 신고하면 포상금을 받을 수 있나요?",
+            "퇴직금을 못 받았어요",
+            "실업급여를 받으려면 어떤 조건을 갖춰야 하나요?",
+            "못 받은 임금은 언제까지 청구할 수 있나요?",
+            "포괄임금제면 야근수당을 못 받나요?",
+        ):
+            with self.subTest(query=query):
+                self.assertEqual([], retriever._guide_candidates(query))
+
+    def test_prioritizes_reviewed_guides_over_near_threshold_vector_noise(self):
+        vector = candidate("근로기준법", "제37조", "미지급 임금 지연이자", distance=0.39)
+        guides = retriever._guide_candidates("월급이 두 달 밀렸는데 무엇부터 해야 하나요?")
+        picked = retriever._pick(guides + [vector], "월급이 두 달 밀렸는데 무엇부터 해야 하나요?", 2)
+        self.assertEqual(
+            ["LABOR-STANDARDS-A43-WAGE-PAYMENT", "LABOR-PORTAL-WAGE-COMPLAINT"],
+            [item[1]["document_id"] for item in picked],
+        )
+
 
 class RetrievalReadinessTest(unittest.TestCase):
     def setUp(self):

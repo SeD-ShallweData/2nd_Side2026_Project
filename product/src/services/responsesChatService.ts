@@ -9,6 +9,7 @@ import { parseChatRequest, sendChatMessage } from "@/services/chatService";
 import { publicAnswerContext, publicAnswerText } from "@/services/publicAnswerContext";
 import { finalizeConversationResponse, recallResponse } from "@/services/conversationRecallService";
 import { LABOR_REVIEW_DATE, applicabilityGuardrailHits, reviewedLaborFallback, reviewedLaborRetrieval } from "@/services/reviewedLaborGuidance";
+import { wageArrearsGuardrailHits } from "@/services/wageArrearsGuidance";
 import {
   CHAT_OUTPUT_GUARDRAILS,
   hasUnverifiedCitation,
@@ -224,6 +225,7 @@ function policyShortCircuit(
 function outputGuardrailHits(run: ResponsesRunResult, request: ChatRequest): string[] {
   const hits = scanRules(run.answer, CHAT_OUTPUT_GUARDRAILS);
   for (const hit of applicabilityGuardrailHits(request.message, run.answer)) hits.add(hit);
+  for (const hit of wageArrearsGuardrailHits(request.message, run.answer)) hits.add(hit);
   const reviewed = reviewedLaborRetrieval(request.message);
   if (!reviewed && run.ledger.citations.length === 0
     && run.toolCalls.some((call) => call.name === "get_company_risk" && call.ok)

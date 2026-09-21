@@ -15,7 +15,8 @@ import {
   primaryAnswerScope,
 } from "@/services/answerPlanService";
 import { clarificationFallback } from "@/services/chatFallback";
-import { reviewedLaborTopics } from "@/services/reviewedLaborGuidance";
+import { hasActualUnpaidWageReport, reviewedLaborTopics } from "@/services/reviewedLaborGuidance";
+import { wageArrearsFallback } from "@/services/wageArrearsGuidance";
 import { finalizeConversationResponse, recallResponse } from "@/services/conversationRecallService";
 import {
   getLlmProviderConfigs,
@@ -268,12 +269,18 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
         threshold: null,
         documents: [],
       }
-    : await retrieveLaborLawContext(reviewedLaborTopics(request.message).length ? request.message : rewrite.query);
+    : await retrieveLaborLawContext(
+        reviewedLaborTopics(request.message).length || hasActualUnpaidWageReport(request.message)
+          ? request.message
+          : rewrite.query,
+      );
 
   const evidenceState = evidenceStateForPlan(answerPlan, ragRetrieval);
   if (evidenceState === "ready") {
     policyBaseline.sources = ragRetrieval.documents.map((document) => document.source);
     policyBaseline.guardrail_status = "passed";
+    const wageFallback = wageArrearsFallback(request.message, policyBaseline, ragRetrieval, hasOutOfScopePart);
+    if (wageFallback) Object.assign(policyBaseline, wageFallback);
   } else if (primaryScope === "labor" && evidenceState !== "not_needed") {
     const hit = evidenceState === "unavailable"
       ? "RAG_UNAVAILABLE"
