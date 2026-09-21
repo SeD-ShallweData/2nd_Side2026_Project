@@ -12,7 +12,7 @@ export default function CommunityPage() {
           <h1>일하는 사람들의 확인 경험</h1>
           <p>혼자 묻기 어려웠던 질문과 확인 경험을 나눕니다. 일하는 사람들의 경험과 질문을 나누는 공간입니다.</p>
         </div>
-        <div className="mock-banner" role="status"><span>안내</span>로그인 사용자는 게시글 작성과 신고를 이용할 수 있습니다. 댓글·공감 기능은 현재 제공하지 않으며 표시되는 수치는 조회용입니다.</div>
+        <div className="mock-banner" role="status"><span>안내</span>로그인 사용자는 게시글 작성과 신고를 이용할 수 있습니다.</div>
         <CommunityBoard />
       </div>
     </div>

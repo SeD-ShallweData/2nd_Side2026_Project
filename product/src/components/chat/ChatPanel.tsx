@@ -701,7 +701,7 @@ export function ChatPanel({
           />
           <span>
             <strong>SKT A.X 답변도 함께 비교</strong>
-            <small>켜면 다음 질문만 두 모델에 같은 조건으로 병렬 전송합니다.</small>
+            <small>선택 시 다음 질문에 두 모델의 답변을 함께 제공합니다.</small>
           </span>
         </label>
       ) : null}

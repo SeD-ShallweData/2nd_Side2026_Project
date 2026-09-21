@@ -20,6 +20,32 @@ interface SubmitError {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/*
+ * 로그인 페이지로 오기 전 있던 화면으로 돌아가기 위한 next 쿼리다. 외부 사이트로
+ * 보내는 open redirect를 막기 위해 "/"로 시작하고 "//"(프로토콜 상대 URL)나
+ * "\"(일부 파서가 "/"로 취급하는 백슬래시 트릭)는 포함하지 않는 내부 상대 경로만
+ * 허용한다. 그 외에는 전부 버리고 기존 기본 동작(/community)으로 되돌린다.
+ */
+export function resolveSafeNextPath(next: string | null): string | null {
+  if (!next) return null;
+  if (!next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return null;
+  return next;
+}
+
+function readNextPathFromLocation(): string | null {
+  if (typeof window === "undefined") return null;
+  return resolveSafeNextPath(new URLSearchParams(window.location.search).get("next"));
+}
+
+/*
+ * guest 대화 가져오기는 next보다 먼저였던 기존 정책이라 그대로 최우선으로 둔다 —
+ * 그 다음이 로그인 전 있던 화면(next), 둘 다 없으면 기존 기본값인 커뮤니티다.
+ */
+export function resolveLoginRedirect(options: { hasGuestConversation: boolean; nextPath: string | null }): string {
+  if (options.hasGuestConversation) return "/chat?guest_import=prompt";
+  return options.nextPath ?? "/community";
+}
+
 // 로그인 자체 실패의 원인은 노출하지 않는다 — 계정 존재 여부가 드러나면 안 된다.
 export function submitErrorMessage(error: AuthApiError): string {
   switch (error.code) {
@@ -51,6 +77,8 @@ export function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // 최초 렌더 시점에 한 번만 읽으면 된다 — 로그인 과정 중 쿼리가 바뀌지 않는다.
+  const [nextPath] = useState<string | null>(readNextPathFromLocation);
 
   function validate(): FieldErrors {
     const errors: FieldErrors = {};
@@ -76,7 +104,7 @@ export function LoginForm() {
     try {
       await login({ email: email.trim(), password });
       // 이동이 끝날 때까지 submitting을 유지해 중복 제출을 막는다.
-      router.push(hasGuestConversation() ? "/chat?guest_import=prompt" : "/community");
+      router.push(resolveLoginRedirect({ hasGuestConversation: hasGuestConversation(), nextPath }));
     } catch (caught) {
       setSubmitting(false);
       if (caught instanceof AuthApiError) {

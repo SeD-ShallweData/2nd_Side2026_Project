@@ -2,6 +2,7 @@ import type {
   CompanyRiskResult,
   Confidence,
   EvidenceItem,
+  Freshness,
   SafetyContextPublic,
   SignalLevel,
   WageRiskPublic,
@@ -20,6 +21,7 @@ interface WageRow {
   as_of_date: string | null;
   target_month: string | null;
   ingested_at: string | Date | null;
+  ingested_date: string | null;
   n_months: number | null;
   n_green: number | null;
   positive_flags?: (boolean | null)[] | null;
@@ -38,6 +40,7 @@ type CompanyBatchRow = Pick<
   | "as_of_date"
   | "target_month"
   | "ingested_at"
+  | "ingested_date"
 >;
 
 interface SafetyRow {
@@ -75,9 +78,11 @@ const VERDICT_META: Record<string, { level: SignalLevel; summary: string; code: 
   },
 };
 
-export function getNextBatchDueDate(asOfDate: string | null): string | null {
-  if (!asOfDate || !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) return null;
-  const [year, month, day] = asOfDate.split("-").map(Number);
+// 배치 실행 시각(ingested_at) 기준 +1개월. as_of_date는 국민연금 관측월(t-6)이라
+// 배치가 실제로 언제 돌았는지와 무관하다 — 화면 유효기간은 반드시 ingested_at에서 셈한다.
+export function getNextBatchDueDate(fromDate: string | null): string | null {
+  if (!fromDate || !/^\d{4}-\d{2}-\d{2}$/.test(fromDate)) return null;
+  const [year, month, day] = fromDate.split("-").map(Number);
   const sourceDate = new Date(Date.UTC(year, month - 1, day));
   if (
     sourceDate.getUTCFullYear() !== year ||
@@ -90,6 +95,17 @@ export function getNextBatchDueDate(asOfDate: string | null): string | null {
   const lastDay = nextMonth.getUTCDate();
   const dueDate = new Date(Date.UTC(year, month, Math.min(day, lastDay)));
   return dueDate.toISOString().slice(0, 10);
+}
+
+// riskService.getFreshnessFromValidUntil과 같은 컷오프(한국시간 자정)를 쓴다.
+// 여기 값은 화면(riskService가 다시 계산)이 아니라 챗봇 경로(getRiskProvider()를
+// 직접 부름)로 나가므로, 기준이 서로 다르면 같은 회사가 경로에 따라 다른
+// freshness로 보이게 된다.
+export function computeFreshness(validUntil: string | null): Freshness {
+  if (!validUntil) return "unknown";
+  const expiresAt = new Date(`${validUntil}T23:59:59.999+09:00`).getTime();
+  if (Number.isNaN(expiresAt)) return "unknown";
+  return Date.now() <= expiresAt ? "current" : "expired";
 }
 
 export function toWageRiskPublic(row: WageRow): WageRiskPublic {
@@ -329,7 +345,8 @@ export class MlRiskProvider {
               b.model_version,
               b.as_of_date::text,
               b.target_month::text,
-              b.ingested_at::text
+              b.ingested_at::text,
+              b.ingested_at::date::text AS ingested_date
          FROM public.firms AS f
          LEFT JOIN latest_batch AS b ON true
         WHERE f.firm_id = $1
@@ -350,14 +367,15 @@ export class MlRiskProvider {
         excluded_wage: null,
       }),
     ]);
+    const validUntil = getNextBatchDueDate(row.ingested_date);
     return {
       company_id: row.firm_id,
       company_name: row.name,
       data_as_of: row.as_of_date,
       target_month: row.target_month,
       generated_at: toIso(row.ingested_at),
-      valid_until: getNextBatchDueDate(row.as_of_date),
-      freshness: "unknown",
+      valid_until: validUntil,
+      freshness: computeFreshness(validUntil),
       wage_risk: wage,
       safety_context: safety.data,
       sources: [
