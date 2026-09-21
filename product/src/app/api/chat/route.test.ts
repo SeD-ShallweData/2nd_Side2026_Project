@@ -11,7 +11,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/services/chatExecutionService", () => ({ sendConfiguredChatMessage: mocks.send }));
 vi.mock("@/server/chatHttpRequest", () => ({ parseChatHttpRequest: mocks.parseHttp }));
 vi.mock("@/services/authService", () => ({ getOptionalSessionUser: mocks.getUser }));
-vi.mock("@/services/chatService", () => ({ parseChatRequest: mocks.parseRequest }));
+vi.mock("@/services/chatService", () => ({
+  parseChatRequest: mocks.parseRequest,
+  assertExternalProcessingConsent: vi.fn((value) => {
+    if (!(value as { external_processing_consent?: boolean }).external_processing_consent) throw new Error("consent required");
+  }),
+}));
 vi.mock("@/services/conversationService", () => ({
   cachedGeneratedResponse: mocks.cached,
   claimConversationRequest: mocks.claim,
@@ -29,7 +34,7 @@ import { POST } from "@/app/api/chat/route";
 import { ServiceError } from "@/utils/errors";
 
 const USER = { user_id: "00000000-0000-4000-8000-000000000021", email: "user@example.com", display_name: "User", role: "user" as const };
-const CHAT_REQUEST = { message: "Question", request_id: "request_0000000000000201", chat_mode: "wage" as const, recent_messages: [] };
+const CHAT_REQUEST = { message: "Question", request_id: "request_0000000000000201", chat_mode: "wage" as const, recent_messages: [], external_processing_consent: true };
 const RESULT = {
   comparison_id: "comparison", conversation_id: "provider", execution_mode: "single_api",
   started_at: "2026-09-18T00:00:00.000Z", completed_at: "2026-09-18T00:00:01.000Z",

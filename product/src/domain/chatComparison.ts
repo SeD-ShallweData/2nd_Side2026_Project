@@ -35,7 +35,7 @@ export interface ProviderMetrics {
 
 export interface SafeExecutionTrace {
   memory?: ConversationMemoryDiagnostics;
-  recall_mode?: "user_statement" | "missing_user_statement";
+  recall_mode?: "user_statement" | "missing_user_statement" | "conversation_context";
   question_intent?: "labor" | "company" | "off_topic" | "unclear";
   intent_status?: "classified" | "unavailable";
   prompt_policy_version: string;

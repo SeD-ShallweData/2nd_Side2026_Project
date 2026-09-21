@@ -67,7 +67,7 @@ try {
   if (target.db !== database || target.role !== owner || target.version < 160000 || target.version >= 170000) throw new Error("WRONG_TARGET");
   if (Number((await sql`SELECT count(*) FROM information_schema.tables WHERE table_schema='public'`)[0].count) !== 0) throw new Error("NOT_EMPTY");
   console.log(`ACCEPTANCE pg_version_num=${target.version} initially_empty=true`);
-  phase = "migration-0000-through-0019";
+  phase = "migration-0000-through-0020";
   await migrate(drizzle(sql), { migrationsFolder: resolve(root, "db/migrations") });
   phase = "role-scripts";
   for (const role of ["auth", "conversation"]) {

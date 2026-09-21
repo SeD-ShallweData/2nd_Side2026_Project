@@ -773,6 +773,26 @@ SELECT json_build_object(
       SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='conversation_summaries'
       AND column_name='lease_expires_at' AND udt_name='timestamptz' AND is_nullable='YES'
     )
+  ),
+  '0020_violet_robin_chapel', json_build_object(
+    'column_type:public.conversation_requests.lease_token_uuid', EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='conversation_requests'
+      AND column_name='lease_token' AND udt_name='uuid' AND is_nullable='YES'
+    ),
+    'column_type:public.conversation_requests.lease_expires_at_timestamptz', EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='conversation_requests'
+      AND column_name='lease_expires_at' AND udt_name='timestamptz' AND is_nullable='YES'
+    ),
+    'index:public.conversation_requests_pending_lease_idx', EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests_pending_lease_idx' AND c.relkind IN ('i','I')
+    ),
+    'constraint:public.conversation_requests.conversation_requests_lease_ck', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='conversation_requests'
+        AND con.conname='conversation_requests_lease_ck' AND con.contype='c'
+    )
   )
 )::text;
 COMMIT;

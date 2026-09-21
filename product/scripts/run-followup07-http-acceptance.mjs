@@ -30,7 +30,7 @@ try {
   assert.equal(signup.status, 201); user = signup.data.user.user_id;
   assert.match(user, /^[0-9a-f-]{36}$/);
   phase = 'duplicate-first-request';
-  const body = { request_id: randomUUID(), message: '내가 말한 급여일을 다시 알려줘.', chat_mode: 'wage' };
+  const body = { request_id: randomUUID(), message: '내가 말한 급여일을 다시 알려줘.', chat_mode: 'wage', external_processing_consent: true };
   const first = await request('/api/chat', body); assert.equal(first.data.conversation_persistence, 'saved');
   const id = first.data.conversation_id; assert.match(id, /^[0-9a-f-]{36}$/);
   if (process.argv.includes('--import-only')) {

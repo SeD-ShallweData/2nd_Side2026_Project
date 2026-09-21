@@ -84,6 +84,8 @@ interface RequestRow {
   conversation_id: string;
   status: ClaimConversationRequest["status"];
   response_payload: CompleteConversationRequestInput["response"] | null;
+  lease_token: string | null;
+  lease_expires_at: Date | null;
 }
 
 function missingConversation(): ServiceError {
@@ -250,7 +252,7 @@ export class RealConversationRepository implements ConversationRepository {
         [`conversation-request:${input.owner_user_id}:${input.request_id}`],
       );
       const existingRequest = await transaction.query<RequestRow>(
-        `SELECT conversation_id::text, status, response_payload
+        `SELECT conversation_id::text, status, response_payload, lease_token::text, lease_expires_at
            FROM conversation_requests
           WHERE owner_user_id = $1::uuid AND request_id = $2
           FOR UPDATE`,
@@ -263,11 +265,27 @@ export class RealConversationRepository implements ConversationRepository {
           [existingRequest[0].conversation_id, input.owner_user_id],
         );
         if (!live[0]) throw missingConversation();
+        const existing = existingRequest[0];
+        if (existing.status === "pending" && (!existing.lease_expires_at || existing.lease_expires_at.getTime() <= Date.now())) {
+          const leaseToken = randomUUID();
+          await transaction.query(
+            `UPDATE conversation_requests
+                SET lease_token = $3::uuid, lease_expires_at = now() + interval '120 seconds',
+                    failure_code = NULL, completed_at = NULL
+              WHERE owner_user_id = $1::uuid AND request_id = $2 AND status = 'pending'`,
+            [input.owner_user_id, input.request_id, leaseToken],
+          );
+          return {
+            conversation_id: existing.conversation_id, status: "pending", reused: false,
+            response: null, lease_token: leaseToken,
+          };
+        }
         return {
-          conversation_id: existingRequest[0].conversation_id,
-          status: existingRequest[0].status,
+          conversation_id: existing.conversation_id,
+          status: existing.status,
           reused: true,
-          response: existingRequest[0].response_payload,
+          response: existing.response_payload,
+          lease_token: existing.status === "pending" ? existing.lease_token : null,
         };
       }
 
@@ -292,12 +310,14 @@ export class RealConversationRepository implements ConversationRepository {
         conversationId = created[0]?.conversation_id;
         if (!conversationId) throw new ServiceError("CONVERSATION_CREATE_FAILED", "Unable to create conversation.", 503, true);
       }
+      const leaseToken = randomUUID();
       await transaction.query(
-        `INSERT INTO conversation_requests (owner_user_id, request_id, conversation_id, status)
-         VALUES ($1::uuid, $2, $3::uuid, 'pending')`,
-        [input.owner_user_id, input.request_id, conversationId],
+        `INSERT INTO conversation_requests
+           (owner_user_id, request_id, conversation_id, status, lease_token, lease_expires_at)
+         VALUES ($1::uuid, $2, $3::uuid, 'pending', $4::uuid, now() + interval '120 seconds')`,
+        [input.owner_user_id, input.request_id, conversationId, leaseToken],
       );
-      return { conversation_id: conversationId, status: "pending" as const, reused: false, response: null };
+      return { conversation_id: conversationId, status: "pending" as const, reused: false, response: null, lease_token: leaseToken };
     });
   }
 
@@ -312,7 +332,7 @@ export class RealConversationRepository implements ConversationRepository {
       );
       if (!live[0]) throw missingConversation();
       const request = await transaction.query<RequestRow>(
-        `SELECT conversation_id::text, status, response_payload
+        `SELECT conversation_id::text, status, response_payload, lease_token::text, lease_expires_at
            FROM conversation_requests
           WHERE owner_user_id = $1::uuid AND request_id = $2
           FOR UPDATE`,
@@ -323,7 +343,8 @@ export class RealConversationRepository implements ConversationRepository {
       if (current.status === "completed" && current.response_payload) {
         return { conversation_id: current.conversation_id, response: current.response_payload, reused: true };
       }
-      if (current.status !== "pending") {
+      if (current.status !== "pending" || current.lease_token !== input.lease_token
+        || !current.lease_expires_at || current.lease_expires_at.getTime() <= Date.now()) {
         throw new ServiceError("CONVERSATION_REQUEST_NOT_PENDING", "Conversation request cannot be completed.", 409, false);
       }
       const recorded = await this.recordCompletedTurnInTransaction(transaction, {
@@ -332,9 +353,10 @@ export class RealConversationRepository implements ConversationRepository {
       });
       await transaction.query(
         `UPDATE conversation_requests
-            SET status = 'completed', response_payload = $3::jsonb, completed_at = now(), failure_code = null
-          WHERE owner_user_id = $1::uuid AND request_id = $2 AND status = 'pending'`,
-        [input.owner_user_id, input.idempotency_key, JSON.stringify(input.response)],
+            SET status = 'completed', response_payload = $3::jsonb, completed_at = now(), failure_code = null,
+                lease_token = NULL, lease_expires_at = NULL
+          WHERE owner_user_id = $1::uuid AND request_id = $2 AND status = 'pending' AND lease_token = $4::uuid`,
+        [input.owner_user_id, input.idempotency_key, JSON.stringify(input.response), input.lease_token],
       );
       return { conversation_id: recorded.conversation_id, response: input.response, reused: false };
     });
@@ -343,15 +365,16 @@ export class RealConversationRepository implements ConversationRepository {
   async failRequest(
     ownerUserId: string,
     requestId: string,
+    leaseToken: string,
     status: "failed" | "cancelled",
     errorCode: string,
   ): Promise<void> {
     await queryWrite(
       "conversation",
       `UPDATE conversation_requests
-          SET status = $3, failure_code = $4, completed_at = now()
-        WHERE owner_user_id = $1::uuid AND request_id = $2 AND status = 'pending'`,
-      [ownerUserId, requestId, status, errorCode],
+          SET status = $4, failure_code = $5, completed_at = now(), lease_token = NULL, lease_expires_at = NULL
+        WHERE owner_user_id = $1::uuid AND request_id = $2 AND status = 'pending' AND lease_token = $3::uuid`,
+      [ownerUserId, requestId, leaseToken, status, errorCode],
     );
   }
 

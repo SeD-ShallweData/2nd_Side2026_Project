@@ -307,10 +307,23 @@ for database in "$DATABASE_A" "$DATABASE_B"; do
     || { echo "$database migration ledger created_at type differs: $ledger_created_at_type" >&2; exit 1; }
 done
 
+docker_copy_into() {
+  local source="$1"
+  local destination="$2"
+  if command -v cygpath >/dev/null 2>&1; then
+    if [[ "$source" == */. ]]; then
+      source="$(cygpath -w "${source%/.}")/."
+    else
+      source="$(cygpath -w "$source")"
+    fi
+  fi
+  docker cp "$source" "$destination"
+}
+
 docker exec "$CONTAINER" mkdir -p /tmp/pathb-sql /tmp/fixture-a /tmp/fixture-b
-docker cp "$DB_ROOT/scripts/sql/." "$CONTAINER:/tmp/pathb-sql"
-docker cp "$TEST_TMP/fixture-a/." "$CONTAINER:/tmp/fixture-a"
-docker cp "$TEST_TMP/fixture-b/." "$CONTAINER:/tmp/fixture-b"
+docker_copy_into "$DB_ROOT/scripts/sql/." "$CONTAINER:/tmp/pathb-sql"
+docker_copy_into "$TEST_TMP/fixture-a/." "$CONTAINER:/tmp/fixture-a"
+docker_copy_into "$TEST_TMP/fixture-b/." "$CONTAINER:/tmp/fixture-b"
 
 run_loader() {
   local database="$1"

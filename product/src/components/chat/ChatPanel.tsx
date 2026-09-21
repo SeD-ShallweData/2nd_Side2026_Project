@@ -20,6 +20,7 @@ import type {
 } from "@/domain/chatComparison";
 import { executionModeCopy, providerRunStatusLabel } from "@/components/chat/runLabels";
 import { readApiResponse } from "@/utils/clientApi";
+import { publicClientHeaders } from "@/utils/publicClientId";
 import { publicAnswerText } from "@/services/publicAnswerContext";
 import {
   appendGuestConversationTurn,
@@ -297,6 +298,7 @@ export function ChatPanel({
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<Record<string, LlmProviderId | "tie">>({});
   const [compare, setCompare] = useState(false);
+  const [externalProcessingConsent, setExternalProcessingConsent] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<ConversationSummaryDto[]>([]);
   const [historyAvailable, setHistoryAvailable] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -340,6 +342,10 @@ export function ChatPanel({
   async function sendMessage(value: string, retryRequestId?: string) {
     const message = value.trim();
     if (!message || loading) return;
+    if (!externalProcessingConsent) {
+      setError("외부 AI 전송 안내를 확인하고 이번 질문 전송에 동의해 주세요.");
+      return;
+    }
     const submittedContractFile = contractFile;
     const requestedComparison = executionMode === "dual_api" && compare;
     const requestId = retryRequestId ?? crypto.randomUUID();
@@ -361,7 +367,7 @@ export function ChatPanel({
     setLoading(true);
 
     try {
-      const requestInit: RequestInit = { method: "POST" };
+      const requestInit: RequestInit = { method: "POST", headers: publicClientHeaders() };
       if (
         executionMode === "openai_responses" &&
         chatMode === "contract" &&
@@ -373,17 +379,20 @@ export function ChatPanel({
         form.append("request_id", requestId);
         form.append("chat_mode", chatMode);
         form.append("recent_messages", JSON.stringify(recentMessages));
+        form.append("external_processing_consent", "true");
         if (conversationId) form.append("conversation_id", conversationId);
         if (activeCompanyId) form.append("company_id", activeCompanyId);
         requestInit.body = form;
       } else {
-        requestInit.headers = { "Content-Type": "application/json" };
+        requestInit.headers = { ...publicClientHeaders(), "Content-Type": "application/json" };
         requestInit.body = JSON.stringify({
           message,
           request_id: requestId,
           conversation_id: conversationId,
           company_id: activeCompanyId,
           compare: requestedComparison,
+          external_processing_consent: true,
+          external_compare_consent: requestedComparison,
           chat_mode: chatMode,
           recent_messages: recentMessages,
         });
@@ -714,6 +723,19 @@ export function ChatPanel({
         </label>
       ) : null}
 
+      <label className="chat-compare-toggle">
+        <input
+          type="checkbox"
+          checked={externalProcessingConsent}
+          onChange={(event) => setExternalProcessingConsent(event.target.checked)}
+          disabled={loading}
+        />
+        <span>
+          <strong>이번 질문의 외부 AI 전송에 동의</strong>
+          <small>질문, 최근 대화 최대 10개, 30일 요약, 선택한 회사 공개 정보와 현재 공식 근거가 전송됩니다. 동의는 저장하지 않으며 체크를 해제하면 다음 전송을 막습니다.</small>
+        </span>
+      </label>
+
       {error ? <p className="chat-error" role="alert">{error}</p> : null}
       {persistenceNotice ? <p className="chat-persistence-status" role="status">{persistenceNotice}</p> : null}
 
@@ -750,7 +772,7 @@ export function ChatPanel({
             }
           }}
         />
-        <button type="submit" className="chat-send" disabled={loading || !draft.trim()} aria-label="질문 보내기"><span aria-hidden="true">↑</span></button>
+        <button type="submit" className="chat-send" disabled={loading || !draft.trim() || !externalProcessingConsent} aria-label="질문 보내기"><span aria-hidden="true">↑</span></button>
       </form>
       {!activeCompanyId ? (
         <p className="chat-company-help">

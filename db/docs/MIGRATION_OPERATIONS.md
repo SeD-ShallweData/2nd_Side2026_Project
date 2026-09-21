@@ -170,6 +170,14 @@ drizzle 자체는 `created_at` 으로 적용 여부를 판단하므로 재적용
 
 새 journal timestamp는 앞선 항목보다 커야 한다. PR #115의 0018 timestamp가 로컬 생성 시계보다 앞서 있으므로 신규 0019만 `0018.when + 1`로 설정했다. 기존 0018 시각은 변경하지 않는다. 실제 빈 PG16 적용 및 두 번째 migrate no-op을 함께 검증한다.
 
+### 0020 request processing lease
+
+0020은 `conversation_requests`에 nullable UUID `lease_token`, timestamptz
+`lease_expires_at`, status/expiry index와 상태-lease 짝 제약을 추가한다. 기존 pending 행은
+migration 시점부터 120초 lease를 받아 무기한 orphan 상태가 되지 않는다. 배포 순서는
+drift 확인 → backup 확인 → migration 0018~0020 → role 재적용 → app → conversation worker다.
+이전 app은 0020의 nullable 컬럼을 무시할 수 있으므로 app/worker rollback 때 컬럼을 DROP하지 않는다.
+
 worker와 운영 적용 순서: [CONVERSATION_MAINTENANCE.md](CONVERSATION_MAINTENANCE.md).
 
 ### 공통 체크리스트

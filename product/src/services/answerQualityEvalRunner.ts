@@ -125,6 +125,8 @@ export async function evaluateAnswerQualityCase(input: {
       },
       body: JSON.stringify({
         ...item.request,
+        external_processing_consent: true,
+        external_compare_consent: item.request.compare === true,
         conversation_id: `answer_eval_${item.id}_${attempt}`,
       }),
     });

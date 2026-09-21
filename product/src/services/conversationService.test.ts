@@ -296,7 +296,8 @@ describe("로그인 대화 원문 저장", () => {
     const storedResponse = response("복원할 최종 답변");
     storedResponse.results[0]!.limitations = ["개별 사실관계 확인 필요"];
     storedResponse.results[0]!.suggested_actions = [{ code: "collect", label: "자료 모으기", priority: "now" }];
-    await completeClaimedConversationRequest({ ...request, conversation_id: claim.conversation_id }, storedResponse, USER);
+    await completeClaimedConversationRequest({ ...request, conversation_id: claim.conversation_id,
+      conversation_request_lease_token: claim.lease_token ?? undefined }, storedResponse, USER);
 
     await updateUserConversation(claim.conversation_id, { title: "수정한 제목", active_company_id: "COMPANY_B" }, USER);
     await updateUserConversation(claim.conversation_id, { active_company_id: null }, USER);
