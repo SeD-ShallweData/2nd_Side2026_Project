@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 
 import type { ChatRequest, ChatResponse } from "@/domain/chat";
 import { ResponsesClientError } from "@/server/responses/responsesClient";
+import { reviewedLaborFallback } from "@/services/reviewedLaborGuidance";
 import type { OpenAIResponsesConfig } from "@/server/responses/responsesConfig";
 import type { ResponsesRunResult } from "@/server/responses/responsesRunner";
 import {
@@ -99,6 +100,23 @@ const REQUEST: ChatRequest = {
 };
 
 describe("Responses chat service adapter", () => {
+  it.each([true, false])("applies the same reviewed conditions without discarding correct generation: %s", async (good) => {
+    const message = "상시 4명인 사업장도 야간수당을 줘야 하나요?";
+    const correct = reviewedLaborFallback(message, BASELINE)!;
+    const { send, run } = setup(BASELINE, { ...RUN, answer: good ? correct.answer : "4명도 법정 야간 가산임금 의무가 있습니다." });
+    const result = await send({ ...REQUEST, message });
+    expect(result.results[0].answer).toBe(correct.answer);
+    expect(result.results[0].status).toBe(good ? "success" : "guardrail_replaced");
+    expect(run.mock.calls[0][0].instructions).toContain("근로기준법 시행령 제7조");
+    expect(result.results[0].sources.some((source) => source.citation === "근로기준법 제56조")).toBe(true);
+  });
+  it("sanitizes baseline/history/summary prompt copies, not the caller's stored history", async () => {
+    const unsafe = "상위5% BIZ_NO미존재사업장 [이전 답변 근거: 제56조]";
+    const { send, run } = setup({ ...BASELINE, answer: unsafe, limitations: [unsafe] });
+    await send({ ...REQUEST, recent_messages: [{ role: "assistant", content: unsafe }] });
+    const prompt = JSON.stringify(run.mock.calls[0][0]);
+    expect(prompt).not.toMatch(/상위5%|BIZ_NO미존재사업장|이전 답변 근거:/);
+  });
   it("passes hydrated memory to Responses and rejects a raw memory injection", async () => {
     for (const [count, through] of [[9, 0], [10, 10], [11, 10], [19, 10], [20, 20], [21, 20]] as const) {
       const memory = through === 0 ? undefined : {

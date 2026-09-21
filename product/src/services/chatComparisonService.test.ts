@@ -44,6 +44,16 @@ beforeEach(() => {
 });
 
 describe("의도와 근거에 따른 상담 경로", () => {
+  it("actual unpaid wages override company-indicator intent and use the original evidence query", async () => {
+    const message = "긍정 지표는 좋다는데 지난달 월급을 못 받았습니다. 지표 때문에 체불이 아닌가요?";
+    mocks.classify.mockResolvedValue({ intent: "company", topic: "other", company_scope: "specific", status: "classified" });
+    mocks.rewrite.mockResolvedValue({ query: "다른 질문", changed: true });
+    mocks.retrieve.mockResolvedValue({ status: "matched", reason: "reviewed_applicability_bundle", documents: [] });
+    await sendComparedChatMessage({ message, company_id: "C1" });
+    expect(mocks.retrieve).toHaveBeenCalledWith(message);
+    expect(mocks.company).not.toHaveBeenCalled();
+    expect(mocks.compare.mock.calls[0][0].questionIntent).toBe("labor");
+  });
   it.each([false, true])("무관한 질문은 회사 선택(%s)과 무관하게 범위 안내", async (selected) => {
     mocks.classify.mockResolvedValue({ intent: "off_topic", topic: "other", status: "classified" });
     const response = await sendComparedChatMessage({ message: "회사 컴퓨터에 게임을 안전하게 설치하려면?", company_id: selected ? "C1" : undefined });

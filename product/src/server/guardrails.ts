@@ -147,6 +147,11 @@ export interface GuardrailRule {
 
 /** 사용자 상담 답변에 적용하는 규칙. */
 export const CHAT_OUTPUT_GUARDRAILS: GuardrailRule[] = [
+  { code: "PUBLIC_RANK_OR_MISSING_LABEL", pattern: /(?:상위|하위)\s*\d+(?:\.\d+)?\s*(?:%|퍼센트)|BIZ[_\s]?NO\s*미존재\s*사업장/i },
+  { code: "PREVIOUS_ANSWER_LABEL", pattern: /\[이전 답변 근거:/ },
+  // A later caveat must not excuse an affirmative past-absence claim in the same sentence.
+  { code: "PAST_WAGE_RECORD_INFERENCE", pattern: /체불\s*(?:기록|이력)?(?:이|은|도)?\s*없(?:었다|다)는\s*(?:사실|뜻|의미)(?:입니다|이다|일\s*뿐|을\s*뜻)/i },
+  { code: "PAST_WAGE_CERTAINTY", pattern: /(?:임금\s*)?체불(?:이나\s*급격한\s*변동)?(?:이|은|도|\s)?\s*(?:전혀\s*)?(?:없었다는\s*(?:사실|뜻|의미)|없(?:었)?(?:습니다|어요)|없던\s*회사)|임금(?:이|은)?\s*항상\s*(?:정상|제때)/i, allowNegated: true },
   // 회사명을 생략한 채 등급·신호 부재나 입사 허용을 근거로 안전을 단정하는 경우도 포함한다.
   { code: "SAFE_COMPANY_CERTAINTY", pattern: /안전한\s*(회사|사업장|기업|직장)(?:입니다|이다)|(?:이\s*)?(?:회사|사업장|기업|직장)(?:는|은|가|이)?\s*안전(?:합니다|하다|해요)|(?:정상\s*(?:등급|판정)(?:이므로|이라서|이기\s*때문에)|(?:확인된\s*)?위험\s*신호가\s*(?:없어서?|없으므로)|입사(?:하셔도|해도))\s*안전(?:합니다|하다|해요)|문제가\s*없는\s*(회사|사업장)(?:입니다|이다)/i, allowNegated: true },
   { code: "DANGEROUS_COMPANY_CERTAINTY", pattern: /위험한\s*(회사|사업장|기업|직장)(?:입니다|이다)|위험이\s*(있는|높은|큰)\s*(회사|사업장|기업)/i, allowNegated: true },

@@ -47,6 +47,8 @@ export interface SafeExecutionTrace {
   rag_reason: string | null;
   rag_topic: string | null;
   retrieved_document_count: number;
+  reviewed_evidence_count?: number;
+  reviewed_evidence_as_of?: string;
   tool_round_count?: number;
   tool_call_count?: number;
   tool_names?: string[];

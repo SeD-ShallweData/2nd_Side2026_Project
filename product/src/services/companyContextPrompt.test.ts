@@ -9,7 +9,7 @@
  *
  * 함께 지키는 것이 하나 더 있다. 모델에게 주는 사업장 판정은 화면용 응답과 다른
  * **정리된 사본**이다(`publicSignalForPrompt`). 등급 토큰·근거 코드·내부 배치
- * 이름·생성 시각이 빠지고 순위 표기가 "상위 구간"으로 바뀐다. 프롬프트에
+ * 이름·생성 시각이 빠지고 순위 표기가 비수치 참고 문구로 바뀐다. 프롬프트에
  * "등급·순위를 말하지 마세요"라고 적어도 컨텍스트에 값이 있으면 모델이 옮기기
  * 때문에, 주입 단계에서 지운다. 그 사본이 무너지면 여기서 걸린다.
  */
@@ -142,6 +142,26 @@ async function systemPrompts(context: ComparisonContext): Promise<string[]> {
 }
 
 describe("사업장 컨텍스트 주입", () => {
+  it("free text, disclaimer, baseline and assistant history cannot reintroduce rank/internal labels", async () => {
+    const context = contextWithCompany();
+    const unsafe = "상위 5% BIZ_NO미존재사업장 [이전 답변 근거: 근로기준법 제56조]";
+    context.policyBaseline = { ...BASELINE, answer: unsafe, limitations: [unsafe] };
+    context.companyContext = { ...context.companyContext!, industry: unsafe, risk: {
+      ...RISK, safety_context: { ...RISK.safety_context, disclaimer: unsafe },
+    } };
+    context.request.recent_messages = [{ role: "assistant", content: unsafe }];
+    const captured: string[] = [];
+    const fakeFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      captured.push(String(init?.body));
+      return okResponse();
+    }) as typeof fetch;
+    const result = await new DualLlmChatProvider(CONFIGS, new OpenAICompatibleChatClient(fakeFetch, 5000)).compare(context);
+    for (const serialized of captured) {
+      expect(serialized).not.toMatch(/상위\s*5%|BIZ_NO미존재사업장|이전 답변 근거:/);
+    }
+    expect(JSON.stringify(result)).not.toMatch(/상위\s*5%|BIZ_NO미존재사업장|이전 답변 근거:/);
+    expect(context.policyBaseline.answer).toBe(unsafe);
+  });
   it("공개 개수와 확인된 항목만 두 모델에 전달한다", async () => {
     const context = contextWithCompany();
     context.companyContext = { ...context.companyContext!, risk: {
@@ -195,8 +215,8 @@ describe("사업장 컨텍스트 주입", () => {
     ]) {
       expect(prompt, `내부 값 ${forbidden} 이 프롬프트로 샜다`).not.toContain(forbidden);
     }
-    // 순위 표기는 "상위 구간"으로 바뀐다.
-    expect(prompt).toContain("상위 구간");
+    // 수치·순위 대신 비수치 참고 문구를 전달한다.
+    expect(prompt).toContain("공표 확인 참고 정보");
   });
 
   it("사업장을 선택하지 않은 상담에는 company가 null로 들어간다", async () => {

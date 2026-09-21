@@ -6,6 +6,8 @@ import type {
   TokenUsage,
 } from "@/domain/chatComparison";
 import { parseChatRequest, sendChatMessage } from "@/services/chatService";
+import { publicAnswerContext, publicAnswerText } from "@/services/publicAnswerContext";
+import { LABOR_REVIEW_DATE, applicabilityGuardrailHits, reviewedLaborFallback, reviewedLaborRetrieval } from "@/services/reviewedLaborGuidance";
 import {
   CHAT_OUTPUT_GUARDRAILS,
   hasUnverifiedCitation,
@@ -97,9 +99,9 @@ function inputMessages(request: ChatRequest): ResponsesInputItem[] {
   return [
     ...request.recent_messages.slice(-10).map((message) => ({
       role: message.role,
-      content: message.content,
+      content: publicAnswerText(message.content),
     })),
-    { role: "user" as const, content: request.message },
+    { role: "user" as const, content: publicAnswerText(request.message) },
   ];
 }
 
@@ -109,6 +111,7 @@ function instructions(
   prompt: string,
 ): string {
   const safeContext = {
+    reviewed_labor_evidence: reviewedLaborRetrieval(request.message),
     selected_company_id: request.company_id ?? null,
     conversation_memory: request.conversation_memory
       ? {
@@ -128,9 +131,9 @@ function instructions(
   return withRuntimeContext(prompt, [
     `상담 모드: ${request.chat_mode}`,
     `정책 버전: ${CHAT_POLICY_VERSION}`,
-    `기본 정책 컨텍스트(JSON): ${JSON.stringify(safeContext)}`,
+    `기본 정책 컨텍스트(JSON): ${JSON.stringify(publicAnswerContext(safeContext))}`,
     "도구 사용 규칙: 특정 사업장 위험을 설명하려면 get_company_risk를 호출하세요. 정확한 company_id가 없으면 search_company를 먼저 호출하세요.",
-    "법령·조문은 retrieve_labor_law documents만 사용하세요. 단, 성공한 review_contract의 legal_basis는 해당 finding 설명에만 사용할 수 있고 다른 조문으로 확장하지 마세요.",
+    "법령·조문은 reviewed_labor_evidence 또는 retrieve_labor_law documents만 사용하세요. 단, 성공한 review_contract의 legal_basis는 해당 finding 설명에만 사용할 수 있고 다른 조문으로 확장하지 마세요.",
     "review_contract는 현재 요청에 업로드가 있을 때만 목록에 나타납니다. 목록에 없으면 파일을 읽었다고 말하지 마세요.",
     "도구 결과의 ok=false를 사실 결과처럼 해석하지 말고, 확인하지 못한 점과 공식 확인 경로를 짧게 안내하세요.",
   ]);
@@ -160,7 +163,9 @@ function comparisonEnvelope(
 }
 
 function traceBase(request: ChatRequest) {
+  const reviewed = reviewedLaborRetrieval(request.message);
   return {
+    ...(reviewed ? { reviewed_evidence_count: reviewed.documents.length, reviewed_evidence_as_of: LABOR_REVIEW_DATE } : {}),
     prompt_policy_version: CHAT_POLICY_VERSION,
     query_transform: "none" as const,
     context_mode: request.company_id ? ("company" as const) : ("general" as const),
@@ -215,15 +220,22 @@ function policyShortCircuit(
   );
 }
 
-function outputGuardrailHits(run: ResponsesRunResult): string[] {
+function outputGuardrailHits(run: ResponsesRunResult, request: ChatRequest): string[] {
   const hits = scanRules(run.answer, CHAT_OUTPUT_GUARDRAILS);
+  for (const hit of applicabilityGuardrailHits(request.message, run.answer)) hits.add(hit);
+  const reviewed = reviewedLaborRetrieval(request.message);
+  if (!reviewed && run.ledger.citations.length === 0
+    && run.toolCalls.some((call) => call.name === "get_company_risk" && call.ok)
+    && /대지급금|진정서|진정.{0,8}(?:신청|제출)/.test(run.answer)) {
+    hits.add("COMPANY_UNSOURCED_LEGAL_PROCEDURE");
+  }
   const citationVerificationStatus =
-    run.ledger.citations.length > 0 ? "matched" : run.ledger.ragStatus;
+    reviewed || run.ledger.citations.length > 0 ? "matched" : run.ledger.ragStatus;
   if (
     hasUnverifiedCitation(
       run.answer,
       citationVerificationStatus,
-      run.ledger.citations,
+      [...run.ledger.citations, ...(reviewed?.documents.map((doc) => doc.citation) ?? [])],
     )
   ) {
     hits.add("UNVERIFIED_LAW_CITATION");
@@ -245,7 +257,9 @@ function successResult(
   baseline: ChatResponse,
   run: ResponsesRunResult,
 ): ProviderComparisonResult {
-  const guardrailHits = outputGuardrailHits(run);
+  const guardrailHits = outputGuardrailHits(run, request);
+  const reviewed = reviewedLaborFallback(request.message, baseline);
+  if (reviewed) baseline = reviewed;
   const hasSuccessfulContractReview = run.toolCalls.some(
     (call) => call.name === "review_contract" && call.ok,
   );
@@ -272,7 +286,7 @@ function successResult(
     status: toolFailed ? "fallback" : replaced ? "guardrail_replaced" : "success",
     answer,
     answer_type: metadata.answer_type,
-    sources: toolFailed || replaced ? baseline.sources : run.ledger.sources,
+    sources: toolFailed || replaced ? baseline.sources : [...run.ledger.sources, ...(reviewed?.sources ?? [])],
     suggested_actions: metadata.suggested_actions,
     limitations: [
       ...metadata.limitations,
@@ -406,11 +420,12 @@ export function createParsedResponsesChatSender(
     options: ResponsesChatOptions = {},
   ): Promise<ChatComparisonResponse> {
     const startedAt = new Date();
-    const policyBaseline = await dependencies.sendPolicyMessage(request);
+    let policyBaseline = publicAnswerContext(await dependencies.sendPolicyMessage(request));
 
     if (policyBaseline.answer_type === "emergency_guidance") {
       return policyShortCircuit(startedAt, request, policyBaseline);
     }
+    policyBaseline = reviewedLaborFallback(request.message, policyBaseline) ?? policyBaseline;
 
     const config = dependencies.getConfig();
     try {

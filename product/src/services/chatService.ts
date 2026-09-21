@@ -3,6 +3,7 @@ import type { ChatMode, ChatRequest, ChatResponse, RecentMessage } from "@/domai
 import { getChatProvider } from "@/services/providers";
 import { delay } from "@/utils/delay";
 import { ServiceError } from "@/utils/errors";
+import { publicAnswerContext } from "@/services/publicAnswerContext";
 
 const CHAT_MODES: ChatMode[] = ["general", "wage", "safety", "contract"];
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,100}$/;
@@ -79,5 +80,5 @@ export function parseChatRequest(value: unknown): ChatRequest {
 
 export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
   if (getDataMode() === "mock") await delay(getMockDelayMs());
-  return getChatProvider().sendMessage(request);
+  return publicAnswerContext(await getChatProvider().sendMessage(request));
 }

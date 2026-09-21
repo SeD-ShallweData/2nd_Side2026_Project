@@ -4,10 +4,19 @@ import answerCases from "../../eval/answer-contract-cases.json";
 import continuityCases from "../../eval/conversation-continuity-cases.json";
 
 const MANUAL_DEVELOPMENT_IDS = [
+  "AQ07-independent-company-no-certainty",
   "AQ11-manual-corrected-payday-recall",
   "AQ12-manual-small-workplace-night-premium",
   "AQ13-manual-1350-filing-boundary",
   "AQ14-manual-list-numbering",
+  "AQ15-certificate-purpose-procedure",
+  "AQ16-night-after-five",
+  "AQ17-night-four-agreement",
+  "AQ18-night-size-unknown",
+  "AQ19-positive-not-arrears-proof",
+  "AQ20-positive-but-unpaid",
+  "AQ21-public-context-history",
+  "AQ22-online-complaint",
 ];
 
 describe("manual QA regression corpus", () => {
