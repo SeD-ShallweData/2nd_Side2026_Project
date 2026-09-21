@@ -57,9 +57,11 @@ AUTH_USER="${AUTH_USER:-wg_auth}"
 [[ "$DB_NAME" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || { echo "DB_NAME 형식이 안전하지 않습니다" >&2; exit 1; }
 # .env.local 의 DB_PASSWORD 를 psql 에 넘긴다 (~/.pgpass 없이도 동작하도록)
 export PGPASSWORD="${DB_PASSWORD}"
-PSQL=(psql -X --no-psqlrc -w -h 127.0.0.1 -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -q -v "auth_user=${AUTH_USER}" -v "auth_password=${AUTH_PASSWORD}" -v "db_name=${DB_NAME}")
+export MW_AUTH_PASSWORD="${AUTH_PASSWORD}"
+PSQL=(psql -X --no-psqlrc -w -h 127.0.0.1 -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -q -v "auth_user=${AUTH_USER}" -v "db_name=${DB_NAME}")
 
 "${PSQL[@]}" <<'SQL'
+\getenv auth_password MW_AUTH_PASSWORD
 -- 1) 역할이 없으면 생성 (있으면 비밀번호만 갱신 — 재실행해도 안전)
 SELECT format(
   'CREATE ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS CONNECTION LIMIT 20',
@@ -85,6 +87,12 @@ GRANT USAGE ON SCHEMA public TO :"auth_user";
 --    이 계정의 책임 범위 밖 — 부여하지 않는다.
 GRANT SELECT, INSERT, UPDATE, DELETE
   ON users, sessions
+  TO :"auth_user";
+
+--    즐겨찾기 데이터도 인증 계정이 처리 — UPDATE는 의도적으로 뺀다
+--    (즐겨찾기 API에 수정 기능 없음, 추가/삭제만 존재).
+GRANT SELECT, INSERT, DELETE
+  ON user_favorite_firms
   TO :"auth_user";
 
 -- ⚠️ ALTER DEFAULT PRIVILEGES 를 일부러 쓰지 않는다.

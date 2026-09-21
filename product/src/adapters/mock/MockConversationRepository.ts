@@ -17,6 +17,7 @@ import type {
 import type { ConversationStructuredSummary, StoredConversationSummaryState } from "@/domain/conversationSummary";
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const summaryLeases = new Map<string, { token: string; expires: number }>();
 
 interface StoredThread extends StoredConversationDetail {
   idempotency: Map<string, string>;
@@ -112,6 +113,9 @@ export class MockConversationRepository implements ConversationRepository {
     const key = requestKey(input.owner_user_id, input.request_id);
     const existingRequest = requests.get(key);
     if (existingRequest) {
+      const live = threads.get(existingRequest.conversation_id);
+      if (!live || Date.parse(live.expires_at) <= Date.now()
+        || (input.conversation_id && input.conversation_id !== existingRequest.conversation_id)) throw new Error("conversation not found");
       return {
         conversation_id: existingRequest.conversation_id,
         status: existingRequest.status,
@@ -152,6 +156,8 @@ export class MockConversationRepository implements ConversationRepository {
     const key = requestKey(input.owner_user_id, input.idempotency_key);
     const request = requests.get(key);
     if (!request || request.conversation_id !== input.conversation_id) throw new Error("conversation request not found");
+    const live = threads.get(request.conversation_id);
+    if (!live || live.owner_user_id !== input.owner_user_id || Date.parse(live.expires_at) <= Date.now()) throw new Error("conversation not found");
     if (request.status === "completed" && request.response) {
       return { conversation_id: request.conversation_id, response: structuredClone(request.response), reused: true };
     }
@@ -182,7 +188,7 @@ export class MockConversationRepository implements ConversationRepository {
   async recordCompletedTurn(input: RecordCompletedConversationTurn): Promise<RecordedConversationTurn> {
     const now = new Date();
     const existing = input.conversation_id ? threads.get(input.conversation_id) : undefined;
-    if (input.conversation_id && (!existing || existing.owner_user_id !== input.owner_user_id)) {
+    if (input.conversation_id && (!existing || existing.owner_user_id !== input.owner_user_id || Date.parse(existing.expires_at) <= Date.now())) {
       throw new Error("conversation not found");
     }
     const thread = existing ?? {
@@ -232,6 +238,7 @@ export class MockConversationRepository implements ConversationRepository {
     if (!thread || thread.owner_user_id !== ownerUserId) return false;
     threads.delete(conversationId);
     summaries.delete(conversationId);
+    summaryLeases.delete(conversationId);
     for (const [key, request] of requests) if (request.conversation_id === conversationId) requests.delete(key);
     return true;
   }
@@ -252,6 +259,7 @@ export class MockConversationRepository implements ConversationRepository {
       if (Date.parse(thread.expires_at) <= now.getTime()) {
         threads.delete(id);
         summaries.delete(id);
+        summaryLeases.delete(id);
         for (const [key, request] of requests) if (request.conversation_id === id) requests.delete(key);
         deleted += 1;
       }
@@ -263,6 +271,7 @@ export class MockConversationRepository implements ConversationRepository {
     threads.clear();
     summaries.clear();
     requests.clear();
+    summaryLeases.clear();
   }
 
   async findSummary(conversationId: string): Promise<StoredConversationSummaryState | null> {
@@ -270,10 +279,25 @@ export class MockConversationRepository implements ConversationRepository {
     return summary ? cloneSummaryState(summary) : null;
   }
 
-  async claimSummary(conversationId: string, throughSequence: number): Promise<boolean> {
-    if (!threads.has(conversationId)) return false;
+  async findSummaryWork(limit: number): Promise<string[]> {
+    return [...threads.values()].filter((thread) => {
+      const summary = summaries.get(thread.conversation_id);
+      const lease = summaryLeases.get(thread.conversation_id);
+      return Date.parse(thread.expires_at) > Date.now()
+        && Math.floor(thread.turns.length * 2 / 10) * 10 > (summary?.summarized_through_sequence ?? 0)
+        && (!lease || lease.expires <= Date.now())
+        && (summary?.status !== "failed" || Date.parse(summary.updated_at) < Date.now() - 60_000);
+    }).slice(0, limit).map((thread) => thread.conversation_id);
+  }
+
+  async claimSummary(conversationId: string, throughSequence: number): Promise<string | null> {
+    const thread = threads.get(conversationId);
+    if (!thread || Date.parse(thread.expires_at) <= Date.now()) return null;
     const existing = summaries.get(conversationId);
-    if (existing && (existing.status === "pending" || existing.summarized_through_sequence >= throughSequence)) return false;
+    const lease = summaryLeases.get(conversationId);
+    if (existing && ((lease && lease.expires > Date.now()) || existing.summarized_through_sequence >= throughSequence)) return null;
+    const token = randomUUID();
+    summaryLeases.set(conversationId, { token, expires: Date.now() + 120_000 });
     summaries.set(conversationId, {
       conversation_id: conversationId,
       summary: existing?.summary ?? emptySummary(),
@@ -281,18 +305,30 @@ export class MockConversationRepository implements ConversationRepository {
       pending_through_sequence: throughSequence,
       summary_version: existing?.summary_version ?? "extractive-v1",
       status: "pending",
-      retry_count: existing?.retry_count ?? 0,
+      retry_count: (existing?.retry_count ?? 0) + (existing?.pending_through_sequence ? 1 : 0),
       last_error_code: null,
       updated_at: new Date().toISOString(),
     });
+    return token;
+  }
+
+  async renewSummary(conversationId: string, leaseToken: string): Promise<boolean> {
+    const lease = summaryLeases.get(conversationId);
+    const thread = threads.get(conversationId);
+    if (!thread || Date.parse(thread.expires_at) <= Date.now() || !lease || lease.token !== leaseToken || lease.expires <= Date.now()) return false;
+    lease.expires = Date.now() + 120_000;
     return true;
   }
 
   async completeSummary(input: {
-    conversation_id: string; through_sequence: number; summary: ConversationStructuredSummary; summary_version: string;
+    conversation_id: string; through_sequence: number; summary: ConversationStructuredSummary; summary_version: string; lease_token: string;
   }): Promise<boolean> {
     const current = summaries.get(input.conversation_id);
-    if (!current || current.pending_through_sequence !== input.through_sequence) return false;
+    const lease = summaryLeases.get(input.conversation_id);
+    const thread = threads.get(input.conversation_id);
+    if (!thread || Date.parse(thread.expires_at) <= Date.now() || !current || current.pending_through_sequence !== input.through_sequence
+      || !lease || lease.token !== input.lease_token || lease.expires <= Date.now()) return false;
+    summaryLeases.delete(input.conversation_id);
     summaries.set(input.conversation_id, {
       ...current, summary: structuredClone(input.summary), summarized_through_sequence: input.through_sequence,
       pending_through_sequence: null, summary_version: input.summary_version, status: "ready",
@@ -301,9 +337,12 @@ export class MockConversationRepository implements ConversationRepository {
     return true;
   }
 
-  async failSummary(conversationId: string, throughSequence: number, errorCode: string): Promise<void> {
+  async failSummary(conversationId: string, throughSequence: number, errorCode: string, leaseToken: string): Promise<void> {
     const current = summaries.get(conversationId);
-    if (!current || current.pending_through_sequence !== throughSequence) return;
+    const lease = summaryLeases.get(conversationId);
+    if (!current || current.pending_through_sequence !== throughSequence
+      || !lease || lease.token !== leaseToken || lease.expires <= Date.now()) return;
+    summaryLeases.delete(conversationId);
     summaries.set(conversationId, {
       ...current, pending_through_sequence: null, status: "failed", retry_count: current.retry_count + 1,
       last_error_code: errorCode, updated_at: new Date().toISOString(),

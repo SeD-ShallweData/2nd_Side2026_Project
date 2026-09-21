@@ -98,12 +98,15 @@ export interface ConversationRepository {
   deleteConversation(conversationId: string, ownerUserId: string): Promise<boolean>;
   deleteExpiredConversations(now: Date): Promise<number>;
   findSummary(conversationId: string): Promise<StoredConversationSummaryState | null>;
-  claimSummary(conversationId: string, throughSequence: number): Promise<boolean>;
+  findSummaryWork(limit: number): Promise<string[]>;
+  claimSummary(conversationId: string, throughSequence: number): Promise<string | null>;
+  renewSummary(conversationId: string, leaseToken: string): Promise<boolean>;
   completeSummary(input: {
     conversation_id: string;
     through_sequence: number;
     summary: ConversationStructuredSummary;
     summary_version: string;
+    lease_token: string;
   }): Promise<boolean>;
-  failSummary(conversationId: string, throughSequence: number, errorCode: string): Promise<void>;
+  failSummary(conversationId: string, throughSequence: number, errorCode: string, leaseToken: string): Promise<void>;
 }

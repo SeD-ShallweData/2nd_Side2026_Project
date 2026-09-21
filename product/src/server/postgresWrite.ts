@@ -129,7 +129,13 @@ export function assertWriteStatementAllowed(sql: string): void {
       "쓰기 adapter는 SELECT/WITH/INSERT/UPDATE/DELETE만 실행할 수 있습니다.",
     );
   }
-  if (FORBIDDEN_KEYWORD.test(normalized)) {
+  // DO in a PostgreSQL upsert is DML, not an anonymous procedural DO block.
+  // Remove only that keyword; keep checking the target and the UPDATE body.
+  const withoutUpsertDo = normalized.replace(
+    /(\bon conflict(?:\s*\([^;()]*\)|\s+on constraint [a-z_]\w*)?\s+)do(?=\s+(?:update|nothing)\b)/g,
+    "$1",
+  );
+  if (FORBIDDEN_KEYWORD.test(withoutUpsertDo)) {
     throw new WriteStatementBlockedError("쓰기 adapter에서 스키마·권한 변경 SQL이 차단되었습니다.");
   }
 }
@@ -180,6 +186,9 @@ function isCommitOutcomeUncertain(error: unknown): boolean {
 function rethrow(error: unknown, role: WriteRole): never {
   if (error instanceof ServiceError) throw error;
   if (error instanceof WriteStatementBlockedError) throw error;
+  if (isDatabaseError(error) && (error.code.startsWith("08") || ["57P01", "57P02", "57P03"].includes(error.code))) {
+    throw unavailable(role);
+  }
   if (isDatabaseError(error)) throw error;
   throw unavailable(role);
 }
@@ -269,4 +278,11 @@ export function isWriteDatabaseConfigured(role: WriteRole): boolean {
 /* 테스트에서 롤별 pool 캐시를 비운다. */
 export function resetWritePoolsForTest(): void {
   pools.clear();
+}
+
+/** Graceful standalone worker shutdown; never used to interrupt an app request. */
+export async function closeWritePools(): Promise<void> {
+  const current = [...pools.values()];
+  pools.clear();
+  await Promise.all(current.map((pool) => pool.end()));
 }

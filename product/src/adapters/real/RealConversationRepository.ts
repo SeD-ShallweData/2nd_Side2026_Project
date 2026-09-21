@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 
 import type { AnswerType, GuardrailStatus } from "@/domain/chat";
 import type {
@@ -256,6 +257,12 @@ export class RealConversationRepository implements ConversationRepository {
         [input.owner_user_id, input.request_id],
       );
       if (existingRequest[0]) {
+        if (input.conversation_id && input.conversation_id !== existingRequest[0].conversation_id) throw missingConversation();
+        const live = await transaction.query<{ id: string }>(
+          "SELECT id FROM conversation_threads WHERE id = $1::uuid AND owner_user_id = $2::uuid AND expires_at > now()",
+          [existingRequest[0].conversation_id, input.owner_user_id],
+        );
+        if (!live[0]) throw missingConversation();
         return {
           conversation_id: existingRequest[0].conversation_id,
           status: existingRequest[0].status,
@@ -298,6 +305,12 @@ export class RealConversationRepository implements ConversationRepository {
     conversation_id: string; response: CompleteConversationRequestInput["response"]; reused: boolean;
   }> {
     return withWriteTransaction("conversation", async (transaction) => {
+      // Parent first: same order as DELETE/cascade, and expired replays are denied.
+      const live = await transaction.query<{ id: string }>(
+        "SELECT id FROM conversation_threads WHERE id = $1::uuid AND owner_user_id = $2::uuid AND expires_at > now() FOR UPDATE",
+        [input.conversation_id, input.owner_user_id],
+      );
+      if (!live[0]) throw missingConversation();
       const request = await transaction.query<RequestRow>(
         `SELECT conversation_id::text, status, response_payload
            FROM conversation_requests
@@ -481,8 +494,11 @@ export class RealConversationRepository implements ConversationRepository {
   async deleteExpiredConversations(now: Date): Promise<number> {
     const rows = await queryWrite<{ count: string }>(
       "conversation",
-      `WITH deleted AS (
-         DELETE FROM conversation_threads WHERE expires_at <= $1::timestamptz RETURNING id
+      `WITH candidates AS (
+         SELECT id FROM conversation_threads WHERE expires_at <= $1::timestamptz
+         ORDER BY expires_at, id LIMIT 100 FOR UPDATE SKIP LOCKED
+       ), deleted AS (
+         DELETE FROM conversation_threads WHERE id IN (SELECT id FROM candidates) RETURNING id
        ) SELECT count(*)::text AS count FROM deleted`,
       [now.toISOString()],
     );
@@ -502,21 +518,49 @@ export class RealConversationRepository implements ConversationRepository {
     return rows[0] ? toStoredSummary(rows[0]) : null;
   }
 
-  async claimSummary(conversationId: string, throughSequence: number): Promise<boolean> {
-    if (!validUuid(conversationId)) return false;
+  async findSummaryWork(limit: number): Promise<string[]> {
+    const rows = await queryWrite<{ id: string }>("conversation", `
+      SELECT t.id::text FROM conversation_threads t
+      LEFT JOIN conversation_summaries s ON s.conversation_id = t.id
+      WHERE t.expires_at > now()
+        AND (s.conversation_id IS NULL OR
+          (s.pending_through_sequence IS NULL AND (s.status <> 'failed' OR s.updated_at < now() - interval '60 seconds')) OR
+          (s.pending_through_sequence IS NOT NULL AND COALESCE(s.lease_expires_at, s.updated_at + interval '120 seconds') <= now()))
+        AND (SELECT count(*) * 2 / 10 * 10 FROM conversation_turns WHERE conversation_id = t.id)
+          > COALESCE(s.summarized_through_sequence, 0)
+      ORDER BY COALESCE(s.updated_at, t.created_at), t.id LIMIT $1`, [Math.max(1, Math.min(100, limit))]);
+    return rows.map((row) => row.id);
+  }
+
+  async claimSummary(conversationId: string, throughSequence: number): Promise<string | null> {
+    if (!validUuid(conversationId)) return null;
+    const leaseToken = randomUUID();
     const rows = await queryWrite<{ conversation_id: string }>(
       "conversation",
       `INSERT INTO conversation_summaries
-         (conversation_id, summary, summarized_through_sequence, pending_through_sequence, summary_version, status)
-       VALUES ($1::uuid, '{}'::jsonb, 0, $2, 'extractive-v1', 'pending')
+         (conversation_id, summary, summarized_through_sequence, pending_through_sequence, summary_version, status, lease_token, lease_expires_at)
+       SELECT id, '{}'::jsonb, 0, $2, 'extractive-v1', 'pending', $3::uuid, now() + interval '120 seconds'
+       FROM conversation_threads WHERE id = $1::uuid AND expires_at > now()
        ON CONFLICT (conversation_id) DO UPDATE
          SET pending_through_sequence = EXCLUDED.pending_through_sequence,
-             status = 'pending', last_error_code = NULL, updated_at = now()
-       WHERE conversation_summaries.pending_through_sequence IS NULL
+             status = 'pending', last_error_code = NULL, updated_at = now(),
+             lease_token = EXCLUDED.lease_token, lease_expires_at = EXCLUDED.lease_expires_at,
+             retry_count = conversation_summaries.retry_count + CASE WHEN conversation_summaries.pending_through_sequence IS NOT NULL THEN 1 ELSE 0 END
+       WHERE (conversation_summaries.pending_through_sequence IS NULL
+         OR COALESCE(conversation_summaries.lease_expires_at, conversation_summaries.updated_at + interval '120 seconds') <= now())
          AND conversation_summaries.summarized_through_sequence < EXCLUDED.pending_through_sequence
        RETURNING conversation_id::text`,
-      [conversationId, throughSequence],
+      [conversationId, throughSequence, leaseToken],
     );
+    return rows.length === 1 ? leaseToken : null;
+  }
+
+  async renewSummary(conversationId: string, leaseToken: string): Promise<boolean> {
+    const rows = await queryWrite("conversation", `UPDATE conversation_summaries
+      SET lease_expires_at = now() + interval '120 seconds'
+      WHERE conversation_id = $1::uuid AND lease_token = $2::uuid AND lease_expires_at > now()
+        AND EXISTS (SELECT 1 FROM conversation_threads WHERE id = $1::uuid AND expires_at > now())
+      RETURNING conversation_id`, [conversationId, leaseToken]);
     return rows.length === 1;
   }
 
@@ -525,28 +569,32 @@ export class RealConversationRepository implements ConversationRepository {
     through_sequence: number;
     summary: ConversationStructuredSummary;
     summary_version: string;
+    lease_token: string;
   }): Promise<boolean> {
     const rows = await queryWrite<{ conversation_id: string }>(
       "conversation",
       `UPDATE conversation_summaries
           SET summary = $3::jsonb, summarized_through_sequence = $2,
               pending_through_sequence = NULL, summary_version = $4, status = 'ready',
-              last_error_code = NULL, updated_at = now()
+              last_error_code = NULL, updated_at = now(), lease_token = NULL, lease_expires_at = NULL
         WHERE conversation_id = $1::uuid AND pending_through_sequence = $2
+          AND lease_token = $5::uuid AND lease_expires_at > now()
+          AND EXISTS (SELECT 1 FROM conversation_threads WHERE id = $1::uuid AND expires_at > now())
         RETURNING conversation_id::text`,
-      [input.conversation_id, input.through_sequence, JSON.stringify(input.summary), input.summary_version],
+      [input.conversation_id, input.through_sequence, JSON.stringify(input.summary), input.summary_version, input.lease_token],
     );
     return rows.length === 1;
   }
 
-  async failSummary(conversationId: string, throughSequence: number, errorCode: string): Promise<void> {
+  async failSummary(conversationId: string, throughSequence: number, errorCode: string, leaseToken: string): Promise<void> {
     await queryWrite(
       "conversation",
       `UPDATE conversation_summaries
           SET pending_through_sequence = NULL, status = 'failed', retry_count = retry_count + 1,
-              last_error_code = $3, updated_at = now()
-        WHERE conversation_id = $1::uuid AND pending_through_sequence = $2`,
-      [conversationId, throughSequence, errorCode.slice(0, 80)],
+              last_error_code = $3, updated_at = now(), lease_token = NULL, lease_expires_at = NULL
+        WHERE conversation_id = $1::uuid AND pending_through_sequence = $2
+          AND lease_token = $4::uuid AND lease_expires_at > now()`,
+      [conversationId, throughSequence, errorCode.slice(0, 80), leaseToken],
     );
   }
 }

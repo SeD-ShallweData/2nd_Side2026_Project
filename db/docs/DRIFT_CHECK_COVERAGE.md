@@ -1,13 +1,14 @@
 # 드리프트 검사기 후조건 커버리지
 
 > **한 줄 요약**
-> `npm run check:migration-drift` 는 이제 **0006~0013 을 모두 검사한다.**
+> `npm run check:migration-drift` 는 이제 **0006~0019를 모두 검사한다(111개 후조건).**
 > 2026-09-09 에 0009·0010·0011 키 28개를 등록해 공백을 메웠고,
 > 2026-09-13 에 0012 키 11개를 같은 PR 에서 등록했고,
-> 2026-09-14 에 K5 현장 신고 분류·상태를 검증하는 0013 키 7개를 추가했다.
+> 2026-09-14 에 K5 현장 신고 분류·상태를 검증하는 0013 키 7개를 추가했고,
+> 2026-09-19 에 0018 키 11개를 추가했다.
 > `0000`~`0005` 는 여전히 후조건이 없다 — 그 구간은 [수동 검증](#수동-검증-절차) 범위 밖이다.
 
-기록 시점: 2026-09-07 · **갱신 2026-09-13** · 대상 `db/scripts/check-migration-drift.mjs`,
+기록 시점: 2026-09-07 · **갱신 2026-09-21** · 대상 `db/scripts/check-migration-drift.mjs`,
 `db/scripts/migration-drift-core.mjs`
 
 ## 검사기가 비교하는 세 가지
@@ -40,6 +41,12 @@
 | `0011_lumpy_proteus` | ✓ | **5개 키** — 전부 부재 확인(users.role·firm_id 와 그 제약 3종) |
 | `0012_v_region_industry_signal` | ✓ | **11개 키** — 뷰 + 집계 컬럼 7종 존재, 개별 사업장 값(firm_id·risk_full·rank) **부재** |
 | `0013_illegal_sir_ram` | ✓ | **7개 키** — 현장 신고 category/status 컬럼·제약·기본값·정렬 인덱스 |
+| `0014_conversation_memory` | ✓ | 18개 — 원문 5개 테이블·인덱스·제약 |
+| `0015_conversation_summaries` | ✓ | 6개 — 누적 요약·상태·checkpoint |
+| `0016_conversation_request_lifecycle` | ✓ | 10개 — 요청 ledger·메시지 순서 |
+| `0017_conversation_context_events` | ✓ | 3개 — 수동 회사 변경 이벤트 |
+| `0018_real_hitman` | ✓ | **11개 키** — user_favorite_firms 테이블·컬럼·PK·FK(cascade)·인덱스 존재 확인 |
+| `0019_conversation_summary_leases` | ✓ | 2개 — nullable UUID lease token·timestamptz expiry |
 
 0012 에 부재 확인을 함께 넣은 이유: 이 뷰의 규격(N6)이 *"개별 기업 점수·순위
 컬럼은 넣지 않음"* 이다. `CREATE OR REPLACE VIEW` 는 컬럼을 조용히 더할 수 있으므로,
@@ -52,7 +59,9 @@
 > 읽게 만들었다. 후조건은 migration 이 **끝난 뒤의 상태**를 기술해야 한다.
 > `db/tests/migration-drift.test.mjs` 가 이 형태를 고정한다.
 
-**합계 61개 키** (0012 이전 43개). 2026-09-09 에 PostgreSQL 16 에 migration 12개를 순서대로 적용한 뒤
+**현재 합계 111개 키** (0013까지 61 + 대화 37 + 즐겨찾기 11 + lease 2). 2026-09-21 새 격리 PG16에서 20개 migration/111개 후조건을 확인했다. 아래는 이전 검증 이력이다.
+
+2026-09-09 에 PostgreSQL 16 에 migration 12개를 순서대로 적용한 뒤
 `POSTCONDITIONS_SQL` 을 실행해 **43/43 통과**를 실측했다. 이어서 `users.role` 을 되살려
 `column_absent:public.users.role` 이 `false` 로 뒤집히는 것까지 확인했다 — 검사가 실제로
 드리프트를 잡는다는 뜻이다.
@@ -158,3 +167,50 @@ migration 을 더 추가하게 되면 그때 함께 하는 편이 싸다. 순서
 `verify-uncovered-postconditions.sql` 은 남겨 둔다. 검사기를 못 돌리는 상황(원장 자체가
 깨졌거나 node 를 쓸 수 없을 때)에서 psql 만으로 확인하는 수단으로 여전히 쓸모가 있다.
 다만 이제 그 SQL 의 23개는 검사기가 자동으로 보는 것과 같은 내용이다.
+
+## 2026-09-19 추가 — 0018 등록
+
+0018(`user_favorite_firms` 즐겨찾기 테이블)를 만들면서 이번에는 "나중에 공백을 메우려면"
+절차를 미루지 않고 같은 PR 에서 함께 수행했다.
+
+1. 후보 키 11개(테이블 존재, `user_id`/`firm_id`/`created_at` 컬럼 존재, 복합 PK
+   `(user_id, firm_id)` 존재, `users`·`firms` 로의 FK 존재, 두 FK 모두
+   `ON DELETE CASCADE` 로 정의됐는지, `user_favorite_firms_user_created_idx`
+   인덱스 존재)를 먼저 로컬 Docker DB(`wageguard-nayeon-db-1`)에서 raw SQL 로
+   직접 실행해 **11/11 `true`** 를 확인했다.
+2. FK 존재만 보고 끝내지 않고 `constraint_definition:` 키로 `ON DELETE CASCADE`
+   여부까지 검사한다 — 0013 이 체크 제약 내용을 검증한 것과 같은 이유다.
+   FK 이름만 맞고 삭제 동작이 `NO ACTION` 으로 잘못 만들어져도 `constraint:`
+   존재 확인만으로는 못 잡는다.
+3. `db/scripts/migration-drift-core.mjs` 의 `POSTCONDITION_KEYS` 와
+   `db/scripts/check-migration-drift.mjs` 의 `POSTCONDITIONS_SQL` 에 같은 11개
+   키를 등록했다.
+4. `cd db && npm run test:migration-drift` — 12개 테스트 전부 통과. 그중
+   `POSTCONDITION_KEYS와 POSTCONDITIONS_SQL의 키가 정확히 같다`,
+   `journal의 모든 migration이 등록 여부를 명시적으로 갖는다` 가 0018 키 누락·
+   불일치를 잡는 안전망 역할을 했다.
+
+현재 Windows 로컬 환경에서는 `npm run check:migration-drift` 자체가 `spawnSync
+psql ENOENT` 로 실패한다 — `npm run` 이 Windows `cmd.exe` 로 스크립트를 실행하는데
+그 안에서 Node 의 `spawnSync('psql', …)` 가 `psql` 대역 bash wrapper(확장자 없는
+shebang 스크립트)를 찾지 못하기 때문이다. 이번 후조건 내용과는 무관한 기존 환경
+제약이며, 위 1번의 raw SQL 실행과 유닛 테스트로 실질적인 검증은 마쳤다.
+
+## 2026-09-20 추가 — main 과 병합하며 0014 → 0018 로 재번호
+
+`task/favorite-firms` 브랜치가 갈라진 뒤 main 에 대화 메모리 기능(0014~0017,
+`0014_conversation_memory` 등 4개)이 먼저 병합되면서 이 브랜치의 `0014_real_hitman`
+과 번호가 겹쳤다. 병합 시 `0014_real_hitman` 을 `0018_real_hitman` 으로 재번호하고
+(`.sql`·`meta/00XX_snapshot.json`·`_journal.json`·`POSTCONDITION_KEYS`·
+`POSTCONDITIONS_SQL` 모두), main 의 0014~0017 후조건 블록 뒤로 재배치했다.
+`npm run test:migration-drift` 12개 전부 통과로 확인했다.
+
+참고: main 의 0014~0017 은 `meta/00XX_snapshot.json` 을 남기지 않았다(수작업 SQL
+작성 방식). 이 문서의 "현재 커버리지" 표는 그 네 migration 을 아직 싣지 않았는데,
+이번 병합의 범위 밖이라 손대지 않았다 — 실제 후조건 등록은
+`db/scripts/migration-drift-core.mjs`/`check-migration-drift.mjs` 에 이미 있다.
+
+2026-09-21 후속 06에서 위 과거 누락 표를 보완했고 누적 0018 snapshot도 복구했다.
+새 격리 PostgreSQL 16.15에 0000~0019 전체 적용 후 동일 SQL 상수로 **111/111** 및
+ledger20행 aligned를 확인했다. 기존 Windows psql CLI 부재는 컨테이너의 PG16 psql로
+실행한 acceptance 경로에서 해소했다. 운영/GCP/복원 DB 확인으로 해석하지 않는다.

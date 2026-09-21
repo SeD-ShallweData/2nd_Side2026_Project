@@ -203,8 +203,9 @@ describe("로그인 대화 원문 저장", () => {
     ]);
     expect(hydrated.conversation_memory?.summarized_through_sequence).toBe(10);
 
-    expect(await repository.claimSummary(conversationId, 20)).toBe(true);
-    await repository.failSummary(conversationId, 20, "SUMMARY_BUILD_FAILED");
+    const token = await repository.claimSummary(conversationId, 20);
+    expect(token).toBeTruthy();
+    await repository.failSummary(conversationId, 20, "SUMMARY_BUILD_FAILED", token!);
     const failedButUsable = await hydrateConversationRequest({
       message: "요약 실패 중 현재 질문",
       request_id: "summary_request_failure",
