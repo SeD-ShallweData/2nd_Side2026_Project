@@ -6,6 +6,7 @@ import type {
 import type { ChatRequest } from "@/domain/chat";
 import type { RagRetrievalResult } from "@/domain/rag";
 import type { IntentDecision } from "@/services/chatIntentService";
+import { hasUnpaidWageQuestion, reviewedLaborTopics } from "@/services/reviewedLaborGuidance";
 
 const DIRECT_LABOR_TERMS = [
   "체불", "근로계약", "근로시간", "퇴근", "수당", "연차", "해고", "휴가", "야근", "노동",
@@ -86,7 +87,7 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
     };
   }
 
-  if (decision.intent === "labor") {
+  if (decision.intent === "labor" || hasUnpaidWageQuestion(request.message) || (!outOfScopeTopic && reviewedLaborTopics(request.message).length > 0)) {
     return {
       request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },
       parts: [part("labor", "사용자가 묻는 임금 또는 근로조건 문제", request)],

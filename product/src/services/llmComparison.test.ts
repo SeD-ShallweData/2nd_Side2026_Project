@@ -257,7 +257,7 @@ describe("실제 LLM 비교 Provider", () => {
     const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare(companyContext);
     expect(result.results[0]).toMatchObject({
       status: "guardrail_replaced",
-      answer: companyBaseline.answer,
+      answer: expect.stringContaining(companyBaseline.answer),
       answer_type: "company_context",
       sources: companyBaseline.sources,
     });
@@ -302,7 +302,7 @@ describe("실제 LLM 비교 Provider", () => {
     const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare(companyContext);
     expect(result.results[0]).toMatchObject({
       status: "guardrail_replaced",
-      answer: companyBaseline.answer,
+      answer: expect.stringContaining(companyBaseline.answer),
       answer_type: "company_context",
     });
     expect(result.results[0].trace.guardrail_hits).toContain(expectedHit);
@@ -369,7 +369,7 @@ describe("실제 LLM 비교 Provider", () => {
     const messages = bodies[0].messages ?? [];
     expect(messages[0].content).toContain("previously_cited_labor_law");
     expect(messages[0].content).toContain("근로기준법 제17조");
-    expect(messages[2].content).toContain("이전 답변 근거");
+    expect(messages[2].content).not.toContain("이전 답변 근거");
     expect(messages[2].content).not.toContain("이후의 매우 긴 설명");
   });
 

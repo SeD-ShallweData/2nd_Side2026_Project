@@ -15,6 +15,7 @@ import {
   primaryAnswerScope,
 } from "@/services/answerPlanService";
 import { clarificationFallback } from "@/services/chatFallback";
+import { reviewedLaborTopics } from "@/services/reviewedLaborGuidance";
 import {
   getLlmProviderConfigs,
   getLlmTimeoutMs,
@@ -69,7 +70,7 @@ function outOfScopeResponse(policyBaseline: ChatResponse, topic: string): ChatRe
 function generalCompanyIndicatorResponse(policyBaseline: ChatResponse): ChatResponse {
   return {
     ...clarificationFallback(policyBaseline),
-    answer: "긍정 지표가 0개라는 것은 현재 공개 자료에서 긍정 신호가 확인되지 않았다는 뜻일 뿐, 회사가 나쁘거나 위험하다는 판단은 아닙니다. 반대로 안전 인증도 아니므로, 특정 회사의 표시를 해석하려면 그 사업장을 선택한 뒤 임금 지급일·급여명세서·근로계약 조건을 함께 확인해 보세요.",
+    answer: "긍정 지표는 납부·고용 등 공개 자료에서 확인된 참고 신호입니다. 긍정 신호가 있어도 과거 임금체불이 없었다고 확정하거나 안전 인증으로 해석할 수는 없습니다. 긍정 지표가 0개이거나 자료가 부족하다는 것도 회사가 나쁘거나 위험하다는 판단은 아닙니다. 공식 명단 미등재도 체불 부재의 증명이 아닙니다. 실제 미지급 사실이 있다면 지표와 별개로 지급일·입금내역을 확인하고, 특정 사업장의 표시를 보려면 회사를 선택해 급여명세서·근로계약 조건을 함께 확인해 보세요.",
     answer_type: "general_guidance",
     limitations: ["특정 사업장의 실제 상태나 향후 근로조건을 이 일반 설명만으로 판단할 수 없습니다."],
   };
@@ -259,7 +260,7 @@ export async function sendParsedComparedChatRequest(
         threshold: null,
         documents: [],
       }
-    : await retrieveLaborLawContext(rewrite.query);
+    : await retrieveLaborLawContext(reviewedLaborTopics(request.message).length ? request.message : rewrite.query);
 
   const evidenceState = evidenceStateForPlan(answerPlan, ragRetrieval);
   if (evidenceState === "ready") {

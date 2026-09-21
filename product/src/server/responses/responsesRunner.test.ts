@@ -10,6 +10,7 @@ import type {
 import type { TokenUsage } from "@/domain/chatComparison";
 import { OpenAIResponsesRunner } from "@/server/responses/responsesRunner";
 import type { ToolDispatcher } from "@/server/responses/toolDispatcher";
+import { MOCK_RISKS } from "@/mocks/risks";
 
 const USAGE: TokenUsage = {
   prompt_tokens: 10,
@@ -83,6 +84,20 @@ const initialRequest = {
 };
 
 describe("OpenAI Responses function-call runner", () => {
+  it("sends allowlisted company fields and sanitized free text to the model, keeping the source DTO intact", async () => {
+    const risk = structuredClone(MOCK_RISKS.COMPANY_DEMO_008);
+    risk.safety_context.summary = "상위5%";
+    risk.safety_context.disclaimer = "BIZ_NO미존재사업장";
+    const { subject, create } = runner([
+      response([{ type: "function_call", call_id: "company_1", name: "get_company_risk", arguments: '{"company_id":"COMPANY_DEMO_008"}' }]),
+      finalResponse(),
+    ], { ok: true, data: risk });
+    await subject.run(initialRequest);
+    const transmitted = JSON.stringify(create.mock.calls[1][0].input);
+    expect(transmitted).toContain("wage_signal");
+    expect(transmitted).not.toMatch(/상위5%|BIZ_NO미존재사업장|evidence_codes|generated_at/);
+    expect(risk.safety_context.summary).toBe("상위5%");
+  });
   it("도구 호출이 없으면 첫 응답을 최종 답변으로 반환한다", async () => {
     const { subject, create, dispatch } = runner([finalResponse()]);
 
