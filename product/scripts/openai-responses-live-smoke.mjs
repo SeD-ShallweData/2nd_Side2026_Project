@@ -132,6 +132,7 @@ async function run() {
       company_id: companyId,
       chat_mode: "safety",
       recent_messages: [],
+      external_processing_consent: true,
     }),
   });
 

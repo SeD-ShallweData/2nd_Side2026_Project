@@ -515,6 +515,8 @@ export const conversationSummaries = pgTable(
     summary: jsonb().notNull().default(sql`'{}'::jsonb`),
     summarizedThroughSequence: integer("summarized_through_sequence").notNull().default(0),
     pendingThroughSequence: integer("pending_through_sequence"),
+    leaseToken: uuid("lease_token"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
     summaryVersion: text("summary_version").notNull().default("extractive-v1"),
     status: text().notNull().default("pending"),
     retryCount: integer("retry_count").notNull().default(0),
@@ -545,14 +547,18 @@ export const conversationRequests = pgTable(
     status: text().notNull().default("pending"),
     responsePayload: jsonb("response_payload"),
     failureCode: text("failure_code"),
+    leaseToken: uuid("lease_token"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },
   (t) => [
     uniqueIndex("conversation_requests_owner_request_uq").on(t.ownerUserId, t.requestId),
     index("conversation_requests_conversation_status_idx").on(t.conversationId, t.status),
+    index("conversation_requests_pending_lease_idx").on(t.status, t.leaseExpiresAt),
     check("conversation_requests_status_ck", sql`${t.status} in ('pending','completed','failed','cancelled')`),
     check("conversation_requests_payload_ck", sql`${t.responsePayload} is null or jsonb_typeof(${t.responsePayload}) = 'object'`),
+    check("conversation_requests_lease_ck", sql`(${t.status} = 'pending' and ${t.leaseToken} is not null and ${t.leaseExpiresAt} is not null) or (${t.status} <> 'pending' and ${t.leaseToken} is null and ${t.leaseExpiresAt} is null)`),
   ],
 );
 

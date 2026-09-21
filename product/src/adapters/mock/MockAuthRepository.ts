@@ -162,6 +162,20 @@ export class MockAuthRepository implements AuthRepository {
   async revokeSession(token: string): Promise<void> {
     if (token && isValidTokenShape(token)) sessions.delete(hashToken(token));
   }
+
+  async deleteAccount(token: string): Promise<boolean> {
+    if (!token || !isValidTokenShape(token)) return false;
+    const tokenHash = hashToken(token);
+    const session = sessions.get(tokenHash);
+    if (!session || session.user.role !== "user") return false;
+    const registered = registeredUsers.get(normalizeEmail(session.user.email));
+    if (!registered || registered.user.user_id !== session.user.user_id) return false;
+    registeredUsers.delete(normalizeEmail(session.user.email));
+    for (const [key, value] of sessions) {
+      if (value.user.user_id === session.user.user_id) sessions.delete(key);
+    }
+    return true;
+  }
 }
 
 export function resetMockSessions(): void {

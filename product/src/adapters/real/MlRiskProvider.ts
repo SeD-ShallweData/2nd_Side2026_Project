@@ -9,6 +9,7 @@ import type {
 } from "@/domain/risk";
 import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
 import { queryReadOnly } from "@/server/postgres";
+import { toPublicIndustry } from "@/services/publicCompanyFields";
 
 interface WageRow {
   firm_id: string;
@@ -187,7 +188,7 @@ function unknownSafety(row: WageRow): SafetyContextPublic {
     level: "unknown",
     summary: "공표된 산업안전 참고자료에서 이 사업장과 연결된 결과를 확인하지 못했습니다.",
     region: row.sido,
-    industry: row.industry,
+    industry: toPublicIndustry(row.industry),
     evidence_codes: [],
     evidence_items: [],
     confidence: "unavailable",
@@ -214,7 +215,7 @@ function safetyResult(company: WageRow, row: SafetyRow): SafetyContextPublic {
     level,
     summary: `공표된 산업안전 자료에서 우선 확인 범위가 ‘${row.provisional_population_priority_band}’으로 표시됐습니다. ${periodNote}`,
     region: company.sido,
-    industry: company.industry,
+    industry: toPublicIndustry(company.industry),
     target_start: row.target_week_start,
     target_end: row.target_week_end,
     evidence_codes: ["PUBLISHED_SAFETY_PRIORITY_BAND"],

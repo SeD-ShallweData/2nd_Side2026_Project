@@ -3,7 +3,7 @@ import { sendConfiguredChatMessage } from "@/services/chatExecutionService";
 import { parseChatHttpRequest } from "@/server/chatHttpRequest";
 import { getChatExecutionMode } from "@/server/responses/responsesConfig";
 import { getOptionalSessionUser } from "@/services/authService";
-import { parseChatRequest } from "@/services/chatService";
+import { assertExternalProcessingConsent, parseChatRequest } from "@/services/chatService";
 import {
   cachedGeneratedResponse,
   claimConversationRequest,
@@ -16,6 +16,7 @@ import {
 import { assertSameOriginRequest } from "@/server/auth/http";
 import { getSessionTokenFromRequest } from "@/server/auth/sessionCookie";
 import { errorPayload, ServiceError } from "@/utils/errors";
+import { assertPublicRateLimit } from "@/server/publicRateLimit";
 
 export async function POST(request: Request): Promise<NextResponse> {
   let claimedRequest = false;
@@ -33,14 +34,20 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
     const user = await getOptionalSessionUser(getSessionTokenFromRequest(request));
+    if (!user) assertPublicRateLimit(request, "anonymous_chat");
     let chatRequest = parseChatRequest(parsed.body);
+    assertExternalProcessingConsent(chatRequest);
     let persistence: "unavailable" | "guest" | undefined = user ? undefined : "guest";
     if (user) {
       try {
         const claim = await claimConversationRequest(chatRequest, user);
         claimedRequest = true;
         claimedUser = user;
-        chatRequest = { ...chatRequest, conversation_id: claim.conversation_id };
+        chatRequest = {
+          ...chatRequest,
+          conversation_id: claim.conversation_id,
+          conversation_request_lease_token: claim.lease_token ?? undefined,
+        };
         claimedChatRequest = chatRequest;
         if (claim.status === "completed" && claim.response) {
           return NextResponse.json({
@@ -63,7 +70,9 @@ export async function POST(request: Request): Promise<NextResponse> {
           }
           throw new ServiceError(
             claim.status === "pending" ? "CHAT_REQUEST_IN_PROGRESS" : "CHAT_REQUEST_NOT_RETRYABLE",
-            "This chat request is already being processed or has finished unsuccessfully.",
+            claim.status === "pending"
+              ? "같은 질문을 처리 중입니다. 잠시 기다린 뒤 같은 재전송 버튼을 사용하세요. 2분이 지나면 저장 상태를 확인하고 같은 요청을 다시 처리할 수 있습니다."
+              : "이 질문은 실패 또는 취소 상태여서 같은 요청으로 다시 처리할 수 없습니다.",
             409,
             claim.status === "pending",
           );
@@ -71,7 +80,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         chatRequest = await hydrateConversationRequest(chatRequest, user);
         claimedChatRequest = chatRequest;
       } catch (error) {
-        if (error instanceof ServiceError && error.status === 503) persistence = "unavailable";
+        if (error instanceof ServiceError && error.status === 503) {
+          persistence = "unavailable";
+          // Authenticated history must not silently fall back to a client-injected
+          // transcript from another room when owner-scoped hydration is unavailable.
+          chatRequest = { ...chatRequest, recent_messages: [], conversation_memory: undefined, conversation_recall: undefined };
+        }
         else throw error;
       }
     }

@@ -282,4 +282,21 @@ export class RealAuthRepository implements AuthRepository {
       [hashToken(token)],
     );
   }
+
+  async deleteAccount(token: string): Promise<boolean> {
+    if (!token || !isValidTokenShape(token)) return false;
+    const rows = await queryWrite<{ id: string }>(
+      "auth",
+      `DELETE FROM users
+        WHERE id = (
+          SELECT s.user_id FROM sessions s
+          WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
+          LIMIT 1
+        )
+          AND auth_role = 'user'
+        RETURNING id::text`,
+      [hashToken(token)],
+    );
+    return rows.length === 1;
+  }
 }

@@ -203,6 +203,7 @@ NON_LABOR_TOPICS = frozenset(("부동산", "세금", "투자", "프로그래밍"
 _lock = threading.Lock()
 _model = None
 _collection = None
+_client = None
 _guides = None
 _last_error = None
 _readiness = {
@@ -363,10 +364,11 @@ def _create_model():
 
 
 def _open_collection():
+    global _client
     import chromadb
 
-    client = chromadb.PersistentClient(path=str(DB_PATH))
-    return client.get_collection(COLLECTION_NAME)
+    _client = chromadb.PersistentClient(path=str(DB_PATH))
+    return _client.get_collection(COLLECTION_NAME)
 
 
 def _load():
@@ -452,7 +454,15 @@ def _guide_candidates(query):
         required_any = guide.get("required_any") or []
         if required_any and not any(keyword in query for keyword in required_any):
             continue
-        if not any(trigger in query for trigger in triggers):
+        intent = guide.get("intent")
+        intent_match = (
+            (intent == "wage_arrears" and _is_wage_arrears_query(query))
+            or (intent == "wage_evidence" and _is_wage_evidence_query(query))
+        )
+        if intent:
+            if not intent_match:
+                continue
+        elif not any(trigger in query for trigger in triggers):
             continue
         metadata = {
             "kind": "official_guide",
@@ -461,10 +471,15 @@ def _guide_candidates(query):
             "citation": guide.get("citation"),
             "organization": guide.get("organization"),
             "url": guide.get("url"),
+            "priority": int(guide.get("priority") or 100),
             "suppress_vector_when_matched": bool(guide.get("suppress_vector_when_matched")),
+            "reviewed_as_of": guide.get("reviewed_as_of"),
         }
         candidates.append((guide.get("content") or "", metadata, None))
-    return sorted(candidates, key=lambda item: not item[1]["suppress_vector_when_matched"])
+    return sorted(candidates, key=lambda item: (
+        not item[1]["suppress_vector_when_matched"],
+        item[1]["priority"],
+    ))
 
 
 def _within_distance_threshold(candidates):
@@ -482,12 +497,47 @@ def _expand_query(query):
             continue
         if any(keyword in query for keyword in rule["triggers"]):
             expansions.append(rule["expansion"])
+    if _is_wage_arrears_query(query):
+        expansions.append("임금 매월 1회 이상 일정한 날짜 전액 지급 근로기준법 제43조 임금체불 진정")
     if any(keyword in query for keyword in ("임금", "월급", "급여", "수당", "체불")):
         if any(keyword in query for keyword in ("자료", "증거", "증빙", "준비", "신고", "진정")):
             expansions.append("임금체불 진정 입증자료 근로계약서 급여자료 근로시간 자료")
     if _looks_like_unpaid_late_work(query):
         expansions.append("연장 야간 근로 가산임금 지급 근로기준법 제56조")
     return f"{query} {' '.join(expansions)}" if expansions else query
+
+
+def _is_wage_arrears_query(query):
+    # These have their own statutes/eligibility questions in the sealed corpus.
+    # A generic wage-complaint guide must not replace those more specific paths.
+    specific_topics = (
+        "대지급금", "임금채권보장", "확인서", "포상금", "생계비", "부담금", "기금",
+        "퇴직", "퇴사", "사망", "금품청산", "금품 청산", "제36조", "퇴직연금", "실업급여", "구직급여", "최저임금", "임금명세", "포괄임금",
+        "나라에서 대신", "파산", "망했", "지연이자", "소멸시효", "언제까지 청구",
+        "도급", "원청", "하청", "직상 수급인",
+    )
+    if any(topic in query for topic in specific_topics):
+        return False
+    wage_terms = ("임금", "월급", "급여", "수당", "체불")
+    arrears_signals = (
+        "밀렸", "밀린", "체불", "미지급", "미입금", "못 받", "못받", "받지 못", "받지못", "안 주", "안 줬", "안 들어", "지급하지 않",
+        "입금되지 않", "입금이 없", "들어오지 않", "지급일이 지났", "월급날이 지났",
+        "지급일을 넘",
+    )
+    return any(term in query for term in wage_terms) and any(signal in query for signal in arrears_signals)
+
+
+def _is_wage_evidence_query(query):
+    evidence_terms = (
+        "근로계약서", "급여명세", "통장", "계좌", "거래내역", "입금내역",
+        "근로시간", "출퇴근", "문자", "카톡", "자료", "증거", "증빙", "기록",
+    )
+    action_terms = ("무엇부터", "뭐부터", "우선", "첫 단계", "준비", "신고", "진정")
+    return (
+        _is_wage_arrears_query(query)
+        and any(term in query for term in evidence_terms)
+        and any(term in query for term in action_terms)
+    )
 
 
 def _looks_like_unpaid_late_work(query):
@@ -499,6 +549,8 @@ def _looks_like_unpaid_late_work(query):
 
 
 def _has_labor_request_signal(query):
+    if _is_wage_arrears_query(query):
+        return True
     if any(keyword in query for keyword in (
         "임금체불", "임금이 밀", "월급이 밀", "월급을 안", "급여를 안", "수당을 안",
         "근로계약", "연차", "휴게시간", "해고", "퇴직금", "야근수당", "연장근로",
@@ -606,7 +658,7 @@ def retrieve(query, limit=5):
     eligible_candidates = (
         guide_candidates
         if any(item[1].get("suppress_vector_when_matched") for item in guide_candidates)
-        else eligible_vectors + guide_candidates
+        else guide_candidates + eligible_vectors
     )
 
     items = []
@@ -623,6 +675,7 @@ def retrieve(query, limit=5):
                 "organization": metadata.get("organization") or "국가법령정보센터",
                 "document_id": metadata.get("document_id") or citation,
                 "url": metadata.get("url"),
+                "as_of": metadata.get("reviewed_as_of"),
             },
         })
 
@@ -630,7 +683,7 @@ def retrieve(query, limit=5):
         "query": query,
         "retrieval_query": retrieval_query,
         "status": "matched" if items else "no_match",
-        "reason": None if items else "no_eligible_documents",
+        "reason": "official_guide" if items and guide_candidates else (None if items else "no_eligible_documents"),
         "threshold": NO_MATCH_DISTANCE_THRESHOLD,
         "top1_distance": top_distance,
         "items": items,
@@ -644,9 +697,12 @@ def warmup():
 
 
 def _reset_for_tests():
-    global _model, _collection, _last_error, _readiness
+    global _model, _collection, _client, _last_error, _readiness
+    if _client is not None:
+        _client.close()
     _model = None
     _collection = None
+    _client = None
     _last_error = None
     _readiness = {
         "asset_integrity": False,

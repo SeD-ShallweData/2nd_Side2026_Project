@@ -162,6 +162,26 @@ drizzle 자체는 `created_at` 으로 적용 여부를 판단하므로 재적용
 
 ## 새 migration 체크리스트
 
+### 2026-09-21 대화 snapshot 누락 복구
+
+0014~0017은 수작업 SQL이지만 적용 후 SQL은 불변이다. PR #115의 0018 snapshot은 0013을 부모로 삼고 대화 7개 테이블이 빠져 있었다. 따라서 **최신 누적 snapshot 메타데이터**에 이미 존재하는 7개 정의를 보강했다. 0014~0017 SQL/journal 시각/hash를 바꾸거나 빈 중복 migration으로 원장을 맞추지 않았다. 과거 번호별 가짜 snapshot도 생성하지 않았다.
+
+0018 SQL은 병합본 `66ba9bd`와 바이트가 동일하다. 그 0018 baseline으로 실제 Drizzle generate가 만든 0019는 lease 컬럼 두 개뿐이다. 0019 snapshot을 기준으로 재생성하면 SQL 0개여야 한다(`scripts/repair-conversation-snapshot.ts`, DB 연결 없음). 해당 스크립트의 `--repair`는 **baseline이 없을 때만** 가능한 기록용 복구이며 기존 snapshot을 덮지 않는다.
+
+새 journal timestamp는 앞선 항목보다 커야 한다. PR #115의 0018 timestamp가 로컬 생성 시계보다 앞서 있으므로 신규 0019만 `0018.when + 1`로 설정했다. 기존 0018 시각은 변경하지 않는다. 실제 빈 PG16 적용 및 두 번째 migrate no-op을 함께 검증한다.
+
+### 0020 request processing lease
+
+0020은 `conversation_requests`에 nullable UUID `lease_token`, timestamptz
+`lease_expires_at`, status/expiry index와 상태-lease 짝 제약을 추가한다. 기존 pending 행은
+migration 시점부터 120초 lease를 받아 무기한 orphan 상태가 되지 않는다. 배포 순서는
+drift 확인 → backup 확인 → migration 0018~0020 → role 재적용 → app → conversation worker다.
+이전 app은 0020의 nullable 컬럼을 무시할 수 있으므로 app/worker rollback 때 컬럼을 DROP하지 않는다.
+
+worker와 운영 적용 순서: [CONVERSATION_MAINTENANCE.md](CONVERSATION_MAINTENANCE.md).
+
+### 공통 체크리스트
+
 - 적용된 과거 migration SQL은 수정하지 않고 새 번호를 추가한다.
 - `_journal.json`과 SQL 파일을 같은 커밋에 넣는다.
 - 비멱등 rename/drop/constraint 변경에는 catalog 후조건을 drift 검사에 추가한다.

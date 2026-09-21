@@ -147,12 +147,18 @@ export interface GuardrailRule {
 
 /** 사용자 상담 답변에 적용하는 규칙. */
 export const CHAT_OUTPUT_GUARDRAILS: GuardrailRule[] = [
+  { code: "PUBLIC_RANK_OR_MISSING_LABEL", pattern: /(?:상위|하위)\s*\d+(?:\.\d+)?\s*(?:%|퍼센트)|BIZ[_\s]?NO\s*미존재\s*사업장/i },
+  { code: "PREVIOUS_ANSWER_LABEL", pattern: /\[이전 답변 근거:/ },
+  // A later caveat must not excuse an affirmative past-absence claim in the same sentence.
+  { code: "PAST_WAGE_RECORD_INFERENCE", pattern: /체불\s*(?:기록|이력)?(?:이|은|도)?\s*없(?:었다|다)는\s*(?:사실|뜻|의미)(?:입니다|이다|일\s*뿐|을\s*뜻)/i },
+  { code: "PAST_WAGE_CERTAINTY", pattern: /(?:임금\s*)?체불(?:이나\s*급격한\s*변동)?(?:이|은|도|\s)?\s*(?:전혀\s*)?(?:없었다는\s*(?:사실|뜻|의미)|없(?:었)?(?:습니다|어요)|없던\s*회사)|임금(?:이|은)?\s*항상\s*(?:정상|제때)/i, allowNegated: true },
   // 회사명을 생략한 채 등급·신호 부재나 입사 허용을 근거로 안전을 단정하는 경우도 포함한다.
   { code: "SAFE_COMPANY_CERTAINTY", pattern: /안전한\s*(회사|사업장|기업|직장)(?:입니다|이다)|(?:이\s*)?(?:회사|사업장|기업|직장)(?:는|은|가|이)?\s*안전(?:합니다|하다|해요)|(?:정상\s*(?:등급|판정)(?:이므로|이라서|이기\s*때문에)|(?:확인된\s*)?위험\s*신호가\s*(?:없어서?|없으므로)|입사(?:하셔도|해도))\s*안전(?:합니다|하다|해요)|문제가\s*없는\s*(회사|사업장)(?:입니다|이다)/i, allowNegated: true },
   { code: "DANGEROUS_COMPANY_CERTAINTY", pattern: /위험한\s*(회사|사업장|기업|직장)(?:입니다|이다)|위험이\s*(있는|높은|큰)\s*(회사|사업장|기업)/i, allowNegated: true },
   { code: "LEGAL_CERTAINTY", pattern: /(?:위법|불법)(?:입니다|이다)|처벌(?:됩니다|받습니다)|반드시\s*승소/i, allowNegated: true },
   { code: "WAGE_FUTURE_CERTAINTY", pattern: /임금체불(?:이|은)?\s*발생할\s*것입니다|임금체불\s*가능성이\s*확실합니다|체불할\s*것입니다/i, allowNegated: true },
   { code: "SAFETY_FUTURE_CERTAINTY", pattern: /산재(?:가|는)?\s*발생할\s*것입니다|사고(?:가|는)?\s*(?:발생합니다|날\s*것입니다)/i, allowNegated: true },
+  { code: "SAFETY_SIGNAL_CERTIFICATION", pattern: /(?:산업안전|산업재해)[^.\n]{0,25}이상(?:이|은|\s)*없(?:습니다|다는\s*뜻|다고\s*확인)|안전\s*인증(?:을\s*받았|이\s*확인|입니다)/i, allowNegated: true },
   { code: "ADMISSION_DECISION", pattern: /입사하지\s*마세요|입사해도\s*됩니다/i, allowNegated: true },
   { code: "PUBLIC_RISK_VALUE", pattern: /(?:체불|산재|사고|위험)\s*(?:확률|점수|지수|등급|순위|랭킹)\s*(?:은|는|이|가|:|：)?\s*[A-Fa-f가-힣\d.]+|\d+(?:\.\d+)?\s*%[^.\n]{0,20}(?:위험|확률|체불)/i, allowNegated: true },
   { code: "PROMPT_DISCLOSURE", pattern: /시스템\s*프롬프트[는은]?\s*(?:다음|아래|이렇게)|숨은\s*프롬프트[는은]?\s*(?:다음|아래)|#\s*(?:역할|가드레일|형식)(?![가-힣])|\bAuthority\b.{0,40}\bScope\b|system prompt (?:is|as follows)/i },

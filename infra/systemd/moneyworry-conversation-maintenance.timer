@@ -1,0 +1,11 @@
+[Unit]
+Description=Money Worry conversation maintenance every 30 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+Persistent=true
+Unit=moneyworry-conversation-maintenance.service
+
+[Install]
+WantedBy=timers.target

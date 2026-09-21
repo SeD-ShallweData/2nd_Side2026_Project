@@ -9,6 +9,7 @@ import type { ChatResponse } from "@/domain/chat";
 import type { ComparisonContext } from "@/domain/chatComparison";
 import type { LlmProviderConfig } from "@/server/llmConfig";
 import { MOCK_RISKS } from "@/mocks/risks";
+import { finalizeConversationResponse } from "@/services/conversationRecallService";
 
 const CONFIGS: LlmProviderConfig[] = [
   { id: "upstage", label: "Upstage Solar", apiKey: "test-upstage-secret", apiUrl: "https://upstage.test/chat", model: "solar-test" },
@@ -63,6 +64,21 @@ function payload(answer: string, model: string) {
 }
 
 describe("실제 LLM 비교 Provider", () => {
+  it.each([true, false])("separates valid recall from actual unverified-citation replacement (bad citation=%s)", async (badCitation) => {
+    const answer = `급여일은 15일이고 회사는 다음 주에 지급하겠다고 말씀하셨습니다.${badCitation ? " 근로기준법 제999조에 따른 안내입니다." : ""}`;
+    const fakeFetch = vi.fn(async () => new Response(JSON.stringify(payload(answer, "test")), { status: 200 }));
+    const request = { ...CONTEXT.request, message: "정정한 급여일과 회사 지급 약속을 정리하고 법적으로 어떻게 해야 하는지 알려주세요.", recent_messages: [
+      { role: "user" as const, content: "급여일은 15일입니다. 회사는 다음 주에 지급하겠다고 했다." },
+    ] };
+    const generated = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({ ...CONTEXT, questionIntent: "labor", request });
+    expect(generated.results[0].trace.guardrail_hits.includes("UNVERIFIED_LAW_CITATION")).toBe(badCitation);
+    expect(generated.results[0].status).toBe(badCitation ? "guardrail_replaced" : "success");
+    const result = finalizeConversationResponse(request, generated).results[0];
+    expect(result.answer).toMatch(/15일.*다음 주/);
+    expect(result.answer).not.toContain("제999조");
+    expect(result.trace.rag_status).toBe("matched");
+  });
+
   it.each(["guardrail", "api_error"])("%s 대체 답변은 기존 회사 요약·출처·행동을 재사용하지 않는다", async (failure) => {
     const fakeFetch = vi.fn(async () => failure === "api_error"
       ? new Response("error", { status: 503 })
@@ -257,7 +273,7 @@ describe("실제 LLM 비교 Provider", () => {
     const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare(companyContext);
     expect(result.results[0]).toMatchObject({
       status: "guardrail_replaced",
-      answer: companyBaseline.answer,
+      answer: expect.stringContaining(companyBaseline.answer),
       answer_type: "company_context",
       sources: companyBaseline.sources,
     });
@@ -302,7 +318,7 @@ describe("실제 LLM 비교 Provider", () => {
     const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare(companyContext);
     expect(result.results[0]).toMatchObject({
       status: "guardrail_replaced",
-      answer: companyBaseline.answer,
+      answer: expect.stringContaining(companyBaseline.answer),
       answer_type: "company_context",
     });
     expect(result.results[0].trace.guardrail_hits).toContain(expectedHit);
@@ -369,7 +385,7 @@ describe("실제 LLM 비교 Provider", () => {
     const messages = bodies[0].messages ?? [];
     expect(messages[0].content).toContain("previously_cited_labor_law");
     expect(messages[0].content).toContain("근로기준법 제17조");
-    expect(messages[2].content).toContain("이전 답변 근거");
+    expect(messages[2].content).not.toContain("이전 답변 근거");
     expect(messages[2].content).not.toContain("이후의 매우 긴 설명");
   });
 

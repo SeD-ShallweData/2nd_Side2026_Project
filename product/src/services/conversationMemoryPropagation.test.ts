@@ -60,6 +60,19 @@ beforeEach(() => {
 });
 
 describe("conversation summary propagation to the dual provider", () => {
+  it("recalls corrected facts before rewrite, intent, retrieval or generation", async () => {
+    const result = await sendParsedComparedChatRequest({
+      message: "정정한 급여일과 회사 지급 약속을 다시 말해 달라.", chat_mode: "wage",
+      recent_messages: [
+        { role: "user", content: "급여일은 10일입니다." },
+        { role: "user", content: "회사는 다음 주에 지급하겠다고 했다." },
+        { role: "user", content: "정정한다. 급여일은 10일이 아니라 15일입니다." },
+      ],
+    });
+    expect(result.results[0].answer).toMatch(/15일.*다음 주/);
+    for (const mock of [mocks.rewrite, mocks.classify, mocks.retrieve, mocks.compare]) expect(mock).not.toHaveBeenCalled();
+  });
+
   it("uses the same summary boundary at the provider input", async () => {
     expect(BOUNDARIES.map(([count]) => summaryTargetForMessageCount(count))).toEqual(
       BOUNDARIES.map(([, target]) => target),

@@ -8,6 +8,7 @@ import type {
 import type { AnswerPlan } from "@/domain/answerPlan";
 import type { CompanyRiskResult, SourceReference } from "@/domain/risk";
 import type { RagRetrievalResult } from "@/domain/rag";
+import type { ConversationMemoryDiagnostics } from "@/domain/conversationRecall";
 
 export type LlmProviderId = "upstage" | "skt";
 export type ChatResultProviderId = LlmProviderId | "openai";
@@ -33,6 +34,8 @@ export interface ProviderMetrics {
 }
 
 export interface SafeExecutionTrace {
+  memory?: ConversationMemoryDiagnostics;
+  recall_mode?: "user_statement" | "missing_user_statement" | "conversation_context";
   question_intent?: "labor" | "company" | "off_topic" | "unclear";
   intent_status?: "classified" | "unavailable";
   prompt_policy_version: string;
@@ -47,6 +50,8 @@ export interface SafeExecutionTrace {
   rag_reason: string | null;
   rag_topic: string | null;
   retrieved_document_count: number;
+  reviewed_evidence_count?: number;
+  reviewed_evidence_as_of?: string;
   tool_round_count?: number;
   tool_call_count?: number;
   tool_names?: string[];

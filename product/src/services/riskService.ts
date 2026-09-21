@@ -31,6 +31,15 @@ export function assertRiskIdentity(company: Company, result: CompanyRiskResult):
   }
 }
 
+/** Public identifiers stay stable while internal batch/model names remain private. */
+export function publicRiskSources(result: CompanyRiskResult): CompanyRiskResult["sources"] {
+  return result.sources.map((source) => ({
+    ...source,
+    ...(source.category === "wage" ? { document_id: "moneyworry-wage-card-v1" } : {}),
+    ...(source.category === "safety" ? { document_id: "moneyworry-safety-card-v1" } : {}),
+  }));
+}
+
 export async function getCompanyRisk(companyId: string): Promise<CompanyRiskResult> {
   const company = await getCompanyById(companyId);
   if (getCompanyDataMode() === "mock") await delay(getMockDelayMs());
@@ -41,6 +50,7 @@ export async function getCompanyRisk(companyId: string): Promise<CompanyRiskResu
   assertRiskIdentity(company, result);
   return {
     ...result,
+    sources: publicRiskSources(result),
     freshness: getFreshnessFromValidUntil(result.valid_until),
   };
 }

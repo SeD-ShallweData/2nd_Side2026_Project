@@ -101,8 +101,9 @@ def main() -> int:
         raise SystemExit("migration bundle output already exists")
     journal = json.loads((migrations / "meta" / "_journal.json").read_text("utf-8"))
     observed = [(entry.get("tag"), entry.get("when")) for entry in journal.get("entries", [])]
-    if observed != [(tag, when) for tag, when, _ in EXPECTED]:
-        raise SystemExit("migration journal changed before private staging")
+    expected_prefix = [(tag, when) for tag, when, _ in EXPECTED]
+    if observed[: len(expected_prefix)] != expected_prefix:
+        raise SystemExit("migration journal prefix changed before private staging")
 
     parts = [HEADER]
     for tag, created_at, digest in EXPECTED:

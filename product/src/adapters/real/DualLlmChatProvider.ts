@@ -1,5 +1,4 @@
 import type { ChatResponse } from "@/domain/chat";
-import type { CompanyRiskResult } from "@/domain/risk";
 import type {
   ChatComparisonProvider,
   ChatComparisonResponse,
@@ -22,8 +21,11 @@ import {
 } from "@/server/guardrails";
 import { loadPrompt, withRuntimeContext } from "@/server/promptLoader";
 import { clarificationFallback } from "@/services/chatFallback";
+import { companySignalForAnswer, companySafetyGuardrailHits, publicAnswerContext, publicAnswerText } from "@/services/publicAnswerContext";
+import { LABOR_REVIEW_DATE, applicabilityGuardrailHits, reviewedLaborFallback } from "@/services/reviewedLaborGuidance";
+import { wageArrearsFallback, wageArrearsGuardrailHits } from "@/services/wageArrearsGuidance";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-17-v8";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-21-v10";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -49,14 +51,13 @@ function digestAssistantMessage(content: string): string {
   const sentences = flat.match(SENTENCE_PATTERN) ?? [flat];
   const core = sentences.find((sentence) => citationKeys(sentence).size > 0) ?? sentences[0];
   const shortened = core.length > 240 ? `${core.slice(0, 240)}…` : core;
-  const citations = [...citationKeys(flat)].slice(0, 6);
-  return citations.length > 0
-    ? `${shortened} [이전 답변 근거: ${citations.join(", ")}]`
-    : shortened;
+  return publicAnswerText(shortened);
 }
 
 function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   const hits = scanRules(answer, CHAT_OUTPUT_GUARDRAILS);
+  for (const hit of applicabilityGuardrailHits(context.request.message, answer)) hits.add(hit);
+  for (const hit of wageArrearsGuardrailHits(context.request.message, answer)) hits.add(hit);
   const unverified = hasUnverifiedCitation(
     answer,
     context.ragRetrieval.status,
@@ -64,6 +65,11 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   );
   if (unverified) hits.add("UNVERIFIED_LAW_CITATION");
   if (context.questionIntent === "company" && context.companyContext) {
+    for (const hit of companySafetyGuardrailHits(answer, context.companyContext.risk)) hits.add(hit);
+    // Company-only evidence cannot support new benefits/filing procedures.
+    if (context.ragRetrieval.status !== "matched" && /대지급금|진정서|진정.{0,8}(?:신청|제출)/.test(answer)) {
+      hits.add("COMPANY_UNSOURCED_LEGAL_PROCEDURE");
+    }
     if (!answer.includes(context.companyContext.company_name)) {
       hits.add("COMPANY_CONTEXT_MISSING");
     }
@@ -78,6 +84,20 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
 }
 
 function replacementBaseline(context: ComparisonContext): ChatResponse {
+  const reviewed = reviewedLaborFallback(context.request.message, context.policyBaseline);
+  if (reviewed && context.ragRetrieval.reason === "reviewed_applicability_bundle") {
+    if (context.answerPlan?.parts.some((part) => part.scope === "out_of_scope")) {
+      reviewed.answer += "\n\n투자 추천이나 매수 시점 등 범위 밖 요청은 안내할 수 없습니다.";
+    }
+    return reviewed;
+  }
+  const wageArrears = wageArrearsFallback(
+    context.request.message,
+    context.policyBaseline,
+    context.ragRetrieval,
+    Boolean(context.answerPlan?.parts.some((part) => part.scope === "out_of_scope")),
+  );
+  if (wageArrears) return wageArrears;
   if (context.answerPlan?.parts.some((part) => part.scope === "labor")
     && context.answerPlan.parts.some((part) => part.scope === "out_of_scope")) {
     return {
@@ -95,7 +115,10 @@ function replacementBaseline(context: ComparisonContext): ChatResponse {
     && context.companyContext
     && context.policyBaseline.answer_type === "company_context"
   ) {
-    return context.policyBaseline;
+    return {
+      ...context.policyBaseline,
+      answer: `${context.policyBaseline.answer}\n\n산업안전 카드의 공개 표시는 ‘${companySignalForAnswer(context.companyContext.risk).safety_context.display_label}’입니다. ${context.companyContext.risk.safety_context.scope === "region_industry" ? "지역·업종 맥락이며 개별 사업장의 안전 판정이 아닙니다." : "검증된 사업장 연결 신호이며 사고 확률이나 안전 인증이 아닙니다."} 미확인은 산업안전 이상이 없다고 확인된 상태가 아닙니다.\n\n납부·고용 긍정 신호는 실제 임금 지급이나 과거 체불 부재를 증명하지 않습니다. 공식 명단 미등재도 체불 부재의 증명이 아니며, 자료 부족과 확인된 사실은 구분해야 합니다. 임금 지급일·급여명세서·입금내역·근로계약 조건을 직접 확인하세요.`,
+    };
   }
 
   // 생성 결과만 안전하지 않은 경우에는 이미 이번 질문에서 확인한 노동법 자료와
@@ -120,56 +143,6 @@ function replacementBaseline(context: ComparisonContext): ChatResponse {
   return clarificationFallback(context.policyBaseline);
 }
 
-/** 순위 표기를 지운다. "우선 확인 범위가 ‘상위1%’으로 표시됐습니다" 같은 문장이 대상이다. */
-function stripBandLabel(text: string): string {
-  return text
-    .replace(/[‘'"“]?상위\s*\d+(?:\.\d+)?\s*(?:%|퍼센트)[’'"”]?/g, "상위 구간")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
-
-/**
- * 모델에게 보여줄 사업장 판정 결과에서 내부 값을 걷어낸다.
- *
- * 프롬프트로 "등급·순위·근거 코드를 말하지 마세요"라고 적어도 모델은 컨텍스트에
- * 있는 값을 그대로 옮깁니다. 실제로 `PUBLISHED_SAFETY_PRIORITY_BAND` 와 `상위1%`,
- * 내부 배치·파이프라인 이름이 사용자 답변에 그대로 나왔습니다. 말하면 안 되는 값은
- * 애초에 주지 않는 편이 확실합니다.
- *
- * 사람이 읽을 요약문과 면책 문구는 남깁니다. 그게 모델이 실제로 써야 할 재료입니다.
- * 화면에 쓰이는 `/api/companies/{id}/risk` 응답은 건드리지 않습니다 — 여기서 만드는
- * 것은 프롬프트에 넣을 사본뿐입니다.
- */
-function publicSignalForPrompt(risk: CompanyRiskResult) {
-  return {
-    data_as_of: risk.data_as_of,
-    wage_signal: {
-      positive_signals: risk.wage_risk.positive_signals
-        ? {
-            availability: risk.wage_risk.positive_signals.availability,
-            confirmed_count: risk.wage_risk.positive_signals.confirmed_count,
-            confirmed_items: risk.wage_risk.positive_signals.items
-              .filter((item) => item.status === "confirmed")
-              .map((item) => item.label),
-          }
-        : null,
-      summary: stripBandLabel(risk.wage_risk.summary),
-      official_listing: {
-        status: risk.wage_risk.official_listing.status,
-        as_of: risk.wage_risk.official_listing.as_of,
-      },
-      check_points: risk.wage_risk.evidence_items.map((item) => stripBandLabel(item.label)),
-    },
-    safety_context: {
-      scope: risk.safety_context.scope,
-      summary: stripBandLabel(risk.safety_context.summary),
-      region: risk.safety_context.region,
-      industry: risk.safety_context.industry,
-      disclaimer: risk.safety_context.disclaimer,
-      check_points: risk.safety_context.evidence_items.map((item) => stripBandLabel(item.label)),
-    },
-  };
-}
 
 function buildSystemPrompt(context: ComparisonContext): string {
   const safeContext = {
@@ -182,7 +155,7 @@ function buildSystemPrompt(context: ComparisonContext): string {
           region: context.companyContext.region,
           industry: context.companyContext.industry,
           size_label: context.companyContext.size_label,
-          public_signal_result: publicSignalForPrompt(context.companyContext.risk),
+          public_signal_result: companySignalForAnswer(context.companyContext.risk),
         }
       : null,
     verified_sources: context.policyBaseline.sources,
@@ -227,7 +200,7 @@ function buildSystemPrompt(context: ComparisonContext): string {
   return withRuntimeContext(loadPrompt("chat/system"), [
     `상담 모드: ${context.request.chat_mode}`,
     `정책 버전: ${CHAT_POLICY_VERSION}`,
-    `제공 컨텍스트(JSON): ${JSON.stringify(safeContext)}`,
+    `제공 컨텍스트(JSON): ${JSON.stringify(publicAnswerContext(safeContext))}`,
     companyOutputContract,
     compositeOutputContract,
   ]);
@@ -240,14 +213,18 @@ function buildMessages(context: ComparisonContext) {
       role: message.role,
       content: message.role === "assistant"
         ? digestAssistantMessage(message.content)
-        : message.content,
+        : publicAnswerText(message.content),
     })),
-    { role: "user" as const, content: context.request.message },
+    { role: "user" as const, content: publicAnswerText(context.request.message) },
   ];
 }
 
 function baseTrace(context: ComparisonContext): Omit<SafeExecutionTrace, "guardrail_action" | "guardrail_hits" | "upstream_request_id"> {
   return {
+    ...(context.ragRetrieval.reason === "reviewed_applicability_bundle" ? {
+      reviewed_evidence_count: context.ragRetrieval.documents.length,
+      reviewed_evidence_as_of: LABOR_REVIEW_DATE,
+    } : {}),
     question_intent: context.questionIntent,
     intent_status: context.questionIntent ? "classified" : undefined,
     prompt_policy_version: CHAT_POLICY_VERSION,
@@ -271,7 +248,7 @@ function fallbackResult(
   context: ComparisonContext,
   error: LlmCallError,
 ): ProviderComparisonResult {
-  baseline = clarificationFallback(baseline, "답변 서비스에 일시적인 문제가 있어 답변을 확인하지 못했습니다. 잠시 후 같은 질문으로 다시 시도해 주세요.");
+  baseline = replacementBaseline({ ...context, policyBaseline: baseline });
   return {
     provider: config.id,
     provider_label: config.label,
@@ -308,16 +285,18 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
   ) {}
 
   async compare(context: ComparisonContext): Promise<ChatComparisonResponse> {
+    context = { ...context, policyBaseline: publicAnswerContext(context.policyBaseline) };
     const startedAt = new Date();
     const messages = buildMessages(context);
     const isComparison = this.configs.length > 1;
     const runs = this.configs.map(async (config): Promise<ProviderComparisonResult> => {
       try {
         const completion = await this.client.complete(config, messages);
-        const guardrailHits = scanGuardrails(completion.answer, context);
+        const generatedAnswer = publicAnswerText(completion.answer);
+        const guardrailHits = scanGuardrails(generatedAnswer, context);
         const replaced = guardrailHits.length > 0;
         const responseBaseline = replaced ? replacementBaseline(context) : context.policyBaseline;
-        const answer = replaced ? responseBaseline.answer : completion.answer;
+        const answer = publicAnswerText(replaced ? responseBaseline.answer : generatedAnswer);
         return {
           provider: config.id,
           provider_label: config.label,

@@ -41,8 +41,9 @@ export function parseComparisonFeedback(value: unknown): ComparisonFeedbackReque
   return { comparison_id: comparisonId, selection, result_metrics: metrics };
 }
 
-export async function saveComparisonFeedback(feedback: ComparisonFeedbackRequest): Promise<void> {
-  if (process.env.SAVE_COMPARISON_FEEDBACK === "false") return;
+export async function saveComparisonFeedback(feedback: ComparisonFeedbackRequest): Promise<boolean> {
+  // Public operation stays off until an issued-comparison ledger and 90-day purge exist.
+  if (process.env.SAVE_COMPARISON_FEEDBACK !== "true") return false;
   const directory = path.join(process.cwd(), ".runtime");
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await chmod(directory, 0o700);
@@ -51,4 +52,5 @@ export async function saveComparisonFeedback(feedback: ComparisonFeedbackRequest
     `${JSON.stringify({ recorded_at: new Date().toISOString(), ...feedback })}\n`,
     { encoding: "utf8", mode: 0o600 },
   );
+  return true;
 }

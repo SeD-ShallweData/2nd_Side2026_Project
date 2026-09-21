@@ -15,4 +15,13 @@ describe("SafeMarkdown", () => {
     expect(html).toContain("<ol>");
     expect(html).toContain("<ul>");
   });
+
+  it("빈 줄과 항목 설명이 있어도 하나의 순서 목록으로 이어지고 중첩 목록을 보존한다", () => {
+    const html = renderToStaticMarkup(<SafeMarkdown>{"1. 지급일을 확인하세요\n  계약서와 통장 내역을 함께 봅니다.\n\n1. 자료를 정리하세요\n  - 근로계약서\n  - 입금 내역\n\n1. 온라인 진정 절차를 확인하세요"}</SafeMarkdown>);
+    expect((html.match(/<ol>/g) ?? [])).toHaveLength(1);
+    expect((html.match(/<li>/g) ?? [])).toHaveLength(5);
+    expect(html).toContain("<ul>");
+    expect(html).toContain("근로계약서");
+    expect(html).toContain("입금 내역");
+  });
 });

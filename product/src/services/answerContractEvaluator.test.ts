@@ -39,4 +39,18 @@ describe("evaluateAnswerContract", () => {
   it("does not convert an unreviewed legal claim into an automatic pass", () => {
     expect(evaluateAnswerContract({ id: "legal-review-required" }, ANSWER).status).toBe("ORACLE_UNCERTAIN");
   });
+
+  it("detects the repeated ordered-list numbering seen in manual QA", () => {
+    const result = evaluateAnswerContract({
+      id: "numbering",
+      forbid_repeated_ordered_list_numbers: true,
+    }, {
+      ...ANSWER,
+      answer: "1. 문자 보관\n1. 근로계약서 확인\n1. 지급 내역 정리",
+    });
+    expect(result).toMatchObject({
+      status: "FAIL",
+      failures: ["ordered list repeats the same number on consecutive items"],
+    });
+  });
 });
