@@ -3,7 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { ServiceError } from "@/utils/errors";
 
-type PublicRateScope = "company_search" | "anonymous_chat";
+type PublicRateScope = "company_search" | "anonymous_chat" | "anonymous_contract_review";
 
 interface Bucket {
   count: number;
@@ -77,23 +77,27 @@ export function assertPublicRateLimit(request: Request, scope: PublicRateScope, 
     return;
   }
 
+  const envPrefix = scope === "anonymous_chat" ? "ANONYMOUS_CHAT" : "ANONYMOUS_CONTRACT_REVIEW";
+  const [defaultHourly, defaultDaily, defaultGlobalDaily] =
+    scope === "anonymous_chat" ? [10, 30, 1_000] : [5, 15, 300];
+
   const hourly = consume(
     `${scope}:hour:${identity}`,
-    configuredLimit("ANONYMOUS_CHAT_PER_HOUR", 10) * testScale,
+    configuredLimit(`${envPrefix}_PER_HOUR`, defaultHourly) * testScale,
     60 * 60_000,
     now,
   );
   if (hourly !== null) reject(hourly);
   const daily = consume(
     `${scope}:day:${identity}`,
-    configuredLimit("ANONYMOUS_CHAT_PER_DAY", 30) * testScale,
+    configuredLimit(`${envPrefix}_PER_DAY`, defaultDaily) * testScale,
     24 * 60 * 60_000,
     now,
   );
   if (daily !== null) reject(daily);
   const globalDaily = consume(
     `${scope}:global-day`,
-    configuredLimit("ANONYMOUS_CHAT_GLOBAL_PER_DAY", 1_000) * testScale,
+    configuredLimit(`${envPrefix}_GLOBAL_PER_DAY`, defaultGlobalDaily) * testScale,
     24 * 60 * 60_000,
     now,
   );

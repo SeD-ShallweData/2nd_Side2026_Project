@@ -33,4 +33,18 @@ describe("public rate limits", () => {
     assertPublicRateLimit(request("00000000-0000-4000-8000-000000000001"), "anonymous_chat", 1_000);
     expect(() => assertPublicRateLimit(request("00000000-0000-4000-8000-000000000002"), "anonymous_chat", 1_001)).not.toThrow();
   });
+
+  it("limits anonymous contract review independently of chat", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TRUST_PROXY_HEADERS", "true");
+    vi.stubEnv("ANONYMOUS_CONTRACT_REVIEW_PER_HOUR", "2");
+    vi.stubEnv("ANONYMOUS_CHAT_PER_HOUR", "2");
+    assertPublicRateLimit(request(), "anonymous_contract_review", 1_000);
+    assertPublicRateLimit(request(), "anonymous_contract_review", 1_001);
+    expect(() => assertPublicRateLimit(request(), "anonymous_contract_review", 1_002)).toThrowError(
+      expect.objectContaining({ code: "PUBLIC_RATE_LIMITED", status: 429 }),
+    );
+    // 계약서 진단 한도를 다 썼어도 채팅 버킷은 별도라 영향이 없다.
+    expect(() => assertPublicRateLimit(request(), "anonymous_chat", 1_002)).not.toThrow();
+  });
 });
