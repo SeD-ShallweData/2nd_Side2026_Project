@@ -87,6 +87,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE
   ON users, sessions
   TO :"auth_user";
 
+--    즐겨찾기 데이터도 인증 계정이 처리 — UPDATE는 의도적으로 뺀다
+--    (즐겨찾기 API에 수정 기능 없음, 추가/삭제만 존재).
+GRANT SELECT, INSERT, DELETE
+  ON user_favorite_firms
+  TO :"auth_user";
+
 -- ⚠️ ALTER DEFAULT PRIVILEGES 를 일부러 쓰지 않는다.
 --    앞으로 만들 테이블에 권한이 자동으로 붙으면, 민감한 테이블이 생겼을 때
 --    아무도 모르게 인증 계정에 열린다. 새 테이블은 매번 명시적으로 GRANT 한다.

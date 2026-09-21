@@ -87,6 +87,19 @@ export const firms = pgTable(
   ],
 );
 
+export const userFavoriteFirms = pgTable(
+  "user_favorite_firms",
+  {
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    firmId: text("firm_id").notNull().references(() => firms.firmId, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.firmId] }),
+    index("user_favorite_firms_user_created_idx").on(t.userId, t.createdAt.desc()),
+  ],
+);
+
 /* ── 적재 배치 ───────────────────────────────────────────── */
 
 export const batches = pgTable(
