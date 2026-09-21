@@ -240,6 +240,19 @@ describe("migration drift predeploy 판정", () => {
 });
 
 describe("후조건 등록 자체의 무결성", () => {
+  it("journal timestamps are strictly increasing and lease SQL never recreates existing tables", () => {
+    const journal = JSON.parse(readFileSync(join(DB_DIR, "migrations/meta/_journal.json"), "utf8"));
+    for (let i = 1; i < journal.entries.length; i++) assert.ok(journal.entries[i].when > journal.entries[i - 1].when);
+    const sql = readFileSync(join(DB_DIR, "migrations/0019_conversation_summary_leases.sql"), "utf8");
+    assert.doesNotMatch(sql, /CREATE\s+TABLE/i);
+    assert.equal((sql.match(/ALTER TABLE/g) ?? []).length, 2);
+    const prior = JSON.parse(readFileSync(join(DB_DIR, "migrations/meta/0018_snapshot.json"), "utf8"));
+    const next = JSON.parse(readFileSync(join(DB_DIR, "migrations/meta/0019_snapshot.json"), "utf8"));
+    assert.equal(next.prevId, prior.id);
+    assert.equal(Object.keys(prior.tables).filter((key) => key.startsWith("public.conversation_")).length, 7);
+    assert.equal(prior.tables["public.conversation_summaries"].columns.lease_token, undefined);
+    assert.equal(next.tables["public.conversation_summaries"].columns.lease_token.type, "uuid");
+  });
   // 키를 한쪽에만 적으면 검사가 조용히 통과하거나 모든 배포가 막힌다.
   // 두 파일을 사람이 대조하지 않아도 되게 여기서 고정한다.
   function sqlKeysByTag() {

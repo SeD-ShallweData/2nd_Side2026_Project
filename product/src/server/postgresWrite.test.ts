@@ -62,6 +62,8 @@ describe("쓰기 문장 경계", () => {
     "INSERT INTO posts (title) VALUES ($1) RETURNING id",
     "UPDATE posts SET status = $1 WHERE id = $2",
     "DELETE FROM sessions WHERE expires_at < now()",
+    "INSERT INTO conversation_summaries(conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO UPDATE SET updated_at=now()",
+    "INSERT INTO posts(title) VALUES ($1) ON CONFLICT DO NOTHING",
   ])("허용한다: %s", (sql) => {
     expect(() => assertWriteStatementAllowed(sql)).not.toThrow();
   });
@@ -75,6 +77,8 @@ describe("쓰기 문장 경계", () => {
     "CREATE TABLE tmp (id int)",
     "COPY posts FROM '/tmp/x.csv'",
     "DO $$ BEGIN END $$",
+    "INSERT INTO posts(title) VALUES ($1) ON CONFLICT DO NOTHING; DO $$ BEGIN END $$",
+    "INSERT INTO posts(title) VALUES ($1) ON CONFLICT (id) DO UPDATE SET title=$1; DROP TABLE users",
   ])("차단한다: %s", (sql) => {
     expect(() => assertWriteStatementAllowed(sql)).toThrow();
   });
@@ -155,6 +159,10 @@ describe("롤별 연결", () => {
 });
 
 describe("오류 처리", () => {
+  it.each(["08006", "57P01", "57P02", "57P03"])("maps infrastructure SQLSTATE %s to retryable 503 without changing constraint errors", async (code) => {
+    pg.query.mockRejectedValueOnce(sqlstateError(code));
+    await expect(queryWrite("conversation", "SELECT 1")).rejects.toMatchObject({ code: "DATABASE_UNAVAILABLE", status: 503, retryable: true });
+  });
   /*
    * 제약 위반을 503으로 뭉개면 "이미 신고한 글입니다" 같은 안내를 만들 수 없다.
    * SQLSTATE가 붙은 오류는 서비스 계층까지 그대로 올라가야 한다.

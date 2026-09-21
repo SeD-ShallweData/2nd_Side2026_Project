@@ -117,13 +117,20 @@ export async function maybeUpdateConversationSummary(
 ): Promise<boolean> {
   const repository = getConversationRepository();
   const messages = allMessages(detail);
-  const existing = await repository.findSummary(detail.conversation_id);
-  const through = existing?.summarized_through_sequence ?? 0;
   const target = summaryTargetForMessageCount(messages.length);
-  if (target < SUMMARY_BATCH_SIZE || target <= through) return false;
-  if (!(await repository.claimSummary(detail.conversation_id, target))) return false;
+  if (target < SUMMARY_BATCH_SIZE) return false;
+  const leaseToken = await repository.claimSummary(detail.conversation_id, target);
+  if (!leaseToken) return false;
+  const heartbeat = setInterval(() => {
+    void repository.renewSummary(detail.conversation_id, leaseToken).catch(() => undefined);
+  }, 30_000);
+  heartbeat.unref();
 
   try {
+    // Read the completed checkpoint AFTER claiming; another worker may have
+    // advanced it between our initial detail read and this claim.
+    const existing = await repository.findSummary(detail.conversation_id);
+    const through = existing?.summarized_through_sequence ?? 0;
     const batch = messages.slice(through, target);
     // 완료 turn만 저장하므로 batch는 항상 user/assistant 짝을 보존한다.
     const summarizedTurns = detail.turns
@@ -154,10 +161,13 @@ export async function maybeUpdateConversationSummary(
       through_sequence: target,
       summary,
       summary_version: SUMMARY_VERSION,
+      lease_token: leaseToken,
     });
   } catch {
-    await repository.failSummary(detail.conversation_id, target, "SUMMARY_BUILD_FAILED").catch(() => undefined);
+    await repository.failSummary(detail.conversation_id, target, "SUMMARY_BUILD_FAILED", leaseToken).catch(() => undefined);
     return false;
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 
