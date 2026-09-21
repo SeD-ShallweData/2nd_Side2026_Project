@@ -77,21 +77,25 @@ export function CommunityReportForm({ postId }: { postId: string }) {
   }
 
   if (reportedMessage) {
-    return <p className="field-help" role="status">{reportedMessage}</p>;
+    // 부모(.community-post-actions)가 가로 flex 라 field-help 의 margin-top 8px 이
+    // 이 문구만 아래로 내려앉게 만든다. 버튼들과 같은 중심선에 두려고 margin 을 0 으로 둔다.
+    return <p className="field-help" role="status" style={{ margin: 0 }}>{reportedMessage}</p>;
   }
 
   if (!open) {
+    // 문단으로 감싸면 flex 자식이 <p> 가 되어 버튼이 혼자 내려앉는다. 버튼만 내보낸다.
     return (
-      <p className="field-help">
-        <button type="button" className="button button-outline button-small" onClick={() => setOpen(true)}>
-          이 게시글 신고
-        </button>
-      </p>
+      <button type="button" className="button button-outline button-small" onClick={() => setOpen(true)}>
+        이 게시글 신고
+      </button>
     );
   }
 
   return (
-    <form className="search-form" onSubmit={handleSubmit} noValidate>
+    // 신고 폼은 라디오 5개와 textarea 를 담아 버튼 한 칸에 들어가지 않는다.
+    // 부모가 flex-wrap 이므로 flexBasis 100% 면 신고 버튼이 있던 자리에서 줄을 바꿔 한 줄을 통째로 쓴다.
+    // order 로 밀지 않는다 — 보이는 순서와 탭 순서가 어긋나면 안 된다.
+    <form className="search-form" onSubmit={handleSubmit} noValidate style={{ flexBasis: "100%" }}>
       <label id={`${fieldId}-reason-label`}>신고 사유</label>
       <div role="radiogroup" aria-labelledby={`${fieldId}-reason-label`}>
         {REPORT_REASONS.map((item) => (
