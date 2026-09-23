@@ -64,6 +64,26 @@ function payload(answer: string, model: string) {
 }
 
 describe("실제 LLM 비교 Provider", () => {
+  it("keeps substantive prior guidance in the model context and replaces a citation-only answer", async () => {
+    const bodies: Array<{ messages: { role: string; content: string }[] }> = [];
+    const fakeFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify(payload("(근로기준법 제43조) (고용노동부 노동포털 「체불임금 해결 방법」)", "test")), { status: 200 });
+    });
+    const response = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({
+      ...CONTEXT,
+      request: {
+        ...CONTEXT.request,
+        message: "회사는 27일 지급하겠다는 문자를 보냈습니다. 기억해 주세요.",
+        recent_messages: [{ role: "assistant", content: "급여일이 지난 상태라면 지급일과 미지급액을 확인하세요. (근로기준법 제43조) (고용노동부 노동포털 「체불임금 해결 방법」)" }],
+      },
+      policyBaseline: { ...BASELINE, answer: "문자 원본과 입금 내역을 보관하세요." },
+    });
+    expect(bodies[0].messages[1].content).toContain("지급일과 미지급액을 확인하세요");
+    expect(response.results[0].status).toBe("guardrail_replaced");
+    expect(response.results[0].trace.guardrail_hits).toContain("CITATION_ONLY_ANSWER");
+    expect(response.results[0].answer).not.toMatch(/^\s*\(근로기준법/);
+  });
   it.each([true, false])("separates valid recall from actual unverified-citation replacement (bad citation=%s)", async (badCitation) => {
     const answer = `급여일은 15일이고 회사는 다음 주에 지급하겠다고 말씀하셨습니다.${badCitation ? " 근로기준법 제999조에 따른 안내입니다." : ""}`;
     const fakeFetch = vi.fn(async () => new Response(JSON.stringify(payload(answer, "test")), { status: 200 }));

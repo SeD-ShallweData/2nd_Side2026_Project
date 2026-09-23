@@ -191,7 +191,7 @@ export function toConversationMemoryContext(
     ...renderItems("기존 안내", summary.summary.actions_already_given),
     ...renderItems("미해결 질문", summary.summary.open_questions),
     ...(summary.summary.recall_facts ?? []).map((fact) =>
-      `사용자 진술 회상: ${fact.kind === "payday" ? "급여일" : "지급 약속"}=${fact.value ?? "미확인/철회"}, 순서=${fact.sequence}${fact.is_correction ? ", 정정" : ""}, 회사=${fact.company_id ?? "미선택"}`),
+      `사용자 진술 회상: ${fact.kind === "payday" ? "급여일" : "지급 약속"}=${fact.state === "denied" ? "받지 않음" : fact.value ?? "미확인/철회"}, 순서=${fact.sequence}${fact.is_correction ? ", 정정" : ""}, 회사=${fact.company_id ?? "미선택"}`),
     "같은 회사·항목은 뒤의 진술/정정이 현재 값이다. 다른 회사 진술을 현재 회사 사실로 옮기지 않는다.",
     summary.summary.referenced_company_ids.length
       ? `과거 선택 회사 ID: ${summary.summary.referenced_company_ids.join(", ")}`

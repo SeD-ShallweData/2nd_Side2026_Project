@@ -6,6 +6,8 @@ export interface ConversationRecallFact {
   sequence: number;
   company_id: string | null;
   is_correction: boolean;
+  /** A user's explicit report of no company payment promise, distinct from an unknown or withdrawn promise. */
+  state?: "denied";
 }
 
 export interface ConversationMemoryDiagnostics {
