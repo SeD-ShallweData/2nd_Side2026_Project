@@ -41,6 +41,7 @@ SAVE_COMPARISON_FEEDBACK=false
 AUTH_DATA_MODE=real
 COMMUNITY_DATA_MODE=real
 WORKSITE_TIP_DATA_MODE=real
+FAVORITE_DATA_MODE=real
 AUTH_DATABASE_URL=postgresql://wg_auth:AuthValue_8xM4qT7vP2nR9kL3sC6w@127.0.0.1:5433/wageguard?sslmode=disable
 COMMUNITY_DATABASE_URL=postgresql://wg_community:CommValue_3zK9wL5mQ8tN2xP7rV4s@127.0.0.1:5433/wageguard?sslmode=disable
 TIP_DATABASE_URL=postgresql://wg_tip:TipValue_6mR3xP8vN2qK7tL5wC9s@127.0.0.1:5433/wageguard?sslmode=disable
@@ -261,11 +262,16 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
         self.assertIn("must remain pinned to 0.42", result.stderr)
 
 
-    # ── 인증·커뮤니티·현장 제보 데이터 모드 (PR #40·#45) ─────────────────
+    # ── 인증·커뮤니티·현장 제보·즐겨찾기 데이터 모드 ─────────────────────
 
     def test_user_data_modes_must_be_explicit(self):
         """생략하면 APP_DATA_MODE=real 을 따라가 조용히 503 이 된다."""
-        for key in ("AUTH_DATA_MODE", "COMMUNITY_DATA_MODE", "WORKSITE_TIP_DATA_MODE"):
+        for key in (
+            "AUTH_DATA_MODE",
+            "COMMUNITY_DATA_MODE",
+            "WORKSITE_TIP_DATA_MODE",
+            "FAVORITE_DATA_MODE",
+        ):
             web = "\n".join(
                 line for line in self.values["web"].splitlines() if not line.startswith(f"{key}=")
             ) + "\n"
@@ -317,6 +323,16 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
         self.assert_failed_without_secret(result)
         self.assertIn(
             "AUTH_DATA_MODE must be real when WORKSITE_TIP_DATA_MODE=real",
+            result.stderr,
+        )
+
+    def test_real_favorite_requires_real_auth_connection(self):
+        web = self.values["web"].replace("AUTH_DATA_MODE=real", "AUTH_DATA_MODE=mock")
+        web = web.replace("WORKSITE_TIP_DATA_MODE=real", "WORKSITE_TIP_DATA_MODE=mock")
+        result = self.run_validator({"web": web})
+        self.assert_failed_without_secret(result)
+        self.assertIn(
+            "AUTH_DATA_MODE must be real when FAVORITE_DATA_MODE=real",
             result.stderr,
         )
 
@@ -380,6 +396,7 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
     def test_mock_auth_requires_mock_passwords(self):
         web = self.values["web"].replace("AUTH_DATA_MODE=real", "AUTH_DATA_MODE=mock")
         web = web.replace("WORKSITE_TIP_DATA_MODE=real", "WORKSITE_TIP_DATA_MODE=mock")
+        web = web.replace("FAVORITE_DATA_MODE=real", "FAVORITE_DATA_MODE=mock")
         web = "\n".join(
             line for line in web.splitlines() if not line.startswith("AUTH_DATABASE_URL=")
         ) + "\n"
@@ -401,6 +418,7 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
     def test_mock_auth_rejects_database_url(self):
         web = self.values["web"].replace("AUTH_DATA_MODE=real", "AUTH_DATA_MODE=mock")
         web = web.replace("WORKSITE_TIP_DATA_MODE=real", "WORKSITE_TIP_DATA_MODE=mock")
+        web = web.replace("FAVORITE_DATA_MODE=real", "FAVORITE_DATA_MODE=mock")
         web = "\n".join(
             line for line in web.splitlines()
             if not line.startswith(("TIP_DATABASE_URL=", "WORKSITE_TIP_STORAGE_ROOT="))
