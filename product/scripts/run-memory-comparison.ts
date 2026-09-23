@@ -236,8 +236,9 @@ try {
     }
   }
   if (bundle === 'all' || bundle === 'diagnostic') {
+    const diagnosticIds = new Set((process.env.MW_MEMORY_EVAL_DIAGNOSTIC_IDS ?? 'AQ12,AQ21,AQ32').split(','));
     const development = JSON.parse(readFileSync('eval/answer-contract-cases.json', 'utf8')).filter((item: { split: string; id: string }) =>
-      item.split === 'development' && ['AQ12', 'AQ21', 'AQ32'].includes(item.id.split('-')[0]));
+      item.split === 'development' && diagnosticIds.has(item.id.split('-')[0]));
     for (const item of development) {
       active = { id: item.id, mode: 'current-product', experiment: 'diagnostic' };
       const start = calls.length;

@@ -24,6 +24,11 @@ describe("public answer context and indicator interpretation", () => {
     expect(dto.safety_context.disclaimer).toContain("개별 사업장");
     expect(companySafetyGuardrailHits("산업안전 이상이 없다는 뜻입니다.", risk)).toContain("SAFETY_PUBLIC_LABEL_MISMATCH");
     expect(companySafetyGuardrailHits("산업안전 카드는 안전 신호 미확인이며 지역·업종 맥락으로 개별 사업장의 안전 인증이 아닙니다.", risk)).toEqual([]);
+    expect(companySafetyGuardrailHits("안전 카드는 지역·업종 신호이며 개별 사업장 판정은 아닙니다.", risk,
+      "이 회사 안전 카드의 의미가 무엇인가요?")).toContain("SAFETY_PUBLIC_LABEL_MISMATCH");
+    expect(companySafetyGuardrailHits("안전 카드는 안전 신호 미확인으로 표시됩니다. 서울특별시·정보통신업 단위의 집계 신호이며 개별 사업장의 사고 위험이나 안전 여부를 판정하지 않습니다.",
+      risk, "선택한 회사의 임금·산업안전 지표 의미와 한계를 설명해 주세요.")).toEqual([]);
+    expect(companySafetyGuardrailHits("임금 카드는 자료가 제한됩니다.", risk, "임금 카드가 무슨 뜻인가요?")).toEqual([]);
     expect([...scanRules("산업안전 이상이 없다는 뜻입니다.", CHAT_OUTPUT_GUARDRAILS)]).toContain("SAFETY_SIGNAL_CERTIFICATION");
     expect([...scanRules("안전 신호 미확인은 산업안전 이상이 없다고 확인된 상태가 아닙니다.", CHAT_OUTPUT_GUARDRAILS)]).toEqual([]);
   });

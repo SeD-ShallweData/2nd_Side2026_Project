@@ -25,12 +25,18 @@ export function publicAnswerContext<T>(value: T): T {
   return value;
 }
 
-export function companySafetyGuardrailHits(answer: string, risk: CompanyRiskResult): string[] {
-  if (!/산업안전|산업재해|안전\s*신호/.test(answer)) return [];
+export function companySafetyGuardrailHits(answer: string, risk: CompanyRiskResult, question = ""): string[] {
+  // Inspect the user's requested card too: a model may say only "안전 카드" or
+  // omit the safety sentence entirely while still sounding cautious.
+  if (!/산업안전|산업재해|안전\s*(?:카드|신호|정보|지표|표시|여부)/.test(`${question}\n${answer}`)) return [];
   const safety = risk.safety_context;
   const hits: string[] = [];
   if (safety.level === "watch" && !answer.includes(getSignalStatusLabel(safety.level))) hits.push("SAFETY_PUBLIC_LABEL_MISMATCH");
-  if (safety.scope === "region_industry" && (!/지역/.test(answer) || !/업종/.test(answer)
+  const scopeNamed = /지역/.test(answer) && /업종/.test(answer);
+  const actualRegionIndustryNamed = Boolean(safety.region && safety.industry
+    && answer.includes(publicAnswerText(safety.region)) && answer.includes(publicAnswerText(safety.industry))
+    && /단위|집계|맥락|범위/.test(answer));
+  if (safety.scope === "region_industry" && (!(scopeNamed || actualRegionIndustryNamed)
     || !/개별\s*사업장|개별\s*회사/.test(answer))) hits.push("SAFETY_PUBLIC_SCOPE_MISSING");
   return hits;
 }

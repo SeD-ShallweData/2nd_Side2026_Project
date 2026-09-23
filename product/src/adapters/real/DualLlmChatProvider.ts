@@ -49,13 +49,27 @@ function digestAssistantMessage(content: string): string {
   const flat = content.replace(/\s+/g, " ").trim();
   if (!flat) return "";
   const sentences = flat.match(SENTENCE_PATTERN) ?? [flat];
-  const core = sentences.find((sentence) => citationKeys(sentence).size > 0) ?? sentences[0];
+  // A citation line alone carries no prior guidance. Keep a substantive
+  // sentence, preferring one with a cited legal basis when it has prose too.
+  const substantive = (sentence: string) => sentence
+    .replace(/\([^)]*\)/g, "")
+    .replace(/근로기준법\s*제\s*\d+\s*조(?:의\s*\d+)?/g, "")
+    .replace(/[^가-힣]/g, "").length >= 10;
+  const core = sentences.find((sentence) => citationKeys(sentence).size > 0 && substantive(sentence))
+    ?? sentences.find(substantive)
+    ?? sentences[0];
   const shortened = core.length > 240 ? `${core.slice(0, 240)}…` : core;
   return publicAnswerText(shortened);
 }
 
 function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   const hits = scanRules(answer, CHAT_OUTPUT_GUARDRAILS);
+  // A stopped generation can return only citation labels while the source DTO
+  // makes the response look sourced. It must not count as a useful answer.
+  const uncitedProse = answer.replace(/\([^)]*\)/g, "").replace(/[^가-힣]/g, "");
+  if ((citationKeys(answer).size > 0 || /「[^」]+」/.test(answer)) && uncitedProse.length < 10) {
+    hits.add("CITATION_ONLY_ANSWER");
+  }
   for (const hit of applicabilityGuardrailHits(context.request.message, answer)) hits.add(hit);
   for (const hit of wageArrearsGuardrailHits(context.request.message, answer)) hits.add(hit);
   const unverified = hasUnverifiedCitation(
@@ -65,7 +79,7 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   );
   if (unverified) hits.add("UNVERIFIED_LAW_CITATION");
   if (context.questionIntent === "company" && context.companyContext) {
-    for (const hit of companySafetyGuardrailHits(answer, context.companyContext.risk)) hits.add(hit);
+    for (const hit of companySafetyGuardrailHits(answer, context.companyContext.risk, context.request.message)) hits.add(hit);
     // Company-only evidence cannot support new benefits/filing procedures.
     if (context.ragRetrieval.status !== "matched" && /대지급금|진정서|진정.{0,8}(?:신청|제출)/.test(answer)) {
       hits.add("COMPANY_UNSOURCED_LEGAL_PROCEDURE");

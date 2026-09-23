@@ -64,6 +64,12 @@ export function paymentTimingGuardrailHits(query: string, answer: string): strin
   if ((/합의|연장/.test(query) || (needsSettlementConditions(query) && clauses.some(clause => /14\s*일/.test(clause) && /지급해야|지급하여야|지급해야\s*합니다|청산해야/.test(clause))))
     && [/특별한\s*사정/, /당사자|쌍방/, /합의/].some(p => !p.test(text))) hits.push("PAYMENT_EXTENSION_CONDITIONS");
   if (/약속.{0,20}(?:지나야|지난\s*후에만)|(?:14일|2주).{0,15}기다린.{0,12}(?:진정|신고)/.test(text)) hits.push("PAYMENT_FILING_DELAY");
+  // Article 36 states a payment period, not a separate 14-day filing window.
+  // Limit this check to an asserted filing deadline; "unpaid after 14 days,
+  // then file" is a different relation and must not be rejected by this hit.
+  if (/(?:14\s*일|2\s*주)\s*(?:이내|안에)\s*(?:에)?\s*(?:진정|신고)(?:을|를|서)?\s*(?:제기|신청|접수|할\s*수)/.test(text)) {
+    hits.push("PAYMENT_NEW_FILING_DEADLINE");
+  }
   return [...new Set(hits)];
 }
 

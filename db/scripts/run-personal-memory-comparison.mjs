@@ -21,6 +21,12 @@ const { build } = requireProduct('esbuild');
 const hash = value => createHash('sha256').update(value).digest('hex');
 const option = name => process.argv[process.argv.indexOf(name) + 1];
 const bundle = process.argv.includes('--bundle') ? option('--bundle') : 'all';
+const serve = process.argv.includes('--serve');
+if (serve) assert(bundle === 'offline' && !process.argv.includes('--resume-from'), 'SERVE_REQUIRES_OFFLINE_FRESH_DB');
+const cumulativeCap = process.argv.includes('--max-calls') ? Number(option('--max-calls')) : 90;
+assert(Number.isInteger(cumulativeCap) && cumulativeCap >= 1 && cumulativeCap <= 90, 'INVALID_CALL_CAP');
+const diagnosticIds = process.argv.includes('--diagnostic-ids') ? option('--diagnostic-ids').split(',') : ['AQ12', 'AQ21', 'AQ32'];
+assert(diagnosticIds.length >= 1 && diagnosticIds.every(id => ['AQ12', 'AQ21', 'AQ32'].includes(id)), 'INVALID_DIAGNOSTIC_IDS');
 const resume = process.argv.includes('--resume-from') ? resolve(root, option('--resume-from')) : null;
 let priorCalls = 0;
 let priorManifest;
@@ -32,13 +38,14 @@ if (resume) {
   // silently forgetting its earlier valid rows or cumulative paid calls.
   assert(!priorManifest.resumed_from, 'CHAINED_RESUME_NOT_SUPPORTED');
   priorCalls = readFileSync(resolve(resume, 'provider-calls.jsonl'), 'utf8').trim().split('\n').filter(Boolean).length;
-  assert(priorCalls < 90);
+  assert(priorCalls < cumulativeCap);
 }
 assert(['all', 'fixed', 'continuous', 'diagnostic', 'offline'].includes(bundle));
 assert.equal(process.versions.node.split('.')[0], '22', 'NODE22_REQUIRED');
 const suffix = `${Date.now()}-${randomBytes(3).toString('hex')}`;
-const name = `mw-personal02-${suffix}`;
-const runtime = resolve(product, '.runtime/personal02', suffix);
+const name = `${serve ? 'mw-personal03' : 'mw-personal02'}-${suffix}`;
+const taskLabel = serve ? 'personal03' : 'personal02';
+const runtime = resolve(product, serve ? '.runtime/personal03' : '.runtime/personal02', suffix);
 // Ensure synthetic outputs cannot accidentally enter Git before any are written.
 assert(execFileSync('git', ['check-ignore', 'product/.runtime/personal02/probe.json'], { cwd: root, encoding: 'utf8' }).trim());
 mkdirSync(runtime, { recursive: true });
@@ -73,8 +80,8 @@ const key = process.env.UPSTAGE_API_KEY || configured.UPSTAGE_API_KEY || configu
 const manifest = { head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   node: process.version, next, lock_sha256: hash(readFileSync(resolve(product, 'package-lock.json'))),
   tokenizer: 'BGE-M3 local evaluation tokens; not Solar billing tokens', tokenizer_sha256: tokenHash,
-  memory_budget: 4096, full_prompt_budget: 12288, bundle, key_present: Boolean(key),
-  provider_call_cap: 90 - priorCalls, prior_provider_calls: priorCalls, cumulative_call_cap: 90,
+  memory_budget: 4096, full_prompt_budget: 12288, bundle, serve, diagnostic_ids: diagnosticIds, key_present: Boolean(key),
+  provider_call_cap: cumulativeCap - priorCalls, prior_provider_calls: priorCalls, cumulative_call_cap: cumulativeCap,
   resumed_from: resume ? relative(root, resume) : null, estimate: 'fixed36 + continuous36 + diagnostic6-9; skip valid fixed rows on resume',
   source_digest: hash(JSON.stringify(before)), started_at: new Date().toISOString(), runtime: relative(root, runtime),
   tools: Object.fromEntries(['product/scripts/memory-comparison-core.ts', 'product/scripts/memory-comparison-fixtures.ts',
@@ -109,7 +116,7 @@ try {
   docker(['info', '--format', '{{.ServerVersion}}']);
   assert.equal(docker(['ps', '-a', '--filter', `name=^${name}$`, '--format', '{{.Names}}']).trim(), '');
   phase = 'fresh-container';
-  docker(['run', '-d', '--name', name, '--label', 'moneyworry.acceptance=personal02', '-p', `127.0.0.1:${port}:5432`,
+  docker(['run', '-d', '--name', name, '--label', `moneyworry.acceptance=${taskLabel}`, '-p', `127.0.0.1:${port}:5432`,
     '--tmpfs', '/var/lib/postgresql/data', '-e', 'POSTGRES_PASSWORD', '-e', `POSTGRES_USER=${owner}`, '-e', `POSTGRES_DB=${database}`, image]);
   created = true;
   for (let attempt = 0; attempt < 60; attempt++) {
@@ -132,18 +139,9 @@ try {
   const ledgerRows = await sql`SELECT id,hash,created_at FROM drizzle.__drizzle_migrations ORDER BY created_at`;
   const drift = analyzeMigrationState({ localMigrations, ledgerExists: true, ledgerRows, postconditions: JSON.parse(psql(POSTCONDITIONS_SQL)) });
   assert.equal(drift.blocked, false);
-  await sql`INSERT INTO firms(firm_id,name,biz_no) VALUES ('COMPANY_DEMO_008','한빛테크','personal02-synthetic-A'),('UNKNOWN_SAFETY_001','푸른건설','personal02-synthetic-B')`;
-  save('database.json', { container: name, label: 'moneyworry.acceptance=personal02', tmpfs: true, ...target, ledger: ledgerRows.length, drift: drift.status, image });
+  await sql`INSERT INTO firms(firm_id,name,biz_no) VALUES ('COMPANY_DEMO_008','한빛테크','personal02-synthetic-A'),('COMPANY_DEMO_002','다온제조','personal03-synthetic-B'),('UNKNOWN_SAFETY_001','푸른건설','personal02-synthetic-C')`;
+  save('database.json', { container: name, label: `moneyworry.acceptance=${taskLabel}`, tmpfs: true, ...target, ledger: ledgerRows.length, drift: drift.status, image });
   log({ phase, ledger: ledgerRows.length, drift: drift.status, pg: target.version });
-  phase = 'bundle-evaluation-worker';
-  const entry = resolve(product, 'scripts/run-memory-comparison.ts');
-  const outfile = resolve(runtime, 'memory-worker.mjs');
-  await build({ entryPoints: [entry], outfile, absWorkingDir: product, platform: 'node', target: 'node22', format: 'esm', bundle: true, packages: 'external',
-    plugins: [{ name: 'standalone-server', setup(builder) {
-      builder.onResolve({ filter: /^server-only$/ }, () => ({ path: 'server-only', namespace: 'standalone' }));
-      builder.onLoad({ filter: /.*/, namespace: 'standalone' }, () => ({ contents: '', loader: 'js' }));
-    } }] });
-  phase = 'memory-comparison';
   const childEnv = { ...process.env, APP_DATA_MODE: 'mock', COMPANY_DATA_MODE: 'mock', AUTH_DATA_MODE: 'real', CONVERSATION_DATA_MODE: 'real',
     DATABASE_URL: '', DATABASE_ENV_FILE: process.platform === 'win32' ? 'NUL' : '/dev/null', DB_SSL: 'false',
     AUTH_DATABASE_URL: url('wg_auth', authPassword), CONVERSATION_DATABASE_URL: url('wg_conversation', conversationPassword),
@@ -151,12 +149,47 @@ try {
     SHARED_API_KEY_FILE: '', SKT_API_KEY: '', OPENAI_API_KEY: '', RAG_API_URL: '', MOCK_DELAY_MS: '0',
     PROMPT_DIR: resolve(product, 'prompts'), CHAT_EXECUTION_MODE: 'dual_api', SAVE_COMPARISON_FEEDBACK: 'false',
     MW_MEMORY_EVAL_CREATED: 'personal02-new-pg16', MW_MEMORY_EVAL_RUNTIME: runtime, MW_MEMORY_EVAL_BUNDLE: bundle, MW_MEMORY_EVAL_TOKENIZER: tokenizer,
-    MW_MEMORY_EVAL_RESUME: resume ?? '', MW_MEMORY_EVAL_CALL_CAP: String(90 - priorCalls) };
-  child = spawn(process.execPath, [outfile], { cwd: product, env: childEnv, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-  child.stdout.on('data', chunk => { for (const line of String(chunk).split(/\r?\n/)) if (line.startsWith('MEMORY_EVAL ')) console.log(line); });
-  child.stderr.resume();
-  const code = await new Promise((done, reject) => { child.once('error', reject); child.once('close', done); });
-  assert.equal(code, 0, 'WORKER_FAILED');
+    MW_MEMORY_EVAL_RESUME: resume ?? '', MW_MEMORY_EVAL_CALL_CAP: String(cumulativeCap - priorCalls),
+    MW_MEMORY_EVAL_DIAGNOSTIC_IDS: diagnosticIds.join(',') };
+  if (serve) {
+    phase = 'local-browser-app';
+    const webPort = 3127;
+    await new Promise((done, reject) => { const probe = createServer(); probe.once('error', reject); probe.listen(webPort, '127.0.0.1', () => probe.close(done)); });
+    child = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', String(webPort)],
+      { cwd: product, env: { ...childEnv, CONTRACT_DATA_MODE: 'mock', COMMUNITY_DATA_MODE: 'mock', WORKSITE_TIP_DATA_MODE: 'mock' },
+        windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    child.stdout.resume(); child.stderr.resume();
+    let ready = false;
+    for (let attempt = 0; attempt < 60; attempt++) {
+      if (child.exitCode !== null) throw new Error('LOCAL_APP_EXITED');
+      try { const response = await fetch(`http://127.0.0.1:${webPort}/api/health/live`); if (response.ok) { ready = true; break; } } catch { /* startup */ }
+      await new Promise(done => setTimeout(done, 500));
+    }
+    assert(ready, 'LOCAL_APP_NOT_READY');
+    const shutdownFile = resolve(runtime, 'shutdown.flag');
+    save('server.json', { url: `http://127.0.0.1:${webPort}`, shutdown_file: relative(root, shutdownFile), synthetic_only: true,
+      auth_mode: 'real', conversation_mode: 'real', company_mode: 'mock', feedback_save: false });
+    log({ local_browser_app_ready: `http://127.0.0.1:${webPort}`, runtime: relative(root, runtime) });
+    while (!existsSync(shutdownFile) && child.exitCode === null) await new Promise(done => setTimeout(done, 500));
+    assert(existsSync(shutdownFile), 'LOCAL_APP_EXITED_BEFORE_SHUTDOWN');
+    child.kill();
+    await new Promise(done => child.once('close', done));
+  } else {
+    phase = 'bundle-evaluation-worker';
+    const entry = resolve(product, 'scripts/run-memory-comparison.ts');
+    const outfile = resolve(runtime, 'memory-worker.mjs');
+    await build({ entryPoints: [entry], outfile, absWorkingDir: product, platform: 'node', target: 'node22', format: 'esm', bundle: true, packages: 'external',
+      plugins: [{ name: 'standalone-server', setup(builder) {
+        builder.onResolve({ filter: /^server-only$/ }, () => ({ path: 'server-only', namespace: 'standalone' }));
+        builder.onLoad({ filter: /.*/, namespace: 'standalone' }, () => ({ contents: '', loader: 'js' }));
+      } }] });
+    phase = 'memory-comparison';
+    child = spawn(process.execPath, [outfile], { cwd: product, env: childEnv, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    child.stdout.on('data', chunk => { for (const line of String(chunk).split(/\r?\n/)) if (line.startsWith('MEMORY_EVAL ')) console.log(line); });
+    child.stderr.resume();
+    const code = await new Promise((done, reject) => { child.once('error', reject); child.once('close', done); });
+    assert.equal(code, 0, 'WORKER_FAILED');
+  }
   phase = 'migration-replay';
   await migrate(drizzle(sql), { migrationsFolder: resolve(root, 'db/migrations') });
   assert.equal(Number((await sql`SELECT count(*) FROM drizzle.__drizzle_migrations`)[0].count), journal.entries.length);
@@ -168,7 +201,7 @@ try {
   await sql?.end();
   if (created) {
     const identity = JSON.parse(docker(['inspect', name]))[0];
-    assert.equal(identity.Name, `/${name}`); assert.equal(identity.Config.Labels['moneyworry.acceptance'], 'personal02');
+    assert.equal(identity.Name, `/${name}`); assert.equal(identity.Config.Labels['moneyworry.acceptance'], taskLabel);
     docker(['rm', '-f', name]); log({ removed_own_container: name });
   }
   const after = sourceHashes(); save('source-after.json', after);
