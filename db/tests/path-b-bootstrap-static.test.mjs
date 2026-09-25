@@ -386,6 +386,7 @@ test("migrations run as one private identity-guarded PostgreSQL transaction", ()
   assert.equal((migrationStager.match(/INSERT INTO drizzle\.__drizzle_migrations/g) ?? []).length, 1);
   assert.ok(migrationStager.indexOf("BEGIN;") < migrationStager.indexOf("COMMIT;"));
   assert.match(bootstrap, /path_b_sha256_file "\$STAGED_MIGRATION_BUNDLE"/);
+  assert.match(migrationStager, /observed\[: len\(expected_prefix\)\] != expected_prefix/);
 });
 
 test("canonical wage manifest fixes all seven batches and exact totals", () => {

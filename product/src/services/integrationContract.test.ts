@@ -32,6 +32,7 @@ describe("실제 ML DB 공개 경계", () => {
     as_of_date: "2026-06-01",
     target_month: "2026-12-01",
     ingested_at: "2026-08-11T00:00:00Z",
+    ingested_date: "2026-08-11",
     n_months: 12,
     n_green: 4,
     excluded_wage: false,
@@ -160,6 +161,7 @@ describe("RAG 내부 계약", () => {
           name: "근로기준법 제43조",
           organization: "국가법령정보센터",
           document_id: "LABOR_STANDARDS_ACT_43",
+          as_of: "2026-09-21",
         },
       }],
       }), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -174,7 +176,7 @@ describe("RAG 내부 계약", () => {
     });
     expect(result.documents[0]).toMatchObject({
       citation: "근로기준법 제43조",
-      source: { organization: "국가법령정보센터" },
+      source: { organization: "국가법령정보센터", as_of: "2026-09-21" },
     });
     expect(requestedAuthorization).toBe("Bearer rag-internal-token");
   });

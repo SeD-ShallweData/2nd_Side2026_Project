@@ -8,8 +8,9 @@ import type {
 } from "@/domain/conversationSummary";
 import type { ConversationMemoryContext } from "@/domain/chat";
 import { getConversationRepository } from "@/services/userDataProviders";
+import { extractRecallFacts } from "@/services/conversationRecallService";
 
-export const SUMMARY_VERSION = "extractive-v1";
+export const SUMMARY_VERSION = "extractive-v2";
 const SUMMARY_BATCH_SIZE = 10;
 const MAX_ITEMS_PER_FIELD = 6;
 
@@ -85,7 +86,8 @@ function buildSummary(
     .map((message) => excerpt(message, 260, companyByMessageId.get(message.message_id)))
     .filter((item): item is ConversationSummaryItem => Boolean(item));
   const facts = userMessages
-    .filter((message) => !isOpenQuestion(message.content) && /(?:했|됐|있|없|받|근무|입사|퇴사|계약|월급|임금|체불)/.test(message.content))
+    .filter((message) => (!isOpenQuestion(message.content) || /(?:입니다|이고|있습니다|못했다|했다고|겠다고)/.test(message.content))
+      && /(?:했|됐|있|없|받|근무|입사|퇴사|계약|월급|임금|체불|급여일|지급)/.test(message.content))
     .map((message) => excerpt(message, 300, companyByMessageId.get(message.message_id), isCorrection(message.content)))
     .filter((item): item is ConversationSummaryItem => Boolean(item));
   const questions = userMessages
@@ -115,13 +117,20 @@ export async function maybeUpdateConversationSummary(
 ): Promise<boolean> {
   const repository = getConversationRepository();
   const messages = allMessages(detail);
-  const existing = await repository.findSummary(detail.conversation_id);
-  const through = existing?.summarized_through_sequence ?? 0;
   const target = summaryTargetForMessageCount(messages.length);
-  if (target < SUMMARY_BATCH_SIZE || target <= through) return false;
-  if (!(await repository.claimSummary(detail.conversation_id, target))) return false;
+  if (target < SUMMARY_BATCH_SIZE) return false;
+  const leaseToken = await repository.claimSummary(detail.conversation_id, target);
+  if (!leaseToken) return false;
+  const heartbeat = setInterval(() => {
+    void repository.renewSummary(detail.conversation_id, leaseToken).catch(() => undefined);
+  }, 30_000);
+  heartbeat.unref();
 
   try {
+    // Read the completed checkpoint AFTER claiming; another worker may have
+    // advanced it between our initial detail read and this claim.
+    const existing = await repository.findSummary(detail.conversation_id);
+    const through = existing?.summarized_through_sequence ?? 0;
     const batch = messages.slice(through, target);
     // 완료 turn만 저장하므로 batch는 항상 user/assistant 짝을 보존한다.
     const summarizedTurns = detail.turns
@@ -140,15 +149,25 @@ export async function maybeUpdateConversationSummary(
       companies,
       companyByMessageId,
     );
+    // Rebuild the bounded structured slots from retained originals, including legacy
+    // checkpoints. This retains corrections/provenance without rewriting history.
+    summary.recall_facts = summarizedTurns.flatMap((turn) => turn.messages.flatMap((message, index) =>
+      message.role === "user" ? extractRecallFacts({
+        content: message.content, source_message_id: message.message_id,
+        sequence: (turn.turn_index - 1) * 2 + index + 1, company_id: turn.company_id ?? null,
+      }) : [])).slice(-64);
     return await repository.completeSummary({
       conversation_id: detail.conversation_id,
       through_sequence: target,
       summary,
       summary_version: SUMMARY_VERSION,
+      lease_token: leaseToken,
     });
   } catch {
-    await repository.failSummary(detail.conversation_id, target, "SUMMARY_BUILD_FAILED").catch(() => undefined);
+    await repository.failSummary(detail.conversation_id, target, "SUMMARY_BUILD_FAILED", leaseToken).catch(() => undefined);
     return false;
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 
@@ -171,6 +190,9 @@ export function toConversationMemoryContext(
     ...renderItems("사용자 진술", summary.summary.user_stated_facts),
     ...renderItems("기존 안내", summary.summary.actions_already_given),
     ...renderItems("미해결 질문", summary.summary.open_questions),
+    ...(summary.summary.recall_facts ?? []).map((fact) =>
+      `사용자 진술 회상: ${fact.kind === "payday" ? "급여일" : "지급 약속"}=${fact.value ?? "미확인/철회"}, 순서=${fact.sequence}${fact.is_correction ? ", 정정" : ""}, 회사=${fact.company_id ?? "미선택"}`),
+    "같은 회사·항목은 뒤의 진술/정정이 현재 값이다. 다른 회사 진술을 현재 회사 사실로 옮기지 않는다.",
     summary.summary.referenced_company_ids.length
       ? `과거 선택 회사 ID: ${summary.summary.referenced_company_ids.join(", ")}`
       : "",

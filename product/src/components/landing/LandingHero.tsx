@@ -11,11 +11,11 @@ export function LandingHero() {
             <span>일하기 전에도, 일하는 중에도</span>
             <mark>미리 대비하는 <span className="refresh-brand-word">Co끼리</span></mark>
           </h1>
-          <p>사업장의 공개 정보부터 계약서, 노동 상담까지. 막막했던 확인을 한곳에서 시작하세요.</p>
+          <p>사업장의 공개 정보부터 계약서, 노동 상담까지.<br />막막했던 확인을 한곳에서 시작하세요.</p>
           <div className="refresh-button-row">
             <Link href="/chat" className="button button-ai button-large consult-cta">
               <Image src="/brand/donworry-mascot.png" alt="" width={192} height={192} />
-              돈워리 AI에게 상담하기
+              돈워리 AI에게 상담하기 <span aria-hidden="true">→</span>
             </Link>
             <Link href="/companies" className="button button-dark button-large">궁금한 사업장의 위험요소 보러가기 <span aria-hidden="true">→</span></Link>
           </div>

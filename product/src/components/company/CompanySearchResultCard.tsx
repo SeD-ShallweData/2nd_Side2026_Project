@@ -49,21 +49,23 @@ export function CompanySearchResultCard({
           </dl>
         </div>
       </div>
-      <button
-        type="button"
-        className="button button-dark"
-        onClick={() => onSelect(company.company_id)}
-        aria-label={`${company.company_name}, ${company.region ?? "지역 정보 없음"}, ${company.industry ?? "업종 정보 없음"} 선택`}
-      >
-        이 사업장 선택
-      </button>
-      <FavoriteButton
-        companyId={company.company_id}
-        companyName={company.company_name}
-        initialIsFavorite={isFavorite}
-        eligibility={favoriteEligibility}
-        onChange={onFavoriteChange}
-      />
+      <div className="company-result-actions">
+        <button
+          type="button"
+          className="button button-dark"
+          onClick={() => onSelect(company.company_id)}
+          aria-label={`${company.company_name}, ${company.region ?? "지역 정보 없음"}, ${company.industry ?? "업종 정보 없음"} 선택`}
+        >
+          이 사업장 선택
+        </button>
+        <FavoriteButton
+          companyId={company.company_id}
+          companyName={company.company_name}
+          initialIsFavorite={isFavorite}
+          eligibility={favoriteEligibility}
+          onChange={onFavoriteChange}
+        />
+      </div>
     </article>
   );
 }

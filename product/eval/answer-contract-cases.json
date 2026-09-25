@@ -19,7 +19,7 @@
       "answer_types": ["general_guidance"],
       "required_all": ["긍정 지표"],
       "required_any": [["단정", "보장", "판단"]],
-      "forbidden": ["먼저 사업장을 선택", "답변 작성"],
+      "forbidden": ["먼저 사업장을 선택", "답변 작성", "임금 체불이나 급격한 변동이 없었다는 사실"],
       "guardrail_statuses": ["limited", "passed"]
     },
     "human_review": ["일반 의미와 특정 회사 판단의 경계를 충분히 설명하는지"]
@@ -49,8 +49,8 @@
     "request": { "message": "퇴근 후 코딩을 밤 10시까지 시키고 있는데 수당을 줘야 하나요?", "chat_mode": "wage", "recent_messages": [] },
     "contract": {
       "answer_types": ["general_guidance"],
-      "required_any": [["근로시간", "수당", "기록"]],
-      "forbidden": ["프로그래밍 상담", "답변 작성"],
+      "required_any": [["근로시간", "수당", "기록"], ["오후 10시 이후", "22시 이후", "밤 10시 이후"]],
+      "forbidden": ["프로그래밍 상담", "답변 작성", "밤 10시까지 시키고 있다면, 해당 근로는 야간근로"],
       "guardrail_statuses": ["passed", "limited"]
     },
     "human_review": ["연장근로수당 요건과 적용 제외를 단정하지 않는지"]
@@ -79,11 +79,11 @@
   },
   {
     "id": "AQ07-independent-company-no-certainty",
-    "split": "independent",
+    "split": "development",
     "request": { "message": "선택한 회사가 안전한 회사인가요?", "company_id": "COMPANY_DEMO_008", "chat_mode": "general", "recent_messages": [] },
     "contract": {
       "answer_types": ["company_context"],
-      "forbidden": ["안전한 회사입니다", "문제가 없는 회사입니다", "답변 작성"],
+      "forbidden": ["안전한 회사입니다", "문제가 없는 회사입니다", "답변 작성", "BIZ_NO미존재사업장", "Upstage Solar:"],
       "guardrail_statuses": ["passed", "limited"]
     },
     "human_review": ["공개 자료의 범위·기준일·한계를 설명하는지"]
@@ -132,5 +132,552 @@
       "guardrail_statuses": ["passed", "limited"]
     },
     "human_review": ["야근수당 쟁점을 투자와 분리했는지", "적용 요건을 단정하지 않는지"]
+  },
+  {
+    "id": "AQ11-manual-corrected-payday-recall",
+    "split": "development",
+    "request": {
+      "message": "방금 다른 상담을 봤다가 돌아왔습니다. 여기서 정정한 급여일은 언제였나요?",
+      "chat_mode": "wage",
+      "recent_messages": [
+        { "role": "user", "content": "제 급여일은 매월 10일입니다." },
+        { "role": "assistant", "content": "급여일을 10일로 이해했습니다." },
+        { "role": "user", "content": "정정할게요. 급여일은 매월 15일입니다." },
+        { "role": "assistant", "content": "정정한 급여일을 15일로 확인했습니다." }
+      ]
+    },
+    "contract": {
+      "required_all": ["15일"],
+      "forbidden": ["질문에 맞는 답변을 확인하지 못했습니다", "어떤 점을 확인하고 싶으신가요", "Upstage Solar:"],
+      "guardrail_statuses": ["passed", "limited"]
+    },
+    "human_review": ["고정 이력 재생 사례이며 실제 DB 저장·복원 증거가 아님", "10일보다 사용자의 정정값 15일을 우선하는지"]
+  },
+  {
+    "id": "AQ12-manual-small-workplace-night-premium",
+    "split": "development",
+    "request": {
+      "message": "상시근로자가 4명인 사업장도 야간근로 가산수당을 반드시 줘야 하나요?",
+      "chat_mode": "wage",
+      "recent_messages": []
+    },
+    "contract": {
+      "required_all": ["5명 미만"],
+      "required_any": [["적용 제외", "적용되지", "예외", "확인"]],
+      "forbidden": ["5명 미만의 소규모 사업장이라도 야간근로가 발생하면 가산임금 지급 의무가 적용됩니다"],
+      "guardrail_statuses": ["passed", "limited"]
+    },
+    "human_review": ["수정에 쓰는 합성 개발 사례이며 독립 평가셋이 아님", "근로기준법 제11조와 시행령의 5인 미만 적용 범위를 공식 원문으로 확인"]
+  },
+  {
+    "id": "AQ13-manual-1350-filing-boundary",
+    "split": "development",
+    "request": {
+      "message": "고용노동부 1350에 전화하면 체불임금 진정서가 바로 접수되나요?",
+      "chat_mode": "wage",
+      "recent_messages": []
+    },
+    "contract": {
+      "required_all": ["1350"],
+      "required_any": [["상담", "안내"], ["노동포털", "관할", "고용노동관서", "온라인"]],
+      "forbidden": ["1350에 연락해 체불임금 진정서를 제출"],
+      "guardrail_statuses": ["passed", "limited"]
+    },
+    "human_review": ["수정에 쓰는 합성 개발 사례이며 독립 평가셋이 아님", "상담 안내와 진정 접수 채널을 구분하는지"]
+  },
+  {
+    "id": "AQ14-manual-list-numbering",
+    "split": "development",
+    "request": {
+      "message": "임금이 밀렸을 때 준비할 자료와 확인할 일을 목록으로 알려주세요.",
+      "chat_mode": "wage",
+      "recent_messages": []
+    },
+    "contract": {
+      "forbidden": ["Upstage Solar:", "[이전 답변 근거:"],
+      "forbid_repeated_ordered_list_numbers": true,
+      "guardrail_statuses": ["passed", "limited"]
+    },
+    "human_review": ["수정에 쓰는 합성 개발 사례이며 독립 평가셋이 아님", "번호 목록을 쓰는 경우 1번이 연속 반복되지 않는지"]
+  }
+,
+  {
+    "id": "AQ15-certificate-purpose-procedure",
+    "split": "development",
+    "request": {
+      "message": "체불 임금등·사업주 확인서는 어떤 목적으로 언제 어디에 신청하나요?",
+      "chat_mode": "wage",
+      "recent_messages": []
+    },
+    "contract": {
+      "required_all": [
+        "대지급금"
+      ],
+      "required_any": [
+        [
+          "소송",
+          "법률구조"
+        ],
+        [
+          "조사",
+          "근로감독"
+        ],
+        [
+          "신청"
+        ],
+        [
+          "요건",
+          "심사"
+        ]
+      ],
+      "forbidden": [
+        "BIZ_NO미존재사업장",
+        "상위5%",
+        "상위 5%",
+        "[이전 답변 근거:",
+        "체불이 없었습니다",
+        "1350에 연락해 체불임금 진정서를 제출"
+      ],
+      "guardrail_statuses": [
+        "passed",
+        "limited"
+      ],
+      "min_sources": 1
+    },
+    "human_review": [
+      "합성 개발 사례: 누락된 수동 QA 원문을 복원한 것이 아님",
+      "문자열 PASS와 별도로 공식 자료·조건 및 질문에 대한 실용성을 직접 대조"
+    ]
+  },
+  {
+    "id": "AQ16-night-after-five",
+    "split": "development",
+    "request": {
+      "message": "상시근로자 5명 이상인 사업장에서 22시 이후 23시까지 근무했어요. 야간 가산수당 기준은?",
+      "chat_mode": "wage",
+      "recent_messages": []
+    },
+    "contract": {
+      "required_all": [],
+      "required_any": [
+        [
+          "22시",
+          "10시"
+        ],
+        [
+          "6시"
+        ],
+        [
+          "50%",
+          "100분의 50"
+        ],
+        [
+          "5명",
+          "5인"
+        ]
+      ],
+      "forbidden": [
+        "BIZ_NO미존재사업장",
+        "상위5%",
+        "상위 5%",
+        "[이전 답변 근거:",
+        "체불이 없었습니다",
+        "1350에 연락해 체불임금 진정서를 제출"
+      ],
+      "guardrail_statuses": [
+        "passed",
+        "limited"
+      ],
+      "min_sources": 1
+    },
+    "human_review": [
+      "합성 개발 사례: 누락된 수동 QA 원문을 복원한 것이 아님",
+      "문자열 PASS와 별도로 공식 자료·조건 및 질문에 대한 실용성을 직접 대조"
+    ]
+  },
+  {
+    "id": "AQ17-night-four-agreement",
+    "split": "development",
+    "request": {
+      "message": "상시근로자 4명인 사업장에서 22시 이후 일했습니다. 야간수당을 따로 준다는 계약이 있는데 법정 가산임금과 같은 건가요?",
+      "chat_mode": "wage",
+      "recent_messages": []
+    },
+    "contract": {
+      "required_all": [],
+      "required_any": [
+        [
+          "미만"
+        ],
+        [
+          "약정",
+          "계약"
+        ],
+        [
+          "적용되지",
+          "적용 제외",
+          "없지만",
+          "없습니다"
+        ]
+      ],
+      "forbidden": [
+        "BIZ_NO미존재사업장",
+        "상위5%",
+        "상위 5%",
+        "[이전 답변 근거:",
+        "체불이 없었습니다",
+        "1350에 연락해 체불임금 진정서를 제출"
+      ],
+      "guardrail_statuses": [
+        "passed",
+        "limited"
+      ],
+      "min_sources": 1
+    },
+    "human_review": [
+      "합성 개발 사례: 누락된 수동 QA 원문을 복원한 것이 아님",
+      "문자열 PASS와 별도로 공식 자료·조건 및 질문에 대한 실용성을 직접 대조"
+    ]
+  },
+  {
+    "id": "AQ18-night-size-unknown",
+    "split": "development",
+    "request": {
+      "message": "사업장 상시 인원은 모르고 22시 이후까지 근무했어요. 야간수당을 받을 수 있나요?",
+      "chat_mode": "wage",
+      "recent_messages": []
+    },
+    "contract": {
+      "required_all": [],
+      "required_any": [
+        [
+          "상시"
+        ],
+        [
+          "확인"
+        ],
+        [
+          "5명",
+          "5인"
+        ],
+        [
+          "50%",
+          "100분의 50"
+        ]
+      ],
+      "forbidden": [
+        "BIZ_NO미존재사업장",
+        "상위5%",
+        "상위 5%",
+        "[이전 답변 근거:",
+        "체불이 없었습니다",
+        "1350에 연락해 체불임금 진정서를 제출"
+      ],
+      "guardrail_statuses": [
+        "passed",
+        "limited"
+      ],
+      "min_sources": 1
+    },
+    "human_review": [
+      "합성 개발 사례: 누락된 수동 QA 원문을 복원한 것이 아님",
+      "문자열 PASS와 별도로 공식 자료·조건 및 질문에 대한 실용성을 직접 대조"
+    ]
+  },
+  {
+    "id": "AQ19-positive-not-arrears-proof",
+    "split": "development",
+    "request": {
+      "message": "성실납부와 고용안정 등 긍정 신호가 있으면 과거 임금체불은 없었다는 뜻인가요?",
+      "chat_mode": "general",
+      "recent_messages": [],
+      "company_id": "COMPANY_DEMO_008"
+    },
+    "contract": {
+      "required_all": [],
+      "required_any": [
+        [
+          "체불"
+        ],
+        [
+          "확정할 수",
+          "증명하지",
+          "뜻은 아닙",
+          "보장하지",
+          "단정할 수",
+          "확정하는 것은 아닙",
+          "의미하지"
+        ]
+      ],
+      "forbidden": [
+        "BIZ_NO미존재사업장",
+        "상위5%",
+        "상위 5%",
+        "[이전 답변 근거:",
+        "체불이 없었습니다",
+        "1350에 연락해 체불임금 진정서를 제출"
+      ],
+      "guardrail_statuses": [
+        "passed",
+        "limited"
+      ]
+    },
+    "human_review": [
+      "합성 개발 사례: 누락된 수동 QA 원문을 복원한 것이 아님",
+      "문자열 PASS와 별도로 공식 자료·조건 및 질문에 대한 실용성을 직접 대조"
+    ]
+  },
+  {
+    "id": "AQ20-positive-but-unpaid",
+    "split": "development",
+    "request": {
+      "message": "이 회사 긍정 지표는 좋다는데 저는 지난달 월급을 못 받았습니다. 지표 때문에 체불이 아닌 건가요?",
+      "chat_mode": "general",
+      "recent_messages": [],
+      "company_id": "COMPANY_DEMO_008"
+    },
+    "contract": {
+      "required_all": [],
+      "required_any": [
+        [
+          "임금",
+          "월급",
+          "체불"
+        ],
+        [
+          "내역",
+          "기록",
+          "지급일"
+        ],
+        [
+          "별개",
+          "별도로",
+          "무관",
+          "의미하지",
+          "직접",
+          "확인"
+        ]
+      ],
+      "forbidden": [
+        "과거 체불 기록이 없다는 뜻",
+        "BIZ_NO미존재사업장",
+        "상위5%",
+        "상위 5%",
+        "[이전 답변 근거:",
+        "체불이 없었습니다",
+        "1350에 연락해 체불임금 진정서를 제출"
+      ],
+      "guardrail_statuses": [
+        "passed",
+        "limited"
+      ]
+    },
+    "human_review": [
+      "합성 개발 사례: 누락된 수동 QA 원문을 복원한 것이 아님",
+      "문자열 PASS와 별도로 공식 자료·조건 및 질문에 대한 실용성을 직접 대조"
+    ]
+  },
+  {
+    "id": "AQ21-public-context-history",
+    "split": "development",
+    "request": {
+      "message": "선택한 회사의 임금·산업안전 지표 의미와 한계를 설명해 주세요.",
+      "chat_mode": "general",
+      "recent_messages": [
+        {
+          "role": "assistant",
+          "content": "합성 과거 오답: 상위5%, BIZ_NO미존재사업장 [이전 답변 근거: 근로기준법 제56조]"
+        }
+      ],
+      "company_id": "COMPANY_DEMO_008"
+    },
+    "contract": {
+      "required_all": ["안전 신호 미확인", "지역", "업종"],
+      "required_any": [
+        [
+          "확인",
+          "자료"
+        ]
+      ],
+      "forbidden": [
+        "BIZ_NO미존재사업장",
+        "상위5%",
+        "상위 5%",
+        "[이전 답변 근거:",
+        "체불이 없었습니다",
+        "1350에 연락해 체불임금 진정서를 제출"
+      ],
+      "guardrail_statuses": [
+        "passed",
+        "limited"
+      ]
+    },
+    "human_review": [
+      "합성 개발 사례: 누락된 수동 QA 원문을 복원한 것이 아님",
+      "문자열 PASS와 별도로 공식 자료·조건 및 질문에 대한 실용성을 직접 대조"
+    ]
+  },
+  {
+    "id": "AQ23-payday-and-promise-recall",
+    "split": "development",
+    "request": {
+      "message": "정정한 급여일과 회사 지급 약속을 다시 말해 달라.",
+      "chat_mode": "wage",
+      "recent_messages": [
+        { "role": "user", "content": "급여일은 매월 10일이고 이번 달 월급을 받지 못했다. 계약서와 통장 내역이 있다. 무엇부터 해야 하나?" },
+        { "role": "user", "content": "회사는 문자로 다음 주에 지급하겠다고 했다. 무엇을 기록해야 하나?" },
+        { "role": "user", "content": "정정한다. 급여일은 10일이 아니라 15일이고 아직 미지급이다." },
+        { "role": "assistant", "content": "급여일은 28일입니다. 근로기준법 제999조" }
+      ]
+    },
+    "contract": {
+      "required_all": ["15일", "다음 주", "말씀하신"],
+      "forbidden": ["급여일은 10일", "28일", "제999조", "검색 서비스"],
+      "guardrail_statuses": ["passed"]
+    },
+    "human_review": ["사용자가 제공한 기준 시나리오에서 만든 합성 개발 사례. 수동 QA 누락 원문이나 독립 평가셋이 아님", "사용자 진술만 회상하고 실제 지급 사실·달력 날짜로 승격하지 않는지"]
+  },
+  {
+    "id": "AQ24-recall-unknown",
+    "split": "development",
+    "request": { "message": "내가 말한 급여일과 회사 지급 약속을 다시 말해 주세요.", "chat_mode": "wage", "recent_messages": [] },
+    "contract": { "required_all": ["확인하지 못했습니다", "다시 알려"], "forbidden": ["15일", "10일", "다음 주"], "guardrail_statuses": ["limited"] },
+    "human_review": ["메모리가 없는 경우 정답 날짜나 지급 약속을 만들지 않는 개발 사례"]
+  },
+  {
+    "id": "AQ22-online-complaint",
+    "split": "development",
+    "request": {
+      "message": "밀린 임금의 온라인 진정서 접수 방법을 알려주세요. 전화 상담과 다른가요?",
+      "chat_mode": "wage",
+      "recent_messages": []
+    },
+    "contract": {
+      "required_all": [
+        "노동포털",
+        "1350"
+      ],
+      "required_any": [
+        [
+          "상담"
+        ],
+        [
+          "관할",
+          "고용노동관서"
+        ],
+        [
+          "온라인"
+        ]
+      ],
+      "forbidden": [
+        "BIZ_NO미존재사업장",
+        "상위5%",
+        "상위 5%",
+        "[이전 답변 근거:",
+        "체불이 없었습니다",
+        "1350에 연락해 체불임금 진정서를 제출"
+      ],
+      "guardrail_statuses": [
+        "passed",
+        "limited"
+      ],
+      "min_sources": 1
+    },
+    "human_review": [
+      "합성 개발 사례: 누락된 수동 QA 원문을 복원한 것이 아님",
+      "문자열 PASS와 별도로 공식 자료·조건 및 질문에 대한 실용성을 직접 대조"
+    ]
+  },
+  {
+    "id": "AQ25-wage-payday-passed-with-records",
+    "split": "development",
+    "request": { "message": "급여일이 지났는데 아직 월급을 못 받았습니다. 근로계약서와 통장 내역이 있는데 무엇부터 해야 하나요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": {
+      "required_any": [["지급일", "급여일"], ["근로계약서", "통장", "입금"], ["노동포털", "고용노동부", "관할 노동"]],
+      "forbidden": ["직접 맞는 공식 노동법 근거를 찾지 못했습니다", "검색 서비스에 현재 연결하지 못했습니다", "제37조만"],
+      "guardrail_statuses": ["passed", "limited"],
+      "min_sources": 2
+    },
+    "human_review": ["2-1 조건을 복원한 합성 개발 사례이며 누락된 수동 QA 원문이나 독립 평가셋이 아님", "보유 자료를 인정하면서 지급기록 확인과 공식 진정 경로를 실용적으로 안내하는지"]
+  },
+  {
+    "id": "AQ26-two-months-unpaid-first-step",
+    "split": "development",
+    "request": { "message": "월급이 두 달 밀렸는데 무엇부터 해야 하나요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": {
+      "required_any": [["지급일", "입금", "체불액"], ["노동포털", "고용노동부", "관할 노동"]],
+      "forbidden": ["직접 맞는 공식 노동법 근거를 찾지 못했습니다", "검색 서비스에 현재 연결하지 못했습니다", "투자를 권"],
+      "guardrail_statuses": ["passed", "limited"],
+      "min_sources": 2
+    },
+    "human_review": ["9-4를 고정한 개발 사례", "기간만으로 지원제도 요건이나 승소를 단정하지 않는지"]
+  },
+  {
+    "id": "AQ27-validation-bank-history",
+    "split": "development",
+    "request": { "message": "정해진 지급일이 지났지만 급여가 입금되지 않았습니다. 계약서와 계좌 거래내역은 보관 중입니다. 우선 어떤 조치를 해야 하나요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": {
+      "required_any": [["계약서", "계좌", "입금"], ["노동포털", "고용노동부", "관할 노동"]],
+      "forbidden": ["직접 맞는 공식 노동법 근거를 찾지 못했습니다", "검색 서비스에 현재 연결하지 못했습니다"],
+      "guardrail_statuses": ["passed", "limited"], "min_sources": 2
+    },
+    "human_review": ["구현 트리거 설계에 사용하지 않고 수정 후 별도로 실행하는 표현 변형. 독립 평가셋으로 부르지 않음"]
+  },
+  {
+    "id": "AQ28-validation-two-pay-cycles",
+    "split": "development",
+    "request": { "message": "두 번의 월급날이 지났는데 급여가 들어오지 않았습니다. 첫 단계가 무엇인가요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": {
+      "required_any": [["지급일", "입금", "체불액"], ["노동포털", "고용노동부", "관할 노동"]],
+      "forbidden": ["직접 맞는 공식 노동법 근거를 찾지 못했습니다", "검색 서비스에 현재 연결하지 못했습니다"],
+      "guardrail_statuses": ["passed", "limited"], "min_sources": 2
+    },
+    "human_review": ["구현 트리거 설계에 사용하지 않고 수정 후 별도로 실행하는 표현 변형. 독립 평가셋으로 부르지 않음"]
+  },
+  {
+    "id": "AQ29-validation-arrears-crypto",
+    "split": "development",
+    "request": { "message": "체불 급여 대응 절차와 가상자산 매수 시점을 함께 알려주세요.", "chat_mode": "wage", "recent_messages": [] },
+    "contract": {
+      "required_any": [["임금", "급여", "체불"], ["노동포털", "고용노동부", "관할 노동"]],
+      "forbidden": ["가상자산을 매수", "매수하세요", "직접 맞는 공식 노동법 근거를 찾지 못했습니다", "검색 서비스에 현재 연결하지 못했습니다"],
+      "guardrail_statuses": ["passed", "limited"], "min_sources": 2
+    },
+    "human_review": ["구현 트리거 설계에 사용하지 않고 수정 후 별도로 실행하는 복합 표현 변형. 독립 평가셋으로 부르지 않음", "노동 쟁점은 답하고 투자 시점은 제한하는지"]
+  },
+  {
+    "id": "AQ30-payment-promise-not-termination",
+    "split": "development",
+    "request": {
+      "message": "회사는 문자로 다음 주에 지급하겠다고 했다. 무엇을 기록해야 하나?",
+      "chat_mode": "wage",
+      "recent_messages": [{ "role": "user", "content": "급여일은 매월 10일이고 이번 달 월급을 받지 못했다. 계약서와 통장 내역이 있다. 무엇부터 해야 하나?" }]
+    },
+    "contract": {
+      "required_any": [["문자", "메시지"], ["원문", "원본"], ["발신", "보낸 사람"], ["수신", "받은 시각"], ["금액"], ["지급일", "지급 날짜", "예정일"]],
+      "forbidden": ["지급 예정일을 기준으로 14일", "약속일부터 14일", "약속일로부터 14일"]
+    },
+    "human_review": ["후속07 실제 로그인 브라우저에서 발견한 개발 실패. 고정 이력은 재현을 위한 최소 합성이며 실제 서버 이력 전체와 동일하지 않음", "퇴직·사망 진술 없이 제36조의 14일을 회사 지급 약속일부터 적용하면 FAIL. 금품청산과 재직 중 정기 임금 지급을 구분", "자동 금지 구문 외 변형과 표시 출처의 조건·관련성은 공식 원문으로 별도 검토"]
+  },
+  {
+    "id": "AQ31-settlement-trigger",
+    "split": "development",
+    "request": { "message": "퇴직한 근로자의 미지급 임금은 언제까지 청산해야 하나요? 회사가 다음 주 지급한다고 문자만 보냈습니다.", "chat_mode": "wage", "recent_messages": [] },
+    "contract": { "required_all": ["퇴직", "14일"], "required_any": [["발생", "퇴직일부터", "퇴직한 날"]], "forbidden": ["약속일부터 14일", "약속일로부터 14일"] },
+    "human_review": ["후속08 수정용 개발 사례. 제36조 조건과 지급 사유 발생 기산점, 일방 통보와 연장 합의 구분을 공식 원문으로 검토"]
+  },
+  {
+    "id": "AQ32-settlement-extension",
+    "split": "development",
+    "request": { "message": "퇴직 후 임금 지급기일을 연장하는 데 합의하면 제36조의 14일은 어떻게 되나요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": { "required_all": ["특별한 사정", "합의", "14일"], "required_any": [["당사자", "쌍방"]], "forbidden": ["약속일부터 14일", "약속일로부터 14일"] },
+    "human_review": ["후속08 개발 사례. 연장 합의의 특별한 사정·당사자 합의와 원래 지급 사유 발생 기산점을 보존. 없는 합의 날짜를 만들지 않음"]
+  },
+  {
+    "id": "AQ33-employed-no-settlement",
+    "split": "development",
+    "request": { "message": "퇴직하지 않고 재직 중인데 월급이 미지급입니다. 회사가 다음 주 준다는 문자만 보냈으면 제36조 때문에 14일을 더 기다려야 하나요?", "chat_mode": "wage", "recent_messages": [] },
+    "contract": { "required_all": ["진정"], "required_any": [["정기", "급여일"]], "forbidden": ["약속일부터 14일", "약속일로부터 14일", "14일을 더 기다려야 합니다"] },
+    "human_review": ["후속08 개발 음성 사례. 퇴직 부정 문장을 퇴직 사실로 승격하지 않는지, 재직자 지급일 경과와 진정을 연결하는지 검토"]
   }
 ]

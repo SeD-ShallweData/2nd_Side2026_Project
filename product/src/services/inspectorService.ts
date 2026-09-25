@@ -14,6 +14,7 @@ import type {
   InspectorRecentMessage,
   InspectorSearchResponse,
 } from "@/domain/inspector";
+import { labelRiskReasons } from "@/domain/riskReasonLabels";
 import {
   INSPECTOR_OUTPUT_GUARDRAILS,
   hasUnverifiedCitation,
@@ -134,7 +135,7 @@ function asQueueItem(row: QueueRow): InspectorQueueItem {
     rank: row.rank,
     grade: row.grade as InspectorQueueGrade,
     model_score: row.risk_full,
-    reasons: row.reasons ?? [],
+    reasons: labelRiskReasons(row.reasons ?? []),
   };
 }
 
@@ -344,7 +345,7 @@ export async function getInspectorCompanyDetail(companyId: string): Promise<Insp
     throw new ServiceError("COMPANY_NOT_FOUND", "선택한 사업장을 찾을 수 없습니다.", 404, false);
   }
 
-  const reasons = row.reasons ?? [];
+  const reasons = labelRiskReasons(row.reasons ?? []);
   const industrialSafety = await getSafetyContext(normalized);
   return {
     company: {

@@ -58,8 +58,8 @@ describe("사업장 검색", () => {
 
   it("DB 모드에 맞는 지역·업종 필터 옵션과 건수를 제공한다", async () => {
     const options = await getCompanyFilterOptions();
-    expect(options.regions).toContainEqual({ value: "경기도", count: 2 });
-    expect(options.industries).toContainEqual({ value: "건설업", count: 2 });
+    expect(options.regions).toContainEqual({ value: "경기도", count: 1, count_label: "1–9" });
+    expect(options.industries).toContainEqual({ value: "건설업", count: 1, count_label: "1–9" });
   });
 
   it("영문 대소문자와 별칭을 구분하지 않는다", async () => {

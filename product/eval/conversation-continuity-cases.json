@@ -1,0 +1,58 @@
+[
+  {
+    "id": "AQ-CONT-01-corrected-payday-recall",
+    "split": "development",
+    "evidence": "synthetic_from_confirmed_manual_failure",
+    "steps": [
+      {
+        "message": "급여일은 매월 10일이고 이번 달 월급을 받지 못했다. 계약서와 통장 내역이 있다. 무엇부터 해야 하나?",
+        "chat_mode": "wage",
+        "contract": { "required_all": ["노동포털", "진정"], "required_any": [["급여일", "지급일"], ["1350", "관할"]], "forbidden": ["약속일부터 14일"] },
+        "human_review": ["사용자 진술을 법적 또는 회사 사실로 확대하지 않는지"]
+      },
+      {
+        "message": "회사는 문자로 다음 주에 지급하겠다고 했다. 무엇을 기록해야 하나?",
+        "chat_mode": "wage",
+        "contract": {
+          "required_any": [["문자", "메시지"], ["원문", "원본"], ["발신", "보낸 사람"], ["수신", "받은 시각"], ["금액"], ["지급일", "지급 날짜", "예정일"]],
+          "forbidden": ["지급 예정일을 기준으로 14일", "약속일부터 14일", "약속일로부터 14일"]
+        },
+        "human_review": ["다음 주를 임의의 달력 날짜로 확정하지 않는지"]
+      },
+      {
+        "message": "정정한다. 급여일은 10일이 아니라 15일이고 아직 미지급이다.",
+        "chat_mode": "wage",
+        "contract": { "required_all": ["15일"], "forbidden": ["급여일은 10일입니다"] },
+        "human_review": ["앞선 10일 진술을 15일로 정정한 사실을 보존하는지"]
+      },
+      {
+        "message": "지금까지 말한 급여일과 회사 답변을 정리해 달라.",
+        "chat_mode": "wage",
+        "contract": {
+          "required_all": ["15일", "다음 주"],
+          "forbidden": ["질문에 맞는 답변을 확인하지 못했습니다", "어떤 점을 확인하고 싶으신가요"]
+        },
+        "human_review": ["요약 전 서버 원문으로 15일과 다음 주를 회상하는지"]
+      },
+      {
+        "message": "지급 약속일까지 못 받으면 어디에 어떻게 문의하나?",
+        "chat_mode": "wage",
+        "contract": { "required_all": ["노동포털", "진정"], "required_any": [["급여일", "지급일"], ["1350", "관할"]], "forbidden": ["약속일부터 14일"] },
+        "human_review": ["회상과 새로운 법률 조언을 분리하고 현재 근거를 사용하는지"]
+      },
+      {
+        "message": "정정한 급여일과 회사 지급 약속을 다시 말해 달라.",
+        "chat_mode": "wage",
+        "contract": { "required_all": ["15일", "다음 주"], "forbidden": ["법령 검색 서비스", "급여일은 10일"] },
+        "human_review": ["10개 메시지 요약 상태·완료 지점·실제 포함 여부를 trace와 대조"]
+      },
+      {
+        "restore_before": "relogin",
+        "message": "정정한 급여일과 회사 지급 약속을 다시 말해 달라.",
+        "chat_mode": "wage",
+        "contract": { "required_all": ["15일", "다음 주"], "forbidden": ["법령 검색 서비스", "급여일은 10일"] },
+        "human_review": ["재로그인·detail 복원 후 recent_messages 없이 서버 소유 기억으로 회상하는지", "브라우저 새로고침·대화 이동 클릭 E2E와 별도 검사"]
+      }
+    ]
+  }
+]

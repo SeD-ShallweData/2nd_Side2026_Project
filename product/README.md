@@ -326,6 +326,11 @@ npm run test:e2e:openai-live
 
 API 키와 숨은 시스템 프롬프트는 브라우저로 전송하지 않습니다. “더 유용한 답변” 평가는 질문·답변 원문 없이 `.runtime/comparison-feedback.jsonl`에 선택과 성능 지표만 저장합니다.
 
+공개 검색·익명 quota, 외부 AI 요청별 동의, 30일 상담 보존, 계정 삭제와 운영 전 확인 항목은
+[`../docs/data-contract/public-ai-privacy.md`](../docs/data-contract/public-ai-privacy.md)를 따릅니다.
+운영에서 chat feedback을 저장하려면 server-issued 비교 확인과 90일 purge가 먼저 필요하므로,
+그 전에는 `SAVE_COMPARISON_FEEDBACK=false`를 유지합니다.
+
 ## API
 
 - `GET /api/companies/search?q=사업장명`

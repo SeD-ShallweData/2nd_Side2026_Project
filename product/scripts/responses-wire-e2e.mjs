@@ -28,6 +28,7 @@ async function chat(message, extra = {}) {
       message,
       chat_mode: "general",
       recent_messages: [],
+      external_processing_consent: true,
       ...extra,
     }),
   });
@@ -136,6 +137,7 @@ contractForm.append(
   new Blob([contractBytes], { type: "application/pdf" }),
   "dummy_contract.pdf",
 );
+contractForm.append("external_processing_consent", "true");
 contractForm.append(
   "message",
   "E2E_TOOL=contract\n현재 업로드한 근로계약서를 검토해 주세요.",

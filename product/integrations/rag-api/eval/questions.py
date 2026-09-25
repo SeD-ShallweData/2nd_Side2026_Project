@@ -174,3 +174,44 @@ USER_LANGUAGE_REGRESSIONS = [
     {"q": "근로계약서를 아직 못 받았어요", "law": KIS, "articles": ["제17조"]},
     {"q": "포괄임금제면 야근수당을 못 받나요?", "law": KIS, "articles": ["제56조"]},
 ]
+
+# Follow-up 04 incident reproductions are development cases, not an independent set.
+FOLLOWUP04_DEVELOPMENT = [
+    {
+        "id": "F04-2-1-payday-passed-with-records",
+        "q": "급여일이 지났는데 아직 월급을 못 받았습니다. 근로계약서와 통장 내역이 있는데 무엇부터 해야 하나요?",
+    },
+    {
+        "id": "F04-9-4-two-months-unpaid",
+        "q": "월급이 두 달 밀렸는데 무엇부터 해야 하나요?",
+    },
+    {
+        "id": "F04-9-8-labor-investment-compound",
+        "q": "밀린 월급을 받는 방법과 코인 매수 타이밍을 같이 알려줘",
+    },
+]
+
+# These wordings are kept out of the implementation trigger design and are run
+# only as validation variations after the development cases are fixed.
+FOLLOWUP04_VALIDATION = [
+    {
+        "id": "F04-V1-payday-passed-bank-history",
+        "q": "정해진 지급일이 지났지만 급여가 입금되지 않았습니다. 계약서와 계좌 거래내역은 보관 중입니다. 우선 어떤 조치를 해야 하나요?",
+    },
+    {
+        "id": "F04-V2-two-pay-cycles",
+        "q": "두 번의 월급날이 지났는데 급여가 들어오지 않았습니다. 첫 단계가 무엇인가요?",
+    },
+    {
+        "id": "F04-V3-arrears-crypto",
+        "q": "체불 급여 대응 절차와 가상자산 투자 시점을 함께 알려주세요.",
+    },
+]
+
+FOLLOWUP04_NEGATIVES = [
+    {"id": "F04-N1-company-indicator", "q": "긍정 지표 0개면 나쁜 회사인가요?"},
+    {"id": "F04-N2-memory-recall", "q": "여기서 정정한 급여일은 언제였나요?"},
+    {"id": "F04-N3-weather", "q": "오늘 서울 날씨 어때?"},
+    {"id": "F04-N4-outside-corpus", "q": "산재 신청은 근로복지공단에 어떻게 하나요?"},
+    {"id": "F04-N5-ambiguous-money", "q": "돈을 아직 못 받았는데 어떻게 해야 하나요?"},
+]

@@ -49,7 +49,7 @@ describe("conversation request lifecycle", () => {
     expect(duplicateWhilePending).toMatchObject({ conversation_id: first.conversation_id, status: "pending", reused: true });
 
     const completed = await completeClaimedConversationRequest(
-      { ...REQUEST, conversation_id: first.conversation_id }, response(), USER,
+      { ...REQUEST, conversation_id: first.conversation_id, conversation_request_lease_token: first.lease_token! }, response(), USER,
     );
     const duplicateAfterCompletion = await claimConversationRequest(REQUEST, USER);
     expect(completed.reused).toBe(false);
@@ -65,19 +65,42 @@ describe("conversation request lifecycle", () => {
     expect(cachedGeneratedResponse(USER, REQUEST.request_id)).toEqual(generated);
     await deleteUserConversation(claim.conversation_id, USER);
     await expect(completeClaimedConversationRequest(
-      { ...REQUEST, conversation_id: claim.conversation_id }, generated, USER,
+      { ...REQUEST, conversation_id: claim.conversation_id, conversation_request_lease_token: claim.lease_token! }, generated, USER,
     )).rejects.toThrow("conversation request not found");
   });
 
   it("marks failed and cancelled requests as non-retryable states", async () => {
     vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
-    await claimConversationRequest(REQUEST, USER);
-    await failClaimedConversationRequest(REQUEST, USER, "failed", "MODEL_FAILED");
+    const failed = await claimConversationRequest(REQUEST, USER);
+    await failClaimedConversationRequest({ ...REQUEST, conversation_request_lease_token: failed.lease_token! }, USER, "failed", "MODEL_FAILED");
     await expect(claimConversationRequest(REQUEST, USER)).resolves.toMatchObject({ status: "failed", reused: true });
 
     const cancelled = { ...REQUEST, request_id: "request_0000000000000102" };
-    await claimConversationRequest(cancelled, USER);
-    await failClaimedConversationRequest(cancelled, USER, "cancelled", "CLIENT_CANCELLED");
+    const cancelledClaim = await claimConversationRequest(cancelled, USER);
+    await failClaimedConversationRequest({ ...cancelled, conversation_request_lease_token: cancelledClaim.lease_token! }, USER, "cancelled", "CLIENT_CANCELLED");
     await expect(claimConversationRequest(cancelled, USER)).resolves.toMatchObject({ status: "cancelled", reused: true });
+  });
+
+  it("reclaims an expired pending request and fences the stale writer", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-21T00:00:00.000Z"));
+    try {
+      const first = await claimConversationRequest(REQUEST, USER);
+      vi.advanceTimersByTime(120_001);
+      const reclaimed = await claimConversationRequest(REQUEST, USER);
+      expect(reclaimed).toMatchObject({ conversation_id: first.conversation_id, status: "pending", reused: false });
+      expect(reclaimed.lease_token).not.toBe(first.lease_token);
+      await expect(completeClaimedConversationRequest(
+        { ...REQUEST, conversation_id: first.conversation_id, conversation_request_lease_token: first.lease_token! },
+        response("stale"), USER,
+      )).rejects.toThrow("conversation request is not pending");
+      await expect(completeClaimedConversationRequest(
+        { ...REQUEST, conversation_id: first.conversation_id, conversation_request_lease_token: reclaimed.lease_token! },
+        response("reclaimed"), USER,
+      )).resolves.toMatchObject({ reused: false });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

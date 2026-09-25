@@ -20,6 +20,8 @@ import type {
 } from "@/domain/chatComparison";
 import { executionModeCopy, providerRunStatusLabel } from "@/components/chat/runLabels";
 import { readApiResponse } from "@/utils/clientApi";
+import { publicClientHeaders } from "@/utils/publicClientId";
+import { publicAnswerText } from "@/services/publicAnswerContext";
 import {
   appendGuestConversationTurn,
   clearGuestConversation,
@@ -70,6 +72,7 @@ interface UiMessage {
   comparison?: ChatComparisonResponse;
   sources?: import("@/domain/risk").SourceReference[];
   companyId?: string | null;
+  companyName?: string | null;
 }
 
 function welcomeContent(company: string | undefined, executionMode: ConfiguredChatExecutionMode): string {
@@ -95,7 +98,7 @@ function comparisonHistoryContent(
     ? comparison.results.filter((result) => result.provider === selection)
     : comparison.results;
   return selected
-    .map((result) => `${result.provider_label}: ${result.answer.slice(0, 900)}`)
+    .map((result) => publicAnswerText(result.answer).slice(0, 900))
     .join("\n");
 }
 
@@ -106,7 +109,7 @@ function isLegacyProvider(
 }
 
 function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
-  const statusLabel = providerRunStatusLabel(result.status, result.trace.guardrail_hits);
+  const statusLabel = providerRunStatusLabel(result.status, result.trace.guardrail_hits, result.trace.recall_mode);
 
   return (
     <article className={`provider-answer provider-answer-${result.provider}`}>
@@ -126,7 +129,7 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
         </div>
       ) : null}
 
-      <div className="provider-answer-copy"><SafeMarkdown>{result.answer}</SafeMarkdown></div>
+      <div className="provider-answer-copy"><SafeMarkdown>{publicAnswerText(result.answer)}</SafeMarkdown></div>
 
       <section className="provider-evidence" aria-label={`${result.provider_label} 답변 근거와 한계`}>
         <div>
@@ -203,6 +206,8 @@ function ComparisonBlock({
   const ragToolCalled = retrieval?.tool_names?.includes("retrieve_labor_law") ?? false;
   const ragLabel = !retrieval
     ? "공식 근거 상태 미확인"
+    : comparison.execution_mode === "policy_short_circuit" && retrieval.recall_mode
+      ? "사용자 진술 기반 · 법령 검색 미사용"
     : comparison.execution_mode === "openai_responses" && !ragToolCalled
       ? "이번 답변에서 공식 법령 검색 미사용"
     : retrieval.rag_status === "matched"
@@ -214,7 +219,7 @@ function ComparisonBlock({
         : comparison.execution_mode === "policy_short_circuit"
           ? "긴급 안내 우선"
           : "공식 근거 검색 연결 안 됨";
-  const modeCopy = executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits);
+  const modeCopy = executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits, retrieval?.recall_mode);
   const feedbackResults = comparison.execution_mode === "dual_api"
     ? comparison.results.filter(isLegacyProvider)
     : [];
@@ -293,6 +298,7 @@ export function ChatPanel({
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<Record<string, LlmProviderId | "tie">>({});
   const [compare, setCompare] = useState(false);
+  const [externalProcessingConsent, setExternalProcessingConsent] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<ConversationSummaryDto[]>([]);
   const [historyAvailable, setHistoryAvailable] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -336,6 +342,10 @@ export function ChatPanel({
   async function sendMessage(value: string, retryRequestId?: string) {
     const message = value.trim();
     if (!message || loading) return;
+    if (!externalProcessingConsent) {
+      setError("외부 AI 전송 안내를 확인하고 이번 질문 전송에 동의해 주세요.");
+      return;
+    }
     const submittedContractFile = contractFile;
     const requestedComparison = executionMode === "dual_api" && compare;
     const requestId = retryRequestId ?? crypto.randomUUID();
@@ -350,14 +360,14 @@ export function ChatPanel({
           : item.content,
       }));
     setMessages((current) => [...current, {
-      id: crypto.randomUUID(), requestId, role: "user", content: message, companyId: activeCompanyId ?? null,
+      id: crypto.randomUUID(), requestId, role: "user", content: message, companyId: activeCompanyId ?? null, companyName: activeCompanyName ?? null,
     }]);
     setDraft("");
     setError(null);
     setLoading(true);
 
     try {
-      const requestInit: RequestInit = { method: "POST" };
+      const requestInit: RequestInit = { method: "POST", headers: publicClientHeaders() };
       if (
         executionMode === "openai_responses" &&
         chatMode === "contract" &&
@@ -369,17 +379,20 @@ export function ChatPanel({
         form.append("request_id", requestId);
         form.append("chat_mode", chatMode);
         form.append("recent_messages", JSON.stringify(recentMessages));
+        form.append("external_processing_consent", "true");
         if (conversationId) form.append("conversation_id", conversationId);
         if (activeCompanyId) form.append("company_id", activeCompanyId);
         requestInit.body = form;
       } else {
-        requestInit.headers = { "Content-Type": "application/json" };
+        requestInit.headers = { ...publicClientHeaders(), "Content-Type": "application/json" };
         requestInit.body = JSON.stringify({
           message,
           request_id: requestId,
           conversation_id: conversationId,
           company_id: activeCompanyId,
           compare: requestedComparison,
+          external_processing_consent: true,
+          external_compare_consent: requestedComparison,
           chat_mode: chatMode,
           recent_messages: recentMessages,
         });
@@ -461,10 +474,13 @@ export function ChatPanel({
       setConversationId(detail.conversation_id);
       setConversationTitle(detail.title);
       setActiveCompanyId(detail.active_company_id ?? undefined);
-      setActiveCompanyName(detail.active_company_id === companyId ? companyName : undefined);
+      const restoredCompanyName = detail.active_company_id === companyId
+        ? companyName
+        : detail.active_company_name ?? undefined;
+      setActiveCompanyName(restoredCompanyName);
       setMessages([
         { id: "welcome", role: "assistant", content: welcomeContent(
-          detail.active_company_id === companyId ? companyName : detail.active_company_id ?? undefined,
+          restoredCompanyName,
           executionMode,
         ) },
         ...detail.turns.flatMap((turn) => turn.messages.map((message) => message.role === "assistant" && turn.response
@@ -474,6 +490,7 @@ export function ChatPanel({
               role: message.role,
               content: message.content,
               companyId: turn.company_id,
+              companyName: turn.company_name,
               ...(message.role === "assistant" ? { sources: turn.sources } : {}),
             })),
       ]);
@@ -594,7 +611,7 @@ export function ChatPanel({
   }
 
   const questions = activeCompanyId ? COMPANY_QUESTIONS : GENERAL_QUESTIONS;
-  const activeCompanyLabel = activeCompanyName ?? activeCompanyId;
+  const activeCompanyLabel = activeCompanyName ?? (activeCompanyId ? "선택 사업장" : undefined);
 
   return (
     <div className="chat-experience-layout">
@@ -622,7 +639,7 @@ export function ChatPanel({
                     <span aria-hidden="true">↻</span> 재전송
                   </button>
                   <div className="chat-message chat-message-user"><p>{message.content}</p></div>
-                  {message.companyId ? <small className="turn-company-label">당시 사업장: {message.companyId}</small> : null}
+                  {message.companyId ? <small className="turn-company-label">당시 사업장: {message.companyName ?? "연결된 사업장"}</small> : null}
                 </div>
               ) : <div className="chat-message chat-message-assistant"><p>{message.content}</p>{message.sources?.length ? <DataSourceList sources={message.sources} /> : null}</div>}
             </div>
@@ -701,10 +718,23 @@ export function ChatPanel({
           />
           <span>
             <strong>SKT A.X 답변도 함께 비교</strong>
-            <small>켜면 다음 질문만 두 모델에 같은 조건으로 병렬 전송합니다.</small>
+            <small>선택 시 다음 질문에 두 모델의 답변을 함께 제공합니다.</small>
           </span>
         </label>
       ) : null}
+
+      <label className="chat-compare-toggle">
+        <input
+          type="checkbox"
+          checked={externalProcessingConsent}
+          onChange={(event) => setExternalProcessingConsent(event.target.checked)}
+          disabled={loading}
+        />
+        <span>
+          <strong>이번 질문의 외부 AI 전송에 동의</strong>
+          <small>질문, 최근 대화 최대 10개, 30일 요약, 선택한 회사 공개 정보와 현재 공식 근거가 전송됩니다. 동의는 저장하지 않으며 체크를 해제하면 다음 전송을 막습니다.</small>
+        </span>
+      </label>
 
       {error ? <p className="chat-error" role="alert">{error}</p> : null}
       {persistenceNotice ? <p className="chat-persistence-status" role="status">{persistenceNotice}</p> : null}
@@ -742,7 +772,7 @@ export function ChatPanel({
             }
           }}
         />
-        <button type="submit" className="chat-send" disabled={loading || !draft.trim()} aria-label="질문 보내기"><span aria-hidden="true">↑</span></button>
+        <button type="submit" className="chat-send" disabled={loading || !draft.trim() || !externalProcessingConsent} aria-label="질문 보내기"><span aria-hidden="true">↑</span></button>
       </form>
       {!activeCompanyId ? (
         <p className="chat-company-help">

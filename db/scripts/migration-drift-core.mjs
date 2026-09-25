@@ -136,6 +136,33 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "constraint:public.conversation_company_events.conversation_company_events_turn_id_conversation_turns_id_fk",
     "constraint:public.conversation_company_events.conversation_company_events_kind_ck",
   ]),
+  // 0018 은 즐겨찾기 테이블을 만든다. 복합 PK 와 두 FK 모두 ON DELETE CASCADE 로
+  // 정의되는 게 계약이라, 존재 확인과 별개로 constraint_definition 으로 그
+  // cascade 여부까지 고정한다 — 그냥 FK 존재만 보면 no-action 으로 잘못
+  // 만들어져도 aligned 로 오판한다.
+  "0018_real_hitman": Object.freeze([
+    "table:public.user_favorite_firms",
+    "column:public.user_favorite_firms.user_id",
+    "column:public.user_favorite_firms.firm_id",
+    "column:public.user_favorite_firms.created_at",
+    "constraint:public.user_favorite_firms.user_favorite_firms_user_id_firm_id_pk",
+    "constraint_definition:public.user_favorite_firms.user_favorite_firms_user_id_firm_id_pk",
+    "constraint:public.user_favorite_firms.user_favorite_firms_user_id_users_id_fk",
+    "constraint_definition:public.user_favorite_firms.user_favorite_firms_user_id_users_id_fk",
+    "constraint:public.user_favorite_firms.user_favorite_firms_firm_id_firms_firm_id_fk",
+    "constraint_definition:public.user_favorite_firms.user_favorite_firms_firm_id_firms_firm_id_fk",
+    "index:public.user_favorite_firms_user_created_idx",
+  ]),
+  "0019_conversation_summary_leases": Object.freeze([
+    "column_type:public.conversation_summaries.lease_token_uuid",
+    "column_type:public.conversation_summaries.lease_expires_at_timestamptz",
+  ]),
+  "0020_violet_robin_chapel": Object.freeze([
+    "column_type:public.conversation_requests.lease_token_uuid",
+    "column_type:public.conversation_requests.lease_expires_at_timestamptz",
+    "index:public.conversation_requests_pending_lease_idx",
+    "constraint:public.conversation_requests.conversation_requests_lease_ck",
+  ]),
 });
 
 function migrationLabel(migration) {

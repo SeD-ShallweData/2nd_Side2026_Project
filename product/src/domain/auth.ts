@@ -54,4 +54,5 @@ export interface AuthRepository {
   resolveSession(token: string): Promise<ResolvedSession | null>;
 
   revokeSession(token: string): Promise<void>;
+  deleteAccount(token: string): Promise<boolean>;
 }

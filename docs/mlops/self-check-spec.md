@@ -33,6 +33,49 @@
 2   파일을 열지 못함 · 인자 오류
 ```
 
+### 실행 형태 두 가지
+
+```bash
+# 사람이 읽는 표 (기본)
+python3 db/scripts/self_check.py --outputs /path/to/outputs
+
+# 기계가 읽는 JSON — 기록·화면 연동용
+python3 db/scripts/self_check.py --outputs /path/to/outputs --json
+```
+
+**검사 내용과 종료 코드는 둘이 완전히 같다.** `--json` 은 출력 형태만 바꾼다.
+
+`--json` 이 내는 것:
+
+```json
+{
+  "target": "/path/to/outputs",
+  "checkedAt": "2026-09-19T19:54:33+09:00",
+  "status": "정상",
+  "errorCount": 0,
+  "warningCount": 1,
+  "notCheckableCount": 3,
+  "passedCount": 21,
+  "errors": [],
+  "warnings": ["[F2] …"],
+  "notCheckable": ["[M2] …", "[V9] …", "[V10] …"],
+  "passed": ["F1", "F3", "C1", "…"],
+  "exitCode": 0
+}
+```
+
+**키 이름이 snake_case 가 아닌 이유** — 이 JSON 의 소비자는 배치 현황 화면이고,
+그 화면이 기대하는 필드명이 이미 정해져 있다
+(`product/src/adapters/mock/MockBatchStatusProvider.ts` 의 `drift` 객체:
+`status`·`errorCount`·`warningCount`·`notCheckableCount`).
+파이썬 관례보다 소비자 계약을 따랐다.
+
+**`status` 는 오류 유무로만 정한다** — 경고가 있어도 적재는 가능하다는 것이 위 표의
+정의이고 종료 코드 규칙과도 같다. 경고는 `warningCount` 로만 드러난다.
+
+> `notCheckableCount` 는 정상 데이터에서 **3** 이다(M2 · V9 · V10).
+> 파일이 깨져 관계 검사를 건너뛰면 R1 이 더해져 4 가 된다.
+
 ---
 
 ## 1. 파일 수준 — 3항목

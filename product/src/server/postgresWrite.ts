@@ -8,14 +8,14 @@ import {
 import { ServiceError } from "@/utils/errors";
 
 /*
- * 사용자 데이터(회원·세션·게시글·신고·현장 제보)를 쓰는 연결 계층.
+ * 사용자 데이터(회원·세션·게시글·신고·현장 제보·즐겨찾기)를 쓰는 연결 계층.
  *
  * server/postgres.ts 와 절대 섞지 않는다. 그쪽은 ML 산출물을 읽는
  * 읽기 전용 경로이고, 연결 자체가 default_transaction_read_only 로 잠겨 있다.
  * 여기는 쓰기가 목적이므로 그 잠금이 없다. 한 모듈에서 둘을 다루면
  * 실수로 읽기 전용 잠금이 풀린 연결로 ML 데이터를 건드릴 수 있다.
  *
- * 롤도 기능별로 나뉜다. wg_auth 는 회원·세션, wg_community 는 게시글·신고,
+ * 롤도 기능별로 나뉜다. wg_auth 는 회원·세션·즐겨찾기, wg_community 는 게시글·신고,
  * wg_tip 은 현장 제보만 볼 수 있고 서로의 테이블에는 접근 권한이 없다. 그래서 게시글 작성 한 건이
  * "인증 연결로 세션 확인 → 커뮤니티 연결로 저장" 두 단계로 나뉘며,
  * 두 단계를 한 트랜잭션으로 묶을 수 없다.
@@ -129,7 +129,13 @@ export function assertWriteStatementAllowed(sql: string): void {
       "쓰기 adapter는 SELECT/WITH/INSERT/UPDATE/DELETE만 실행할 수 있습니다.",
     );
   }
-  if (FORBIDDEN_KEYWORD.test(normalized)) {
+  // DO in a PostgreSQL upsert is DML, not an anonymous procedural DO block.
+  // Remove only that keyword; keep checking the target and the UPDATE body.
+  const withoutUpsertDo = normalized.replace(
+    /(\bon conflict(?:\s*\([^;()]*\)|\s+on constraint [a-z_]\w*)?\s+)do(?=\s+(?:update|nothing)\b)/g,
+    "$1",
+  );
+  if (FORBIDDEN_KEYWORD.test(withoutUpsertDo)) {
     throw new WriteStatementBlockedError("쓰기 adapter에서 스키마·권한 변경 SQL이 차단되었습니다.");
   }
 }
@@ -180,6 +186,9 @@ function isCommitOutcomeUncertain(error: unknown): boolean {
 function rethrow(error: unknown, role: WriteRole): never {
   if (error instanceof ServiceError) throw error;
   if (error instanceof WriteStatementBlockedError) throw error;
+  if (isDatabaseError(error) && (error.code.startsWith("08") || ["57P01", "57P02", "57P03"].includes(error.code))) {
+    throw unavailable(role);
+  }
   if (isDatabaseError(error)) throw error;
   throw unavailable(role);
 }
@@ -269,4 +278,11 @@ export function isWriteDatabaseConfigured(role: WriteRole): boolean {
 /* 테스트에서 롤별 pool 캐시를 비운다. */
 export function resetWritePoolsForTest(): void {
   pools.clear();
+}
+
+/** Graceful standalone worker shutdown; never used to interrupt an app request. */
+export async function closeWritePools(): Promise<void> {
+  const current = [...pools.values()];
+  pools.clear();
+  await Promise.all(current.map((pool) => pool.end()));
 }
