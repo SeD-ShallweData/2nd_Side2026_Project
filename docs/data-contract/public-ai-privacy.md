@@ -39,6 +39,10 @@
   metrics/alert를 연결한다. 기본 1,000회는 코드 fallback이며 재무 승인값이 아니다.
 - live DB 삭제는 즉시 반영한다. backup은 최대 30일 뒤 만료하며, restore한 DB는 서비스 개방 전에
   현재 expiry cutoff와 삭제 journal/tombstone을 재적용한다. 실제 backup catalog/TTL/rehearsal은 별도 증거가 필요하다.
+- 2026-09-29 사용자 승인: 복원 시 수동 삭제를 재적용하기 위해 사용자 UUID·대화 UUID(해당 시)·삭제
+  시각만 암호화한 독립 삭제 원장에 최대 30일 보관한다. 이메일·상담 원문은 넣지 않는다. 현재
+  outbox/독립 원장은 구현·운영 적용되지 않았고, 이 승인만으로 복원 안전성이 확보되지는 않는다.
+  [작업09 런북](../../db/docs/RESTORE_DELETION_REPLAY.md)의 순번·완전성 게이트가 필요하다.
 - 외부 LLM은 무학습, 승인된 처리 지역, 계약상 최소 보존 또는 최대 30일 조건을 조달 문서에서 확인한다.
   철회는 미래 전송과 local 식별 데이터 삭제를 즉시 적용하고, 과거 provider 데이터는 해당 계약의
   삭제 API 또는 TTL을 따른다고 고지한다.
