@@ -1,14 +1,20 @@
 import type { ChatRequest } from "@/domain/chat";
 import type { ChatComparisonResponse, ChatResultProviderId } from "@/domain/chatComparison";
 import type { ConversationRecallFact } from "@/domain/conversationRecall";
+import { mentionedCompanies, statementCompany, type RecallCompany } from "@/services/conversationCompanyScope";
+import { asksNextAction } from "@/services/chatQuestionPurpose";
 
 const PAYDAY = /(?:급여일|월급날|(?:급여|월급|임금)\s*지급일)/;
 const PROMISE = /(?:지급\s*약속|회사\s*(?:답변|응답)|입금\s*약속)/;
-const RECALL = /(?:말한|말했던|정정한(?!다)|알려\s*준|기억|회상|다시\s*(?:말|알려|정리)|지금까지|앞서|아까|였나|였죠|였지|정리해)/;
+const RECALL = /(?:말한|말했던|말했는지|정정한(?!다)|알려\s*준|기억|회상|다시\s*(?:말|알려|정리)|지금까지|앞서|아까|였나|였죠|였지|정리해)/;
 const LEGAL = /(?:법적|법률|신고|진정|신청|청구|문의|어디|어떻게|무엇부터|뭘\s*해야|해야\s*하|할\s*수|가산|계산|위법|투자|주식|추천)/;
-const NEXT_ACTION = /(?:지금|다음|앞으로|어떤|무엇을|뭘).{0,12}(?:할\s*일|행동|대응|준비)|(?:할\s*일|행동|대응|준비).{0,14}(?:알려|말해|정리)/;
 const COMPANY_NAME_RECALL = /(?:회사|사업장)\s*(?:이름|명)|어느\s*(?:회사|사업장)|사용한\s*(?:회사|사업장)|연결한\s*(?:회사|사업장)/;
 const COMPANY_CONTEXT_RECALL = /(?:앞선|이전|앞서|아까|순서대로|다시|말해|알려)/;
+
+function needsEvidence(message: string): boolean {
+  // Reporting what was said is recall; "어떻게 신고하나" still needs evidence.
+  return LEGAL.test(message.replace(/어떻게\s*말했는지/g, "말했는지")) || asksNextAction(message);
+}
 
 function companyContextRecall(request: ChatRequest): { answer: string; found: boolean } | null {
   if (!COMPANY_CONTEXT_RECALL.test(request.message) || !COMPANY_NAME_RECALL.test(request.message) || LEGAL.test(request.message)) return null;
@@ -33,12 +39,15 @@ function companyContextRecall(request: ChatRequest): { answer: string; found: bo
 /** Only normalized dates/time phrases leave this extractor, never arbitrary raw text. */
 export function extractRecallFacts(input: {
   content: string; source_message_id: string; sequence: number; company_id: string | null;
+  companies?: RecallCompany[];
 }): ConversationRecallFact[] {
   const facts: ConversationRecallFact[] = [];
   const isCorrection = /정정|수정|아니라|아니고|잘못\s*말/.test(input.content);
+  let subjectId = input.company_id;
+  let unresolvedSubject = false;
   const add = (kind: ConversationRecallFact["kind"], value: string | null, state?: ConversationRecallFact["state"]) => facts.push({
     kind, value, source_message_id: input.source_message_id, sequence: input.sequence,
-    company_id: input.company_id, is_correction: isCorrection, ...(state ? { state } : {}),
+    company_id: subjectId, is_correction: isCorrection, ...(state ? { state } : {}),
   });
   // Questions, hypotheticals and recall requests are not new assertions.
   for (const sentence of input.content.match(/[^.!?。？\n]+[.!?。？]?/g) ?? []) {
@@ -46,6 +55,11 @@ export function extractRecallFacts(input: {
       || /(?:동료|친구|다른\s*(?:회사|상담|사람)|예시|답변에서는|챗봇|모델|상담사)/.test(sentence)
       || RECALL.test(sentence)
       || (/[?？]$/.test(sentence) && !/(?:이고|이며|입니다|있습니다|했다고|겠다고)/.test(sentence))) continue;
+    const scope = statementCompany(sentence, subjectId, input.companies ?? []);
+    if (scope.ambiguous) { unresolvedSubject = true; continue; }
+    if (mentionedCompanies(sentence, input.companies ?? []).length === 1) unresolvedSubject = false;
+    if (unresolvedSubject) continue;
+    subjectId = scope.company_id;
     if (PAYDAY.test(sentence)) {
       const tail = sentence.slice(sentence.search(PAYDAY));
       const corrected = tail.split(/아니라|아니고/).at(-1)!;
@@ -54,7 +68,7 @@ export function extractRecallFacts(input: {
       else if (days.length === 1 && Number(days[0][1]) > 0) add("payday", `${Number(days[0][1])}일`);
       else if (days.length > 1 || isCorrection) add("payday", null);
     }
-    if (/(?:회사|사장|사업주|대표|문자|약속)/.test(sentence)
+    if ((/(?:회사|사장|사업주|대표|문자|약속)/.test(sentence) || mentionedCompanies(sentence, input.companies ?? []).length === 1)
       && /(?:지급|입금|주겠|준다고)/.test(sentence)) {
       if (/(?:취소|철회)/.test(sentence)) {
         add("payment_promise", null);
@@ -77,29 +91,45 @@ export function extractRecallFacts(input: {
 export function recallAnswer(request: ChatRequest, allowMixed = false): { answer: string; found: boolean } | null {
   // A correction is a new user assertion, not a request to repeat the old value.
   // Normalize only supported facts; do not mutate stored history or trust model text.
+  const companies = request.conversation_recall?.companies ?? request.conversation_recall?.company_history ?? [];
   const currentFacts = extractRecallFacts({ content: request.message, source_message_id: "current_request",
-    sequence: 0, company_id: request.company_id ?? null });
-  const correcting = currentFacts.some((fact) => fact.is_correction);
-  if ((!RECALL.test(request.message) && !correcting) || (!PAYDAY.test(request.message) && !PROMISE.test(request.message))
-    || (!allowMixed && (LEGAL.test(request.message) || NEXT_ACTION.test(request.message)))) return null;
+    sequence: 0, company_id: request.company_id ?? null, companies });
+  if ((!RECALL.test(request.message) && currentFacts.length === 0)
+    || (!PAYDAY.test(request.message) && !PROMISE.test(request.message) && currentFacts.length === 0)
+    || (!allowMixed && needsEvidence(request.message))) return null;
   const facts = request.conversation_recall?.facts ?? request.recent_messages.flatMap((message, index) =>
     message.role === "user" ? extractRecallFacts({ content: message.content,
-      source_message_id: `recent_${index}`, sequence: index + 1, company_id: request.company_id ?? null }) : []);
-  const applicable = [...facts.filter((fact) => fact.company_id === (request.company_id ?? null))
-    .toSorted((a, b) => a.sequence - b.sequence), ...currentFacts];
+      source_message_id: `recent_${index}`, sequence: index + 1, company_id: request.company_id ?? null, companies }) : []);
+  const named = mentionedCompanies(request.message, companies);
+  if ((named.length < 2 && statementCompany(request.message, request.company_id ?? null, companies).ambiguous)
+    || named.some((item, index) => named.some((other, otherIndex) => index !== otherIndex && item.company_name === other.company_name))) {
+    return { answer: "이 상담의 회사별 진술과 질문의 회사 대상을 확실하게 연결하지 못했습니다. 회사 이름과 해당 진술을 함께 알려 주세요.", found: false };
+  }
+  const selected = named.length ? named
+    : /(?:두|각|모든)\s*회사|회사별/.test(request.message) ? companies
+    : [{ company_id: request.company_id ?? null, company_name: companies.find((item) => item.company_id === request.company_id)?.company_name }];
+  const targets = selected.filter((item, index) => selected.findIndex((candidate) => candidate.company_id === item.company_id) === index);
+  const wantPayday = PAYDAY.test(request.message) || currentFacts.some((fact) => fact.kind === "payday");
+  const wantPromise = PROMISE.test(request.message) || currentFacts.some((fact) => fact.kind === "payment_promise");
+  const answers = targets.map((target) => {
+  const applicable = [...facts.toSorted((a, b) => a.sequence - b.sequence), ...currentFacts]
+    .filter((fact) => fact.company_id === target.company_id);
   const payday = applicable.findLast((fact) => fact.kind === "payday");
   const promise = applicable.findLast((fact) => fact.kind === "payment_promise");
   const parts: string[] = [];
-  if (PAYDAY.test(request.message)) parts.push(payday?.value
+  if (wantPayday) parts.push(payday?.value
     ? `급여일은 ${payday.value}입니다${payday.is_correction ? "(정정된 값)" : ""}.`
     : "현재 문맥에서 급여일 진술을 확인하지 못했습니다.");
-  if (PROMISE.test(request.message)) parts.push(promise?.value
+  if (wantPromise) parts.push(promise?.value
     ? `회사에서는 ${promise.value}에 지급하겠다고 했습니다. 이는 당시의 표현이며 실제 지급 여부나 확정 날짜를 확인한 것은 아닙니다.`
     : promise?.state === "denied"
       ? "이 회사로부터 지급 약속을 받지 않았다고 말씀하셨습니다. 이후 새 약속이 생겼는지는 확인되지 않았습니다."
     : "현재 문맥에서 회사의 지급 약속을 확인하지 못했습니다.");
-  const found = Boolean((PAYDAY.test(request.message) && payday?.value) || (PROMISE.test(request.message) && (promise?.value || promise?.state === "denied")));
-  return { answer: `이 상담에서 말씀하신 내용 기준입니다. ${parts.join(" ")}${found ? "" : " 해당 내용을 다시 알려 주시면 이어서 정리하겠습니다."}`, found };
+  const found = Boolean((wantPayday && payday?.value) || (wantPromise && (promise?.value || promise?.state === "denied")));
+  return { answer: `${target.company_name ? `${target.company_name}: ` : ""}${parts.join(" ")}`, found };
+  });
+  const found = answers.some((item) => item.found);
+  return { answer: `이 상담에서 말씀하신 내용 기준입니다.\n\n${answers.map((item, index) => `${answers.length > 1 ? `${index + 1}. ` : ""}${item.answer}`).join("\n")}${found ? "" : " 해당 내용을 다시 알려 주시면 이어서 정리하겠습니다."}`, found };
 }
 
 export function recallResponse(request: ChatRequest, providers: Array<{
@@ -135,7 +165,7 @@ export function recallResponse(request: ChatRequest, providers: Array<{
 }
 
 export function finalizeConversationResponse(request: ChatRequest, response: ChatComparisonResponse): ChatComparisonResponse {
-  const mixedRecall = LEGAL.test(request.message) || NEXT_ACTION.test(request.message) ? recallAnswer(request, true) : null;
+  const mixedRecall = needsEvidence(request.message) ? recallAnswer(request, true) : null;
   return { ...response, results: response.results.map((result) => {
     // Even a legal-generation replacement keeps the separately sourced recall.
     // Emergency answers always retain priority and are not prefixed.

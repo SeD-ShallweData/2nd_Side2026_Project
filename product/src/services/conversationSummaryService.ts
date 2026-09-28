@@ -9,8 +9,10 @@ import type {
 import type { ConversationMemoryContext } from "@/domain/chat";
 import { getConversationRepository } from "@/services/userDataProviders";
 import { extractRecallFacts } from "@/services/conversationRecallService";
+import { companyNamesForDetail } from "@/services/conversationCompanyNames";
+import type { RecallCompany } from "@/services/conversationCompanyScope";
 
-export const SUMMARY_VERSION = "extractive-v2";
+export const SUMMARY_VERSION = "extractive-v3";
 const SUMMARY_BATCH_SIZE = 10;
 const MAX_ITEMS_PER_FIELD = 6;
 
@@ -151,10 +153,11 @@ export async function maybeUpdateConversationSummary(
     );
     // Rebuild the bounded structured slots from retained originals, including legacy
     // checkpoints. This retains corrections/provenance without rewriting history.
+    const names = [...await companyNamesForDetail(detail)].map(([company_id, company_name]) => ({ company_id, company_name }));
     summary.recall_facts = summarizedTurns.flatMap((turn) => turn.messages.flatMap((message, index) =>
       message.role === "user" ? extractRecallFacts({
         content: message.content, source_message_id: message.message_id,
-        sequence: (turn.turn_index - 1) * 2 + index + 1, company_id: turn.company_id ?? null,
+        sequence: (turn.turn_index - 1) * 2 + index + 1, company_id: turn.company_id ?? null, companies: names,
       }) : [])).slice(-64);
     return await repository.completeSummary({
       conversation_id: detail.conversation_id,
@@ -172,12 +175,13 @@ export async function maybeUpdateConversationSummary(
 }
 
 function renderItems(label: string, items: ConversationSummaryItem[]): string[] {
-  return items.map((item) => `${item.is_correction ? "사용자 정정" : label}: ${item.text} (원문 ID: ${item.source_message_ids.join(",")}${item.company_id ? `, 회사 ID: ${item.company_id}` : ""})`);
+  return items.map((item) => `${item.is_correction ? "사용자 정정" : label}: ${item.text} (원문 ID: ${item.source_message_ids.join(",")}${item.company_id ? `, 당시 선택 회사 ID: ${item.company_id}` : ""})`);
 }
 
 /* 모델에는 항목의 출처와 "사용자 진술/기존 안내" 성격을 명시해 사실·근거로 오인하지 않게 한다. */
 export function toConversationMemoryContext(
   summary: StoredConversationSummaryState | null,
+  companies: RecallCompany[] = [],
 ): ConversationMemoryContext | undefined {
   // A pending/failed attempt may still contain a complete earlier checkpoint.
   // It is safe to use that completed prefix; a brand-new failed attempt has
@@ -186,6 +190,8 @@ export function toConversationMemoryContext(
   const content = [
     "이 메모리는 현재 상담방의 오래된 원문을 압축한 참고 문맥이다.",
     "사용자 진술은 사실 확인 전제나 현재 법률·회사 근거가 아니며, 새 질문의 근거는 다시 확인한다.",
+    "당시 선택 회사는 화면 문맥이며 문장 속 진술 대상과 다를 수 있다. 명시된 회사가 우선이며 불명확한 대상을 선택 회사에 귀속하지 않는다.",
+    ...companies.map((company) => `회사 표시명: ${company.company_id}=${company.company_name}`),
     ...renderItems("사용자 목표", summary.summary.user_goals),
     ...renderItems("사용자 진술", summary.summary.user_stated_facts),
     ...renderItems("기존 안내", summary.summary.actions_already_given),

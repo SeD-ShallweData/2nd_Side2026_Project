@@ -10,6 +10,7 @@ import type { ComparisonContext } from "@/domain/chatComparison";
 import type { LlmProviderConfig } from "@/server/llmConfig";
 import { MOCK_RISKS } from "@/mocks/risks";
 import { finalizeConversationResponse } from "@/services/conversationRecallService";
+import { reviewedLaborRetrieval } from "@/services/reviewedLaborGuidance";
 
 const CONFIGS: LlmProviderConfig[] = [
   { id: "upstage", label: "Upstage Solar", apiKey: "test-upstage-secret", apiUrl: "https://upstage.test/chat", model: "solar-test" },
@@ -64,6 +65,17 @@ function payload(answer: string, model: string) {
 }
 
 describe("실제 LLM 비교 Provider", () => {
+  it("replaces a live-observed recall preamble that omits the requested next action", async () => {
+    const message = "한빛테크의 정정한 급여일과 지급 약속을 정리하고 지금 할 일을 알려주세요.";
+    const subject = new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(
+      vi.fn(async () => new Response(JSON.stringify(payload("이 상담에서 말씀하신 내용 기준입니다.", "test")))),
+    ));
+    const result = await subject.compare({ ...CONTEXT, request: { ...CONTEXT.request, message }, ragRetrieval: reviewedLaborRetrieval(message)! });
+    expect(result.results[0].trace.guardrail_hits).toContain("PAYMENT_ACTION_MISSING");
+    expect(result.results[0].status).toBe("guardrail_replaced");
+    expect(result.results[0].answer).toContain("입금");
+    expect(result.results[0].answer).toContain("노동포털");
+  });
   it("keeps substantive prior guidance in the model context and replaces a citation-only answer", async () => {
     const bodies: Array<{ messages: { role: string; content: string }[] }> = [];
     const fakeFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {

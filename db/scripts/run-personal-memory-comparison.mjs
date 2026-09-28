@@ -1,7 +1,7 @@
 /** New loopback PG16 only. Secrets are memory/env-only; never accepts an existing DB URL. */
 import assert from 'node:assert/strict';
 import { randomBytes, createHash } from 'node:crypto';
-import { readFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, readdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, relative } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
@@ -13,6 +13,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { analyzeMigrationState } from './migration-drift-core.mjs';
 import { POSTCONDITIONS_SQL } from './check-migration-drift.mjs';
+import { startPersonal03Proxies } from '../../product/scripts/personal03-proxies.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const product = resolve(root, 'product');
@@ -82,10 +83,11 @@ const manifest = { head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root,
   tokenizer: 'BGE-M3 local evaluation tokens; not Solar billing tokens', tokenizer_sha256: tokenHash,
   memory_budget: 4096, full_prompt_budget: 12288, bundle, serve, diagnostic_ids: diagnosticIds, key_present: Boolean(key),
   provider_call_cap: cumulativeCap - priorCalls, prior_provider_calls: priorCalls, cumulative_call_cap: cumulativeCap,
-  resumed_from: resume ? relative(root, resume) : null, estimate: 'fixed36 + continuous36 + diagnostic6-9; skip valid fixed rows on resume',
+  resumed_from: resume ? relative(root, resume) : null, estimate: serve ? `03B bounded live and fault auxiliary calls; hard cap${cumulativeCap}, no automatic retry` : 'fixed36 + continuous36 + diagnostic6-9; skip valid fixed rows on resume',
   source_digest: hash(JSON.stringify(before)), started_at: new Date().toISOString(), runtime: relative(root, runtime),
   tools: Object.fromEntries(['product/scripts/memory-comparison-core.ts', 'product/scripts/memory-comparison-fixtures.ts',
-    'product/scripts/run-memory-comparison.ts', 'product/scripts/memory-eval-token-counter.py', 'db/scripts/run-personal-memory-comparison.mjs']
+    'product/scripts/run-memory-comparison.ts', 'product/scripts/memory-eval-token-counter.py', 'product/scripts/personal03-proxies.mjs',
+    'product/scripts/run-personal03b-http.mjs', 'db/scripts/run-personal-memory-comparison.mjs']
     .map(file => [file, hash(readFileSync(resolve(root, file)))])) };
 save('manifest.json', manifest); log({ preflight: manifest });
 if (priorManifest) {
@@ -110,6 +112,7 @@ const url = (role, secret) => `postgresql://${role}:${secret}@127.0.0.1:${port}/
 let created = false;
 let sql;
 let child;
+let proxies;
 let phase = 'port-preflight';
 try {
   await new Promise((done, reject) => { const probe = createServer(); probe.once('error', reject); probe.listen(port, '127.0.0.1', () => probe.close(done)); });
@@ -153,10 +156,13 @@ try {
     MW_MEMORY_EVAL_DIAGNOSTIC_IDS: diagnosticIds.join(',') };
   if (serve) {
     phase = 'local-browser-app';
-    const webPort = 3127;
+    const webPort = 3128;
     await new Promise((done, reject) => { const probe = createServer(); probe.once('error', reject); probe.listen(webPort, '127.0.0.1', () => probe.close(done)); });
+    proxies = await startPersonal03Proxies({ runtime, key, cap: cumulativeCap });
+    childEnv.UPSTAGE_API_URL = proxies.providerUrl;
+    const startApp = async () => {
     child = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', String(webPort)],
-      { cwd: product, env: { ...childEnv, CONTRACT_DATA_MODE: 'mock', COMMUNITY_DATA_MODE: 'mock', WORKSITE_TIP_DATA_MODE: 'mock' },
+      { cwd: product, env: { ...childEnv, FAVORITE_DATA_MODE: 'real', CONTRACT_DATA_MODE: 'mock', COMMUNITY_DATA_MODE: 'mock', WORKSITE_TIP_DATA_MODE: 'mock' },
         windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     child.stdout.resume(); child.stderr.resume();
     let ready = false;
@@ -166,14 +172,30 @@ try {
       await new Promise(done => setTimeout(done, 500));
     }
     assert(ready, 'LOCAL_APP_NOT_READY');
+    };
+    await startApp();
     const shutdownFile = resolve(runtime, 'shutdown.flag');
-    save('server.json', { url: `http://127.0.0.1:${webPort}`, shutdown_file: relative(root, shutdownFile), synthetic_only: true,
+    save('server.json', { url: 'http://127.0.0.1:3127', shutdown_file: relative(root, shutdownFile), synthetic_only: true,
       auth_mode: 'real', conversation_mode: 'real', company_mode: 'mock', feedback_save: false });
-    log({ local_browser_app_ready: `http://127.0.0.1:${webPort}`, runtime: relative(root, runtime) });
-    while (!existsSync(shutdownFile) && child.exitCode === null) await new Promise(done => setTimeout(done, 500));
+    log({ local_browser_app_ready: 'http://127.0.0.1:3127', runtime: relative(root, runtime), provider_call_cap: cumulativeCap });
+    const restartFile = resolve(runtime, 'restart.once');
+    while (!existsSync(shutdownFile) && child.exitCode === null) {
+      if (existsSync(restartFile)) {
+        unlinkSync(restartFile);
+        child.kill(); await new Promise(done => child.once('close', done));
+        await startApp(); save('app-restart.json', { restarted_at: new Date().toISOString(), own_child_only: true });
+        log({ own_app_restarted: true });
+      }
+      await new Promise(done => setTimeout(done, 500));
+    }
     assert(existsSync(shutdownFile), 'LOCAL_APP_EXITED_BEFORE_SHUTDOWN');
     child.kill();
     await new Promise(done => child.once('close', done));
+    save('synthetic-remaining.json', {
+      users: Number((await sql`SELECT count(*) FROM users`)[0].count),
+      favorites: Number((await sql`SELECT count(*) FROM user_favorite_firms`)[0].count),
+      conversations: Number((await sql`SELECT count(*) FROM conversation_threads`)[0].count),
+    });
   } else {
     phase = 'bundle-evaluation-worker';
     const entry = resolve(product, 'scripts/run-memory-comparison.ts');
@@ -198,6 +220,7 @@ try {
   log({ phase, status: 'BLOCKED', code: typeof error?.code === 'string' ? error.code : 'CHECK_FAILED' }); process.exitCode = 2;
 } finally {
   if (child && child.exitCode === null) child.kill();
+  await proxies?.close();
   await sql?.end();
   if (created) {
     const identity = JSON.parse(docker(['inspect', name]))[0];

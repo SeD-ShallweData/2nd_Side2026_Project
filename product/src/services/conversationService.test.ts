@@ -46,6 +46,60 @@ afterEach(() => {
 });
 
 describe("로그인 대화 원문 저장", () => {
+  it("keeps named statement subjects separate from selected context through 26 turns, clear and legacy checkpoints", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    vi.stubEnv("COMPANY_DATA_MODE", "mock");
+    const a = "COMPANY_DEMO_008";
+    const b = "COMPANY_DEMO_002";
+    const statements = [
+      [a, "한빛테크에서는 9월 27일 지급하겠다는 문자를 받았습니다. 급여일은 10일입니다."],
+      [a, "다온제조에서는 아직 지급 약속을 받은 적이 없습니다. 한빛테크의 약속과 혼동하지 마세요."],
+      [b, "다온제조의 급여일은 7일입니다."],
+      [a, "정정합니다. 다온제조의 급여일은 7일이 아니라 8일입니다."],
+      [a, "새로운업체에서는 다음 주 지급하겠다고 약속했습니다."],
+    ];
+    let id = "";
+    for (let index = 0; index < 26; index++) {
+      const [company_id, message] = statements[index] ?? [b, `추가 상담 기록 ${index}: 이전 진술의 변경은 없습니다.`];
+      id = await persistCompletedChat({ message, company_id, conversation_id: id || undefined,
+        request_id: `company_scope_${String(index).padStart(16, "0")}`, chat_mode: "wage", recent_messages: [] }, response(), USER);
+    }
+    const input = { conversation_id: id, message: "한빛테크와 다온제조의 급여일과 지급 약속을 각각 어떻게 말했는지 알려주세요.",
+      chat_mode: "wage" as const, recent_messages: [{ role: "user" as const, content: "급여일은 29일입니다." }] };
+    const check = async () => {
+      const hydrated = await hydrateConversationRequest(input, USER);
+      const answer = recallAnswer(hydrated);
+      expect(answer?.answer).toMatch(/한빛테크[^\n]*10일[^\n]*9월 27일/);
+      expect(answer?.answer).toMatch(/다온제조[^\n]*8일[^\n]*약속을 받지 않았/);
+      expect(answer?.answer).not.toMatch(/29일|다음 주/);
+      expect(hydrated.conversation_recall?.facts.filter((fact) => fact.company_id === a && fact.kind === "payment_promise"))
+        .toMatchObject([{ value: "9월 27일" }]);
+      expect(hydrated.conversation_recall?.diagnostics.summarized_through_sequence).toBe(50);
+      expect(hydrated.conversation_memory?.content).toContain("당시 선택 회사");
+      expect(hydrated.conversation_memory?.content).not.toContain("지급 약속=내일");
+      expect(recallAnswer({ ...hydrated, message: "다온제조의 급여일과 지급 약속을 다시 알려주세요.", company_id: a })?.answer)
+        .toMatch(/다온제조[^\n]*8일[^\n]*약속을 받지 않았/);
+      expect(recallAnswer({ ...hydrated, message: "정정합니다. 한빛테크의 급여일은 10일이 아니라 15일입니다.", company_id: b })?.answer)
+        .toMatch(/한빛테크[^\n]*15일/);
+      expect(recallAnswer({ ...hydrated, message: "두 회사 지급 약속을 정리하고 어디에 진정해야 하나요?" })).toBeNull();
+      return hydrated;
+    };
+    await check();
+    await updateUserConversation(id, { active_company_id: null }, USER);
+    await check();
+    const repository = getConversationRepository();
+    const current = (await repository.findSummary(id))!;
+    const spy = vi.spyOn(repository, "findSummary").mockResolvedValue({ ...current, summary_version: "extractive-v2",
+      summary: { ...current.summary, recall_facts: [{ kind: "payment_promise", value: "내일", company_id: a, sequence: 3, source_message_id: "stale", is_correction: false }] } });
+    expect((await check()).conversation_recall?.diagnostics.legacy_recall_rebuilt).toBe(true);
+    spy.mockRestore();
+    const detail = await getUserConversation(id, USER);
+    expect(detail.turns[1].company_id).toBe(a);
+    expect(detail.turns[1].messages[0].content).toContain("다온제조");
+    await expect(hydrateConversationRequest(input, OTHER)).rejects.toMatchObject({ code: "CONVERSATION_NOT_FOUND" });
+    await deleteUserConversation(id, USER);
+    await expect(hydrateConversationRequest(input, USER)).rejects.toMatchObject({ code: "CONVERSATION_NOT_FOUND" });
+  });
   it("recalls before/after 10 and 20 messages, including pending/failed checkpoints and legacy summaries", async () => {
     vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
     const statements = [
@@ -178,7 +232,7 @@ describe("로그인 대화 원문 저장", () => {
 
     const repository = getConversationRepository();
     const initial = await repository.findSummary(conversationId);
-    expect(initial).toMatchObject({ status: "ready", summarized_through_sequence: 10, summary_version: "extractive-v2" });
+    expect(initial).toMatchObject({ status: "ready", summarized_through_sequence: 10, summary_version: "extractive-v3" });
     expect(initial?.summary.user_goals[0]?.source_message_ids).toHaveLength(1);
     expect(initial?.summary.user_goals.map((item) => item.text).join(" ")).not.toContain("010-1234-5678");
     expect(initial?.summary.system_confirmed_facts).toEqual([]);
