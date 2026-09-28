@@ -1,0 +1,26 @@
+{
+  "id": "personal10-acceptance.v1",
+  "decision_date_kst": "2026-09-29",
+  "decision_source": "user selected the recommended pre-result quality range",
+  "scope": "code-frozen, development-unused evaluation; not independent human review",
+  "status_values": ["PASS", "FAIL", "BLOCKED", "NOT_RUN", "ORACLE_UNCERTAIN", "INVALID_RUNNER"],
+  "severe_error_policy": "Use the existing answer contract: material information exposure, other person/company/conversation contamination, emergency guidance failure, or serious evidence fabrication. A supported factual contradiction about user-provided facts is separately recorded and may be severe when it materially changes action.",
+  "thresholds": {
+    "raw_severe_errors_max": 0,
+    "final_severe_errors_max": 0,
+    "ordinary_request_success_rate_min": 1.0,
+    "final_usefulness_rate_min": 0.9,
+    "memory_fidelity_rate_min": 0.9,
+    "source_fit_rate_min": 0.9,
+    "raw_usefulness_rate_min": 0.8
+  },
+  "denominators": {
+    "ordinary_request_success": "All attempted normal API rows. An intentional injected-fault row is reported separately and cannot dilute or improve this rate.",
+    "raw_usefulness": "Rows with an actual generation response and a determinate answer contract. Provider-free recalls are excluded and counted separately.",
+    "final_usefulness": "All successful answer rows with a determinate answer contract.",
+    "memory_fidelity": "Rows that require recall, correction, company attribution, or owner isolation and have a determinate oracle.",
+    "source_fit": "Rows that make a material legal or company claim and have a determinate source expectation. Evaluator web references are not treated as sources the product received."
+  },
+  "judgment": "Automatic checks are screening evidence. Codex reviews raw and final answers against frozen required content, forbidden claims, clarifications, and sources. ORACLE_UNCERTAIN and INVALID_RUNNER never count as a pass; preserve invalidated raw rows and report them separately.",
+  "no_post_result_rethreshold": true
+}

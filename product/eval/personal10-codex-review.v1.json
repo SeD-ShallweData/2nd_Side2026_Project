@@ -1,0 +1,767 @@
+{
+  "schema": "personal10-codex-review.v1",
+  "reviewer": "Codex",
+  "basis": "Frozen personal10-holdout.v1 oracle and personal10-acceptance.v1; all 72 scored rows inspected. Synthetic fault raw output is excluded from raw generation quality.",
+  "independence": "Code-frozen development-unused set validation; not external independent human evaluation.",
+  "review_status": "Codex reviewed all scored rows; user reviewed only S17 and D1T19 after seeing the concrete responses and technical evidence.",
+  "rates": {
+    "final_usefulness": {
+      "pass": 23,
+      "denominator": 71,
+      "rate": 0.3239
+    },
+    "raw_usefulness": {
+      "pass": 23,
+      "denominator": 31,
+      "rate": 0.7419
+    },
+    "memory_fidelity": {
+      "pass": 11,
+      "denominator": 45,
+      "rate": 0.2444
+    },
+    "source_fit": {
+      "pass": 15,
+      "denominator": 38,
+      "rate": 0.3947
+    }
+  },
+  "severe": {
+    "raw_ids": [
+      "S02",
+      "D1T14",
+      "D1T24",
+      "D2T10"
+    ],
+    "final_ids": [
+      "S02",
+      "S07",
+      "D1T24",
+      "D2T11"
+    ]
+  },
+  "decisive_findings": [
+    {
+      "ids": [
+        "S02"
+      ],
+      "kind": "legal_timing",
+      "finding": "Raw/final answer says a wage complaint may be filed within 14 days after resignation, confusing settlement deadline with filing deadline."
+    },
+    {
+      "ids": [
+        "S07",
+        "D2T11"
+      ],
+      "kind": "urgent_guidance",
+      "finding": "Unconscious coworker received generic wage evidence advice; worsening inability to walk was rejected as out of scope."
+    },
+    {
+      "ids": [
+        "D1T24"
+      ],
+      "kind": "company_evidence",
+      "finding": "Raw/final answer presented two firms as having no clear warning even though the Incheon synthetic wage card has employee-decrease/turnover watch signals."
+    },
+    {
+      "ids": [
+        "D1T10",
+        "D1T13",
+        "D2T20",
+        "D2T22"
+      ],
+      "kind": "memory",
+      "finding": "Real PostgreSQL restore/summary succeeded, but final replies failed to recall explicit corrected company facts or the arithmetic balance."
+    },
+    {
+      "ids": [
+        "S05",
+        "D2T19"
+      ],
+      "kind": "guard_overreplacement",
+      "finding": "Guard replaced relevant raw answers with filing boilerplate or company card text, losing the current user request."
+    },
+    {
+      "ids": [
+        "S21"
+      ],
+      "kind": "api_error",
+      "finding": "Normal error-fixture company question returned HTTP 503 before an answer; not an injected provider fault."
+    }
+  ],
+  "user_review_cases": [
+    {
+      "id": "S17",
+      "codex_provisional": "PASS",
+      "user_decision": "FAIL: too generic for the question",
+      "applied_to_final_usefulness": "FAIL",
+      "technical": "HTTP 200, short circuit, 0 generation, 0 sources",
+      "question": "Quote containing stock words but the actual request is missing pay for work hours.",
+      "answer_excerpt": "Record payday, actual payment and hours, then ask 1350; says no direct official source found.",
+      "choice_a": "Accept as minimally useful wage guidance",
+      "choice_b": "Reject as too generic for missing hours"
+    },
+    {
+      "id": "D1T19",
+      "codex_provisional": "FAIL",
+      "user_decision": "PASS: one compact question is sufficient",
+      "applied_to_final_usefulness": "PASS",
+      "applied_to_raw_usefulness": "PASS",
+      "technical": "HTTP 200, raw passed, 3 provider calls, saved in real DB",
+      "question": "Provide interview questions about safety training and protective equipment provision.",
+      "answer_excerpt": "One question asks training frequency and what protective equipment must be worn, without asking how it is provided or task-specific procedures.",
+      "choice_a": "Accept one compact combined question",
+      "choice_b": "Require provision and task-specific procedure questions"
+    }
+  ],
+  "by_row": [
+    {
+      "id": "S01",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S02",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "FAIL",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": true,
+      "final_severe": true
+    },
+    {
+      "id": "S03",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "FAIL",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S04",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S05",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S06",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S07",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": true
+    },
+    {
+      "id": "S08",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S09",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S10",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S11",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S12",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S13",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S14",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S15",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S16",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S17",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S18",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S19",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S20",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S21",
+      "final_usefulness": "NOT_ASSESSABLE_HTTP",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S22",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "PASS",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S23",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "S24",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T01",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T02",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "FAIL",
+      "memory_fidelity": "PASS",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T03",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T04",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T05",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T06",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "PASS",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T07",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T08",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "PASS",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T09",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "PASS",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T10",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T11",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "FAIL",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T12",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T13",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T14",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "FAIL",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "FAIL",
+      "raw_severe": true,
+      "final_severe": false
+    },
+    {
+      "id": "D1T15",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "PASS",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T16",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T17",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T18",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T19",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T20",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T21",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "PASS",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T22",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T23",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D1T24",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "FAIL",
+      "memory_fidelity": "FAIL",
+      "source_fit": "FAIL",
+      "raw_severe": true,
+      "final_severe": true
+    },
+    {
+      "id": "D2T01",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "FAIL",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T02",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "FAIL",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T03",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T04",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T05",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "FAIL",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T06",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T07",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "PASS",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T08",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T09",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "FAIL",
+      "memory_fidelity": "PASS",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T10",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "FAIL",
+      "memory_fidelity": "PASS",
+      "source_fit": "FAIL",
+      "raw_severe": true,
+      "final_severe": false
+    },
+    {
+      "id": "D2T11",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": true
+    },
+    {
+      "id": "D2T12",
+      "final_usefulness": "PASS",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "NOT_APPLICABLE",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T13",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T14",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T15",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T16",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T17",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T18",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "FAIL",
+      "memory_fidelity": "FAIL",
+      "source_fit": "PASS",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T19",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "FAIL",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T20",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T21",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "PASS",
+      "memory_fidelity": "PASS",
+      "source_fit": "FAIL",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T22",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T23",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    },
+    {
+      "id": "D2T24",
+      "final_usefulness": "FAIL",
+      "raw_usefulness": "NOT_GENERATED_OR_INJECTED",
+      "memory_fidelity": "FAIL",
+      "source_fit": "NOT_APPLICABLE",
+      "raw_severe": false,
+      "final_severe": false
+    }
+  ]
+}
