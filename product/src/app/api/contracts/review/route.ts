@@ -40,7 +40,7 @@ async function parseRequest(request: Request): Promise<ContractReviewRequest> {
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     assertSameOriginRequest(request);
-    assertPublicRateLimit(request, "anonymous_contract_review");
+    await assertPublicRateLimit(request, "anonymous_contract_review");
     const input = await parseRequest(request);
     input.signal = request.signal;
     return NextResponse.json(await reviewContract(input));

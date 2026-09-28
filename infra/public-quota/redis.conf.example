@@ -1,0 +1,11 @@
+# Copy to /etc/moneyworry/public-quota-redis.conf after review.
+# Keep this Redis instance dedicated to public quota keys.
+bind 0.0.0.0
+port 6379
+protected-mode yes
+aclfile /usr/local/etc/redis/users.acl
+appendonly yes
+appendfsync everysec
+dir /data
+maxmemory-policy noeviction
+

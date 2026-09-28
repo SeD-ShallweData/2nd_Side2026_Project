@@ -128,3 +128,23 @@ CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 `/srv/moneyworry/worksite-tip-media` 아래에 저장한다. systemd는 웹 프로세스에 이 경로만 추가로
 쓰기 허용한다. 설치기는 경로를 웹 서비스 계정 소유 `0700`으로 만들고, 하위 디렉터리 `0700`,
 파일 `0600`, symlink·특수 파일 없음, 다른 세 서비스 계정의 접근 불가를 시작 전에 확인한다.
+
+## Public quota rollout (Personal08)
+
+The shared quota deployment adds these web.env entries. Keep the Redis URL and proxy token in the owner-readable local env file; never copy their values into tickets or logs.
+
+```dotenv
+PUBLIC_RATE_LIMIT_STORE=redis
+PUBLIC_RATE_LIMIT_REDIS_URL=redis://mwquota:<URL_ENCODED_LOCAL_SECRET>@127.0.0.1:6379/0
+TRUST_PROXY_HEADERS=true
+PUBLIC_RATE_LIMIT_PROXY_TOKEN=<SAME_SECRET_AS_PUBLIC_GATEWAY_ENV>
+PUBLIC_COMPANY_SEARCH_PER_MINUTE=30
+ANONYMOUS_CHAT_PER_HOUR=10
+ANONYMOUS_CHAT_PER_DAY=30
+ANONYMOUS_CHAT_GLOBAL_PER_DAY=1000
+ANONYMOUS_CONTRACT_REVIEW_PER_HOUR=5
+ANONYMOUS_CONTRACT_REVIEW_PER_DAY=15
+ANONYMOUS_CONTRACT_REVIEW_GLOBAL_PER_DAY=300
+```
+
+The last three contract values take effect on 2026-10-02 00:00 KST. Through October 1 KST contract review is exempt from request limits. The 1000/300 request counts are not financial spending limits. The gateway gets only `PUBLIC_GATEWAY_PORT`, `PUBLIC_GATEWAY_UPSTREAM_PORT`, `PUBLIC_GATEWAY_PUBLIC_HOST`, and the same `PUBLIC_RATE_LIMIT_PROXY_TOKEN` in `/etc/moneyworry/public-gateway.env`. Validate both service env files before a gateway switch. See `docs/qa/2026-09-28-personal-08.md` for ordered rollout and rollback.

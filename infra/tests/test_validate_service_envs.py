@@ -103,6 +103,23 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("validated split service environment contracts", result.stdout)
 
+    def test_shared_quota_requires_authenticated_loopback_and_proxy(self) -> None:
+        base = self.values["web"] + "PUBLIC_RATE_LIMIT_STORE=redis\n"
+        result = self.run_validator({"web": base})
+        self.assert_failed_without_secret(result)
+        self.assertIn("PUBLIC_RATE_LIMIT_REDIS_URL", result.stderr)
+
+        configured = base + (
+            "PUBLIC_RATE_LIMIT_REDIS_URL=redis://mwquota:synthetic_password@127.0.0.1:6379/0\n"
+            "PUBLIC_RATE_LIMIT_PROXY_TOKEN=synthetic_proxy_token_at_least_32_chars\n"
+            "TRUST_PROXY_HEADERS=true\n"
+        )
+        result = self.run_validator({"web": configured})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.run_validator({"web": configured.replace("127.0.0.1:6379", "example.test:6379")})
+        self.assert_failed_without_secret(result)
+        self.assertIn("authenticated loopback Redis", result.stderr)
+
     def test_web_rejects_admin_password(self) -> None:
         result = self.run_validator({"web": self.values["web"] + "DB_PASSWORD=AdminLeak_4vT8pN2xQ6mK9rLs\n"})
         self.assert_failed_without_secret(result)

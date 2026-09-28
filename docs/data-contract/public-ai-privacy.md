@@ -60,3 +60,10 @@
 - 운영 gateway의 공유 quota 저장소, trusted proxy header 정규화, budget alert
 
 공개 공급자 정책은 위와 같이 조사했지만 계정 적용과 운영 환경의 세 항목은 아직 확인되지 않았다. 코드 기본값만으로 충족됐다고 판단하지 않는다.
+
+## Personal08 request-protection decision (2026-09-29)
+
+- Existing anonymous chat and company-search request caps remain unchanged. A shared Redis counter and canonical proxy source IP are prepared locally; production deployment and actual ingress configuration are unverified. The per-IP companion key prevents rotating a browser tab marker from bypassing the same per-client cap. Users behind one public IP share that cap.
+- Contract review has no request cap through 2026-10-01 23:59:59 KST for the demo. From 2026-10-02 00:00 KST, apply 5/hour, 15/day and 300/day globally. The exemption does not grant access past proxy authentication.
+- If the shared store fails through the demo date, public AI requests use temporary process-local protection. From 2026-10-02 00:00 KST, public AI requests return 503 until the store recovers. Company lookup continues with a local fallback. This failure mode is weaker across app processes and must be observed.
+- Request counts and returned tokens are not billed amounts. A financial amount-based cutoff is deferred by the owner; the code fallback request counts do not constitute a budget approval.
