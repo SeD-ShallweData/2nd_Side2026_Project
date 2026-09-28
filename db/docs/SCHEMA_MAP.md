@@ -11,7 +11,8 @@
 
 > **구조도 기준 시점**: 구조도는 26개 테이블(public 15 + industrial_safety 11)을 그린다.
 > 이후 추가된 **즐겨찾기 1개(`user_favorite_firms`)와 상담 대화 기록 7개(`conversation_*`)**
-> 는 구조도에 아직 없고 아래 표에만 있다. 현재 전체는 **34개**(public 23 + industrial_safety 11)다.
+> 는 구조도에 그리지 않았다(구조도 하단 「읽을 때 주의」에 이름만 적었다). 아래 표에는 모두 있다.
+> 현재 전체는 **34개**(public 23 + industrial_safety 11)다.
 
 ## 영역 요약
 
