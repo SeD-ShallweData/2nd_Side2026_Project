@@ -44,6 +44,18 @@ beforeEach(() => {
 });
 
 describe("의도와 근거에 따른 상담 경로", () => {
+  it.each([
+    "한빛테크에서 제가 보유한 문서와 없는 서류를 구분하고 임금체불 진정에 어떻게 사용하는지 알려주세요.",
+    "한빛테크와 다온제조의 계약서 보유 상태를 구분하고 임금체불 자료로 어떻게 활용하나요?",
+    "1. 한빛테크 2. 다온제조 순서로 제가 말한 계약서 보유 상태를 정리하고 임금체불 진정에 필요한 다음 행동과 출처를 알려주세요.",
+  ])("keeps document-use recall on labor evidence: %s", async message => {
+    mocks.classify.mockResolvedValue({ intent: "company", topic: "other", company_scope: "specific", status: "classified" });
+    mocks.retrieve.mockResolvedValue({ status: "matched", reason: "reviewed_applicability_bundle", documents: [] });
+    await sendComparedChatMessage({ message, company_id: "C1" });
+    expect(mocks.retrieve).toHaveBeenCalledWith(message);
+    expect(mocks.compare.mock.calls[0][0].questionIntent).toBe("labor");
+    expect(mocks.company).not.toHaveBeenCalled();
+  });
   it.each(["off_topic", "company", "unclear"])("keeps named-company payroll follow-ups on evidence despite %s classification", async (intent) => {
     const message = "한빛테크의 정정한 급여일과 지급 약속을 정리하고 지금 할 일을 알려주세요.";
     mocks.classify.mockResolvedValue({ intent, topic: "other", company_scope: "not_applicable", status: "classified" });

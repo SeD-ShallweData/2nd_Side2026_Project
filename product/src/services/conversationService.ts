@@ -18,11 +18,13 @@ import {
   maybeUpdateConversationSummary,
   toConversationMemoryContext,
   SUMMARY_VERSION,
+  selectUserFacts,
 } from "@/services/conversationSummaryService";
 import { ServiceError } from "@/utils/errors";
 import { extractRecallFacts } from "@/services/conversationRecallService";
 import { companyNamesForDetail } from "@/services/conversationCompanyNames";
 import { publicAnswerContext } from "@/services/publicAnswerContext";
+import { selectRecallFacts } from "@/services/conversationMemorySelection";
 
 const MAX_LIST_LIMIT = 50;
 const HISTORY_MESSAGE_LIMIT = 10;
@@ -273,9 +275,11 @@ export async function hydrateConversationRequest(
       ? extractRecallFacts({ content: message.content, source_message_id: message.message_id,
         sequence, company_id: turn.company_id ?? null, companies }) : [];
   }));
-  const recallFacts = originals.slice(-64);
+  const recallFacts = selectRecallFacts(originals);
   const memory = toConversationMemoryContext(summary ? { ...summary,
-    summary: { ...summary.summary, recall_facts: originals.filter((fact) => fact.sequence <= through).slice(-64) },
+    summary: { ...summary.summary,
+      user_stated_facts: selectUserFacts(detail, through, companies, request.message),
+      recall_facts: selectRecallFacts(originals.filter((fact) => fact.sequence <= through)) },
   } : null, companies);
   const companyHistory = detail.turns.flatMap((turn) => {
     const companyName = turn.company_id ? companyNames.get(turn.company_id) : undefined;

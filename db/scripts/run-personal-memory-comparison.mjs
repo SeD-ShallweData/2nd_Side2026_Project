@@ -23,6 +23,8 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const option = name => process.argv[process.argv.indexOf(name) + 1];
 const bundle = process.argv.includes('--bundle') ? option('--bundle') : 'all';
 const serve = process.argv.includes('--serve');
+const personal05 = process.argv.includes('--personal05');
+if (personal05) assert(serve, 'PERSONAL05_REQUIRES_SERVE');
 if (serve) assert(bundle === 'offline' && !process.argv.includes('--resume-from'), 'SERVE_REQUIRES_OFFLINE_FRESH_DB');
 const cumulativeCap = process.argv.includes('--max-calls') ? Number(option('--max-calls')) : 90;
 assert(Number.isInteger(cumulativeCap) && cumulativeCap >= 1 && cumulativeCap <= 90, 'INVALID_CALL_CAP');
@@ -30,6 +32,16 @@ const diagnosticIds = process.argv.includes('--diagnostic-ids') ? option('--diag
 assert(diagnosticIds.length >= 1 && diagnosticIds.every(id => ['AQ12', 'AQ21', 'AQ32'].includes(id)), 'INVALID_DIAGNOSTIC_IDS');
 const resume = process.argv.includes('--resume-from') ? resolve(root, option('--resume-from')) : null;
 let priorCalls = 0;
+if (personal05) {
+  const base = resolve(product, '.runtime/personal05');
+  if (existsSync(base)) for (const dir of readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory())) {
+    priorCalls += Math.max(0, ...['calls.jsonl', 'provider-calls.jsonl', 'attempts.jsonl'].map(file => {
+      const path = resolve(base, dir.name, file);
+      return existsSync(path) ? readFileSync(path, 'utf8').trim().split('\n').filter(Boolean).length : 0;
+    }));
+  }
+  assert(cumulativeCap + priorCalls <= 72, 'PERSONAL05_TOTAL_CAP72');
+}
 let priorManifest;
 if (resume) {
   const within = relative(resolve(product, '.runtime/personal02'), resume);
@@ -44,11 +56,12 @@ if (resume) {
 assert(['all', 'fixed', 'continuous', 'diagnostic', 'offline'].includes(bundle));
 assert.equal(process.versions.node.split('.')[0], '22', 'NODE22_REQUIRED');
 const suffix = `${Date.now()}-${randomBytes(3).toString('hex')}`;
-const name = `${serve ? 'mw-personal03' : 'mw-personal02'}-${suffix}`;
-const taskLabel = serve ? 'personal03' : 'personal02';
-const runtime = resolve(product, serve ? '.runtime/personal03' : '.runtime/personal02', suffix);
+const taskLabel = personal05 ? 'personal05' : serve ? 'personal03' : 'personal02';
+const name = `mw-${taskLabel}-${suffix}`;
+const runtime = resolve(product, `.runtime/${taskLabel}`, suffix);
 // Ensure synthetic outputs cannot accidentally enter Git before any are written.
-assert(execFileSync('git', ['check-ignore', 'product/.runtime/personal02/probe.json'], { cwd: root, encoding: 'utf8' }).trim());
+if (!personal05) assert(execFileSync('git', ['check-ignore', 'product/.runtime/personal02/probe.json'], { cwd: root, encoding: 'utf8' }).trim());
+else assert(readFileSync(resolve(product, '.gitignore'), 'utf8').includes('.runtime/'));
 mkdirSync(runtime, { recursive: true });
 const save = (file, data) => writeFileSync(resolve(runtime, file), JSON.stringify(data, null, 2));
 const log = data => console.log(`MEMORY_EVAL ${JSON.stringify(data)}`);
@@ -78,12 +91,12 @@ const configured = existsSync(resolve(product, '.env.local')) ? parse(readFileSy
 let shared = {};
 try { if (configured.SHARED_API_KEY_FILE) shared = parse(readFileSync(configured.SHARED_API_KEY_FILE)); } catch { /* presence only */ }
 const key = process.env.UPSTAGE_API_KEY || configured.UPSTAGE_API_KEY || configured.Upstage_API_KEY || shared.UPSTAGE_API_KEY || shared.Upstage_API_KEY;
-const manifest = { head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+const manifest = { head: personal05 ? 'user-owned Git; source digest only' : execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   node: process.version, next, lock_sha256: hash(readFileSync(resolve(product, 'package-lock.json'))),
   tokenizer: 'BGE-M3 local evaluation tokens; not Solar billing tokens', tokenizer_sha256: tokenHash,
   memory_budget: 4096, full_prompt_budget: 12288, bundle, serve, diagnostic_ids: diagnosticIds, key_present: Boolean(key),
-  provider_call_cap: cumulativeCap - priorCalls, prior_provider_calls: priorCalls, cumulative_call_cap: cumulativeCap,
-  resumed_from: resume ? relative(root, resume) : null, estimate: serve ? `03B bounded live and fault auxiliary calls; hard cap${cumulativeCap}, no automatic retry` : 'fixed36 + continuous36 + diagnostic6-9; skip valid fixed rows on resume',
+  provider_call_cap: personal05 ? cumulativeCap : cumulativeCap - priorCalls, prior_provider_calls: priorCalls, cumulative_call_cap: personal05 ? 72 : cumulativeCap,
+  resumed_from: resume ? relative(root, resume) : null, estimate: personal05 ? `05 bounded final-build conversation/browser/fault; this server cap${cumulativeCap}, total72, no automatic retry` : serve ? `03B bounded live and fault auxiliary calls; hard cap${cumulativeCap}, no automatic retry` : 'fixed36 + continuous36 + diagnostic6-9; skip valid fixed rows on resume',
   source_digest: hash(JSON.stringify(before)), started_at: new Date().toISOString(), runtime: relative(root, runtime),
   tools: Object.fromEntries(['product/scripts/memory-comparison-core.ts', 'product/scripts/memory-comparison-fixtures.ts',
     'product/scripts/run-memory-comparison.ts', 'product/scripts/memory-eval-token-counter.py', 'product/scripts/personal03-proxies.mjs',
@@ -97,8 +110,8 @@ if (priorManifest) {
 if (!process.argv.includes('--live')) process.exit(0);
 assert(key || bundle === 'offline', 'UPSTAGE_KEY_MISSING');
 
-const database = 'mw_personal02';
-const owner = 'mw_personal02_owner';
+const database = personal05 ? 'mw_personal05' : 'mw_personal02';
+const owner = personal05 ? 'mw_personal05_owner' : 'mw_personal02_owner';
 const port = 55442;
 const image = 'postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685';
 const password = randomBytes(24).toString('hex');
@@ -155,10 +168,22 @@ try {
     MW_MEMORY_EVAL_RESUME: resume ?? '', MW_MEMORY_EVAL_CALL_CAP: String(cumulativeCap - priorCalls),
     MW_MEMORY_EVAL_DIAGNOSTIC_IDS: diagnosticIds.join(',') };
   if (serve) {
+    if (personal05) {
+      const outfile = resolve(runtime, 'pg-recovery.mjs');
+      await build({ entryPoints: [resolve(product, 'scripts/personal05-pg.ts')], outfile, absWorkingDir: product,
+        platform: 'node', target: 'node22', format: 'esm', bundle: true, packages: 'external',
+        plugins: [{ name: 'standalone', setup(b) {
+          b.onResolve({ filter: /^server-only$/ }, () => ({ path: 'server-only', namespace: 'stub' }));
+          b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: '', loader: 'js' }));
+        } }] });
+      const probe = spawn(process.execPath, [outfile], { cwd: product, env: childEnv, windowsHide: true, stdio: ['ignore','pipe','pipe'] });
+      probe.stdout.pipe(process.stdout); probe.stderr.resume();
+      assert.equal(await new Promise(done => probe.once('exit', done)), 0, 'PERSONAL05_RECOVERY_FAILED');
+    }
     phase = 'local-browser-app';
     const webPort = 3128;
     await new Promise((done, reject) => { const probe = createServer(); probe.once('error', reject); probe.listen(webPort, '127.0.0.1', () => probe.close(done)); });
-    proxies = await startPersonal03Proxies({ runtime, key, cap: cumulativeCap });
+    proxies = await startPersonal03Proxies({ runtime, key, cap: cumulativeCap, captureSyntheticPrompt: personal05 });
     childEnv.UPSTAGE_API_URL = proxies.providerUrl;
     const startApp = async () => {
     child = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', String(webPort)],
@@ -177,6 +202,7 @@ try {
     const shutdownFile = resolve(runtime, 'shutdown.flag');
     save('server.json', { url: 'http://127.0.0.1:3127', shutdown_file: relative(root, shutdownFile), synthetic_only: true,
       auth_mode: 'real', conversation_mode: 'real', company_mode: 'mock', feedback_save: false });
+    if (personal05) save('final-build.json', { build_id: readFileSync(resolve(product, '.next/BUILD_ID'), 'utf8'), source_digest: manifest.source_digest });
     log({ local_browser_app_ready: 'http://127.0.0.1:3127', runtime: relative(root, runtime), provider_call_cap: cumulativeCap });
     const restartFile = resolve(runtime, 'restart.once');
     while (!existsSync(shutdownFile) && child.exitCode === null) {
@@ -195,6 +221,11 @@ try {
       users: Number((await sql`SELECT count(*) FROM users`)[0].count),
       favorites: Number((await sql`SELECT count(*) FROM user_favorite_firms`)[0].count),
       conversations: Number((await sql`SELECT count(*) FROM conversation_threads`)[0].count),
+      ...(personal05 ? {
+        messages: Number((await sql`SELECT count(*) FROM conversation_messages`)[0].count),
+        summaries: Number((await sql`SELECT count(*) FROM conversation_summaries`)[0].count),
+        requests: Number((await sql`SELECT count(*) FROM conversation_requests`)[0].count),
+      } : {}),
     });
   } else {
     phase = 'bundle-evaluation-worker';

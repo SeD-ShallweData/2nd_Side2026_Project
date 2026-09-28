@@ -1,6 +1,6 @@
 import type { ChatResponse } from "@/domain/chat";
 import type { RagDocument, RagRetrievalResult } from "@/domain/rag";
-import { asksNextAction } from "@/services/chatQuestionPurpose";
+import { asksNextAction, asksWageDocumentUse } from "@/services/chatQuestionPurpose";
 
 /** Narrow, source-reviewed evidence bundles; not a replacement for general retrieval.
  * Revalidate on law/procedure changes. Provenance and review boundaries: followup-02.md.
@@ -102,8 +102,8 @@ export function reviewedLaborTopics(query: string): Topic[] {
   if (/야간|야근|(?:22\s*시|밤\s*(?:10|열)\s*시|오후\s*10\s*시)/.test(query)
     && /근로|근무|수당|가산|일하|시키|퇴근|임금|야근/.test(query)) topics.push("night");
   if (/체불.{0,20}확인서|사업주\s*확인서/.test(query)) topics.push("certificate");
-  if (/\b1350\b|진정(?:서|을|은|\s)|온라인.{0,12}(?:신고|접수)/.test(query)
-    && /체불|임금|월급|급여|노동|진정|상담/.test(query)) topics.push("filing");
+  if ((/\b1350\b|진정(?:서|을|은|에|의|\s|$)|온라인.{0,12}(?:신고|접수)/.test(query)
+    && /체불|임금|월급|급여|노동|진정|상담/.test(query)) || asksWageDocumentUse(query)) topics.push("filing");
   return topics;
 }
 

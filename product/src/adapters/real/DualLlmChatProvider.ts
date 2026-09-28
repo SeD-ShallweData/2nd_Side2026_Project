@@ -25,8 +25,9 @@ import { companySignalForAnswer, companySafetyGuardrailHits, publicAnswerContext
 import { LABOR_REVIEW_DATE, applicabilityGuardrailHits, reviewedLaborFallback } from "@/services/reviewedLaborGuidance";
 import { wageArrearsFallback, wageArrearsGuardrailHits } from "@/services/wageArrearsGuidance";
 import { generationHistoryMessage } from "@/services/generationHistory";
+import { asksWageDocumentUse } from "@/services/chatQuestionPurpose";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-28-v11";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-28-v12";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -199,6 +200,9 @@ function buildSystemPrompt(context: ComparisonContext): string {
     `제공 컨텍스트(JSON): ${JSON.stringify(publicAnswerContext(safeContext))}`,
     companyOutputContract,
     compositeOutputContract,
+    asksWageDocumentUse(context.request.message)
+      ? "현재 질문은 사용자 문서의 보유 상태와 활용이다. 질문에 명시된 회사별로 사용자 원문/진술의 문서 보유·부재와 원본·사본을 먼저 구분하고, 그 뒤 현재 근거에 따른 활용·다음 행동을 답한다. 같은 회사의 뒤 정정은 해당 문서만 갱신한다. 다른 회사의 보유 사실, 질문에 나열된 문서명, 이전 assistant의 일반 준비물 안내를 보유 사실로 바꾸지 않는다. 없는 자료는 없다고 하고 확인되지 않은 것은 미확인으로 남긴다. 급여일·지급 약속만 반복하여 문서 질문을 대신하지 않는다."
+      : "",
   ]);
 }
 
