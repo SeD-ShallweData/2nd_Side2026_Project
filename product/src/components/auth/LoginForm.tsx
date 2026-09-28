@@ -32,7 +32,13 @@ export function resolveSafeNextPath(next: string | null): string | null {
   return next;
 }
 
-function readNextPathFromLocation(): string | null {
+/*
+ * 로그인 성공 후 이동을 실행하는 바로 그 순간에 호출해야 한다. mount 시점에
+ * 한 번만 읽어 state에 저장해 두면, Next.js가 쿼리만 다른 `/login` 재방문에서
+ * 같은 LoginForm 인스턴스를 재사용할 경우(주소창은 새 next로 바뀌어도) 오래된
+ * 값을 계속 쓰게 된다 — 그래서 이 함수는 절대 useState 초기값으로 캐싱하지 않는다.
+ */
+export function readNextPathFromLocation(): string | null {
   if (typeof window === "undefined") return null;
   return resolveSafeNextPath(new URLSearchParams(window.location.search).get("next"));
 }
@@ -77,8 +83,6 @@ export function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  // 최초 렌더 시점에 한 번만 읽으면 된다 — 로그인 과정 중 쿼리가 바뀌지 않는다.
-  const [nextPath] = useState<string | null>(readNextPathFromLocation);
 
   function validate(): FieldErrors {
     const errors: FieldErrors = {};
@@ -104,7 +108,13 @@ export function LoginForm() {
     try {
       await login({ email: email.trim(), password });
       // 이동이 끝날 때까지 submitting을 유지해 중복 제출을 막는다.
-      router.push(resolveLoginRedirect({ hasGuestConversation: hasGuestConversation(), nextPath }));
+      // next는 여기서, 이동을 실행하는 시점에 다시 읽는다(readNextPathFromLocation 주석 참고).
+      router.push(
+        resolveLoginRedirect({
+          hasGuestConversation: hasGuestConversation(),
+          nextPath: readNextPathFromLocation(),
+        }),
+      );
     } catch (caught) {
       setSubmitting(false);
       if (caught instanceof AuthApiError) {

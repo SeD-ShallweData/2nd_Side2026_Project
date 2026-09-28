@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { resolveLoginRedirect, resolveSafeNextPath, submitErrorMessage } from "@/components/auth/LoginForm";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { readNextPathFromLocation, resolveLoginRedirect, resolveSafeNextPath, submitErrorMessage } from "@/components/auth/LoginForm";
 import { AuthApiError } from "@/services/authClient";
 
 function lockedError(retryAfterSeconds: number | null): AuthApiError {
@@ -62,6 +62,31 @@ describe("resolveSafeNextPath — open redirect 방지", () => {
     expect(resolveSafeNextPath("community")).toBeNull();
     expect(resolveSafeNextPath("")).toBeNull();
     expect(resolveSafeNextPath(null)).toBeNull();
+  });
+});
+
+describe("readNextPathFromLocation — mount 시점 캐싱 없이 매번 새로 읽는다", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("호출 시점의 window.location.search를 그대로 반영한다 (state로 캐싱하지 않음)", () => {
+    // 같은 LoginForm 인스턴스가 재사용되더라도, 이 함수를 이동 직전에 다시 호출하기만
+    // 하면 매번 그 순간의 주소창 쿼리를 읽는다는 것을 검증한다 — mount 시점에 한 번
+    // 읽어 useState에 저장해 두던 예전 구조에서는 아래 두 값이 같아야 했다(버그).
+    vi.stubGlobal("window", { location: { search: "" } });
+    expect(readNextPathFromLocation()).toBeNull();
+
+    vi.stubGlobal("window", { location: { search: "?next=%2Fcompanies" } });
+    expect(readNextPathFromLocation()).toBe("/companies");
+
+    vi.stubGlobal("window", { location: { search: "?next=%2Ffavorites" } });
+    expect(readNextPathFromLocation()).toBe("/favorites");
+  });
+
+  it("window가 없으면(서버 렌더) null을 반환한다", () => {
+    vi.stubGlobal("window", undefined);
+    expect(readNextPathFromLocation()).toBeNull();
   });
 });
 
