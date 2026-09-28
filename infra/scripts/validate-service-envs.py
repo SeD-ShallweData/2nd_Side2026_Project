@@ -297,6 +297,31 @@ def validate_web(web: dict[str, str], db: dict[str, str]) -> None:
     for key in ("DATABASE_URL", "DATABASE_ENV_FILE", "SHARED_API_KEY_FILE"):
         if key in web:
             fail(f"web.env must not define ambiguous fallback: {key}")
+    if web.get("PUBLIC_RATE_LIMIT_STORE", "local") not in {"local", "redis"}:
+        fail("web.env PUBLIC_RATE_LIMIT_STORE must be local or redis")
+    if web.get("PUBLIC_RATE_LIMIT_STORE") == "redis":
+        require(web, "web.env shared public quota", "PUBLIC_RATE_LIMIT_REDIS_URL", "PUBLIC_RATE_LIMIT_PROXY_TOKEN")
+        if web.get("TRUST_PROXY_HEADERS") != "true":
+            fail("web.env TRUST_PROXY_HEADERS must be true with shared public quota")
+        require_secret(web["PUBLIC_RATE_LIMIT_PROXY_TOKEN"], "web.env PUBLIC_RATE_LIMIT_PROXY_TOKEN", 32)
+        require_printable_ascii(web["PUBLIC_RATE_LIMIT_PROXY_TOKEN"], "web.env PUBLIC_RATE_LIMIT_PROXY_TOKEN")
+        try:
+            quota_url = urlsplit(web["PUBLIC_RATE_LIMIT_REDIS_URL"])
+            valid_quota_url = (
+                quota_url.scheme == "redis"
+                and quota_url.hostname == "127.0.0.1"
+                and quota_url.port == 6379
+                and bool(quota_url.password)
+                and quota_url.path == "/0"
+                and not quota_url.query
+                and not quota_url.fragment
+            )
+        except ValueError:
+            valid_quota_url = False
+        if not valid_quota_url:
+            fail("web.env PUBLIC_RATE_LIMIT_REDIS_URL must use authenticated loopback Redis on port 6379 DB 0")
+    elif web.get("TRUST_PROXY_HEADERS") == "true":
+        fail("web.env TRUST_PROXY_HEADERS requires shared public quota")
     if web["RAG_API_URL"].rstrip("/") != "http://127.0.0.1:5051":
         fail("web.env RAG_API_URL must target http://127.0.0.1:5051")
     if web["CONTRACT_ANALYSIS_URL"].rstrip("/") != "http://127.0.0.1:8000":
@@ -387,6 +412,17 @@ def validate_web(web: dict[str, str], db: dict[str, str]) -> None:
             "MOCK_AUTH_USER_PASSWORD",
             "MOCK_AUTH_ADMIN_PASSWORD",
             "MOCK_AUTH_INSPECTOR_PASSWORD",
+            "PUBLIC_RATE_LIMIT_STORE",
+            "PUBLIC_RATE_LIMIT_REDIS_URL",
+            "PUBLIC_RATE_LIMIT_PROXY_TOKEN",
+            "TRUST_PROXY_HEADERS",
+            "PUBLIC_COMPANY_SEARCH_PER_MINUTE",
+            "ANONYMOUS_CHAT_PER_HOUR",
+            "ANONYMOUS_CHAT_PER_DAY",
+            "ANONYMOUS_CHAT_GLOBAL_PER_DAY",
+            "ANONYMOUS_CONTRACT_REVIEW_PER_HOUR",
+            "ANONYMOUS_CONTRACT_REVIEW_PER_DAY",
+            "ANONYMOUS_CONTRACT_REVIEW_GLOBAL_PER_DAY",
         },
     )
     validate_user_data_modes(web, db)
@@ -395,6 +431,13 @@ def validate_web(web: dict[str, str], db: dict[str, str]) -> None:
         ("LLM_HEALTH_TIMEOUT_MS", 500, 30_000),
         ("RAG_TIMEOUT_MS", 1_000, 60_000),
         ("CONTRACT_TIMEOUT_MS", 1_000, 300_000),
+        ("PUBLIC_COMPANY_SEARCH_PER_MINUTE", 1, 100_000),
+        ("ANONYMOUS_CHAT_PER_HOUR", 1, 100_000),
+        ("ANONYMOUS_CHAT_PER_DAY", 1, 100_000),
+        ("ANONYMOUS_CHAT_GLOBAL_PER_DAY", 1, 1_000_000),
+        ("ANONYMOUS_CONTRACT_REVIEW_PER_HOUR", 1, 100_000),
+        ("ANONYMOUS_CONTRACT_REVIEW_PER_DAY", 1, 100_000),
+        ("ANONYMOUS_CONTRACT_REVIEW_GLOBAL_PER_DAY", 1, 1_000_000),
     ):
         require_bounded_integer(web, "web.env", key, minimum, maximum)
 
