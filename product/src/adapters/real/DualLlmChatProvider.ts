@@ -24,8 +24,9 @@ import { clarificationFallback } from "@/services/chatFallback";
 import { companySignalForAnswer, companySafetyGuardrailHits, publicAnswerContext, publicAnswerText } from "@/services/publicAnswerContext";
 import { LABOR_REVIEW_DATE, applicabilityGuardrailHits, reviewedLaborFallback } from "@/services/reviewedLaborGuidance";
 import { wageArrearsFallback, wageArrearsGuardrailHits } from "@/services/wageArrearsGuidance";
+import { generationHistoryMessage } from "@/services/generationHistory";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-21-v10";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-28-v11";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -34,8 +35,6 @@ const EMPTY_USAGE: TokenUsage = {
   reasoning_tokens: null,
 };
 
-const SENTENCE_PATTERN = /[^.!?\n]+[.!?]?/g;
-
 function previousCitations(context: ComparisonContext): string[] {
   return citationLabels(
     context.request.recent_messages
@@ -43,23 +42,6 @@ function previousCitations(context: ComparisonContext): string[] {
       .map((message) => message.content)
       .join("\n"),
   );
-}
-
-function digestAssistantMessage(content: string): string {
-  const flat = content.replace(/\s+/g, " ").trim();
-  if (!flat) return "";
-  const sentences = flat.match(SENTENCE_PATTERN) ?? [flat];
-  // A citation line alone carries no prior guidance. Keep a substantive
-  // sentence, preferring one with a cited legal basis when it has prose too.
-  const substantive = (sentence: string) => sentence
-    .replace(/\([^)]*\)/g, "")
-    .replace(/근로기준법\s*제\s*\d+\s*조(?:의\s*\d+)?/g, "")
-    .replace(/[^가-힣]/g, "").length >= 10;
-  const core = sentences.find((sentence) => citationKeys(sentence).size > 0 && substantive(sentence))
-    ?? sentences.find(substantive)
-    ?? sentences[0];
-  const shortened = core.length > 240 ? `${core.slice(0, 240)}…` : core;
-  return publicAnswerText(shortened);
 }
 
 function scanGuardrails(answer: string, context: ComparisonContext): string[] {
@@ -223,12 +205,7 @@ function buildSystemPrompt(context: ComparisonContext): string {
 function buildMessages(context: ComparisonContext) {
   return [
     { role: "system" as const, content: buildSystemPrompt(context) },
-    ...context.request.recent_messages.slice(-10).map((message) => ({
-      role: message.role,
-      content: message.role === "assistant"
-        ? digestAssistantMessage(message.content)
-        : publicAnswerText(message.content),
-    })),
+    ...generationHistoryMessage(context.request.recent_messages),
     { role: "user" as const, content: publicAnswerText(context.request.message) },
   ];
 }

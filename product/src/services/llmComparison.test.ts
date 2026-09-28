@@ -391,7 +391,7 @@ describe("실제 LLM 비교 Provider", () => {
     expect(result.results.every((item) => item.status === "success")).toBe(true);
   });
 
-  it("이전 모델 답변은 핵심 근거만 남겨 반복 생성을 줄인다", async () => {
+  it("keeps prior answer bodies as labelled data and the current question as the last user message", async () => {
     const bodies: Array<{ messages?: Array<{ role: string; content: string }> }> = [];
     const verboseAnswer = "먼저 상황을 확인하세요. 근로기준법 제17조에 따라 근로조건은 서면으로 확인해야 합니다. 이후의 매우 긴 설명은 다음 답변에 그대로 복제되면 안 됩니다.";
     const historyContext: ComparisonContext = {
@@ -418,7 +418,11 @@ describe("실제 LLM 비교 Provider", () => {
     expect(messages[0].content).toContain("previously_cited_labor_law");
     expect(messages[0].content).toContain("근로기준법 제17조");
     expect(messages[2].content).not.toContain("이전 답변 근거");
-    expect(messages[2].content).not.toContain("이후의 매우 긴 설명");
+    expect(messages.map(message => message.role)).toEqual(["system", "user", "user"]);
+    expect(messages[1].content).toContain("근로조건은 서면으로 확인해야 합니다");
+    expect(messages[1].content).toContain("이후의 매우 긴 설명");
+    expect(messages[1].content).toContain('"speaker":"assistant"');
+    expect(messages[2].content).toBe(historyContext.request.message);
   });
 
   it("내부 프롬프트 공개 거절 문장은 유출로 오탐하지 않는다", async () => {
