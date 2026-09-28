@@ -42,9 +42,11 @@ AUTH_DATA_MODE=real
 COMMUNITY_DATA_MODE=real
 WORKSITE_TIP_DATA_MODE=real
 FAVORITE_DATA_MODE=real
+CONVERSATION_DATA_MODE=real
 AUTH_DATABASE_URL=postgresql://wg_auth:AuthValue_8xM4qT7vP2nR9kL3sC6w@127.0.0.1:5433/wageguard?sslmode=disable
 COMMUNITY_DATABASE_URL=postgresql://wg_community:CommValue_3zK9wL5mQ8tN2xP7rV4s@127.0.0.1:5433/wageguard?sslmode=disable
 TIP_DATABASE_URL=postgresql://wg_tip:TipValue_6mR3xP8vN2qK7tL5wC9s@127.0.0.1:5433/wageguard?sslmode=disable
+CONVERSATION_DATABASE_URL=postgresql://wg_conversation:ConversationValue_8xM4qT7vP2nR9kL3sC6w@127.0.0.1:5433/wageguard?sslmode=disable
 WORKSITE_TIP_STORAGE_ROOT=/srv/moneyworry/worksite-tip-media
 """,
             "rag": "RAG_DEVICE=cpu\nRAG_GUNICORN_THREADS=2\nRAG_INTERNAL_TOKEN=RagInternal_7pQ2mV9xR4tK8nC3sL6wF\n",
@@ -271,6 +273,7 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
             "COMMUNITY_DATA_MODE",
             "WORKSITE_TIP_DATA_MODE",
             "FAVORITE_DATA_MODE",
+            "CONVERSATION_DATA_MODE",
         ):
             web = "\n".join(
                 line for line in self.values["web"].splitlines() if not line.startswith(f"{key}=")
@@ -287,6 +290,27 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
         result = self.run_validator({"web": web})
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("AUTH_DATABASE_URL is required when AUTH_DATA_MODE=real", result.stderr)
+
+    def test_conversation_requires_real_mode_and_dedicated_url(self):
+        web = self.values["web"].replace("CONVERSATION_DATA_MODE=real", "CONVERSATION_DATA_MODE=mock")
+        result = self.run_validator({"web": web})
+        self.assert_failed_without_secret(result)
+        self.assertIn("CONVERSATION_DATA_MODE must be real in production", result.stderr)
+
+        web = "\n".join(
+            line for line in self.values["web"].splitlines()
+            if not line.startswith("CONVERSATION_DATABASE_URL=")
+        ) + "\n"
+        result = self.run_validator({"web": web})
+        self.assert_failed_without_secret(result)
+        self.assertIn("CONVERSATION_DATABASE_URL is required", result.stderr)
+
+    def test_conversation_url_requires_exact_role(self):
+        for role in ("pathb_admin", "wg_bot", "wg_auth"):
+            web = self.values["web"].replace("postgresql://wg_conversation:", f"postgresql://{role}:")
+            result = self.run_validator({"web": web})
+            self.assert_failed_without_secret(result)
+            self.assertIn("CONVERSATION_DATABASE_URL", result.stderr)
 
     def test_write_role_url_must_not_reuse_owner_or_bot(self):
         """소유자·읽기전용으로 붙으면 롤 분리가 무의미해진다."""
