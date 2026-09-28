@@ -5,6 +5,7 @@ import { ChangeEvent, FormEvent, useId, useRef, useState } from "react";
 import type { DataMode } from "@/config/dataMode";
 import type { ContractItem, ContractReviewResult } from "@/domain/contract";
 import { readApiResponse } from "@/utils/clientApi";
+import { publicClientHeaders } from "@/utils/publicClientId";
 
 const ALLOWED_TYPES = ["application/pdf", "image/png", "image/jpeg"];
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -85,7 +86,11 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
       const form = new FormData();
       if (file) form.append("file", file);
       if (useDemo) form.append("scenario_id", "default");
-      const response = await fetch("/api/contracts/review", { method: "POST", body: form });
+      const response = await fetch("/api/contracts/review", {
+        method: "POST",
+        headers: publicClientHeaders(),
+        body: form,
+      });
       setResult(await readApiResponse<ContractReviewResult>(response));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "계약서 검토 결과를 불러오지 못했습니다.");
