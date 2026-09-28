@@ -50,4 +50,22 @@ describe("generation history boundary", () => {
     expect(result.trace.guardrail_hits).toContain("PAYMENT_ACTION_MISSING");
     expect(result.status).toBe("guardrail_replaced");
   });
+  it("flags verbatim reuse of the previous answer when the current question changed", async () => {
+    const previous = "급여일과 실제 입금 내역을 확인한 뒤 관할 노동관서에 문의하세요.";
+    const question = "정정한 급여일과 지급 약속을 정리하고 지금 할 일을 알려주세요.";
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ model: "synthetic",
+      choices: [{ message: { content: previous }, finish_reason: "stop" }],
+      usage: { completion_tokens: 20, prompt_tokens: 100, total_tokens: 120 } })));
+    const result = (await new DualLlmChatProvider([{ id: "upstage", label: "test", model: "test",
+      apiKey: "synthetic", apiUrl: "https://example.invalid" }], new OpenAICompatibleChatClient(fetcher)).compare({
+      request: { message: question, chat_mode: "wage", recent_messages: [
+        { role: "user", content: "처음에 무엇을 하면 되나요?" }, { role: "assistant", content: previous },
+      ] }, questionIntent: "labor",
+      policyBaseline: { conversation_id: "test", answer: "", answer_type: "general_guidance",
+        sources: [], suggested_actions: [], limitations: [], guardrail_status: "passed" },
+      ragRetrieval: reviewedLaborRetrieval(question)!,
+    })).results[0];
+    expect(result.trace.guardrail_hits).toContain("PREVIOUS_ANSWER_VERBATIM");
+    expect(result.status).toBe("guardrail_replaced");
+  });
 });

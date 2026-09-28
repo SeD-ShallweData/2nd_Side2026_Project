@@ -18,6 +18,7 @@ import {
   maybeUpdateConversationSummary,
   toConversationMemoryContext,
   SUMMARY_VERSION,
+  selectDocumentStatements,
   selectUserFacts,
 } from "@/services/conversationSummaryService";
 import { ServiceError } from "@/utils/errors";
@@ -276,6 +277,7 @@ export async function hydrateConversationRequest(
         sequence, company_id: turn.company_id ?? null, companies }) : [];
   }));
   const recallFacts = selectRecallFacts(originals);
+  const documentStatements = selectDocumentStatements(detail, companies, request.message);
   const memory = toConversationMemoryContext(summary ? { ...summary,
     summary: { ...summary.summary,
       user_stated_facts: selectUserFacts(detail, through, companies, request.message),
@@ -294,6 +296,7 @@ export async function hydrateConversationRequest(
     conversation_memory: memory,
     conversation_recall: {
       facts: recallFacts,
+      document_statements: documentStatements,
       companies,
       company_history: companyHistory,
       diagnostics: {

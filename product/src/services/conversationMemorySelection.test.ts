@@ -59,6 +59,23 @@ describe("bounded owner-scoped memory selection", () => {
     expect(hydrated.conversation_memory?.content).toContain("근로계약서 종이 원본을 갖고 있습니다");
     expect(hydrated.conversation_memory?.content).toContain("다온제조");
   });
+  it("puts only owner user document statements in generation context, preserving an unrelated possession after correction", async () => {
+    const id = await store([
+      [a, "한빛테크의 근로계약서 원본과 통장 사본을 갖고 있습니다. 급여명세서는 없습니다."],
+      [b, "다온제조의 계약서 사본을 갖고 있습니다."],
+      [a, "정정합니다. 한빛테크의 근로계약서 원본은 분실했고 사본만 갖고 있습니다."],
+      [b, "통장 사본을 갖고 있나요? 보유 상태를 알려주세요."],
+    ]);
+    const hydrated = await hydrateConversationRequest(query(id,
+      "한빛테크와 다온제조의 문서 보유 상태를 임금체불 자료와 함께 알려주세요.", b), user);
+    const statements = hydrated.conversation_recall?.document_statements ?? [];
+    expect(statements.some(item => item.company_id === a && item.text.includes("통장 사본을 갖고"))).toBe(true);
+    expect(statements.some(item => item.company_id === a && item.text.includes("원본은 분실했고 사본만"))).toBe(true);
+    expect(statements.some(item => item.company_id === b && item.text.includes("계약서 사본을 갖고"))).toBe(true);
+    expect(statements.some(item => item.text.includes("보유 상태를 알려주세요"))).toBe(false);
+    expect(statements.filter(item => item.company_id === b).some(item => item.text.includes("통장"))).toBe(false);
+    expect(statements.length).toBeLessThanOrEqual(8);
+  });
   it("does not turn questions, unknown subjects or another room into selected-company facts", async () => {
     const id = await store([[a, "계약서를 제출했나요? 계약서 보유 상태를 알려주세요."], [b, "급여명세서는 없습니다."],
       [b, "한빛테크의 계약서 사본을 갖고 있습니다."], [b, "새로운업체에서는 계약서를 받았습니다."],

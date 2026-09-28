@@ -7,6 +7,7 @@ import type {
   StoredConversationSummaryState,
 } from "@/domain/conversationSummary";
 import type { ConversationMemoryContext } from "@/domain/chat";
+import type { ConversationDocumentStatement } from "@/domain/conversationRecall";
 import { getConversationRepository } from "@/services/userDataProviders";
 import { extractRecallFacts } from "@/services/conversationRecallService";
 import { companyNamesForDetail } from "@/services/conversationCompanyNames";
@@ -67,6 +68,45 @@ function appendUnique(
 }
 
 const DOCUMENT_TOPICS = [/계약서|계약\s*문서/, /통장|입금\s*내역/, /급여명세서|급여\s*명세/, /출퇴근|근무\s*기록|근로시간/, /문자|메시지|이메일/];
+
+/** Put explicit user document claims beside generation, independently of old assistant prose.
+ * Keep the latest claim per company/topic and the earlier claim when a later correction
+ * only changes one document. Never derive an absence from another company's silence. */
+export function selectDocumentStatements(
+  detail: StoredConversationDetail, companies: RecallCompany[], question: string,
+): ConversationDocumentStatement[] {
+  const candidates = detail.turns.flatMap((turn) => turn.messages.flatMap((message, index) => {
+    if (message.role !== "user") return [];
+    const sequence = (turn.turn_index - 1) * 2 + index + 1;
+    let selected = turn.company_id ?? null;
+    return (message.content.match(/[^.!?。？\n]+[.!?。？]?/g) ?? []).flatMap((part) => {
+      const sentence = part.trim();
+      if (!sentence || isOpenQuestion(sentence)
+        || !/(?:있|없|보유|갖|분실|잃|받|소지)/.test(sentence)) return [];
+      const topics = DOCUMENT_TOPICS.flatMap((pattern, topic) => pattern.test(sentence) ? [topic] : []);
+      if (!topics.length) return [];
+      const scope = statementCompany(sentence.replace(/^(?:정정합니다[.!]?|사실은)\s*/, ""), selected, companies);
+      if (scope.ambiguous) return [];
+      selected = scope.company_id;
+      const item = excerpt({ ...message, content: sentence }, 200, selected ?? undefined, isCorrection(sentence) || isCorrection(message.content));
+      return item ? [{ text: item.text, source_message_id: message.message_id, sequence,
+        company_id: selected, is_correction: Boolean(item.is_correction), topics }] : [];
+    });
+  }));
+  const latest = new Map<string, number>();
+  candidates.forEach((candidate, index) => candidate.topics.forEach((topic) =>
+    latest.set(`${candidate.company_id ?? ""}:${topic}`, index)));
+  const reserved = new Set(latest.values());
+  const focus = new Set(mentionedCompanies(question, companies).map((company) => company.company_id));
+  const ranked = candidates.map((candidate, index) => ({ candidate, index })).sort((a, b) =>
+    Number(reserved.has(b.index)) - Number(reserved.has(a.index))
+    || Number(focus.has(b.candidate.company_id ?? "")) - Number(focus.has(a.candidate.company_id ?? ""))
+    || b.candidate.sequence - a.candidate.sequence);
+  return ranked.slice(0, 8).sort((a, b) => a.candidate.sequence - b.candidate.sequence || a.index - b.index)
+    .map(({ candidate }) => ({ text: candidate.text, source_message_id: candidate.source_message_id,
+      sequence: candidate.sequence, company_id: candidate.company_id,
+      is_correction: candidate.is_correction }));
+}
 
 /** Re-select only six redacted excerpts from the already owner-checked prefix.
  * This also repairs legacy summaries without changing retention or sending originals. */
