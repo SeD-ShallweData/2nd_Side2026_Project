@@ -44,6 +44,16 @@ beforeEach(() => {
 });
 
 describe("의도와 근거에 따른 상담 경로", () => {
+  it.each(["off_topic", "company", "unclear"])("keeps named-company payroll follow-ups on evidence despite %s classification", async (intent) => {
+    const message = "한빛테크의 정정한 급여일과 지급 약속을 정리하고 지금 할 일을 알려주세요.";
+    mocks.classify.mockResolvedValue({ intent, topic: "other", company_scope: "not_applicable", status: "classified" });
+    mocks.rewrite.mockResolvedValue({ query: "약속을 확인", changed: true });
+    mocks.retrieve.mockResolvedValue({ status: "matched", reason: "reviewed_applicability_bundle", documents: [] });
+    await sendComparedChatMessage({ message, recent_messages: [] });
+    expect(mocks.retrieve).toHaveBeenCalledWith(message);
+    expect(mocks.compare.mock.calls[0][0].questionIntent).toBe("labor");
+    expect(mocks.company).not.toHaveBeenCalled();
+  });
   it("actual unpaid wages override company-indicator intent and use the original evidence query", async () => {
     const message = "긍정 지표는 좋다는데 지난달 월급을 못 받았습니다. 지표 때문에 체불이 아닌가요?";
     mocks.classify.mockResolvedValue({ intent: "company", topic: "other", company_scope: "specific", status: "classified" });

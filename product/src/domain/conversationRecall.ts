@@ -23,6 +23,8 @@ export interface ConversationMemoryDiagnostics {
 
 export interface ConversationRecallContext {
   facts: ConversationRecallFact[];
+  /** Server-resolved display names for owned-history/current-selection IDs. */
+  companies?: Array<{ company_id: string; company_name: string }>;
   /** Server-hydrated public display names from owned turns, never client supplied. */
   company_history: Array<{
     company_id: string;

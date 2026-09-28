@@ -15,6 +15,29 @@ const HISTORY = [
 ];
 
 describe("user statement recall without law retrieval", () => {
+  const companies = [{ company_id: "A", company_name: "한빛테크" }, { company_id: "B", company_name: "다온제조" }];
+  it("resolves explicit subjects and sentence continuations without changing the selected context", () => {
+    const facts = extractRecallFacts({ content: "다온제조에서는 다음 주에 지급하겠다고 했습니다. 급여일은 8일입니다. 한빛테크의 급여일은 10일입니다.",
+      company_id: "A", companies, source_message_id: "original", sequence: 7 });
+    expect(facts.map(({ company_id, value }) => [company_id, value])).toEqual([["B", "다음 주"], ["B", "8일"], ["A", "10일"]]);
+    expect(facts.every((fact) => fact.source_message_id === "original" && fact.sequence === 7)).toBe(true);
+  });
+  it.each([
+    "새로운업체에서는 다음 주 지급하겠다고 약속했습니다. 급여일은 28일입니다.",
+    "한빛테크와 다온제조의 급여일은 각각 10일과 8일입니다.",
+  ])("does not guess an unknown or ambiguous subject: %s", (content) => {
+    expect(extractRecallFacts({ content, company_id: "A", companies, source_message_id: "m", sequence: 1 })).toEqual([]);
+  });
+  it("does not answer an unknown company question with selected-company facts", () => {
+    const input = request(HISTORY, "새로운업체의 급여일과 지급 약속을 다시 알려주세요.");
+    input.company_id = "A";
+    expect(recallAnswer(input)).toMatchObject({ found: false });
+    expect(recallAnswer(input)?.answer).not.toMatch(/15일|다음 주/);
+  });
+  it("keeps identical display names ambiguous rather than choosing one company", () => {
+    expect(extractRecallFacts({ content: "한빛테크의 급여일은 10일입니다.", company_id: "A",
+      companies: [...companies, { company_id: "C", company_name: "한빛테크" }], source_message_id: "m", sequence: 1 })).toEqual([]);
+  });
   it.each([
     "정정한다. 급여일은 10일이 아니라 15일이고 아직 미지급이다.",
     "정정할게요. 급여일은 10일이 아니라 15일입니다.",
@@ -61,7 +84,8 @@ describe("user statement recall without law retrieval", () => {
     expect(recallAnswer(request([...HISTORY, "급여일은 15일이 아닙니다."]))?.answer).toContain("급여일 진술을 확인하지 못했습니다");
   });
   it("distinguishes a company's explicit no-promise statement from missing memory or another company's promise", () => {
-    const b = extractRecallFacts({ content: "푸른건설은 아직 지급 약속을 하지 않았습니다.", source_message_id: "b", sequence: 4, company_id: "B" });
+    const b = extractRecallFacts({ content: "푸른건설은 아직 지급 약속을 하지 않았습니다.", source_message_id: "b", sequence: 4, company_id: "B",
+      companies: [{ company_id: "B", company_name: "푸른건설" }] });
     expect(b).toMatchObject([{ kind: "payment_promise", value: null, state: "denied", company_id: "B" }]);
     const input = request([], "정정한 급여일과 회사 지급 약속 유무를 알려 주세요.");
     input.company_id = "B";

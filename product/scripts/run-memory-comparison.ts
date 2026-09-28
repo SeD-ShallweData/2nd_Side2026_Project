@@ -132,7 +132,7 @@ async function append(room: Room, turn: EvalTurn, summaryEnabled: boolean, resul
     const context = toConversationMemoryContext(state)!;
     assert.equal(context.summarized_through_sequence, room.turns.length * 2);
     room.summaries.push({ through: context.summarized_through_sequence, content: context.content });
-    summaryBuilds.push({ room: room.label, through: context.summarized_through_sequence, method: 'extractive-v2',
+    summaryBuilds.push({ room: room.label, through: context.summarized_through_sequence, method: context.summary_version,
       provider_calls: 0, provider_tokens: 0, duration_ms: performance.now() - began, content_eval_tokens: await count(context.content) });
     save('summary-builds.json', summaryBuilds);
   }

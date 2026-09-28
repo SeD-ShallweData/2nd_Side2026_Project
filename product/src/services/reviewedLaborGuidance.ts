@@ -1,5 +1,6 @@
 import type { ChatResponse } from "@/domain/chat";
 import type { RagDocument, RagRetrievalResult } from "@/domain/rag";
+import { asksNextAction } from "@/services/chatQuestionPurpose";
 
 /** Narrow, source-reviewed evidence bundles; not a replacement for general retrieval.
  * Revalidate on law/procedure changes. Provenance and review boundaries: followup-02.md.
@@ -15,7 +16,9 @@ export function isPaymentTimingQuestion(query: string): boolean {
   return /제?\s*36\s*조|금품\s*청산/.test(query)
     || (/퇴직|퇴사|사망/.test(query) && /임금|월급|급여|금품|지급|14일|2주/.test(query))
     || (/지급|입금/.test(query) && /약속|하겠|예정|기일.{0,10}(?:연장|합의)/.test(query)
-      && /회사|사장|문자|메시지|기록|못\s*받|언제|문의|합의|진정/.test(query));
+      // Payroll context does not depend on a literal "회사": a real company name
+      // or cleared selection must retain the same labor procedure path.
+      && /회사|사장|문자|메시지|기록|못\s*받|언제|문의|합의|진정|급여일|월급날|(?:급여|임금|월급)\s*지급일/.test(query));
 }
 
 function needsPaymentRecords(query: string): boolean {
@@ -57,6 +60,8 @@ export function paymentTimingGuardrailHits(query: string, answer: string): strin
     }
   }
   if (!isPaymentTimingQuestion(query)) return [...new Set(hits)];
+  if (asksNextAction(query) && (!/기록|보관|대조|확인|신청|접수|준비/.test(text)
+    || !/지급|입금|급여|임금|문자|노동포털|1350/.test(text))) hits.push("PAYMENT_ACTION_MISSING");
   if (needsPaymentRecords(query) && [/원문|원본/, /발신|보낸\s*사람/, /수신|받은\s*(?:날|시)|받았.*시각/, /금액/, /지급\s*(?:예정일|일|날짜)|지급할\s*날짜/].some(p => !p.test(text))) hits.push("PAYMENT_RECORD_DETAILS");
   if (needsPaymentRecords(query) && /다음\s*주/.test(query)
     && (!/다음\s*주/.test(text) || !/미확인|정확한.{0,20}확인|임의.{0,15}(?:날짜|확정)|날짜.{0,20}확인/.test(text))) hits.push("PAYMENT_PROMISE_UNCERTAINTY");
@@ -188,7 +193,15 @@ export function applicabilityGuardrailHits(query: string, answer: string): strin
   }
   if (/(?:22\s*시|10\s*시|열\s*시)까지[^.\n]{0,50}(?:야간근로(?:에\s*해당합니다|입니다|로\s*분류됩니다)|야간\s*수당을\s*(?:지급해야|받을\s*수\s*있))/.test(text)) hits.push("NIGHT_END_TIME_CONFUSION");
   if (/(?:5\s*(?:명|인)\s*미만|4\s*(?:명|인)(?:\s*이하)?)[^.\n]{0,60}(?:법정|법적)[^.\n]{0,45}(?:의무가\s*(?:있|적용)|반드시\s*지급|적용됩니다)/.test(text)) hits.push("SMALL_WORKPLACE_PREMIUM_CONFUSION");
-  if (/1350(?:에|으로)[^.\n]{0,30}(?:진정서[를가]?\s*(?:제출|접수)|진정을\s*접수)/.test(text)) hits.push("HOTLINE_FILING_CONFUSION");
+  const hotlineFiling = text.split(/[.!?。\n]/).some((sentence) => {
+    if (!/1350/.test(sentence) || !/진정(?:서)?(?:을|를|이|가)?\s*(?:제출|접수)/.test(sentence)) return false;
+    // A negated phone-filing claim or a separate filing step after consultation is valid.
+    if (/(?:제출|접수).{0,35}(?:아닙|아니|않|없|불가)/.test(sentence)
+      || /상담.{0,8}(?:후|뒤).{0,35}(?:노동포털|노동관서)/.test(sentence)) return false;
+    return /1350(?:에|으로)/.test(sentence)
+      || /1350.{0,35}(?:또는|혹은).{0,70}(?:진정|접수)/.test(sentence);
+  });
+  if (hotlineFiling) hits.push("HOTLINE_FILING_CONFUSION");
   if (/진정서\s*조회.{0,8}메뉴|양식을\s*내려받아/.test(text) && reviewedLaborTopics(query).includes("filing")) hits.push("UNVERIFIED_FILING_UI_DETAIL");
   return hits;
 }

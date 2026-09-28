@@ -84,8 +84,16 @@ describe("source-reviewed applicability bundles (development, not an independent
     ["22시까지 근무는 야간근로에 해당합니다.", "NIGHT_END_TIME_CONFUSION"],
     ["상시 4명인 사업장에도 법정 야간 가산임금 의무가 있습니다.", "SMALL_WORKPLACE_PREMIUM_CONFUSION"],
     ["1350에 전화해서 진정서를 제출하세요.", "HOTLINE_FILING_CONFUSION"],
+    ["고용노동부 1350(전화 상담) 또는 관할 지방고용노동관서 방문을 통해 정식 진정을 접수합니다.", "HOTLINE_FILING_CONFUSION"],
   ])("rejects affirmative relation, not just exact QA sentence: %s", (bad, hit) => {
     expect(applicabilityGuardrailHits(query, bad)).toContain(hit);
+  });
+  it.each([
+    "1350에서 절차를 상담할 수 있습니다. 진정은 노동포털이나 관할 노동관서 방문으로 접수하세요.",
+    "1350에 전화해 상담한 후 노동포털에서 진정서를 접수하세요.",
+    "1350에 전화하는 것만으로 진정서를 접수할 수 있는 것은 아닙니다.",
+  ])("preserves separate consultation and filing: %s", (answer) => {
+    expect(applicabilityGuardrailHits(query, answer)).not.toContain("HOTLINE_FILING_CONFUSION");
   });
   it.each([true, false])("Dual final route: good model answer is preserved=%s", async (good) => {
     const correct = reviewedLaborFallback(query, baseline)!;
