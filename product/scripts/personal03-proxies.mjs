@@ -4,7 +4,7 @@ import { appendFileSync, existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 
-export async function startPersonal03Proxies({ runtime, key, cap, appPort = 3128, webPort = 3127 }) {
+export async function startPersonal03Proxies({ runtime, key, cap, appPort = 3128, webPort = 3127, captureSyntheticPrompt = false }) {
   const append = (file, value) => appendFileSync(resolve(runtime, file), JSON.stringify(value) + '\n');
   const listen = server => new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done); });
   let calls = 0, failures = 0, stopped = false;
@@ -28,6 +28,8 @@ export async function startPersonal03Proxies({ runtime, key, cap, appPort = 3128
     const record = { call: ++calls, phase, started_at: new Date().toISOString(),
       prompt_sha256: createHash('sha256').update(JSON.stringify(payload.messages)).digest('hex'),
       temperature: payload.temperature, max_tokens: payload.max_tokens };
+    append('attempts.jsonl', { call: calls, phase });
+    if (captureSyntheticPrompt) record.messages = payload.messages;
     const began = performance.now();
     try {
       const upstream = await fetch('https://api.upstage.ai/v1/chat/completions', { method: 'POST',

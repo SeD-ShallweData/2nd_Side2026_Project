@@ -232,7 +232,7 @@ describe("로그인 대화 원문 저장", () => {
 
     const repository = getConversationRepository();
     const initial = await repository.findSummary(conversationId);
-    expect(initial).toMatchObject({ status: "ready", summarized_through_sequence: 10, summary_version: "extractive-v3" });
+    expect(initial).toMatchObject({ status: "ready", summarized_through_sequence: 10, summary_version: "extractive-v4" });
     expect(initial?.summary.user_goals[0]?.source_message_ids).toHaveLength(1);
     expect(initial?.summary.user_goals.map((item) => item.text).join(" ")).not.toContain("010-1234-5678");
     expect(initial?.summary.system_confirmed_facts).toEqual([]);

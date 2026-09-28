@@ -22,7 +22,8 @@ export function statementCompany(
   if (subject) {
     const value = subject[1].trim();
     const contextual = /^(?:이\s*회사|회사|사장|사업주|대표|저|저희|우리|이번\s*회사)$/.test(value)
-      || /급여일|월급날|지급일|지급\s*약속|입금\s*약속|임금|월급/.test(value);
+      || /급여일|월급날|지급일|지급\s*약속|입금\s*약속|임금|월급/.test(value)
+      || /^(?:제\s*)?(?:근로계약서|계약서|급여명세서|통장|출퇴근\s*기록)(?:\s*(?:원본|사본))?$/.test(value);
     const subjectMatches = companies.filter((company) => company.company_name === value);
     if (!contextual && subjectMatches.length !== 1) return { company_id: null, ambiguous: true };
     if (subjectMatches.length === 1) return { company_id: subjectMatches[0].company_id, ambiguous: false };
