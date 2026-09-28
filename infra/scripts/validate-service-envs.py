@@ -213,6 +213,7 @@ def validate_user_data_modes(web: dict[str, str], db: dict[str, str]) -> None:
         "COMMUNITY_DATA_MODE",
         "WORKSITE_TIP_DATA_MODE",
         "FAVORITE_DATA_MODE",
+        "CONVERSATION_DATA_MODE",
     )
     for key in mode_keys:
         if key not in web:
@@ -221,6 +222,8 @@ def validate_user_data_modes(web: dict[str, str], db: dict[str, str]) -> None:
     for key in mode_keys:
         if web[key] not in {"real", "mock"}:
             fail(f"web.env {key} must be real or mock")
+    if web["CONVERSATION_DATA_MODE"] != "real":
+        fail("web.env CONVERSATION_DATA_MODE must be real in production")
 
     if web["WORKSITE_TIP_DATA_MODE"] == "real" and web["AUTH_DATA_MODE"] != "real":
         fail(
@@ -238,6 +241,7 @@ def validate_user_data_modes(web: dict[str, str], db: dict[str, str]) -> None:
         ("AUTH_DATA_MODE", "AUTH_DATABASE_URL", None),
         ("COMMUNITY_DATA_MODE", "COMMUNITY_DATABASE_URL", None),
         ("WORKSITE_TIP_DATA_MODE", "TIP_DATABASE_URL", "wg_tip"),
+        ("CONVERSATION_DATA_MODE", "CONVERSATION_DATABASE_URL", "wg_conversation"),
     )
     for mode_key, url_key, expected_username in pairs:
         if web[mode_key] == "real":
@@ -349,6 +353,7 @@ def validate_web(web: dict[str, str], db: dict[str, str]) -> None:
             "APP_DATA_MODE",
             "COMPANY_DATA_MODE",
             "CONTRACT_DATA_MODE",
+            "CONVERSATION_DATA_MODE",
             "CHAT_EXECUTION_MODE",
             "UPSTAGE_API_KEY",
             "UPSTAGE_API_URL",
@@ -377,6 +382,7 @@ def validate_web(web: dict[str, str], db: dict[str, str]) -> None:
             "AUTH_DATABASE_URL",
             "COMMUNITY_DATABASE_URL",
             "TIP_DATABASE_URL",
+            "CONVERSATION_DATABASE_URL",
             "WORKSITE_TIP_STORAGE_ROOT",
             "MOCK_AUTH_USER_PASSWORD",
             "MOCK_AUTH_ADMIN_PASSWORD",

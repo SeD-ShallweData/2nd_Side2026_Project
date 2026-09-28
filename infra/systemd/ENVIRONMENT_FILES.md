@@ -18,6 +18,12 @@ POSTGRES_DATA_DIR=/srv/moneyworry/postgres
 DB 서비스 계정 소유 `0600` 또는 `root:DB_GROUP 0640`만 허용한다. `DATABASE_URL`과 외부 API
 key는 넣지 않는다.
 
+`create-conversation-role.sh`를 운영에서 실행해야 할 때에는 DB 서비스 env에 대화 role
+비밀번호를 추가하지 않는다. 별도 root 소유 `0600` 파일에 비밀번호 **한 줄만** 보관하고
+`CONVERSATION_PASSWORD_FILE=/etc/moneyworry/conversation-role.secret`을 명시한다.
+적용한 비밀번호는 web/worker의 `wg_conversation` URL에 인코딩된 값과 같아야 한다.
+이 파일 자체나 값을 로그·명령행·채팅에 출력하지 않는다.
+
 ## `web.env`
 
 ```dotenv
@@ -31,9 +37,11 @@ AUTH_DATA_MODE=real
 COMMUNITY_DATA_MODE=real
 WORKSITE_TIP_DATA_MODE=real
 FAVORITE_DATA_MODE=real
+CONVERSATION_DATA_MODE=real
 AUTH_DATABASE_URL=postgresql://wg_auth:<URL_ENCODED_AUTH_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 COMMUNITY_DATABASE_URL=postgresql://wg_community:<URL_ENCODED_COMMUNITY_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 TIP_DATABASE_URL=postgresql://wg_tip:<URL_ENCODED_TIP_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
+CONVERSATION_DATABASE_URL=postgresql://wg_conversation:<URL_ENCODED_CONVERSATION_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 WORKSITE_TIP_STORAGE_ROOT=/srv/moneyworry/worksite-tip-media
 CHAT_EXECUTION_MODE=dual_api
 UPSTAGE_API_KEY=<UPSTAGE_SECRET>
@@ -82,9 +90,9 @@ CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 금지된다. 전용 token은 `web.env`의 같은 이름 값과 일치하고 RAG token과 달라야 한다. 위 목록 외의 endpoint override도 거부한다. production unit이 두 file fallback을
 `/dev/null`로 고정하며 로그·계약서 캐시는 비활성화한다.
 
-## 인증·커뮤니티·현장 제보·즐겨찾기
+## 인증·커뮤니티·현장 제보·즐겨찾기·대화
 
-사용자 데이터 기능의 **네 모드 키는 생략할 수 없다** —
+사용자 데이터 기능의 **다섯 모드 키는 생략할 수 없다** —
 생략하면 `APP_DATA_MODE=real` 을 따라가는데, 연결 문자열 없이 real 이 되면
 로그인·글쓰기가 조용히 503 이 된다. `validate-service-envs.py` 가 명시를 강제한다.
 
@@ -94,9 +102,11 @@ CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 | `COMMUNITY_DATA_MODE` | `real` 또는 `mock` | real 이면 `COMMUNITY_DATABASE_URL` 필수 |
 | `WORKSITE_TIP_DATA_MODE` | `real` 또는 `mock` | real 이면 `TIP_DATABASE_URL`과 고정 저장 경로 필수 |
 | `FAVORITE_DATA_MODE` | `real` 또는 `mock` | real 이면 `wg_auth` 연결로 `user_favorite_firms` 사용 |
+| `CONVERSATION_DATA_MODE` | 운영에서는 `real` | `CONVERSATION_DATABASE_URL`을 명시해 `wg_conversation`으로 저장 |
 | `AUTH_DATABASE_URL` | `postgresql://wg_auth:…@127.0.0.1:5433/wageguard?sslmode=disable` | mock 일 때는 **두면 안 된다** |
 | `COMMUNITY_DATABASE_URL` | `postgresql://wg_community:…@127.0.0.1:5433/wageguard?sslmode=disable` | 〃 |
 | `TIP_DATABASE_URL` | `postgresql://wg_tip:…@127.0.0.1:5433/wageguard?sslmode=disable` | 〃 |
+| `CONVERSATION_DATABASE_URL` | `postgresql://wg_conversation:…@127.0.0.1:5433/wageguard?sslmode=disable` | 대화 7개 테이블 전용 롤. 운영에서 생략 금지 |
 | `WORKSITE_TIP_STORAGE_ROOT` | `/srv/moneyworry/worksite-tip-media` | 현장 제보 real 일 때만 사용하며 다른 경로는 거부 |
 | `MOCK_AUTH_*_PASSWORD` 3종 | mock 일 때만 | real 로 바꾸면 **지워야 한다** |
 
