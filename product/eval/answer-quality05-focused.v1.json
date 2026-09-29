@@ -1,0 +1,74 @@
+{
+  "id": "answer-quality05-focused.v1",
+  "kind": "development_regression",
+  "provider_call_cap": 140,
+  "initial_run_cap": 90,
+  "short_holdout_ids": [],
+  "extra_short_ids": [],
+  "comparison_ids": [],
+  "protocol": {
+    "long_turns": 6,
+    "min_actual_generation_turns": 1,
+    "scope": "final focused follow-up, not another 20-turn run",
+    "remaining_after_call_cap": 3,
+    "rules": "same global140 and cumulative after50; no reset; setup user statements then actual generation at L17"
+  },
+  "dialogues": [
+    {
+      "id": "F",
+      "steps": [
+        {
+          "id": "L01",
+          "message": "인천 OO건설의 급여일은 매달 25일이고 현장 보조 업무입니다. 하루 9시간 일합니다. 근로계약서 원본과 통장 사본을 갖고 있고 급여명세서는 받지 못했습니다.",
+          "expected": "A25일/9시간, 원본·통장사본 보유, 명세서 부재를 사용자 진술로 유지",
+          "planned_generation": false,
+          "company_id": "COMPANY_DEMO_001",
+          "checkpoint": true
+        },
+        {
+          "id": "L03",
+          "message": "김포 OO건설은 급여일이 매달 8일이고 사무 보조 업무입니다. 하루 9시간 일하며 급여명세서는 갖고 있습니다.",
+          "expected": "B8일/9시간/명세서 보유, B계약서·통장은 미진술",
+          "planned_generation": false,
+          "company_id": "COMPANY_DEMO_006",
+          "set_active_company": "COMPANY_DEMO_006",
+          "checkpoint": true
+        },
+        {
+          "id": "L05",
+          "message": "정정합니다. 인천 OO건설의 급여일은 25일이 아니라 23일입니다. 김포의 8일은 그대로입니다.",
+          "expected": "A23일/B8일 회사별 정정",
+          "planned_generation": false,
+          "checkpoint": true
+        },
+        {
+          "id": "L07",
+          "message": "인천 OO건설의 근로계약서 원본은 분실했고 사본만 갖고 있습니다. 통장 사본은 계속 보관 중이며 급여명세서는 없습니다.",
+          "expected": "원본 분실/계약사본·통장사본 보유/명세서 부재",
+          "planned_generation": false,
+          "company_id": "COMPANY_DEMO_001",
+          "set_active_company": "COMPANY_DEMO_001",
+          "checkpoint": true
+        },
+        {
+          "id": "L08",
+          "message": "김포 OO건설의 하루 근무시간은 9시간이 아니라 5시간으로 정정합니다. 급여일은 8일입니다.",
+          "expected": "B5시간8일/A9시간23일",
+          "planned_generation": false,
+          "company_id": "COMPANY_DEMO_006",
+          "set_active_company": "COMPANY_DEMO_006",
+          "checkpoint": true
+        },
+        {
+          "id": "L17",
+          "message": "1. 인천 2. 김포 순서로 최신 급여일·근무시간·제가 말한 서류 상태를 정리하고 임금체불 진정에 필요한 자료를 알려주세요.",
+          "expected": "A23일9시간계약원본분실사본통장보유명세서없음;B8일5시간명세서보유계약통장미진술;번호/행동",
+          "planned_generation": true,
+          "set_active_company": null,
+          "restart_before": true,
+          "checkpoint": true
+        }
+      ]
+    }
+  ]
+}

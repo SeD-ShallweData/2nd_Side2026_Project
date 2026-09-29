@@ -9,6 +9,7 @@ import type { RiskProvider, SourceReference } from "@/domain/risk";
 import { CHAT_COPY } from "@/mocks/chatResponses";
 import { ServiceError } from "@/utils/errors";
 import { containsAny, normalizeSearchText } from "@/utils/text";
+import { hasCompanyLocationQualifier } from "@/services/conversationCompanyScope";
 
 const SEARCH_ACTION: SuggestedAction = {
   code: "SEARCH_COMPANY",
@@ -256,9 +257,15 @@ async function findOtherReferencedCompany(
   companies: CompanyRepository,
 ) {
   const candidates = [...new Set(message.match(COMPANY_NAME_PATTERN) ?? [])];
+  const selected = await companies.getById(selectedCompanyId);
   for (const candidate of candidates) {
     const results = await companies.search(candidate, 3);
-    const other = results.find((result) => result.company_id !== selectedCompanyId);
+    // A shared display name is not an explicit reference to the other firm.
+    // Only a location that distinguishes it from the selected firm can do so.
+    const other = results.find((result) => result.company_id !== selectedCompanyId
+      && (normalizeSearchText(candidate) !== normalizeSearchText(selected?.company_name ?? "")
+        || (hasCompanyLocationQualifier(message, result)
+          && !hasCompanyLocationQualifier(message, selected!))));
     if (other && normalizeSearchText(other.company_name) === normalizeSearchText(candidate)) return other;
   }
   return null;
@@ -279,8 +286,10 @@ export class PolicyChatProvider implements ChatProvider {
       .slice(-6).some((item) => ACUTE_INJURY.test(item.content));
     const urgentInjury = ACUTE_INJURY.test(message)
       || (INJURY_FOLLOWUP.test(message) && recentInjury);
+    const locationCorrection = /정정/.test(message) && /(?:일터|작업장).{0,15}아니라/.test(message)
+      && /집\s*계단/.test(message) && /걸을\s*수\s*있/.test(message);
     if (urgentConsciousness || urgentInjury
-      || (containsAny(message, EMERGENCY_SIGNS) && !containsAny(message, EMERGENCY_EXCLUSIONS))) {
+      || (containsAny(message, EMERGENCY_SIGNS) && !containsAny(message, EMERGENCY_EXCLUSIONS) && !locationCorrection)) {
       const answer = urgentConsciousness
         ? "의식이 흐릿하거나 반응이 없는 사람은 즉시 119에 신고하고 현장 위험에서 안전하게 벗어나도록 도와주세요. 무리하게 이동시키지 말고 119 지시에 따르세요. 회사 산재 지표 조회나 서류 확인은 응급 대응 뒤에 하세요."
         : urgentInjury

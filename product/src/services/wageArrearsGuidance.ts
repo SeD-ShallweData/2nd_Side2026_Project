@@ -25,6 +25,12 @@ export function wageArrearsFallback(
   const periodNote = /두\s*(?:달|개월)|2\s*(?:달|개월)/.test(query)
     ? "두 달분은 각 월의 약정 지급일, 약정액, 실제 입금액을 나눠 미지급액을 합산하세요."
     : "약정 지급일과 실제 입금 내역을 대조해 미지급 기간과 금액을 적어 두세요.";
+  const paydayMatch = query.match(/(?:급여일|월급날)(?:은|이|가)?\s*(\d{1,2})일|(?:매달\s*)?(\d{1,2})일에\s*(?:월급|급여|임금)/);
+  const paydayNumber = Number(paydayMatch?.[1] ?? paydayMatch?.[2]);
+  const payday = paydayNumber >= 1 && paydayNumber <= 31 ? `${paydayNumber}일` : null;
+  const opening = payday && /(?:안\s*들어오면|못\s*받으면|미입금되면)/.test(query)
+    ? `질문에서 말한 ${payday}에 임금이 들어오지 않으면 먼저 약정 지급일과 미지급액을 기록으로 고정하세요.`
+    : "급여일이 지났는데 임금이 입금되지 않았다면 먼저 지급일과 미지급액을 기록으로 고정하세요.";
   const evidenceNote = /근로계약서|계약서|통장|입금\s*내역|거래\s*내역/.test(query)
     ? "보유한 근로계약서와 통장·거래 내역은 원본을 보관하고 제출용 사본을 준비하세요."
     : "근로계약서, 급여명세서, 출퇴근·업무 기록, 통장 입금 내역, 회사의 지급 약속 메시지를 확보하세요.";
@@ -35,7 +41,7 @@ export function wageArrearsFallback(
   return {
     ...baseline,
     answer: [
-      `급여일이 지났는데 임금이 입금되지 않았다면 먼저 지급일과 미지급액을 기록으로 고정하세요. ${periodNote}`,
+      `${opening} ${periodNote}`,
       `${evidenceNote} 회사가 지급을 약속했다면 금액과 지급 예정일을 문자나 이메일처럼 남는 방식으로 다시 확인하세요.`,
       `재직 중 정기 임금은 원칙적으로 매월 1회 이상 정한 날짜에 지급해야 합니다(근로기준법 제43조). 정기 급여일이 이미 지났다면 회사가 새로 약속한 날까지 기다려야만 진정할 수 있는 것은 아닙니다. 1350에서 절차를 상담할 수 있습니다. 정식 임금체불 진정은 전화 상담과 별개로 고용노동부 노동포털에서 온라인 신청하거나 사업장 소재지 관할 고용노동관서를 방문해 접수하고, 준비한 지급일·미지급액·근무 및 입금 자료를 제출하세요(고용노동부 노동포털 「체불임금 해결 방법」).${outOfScopeNote}`,
     ].join("\n\n"),
@@ -54,8 +60,12 @@ export function wageArrearsFallback(
 
 /** Detect model-added filing prerequisites that are absent from the retrieved wage evidence. */
 export function wageArrearsGuardrailHits(query: string, answer: string): string[] {
-  if (!hasUnpaidWageQuestion(query)) return [];
   const hits: string[] = [];
+  if (/임금|급여|월급|노동포털|진정/.test(query) && answer.split(/[.!?。\n]/).some(sentence =>
+    /체불|진정|접수/.test(sentence) && /계약서|명세서|입금/.test(sentence)
+    && /모두\s*필요|없으면.{0,12}(?:불가|못|할\s*수\s*없)/.test(sentence)
+    && !/필요하지\s*않|모두.{0,12}아니/.test(sentence))) hits.push("WAGE_DOCUMENTS_AS_PREREQUISITE");
+  if (!hasUnpaidWageQuestion(query)) return hits;
   if (/(?:4대보험|고용보험|국민연금).{0,25}(?:가입|가입 여부|확인).{0,20}(?:필요|먼저|해야|하세요)|(?:먼저|필요).{0,20}(?:4대보험|고용보험|국민연금).{0,20}(?:가입|확인)/.test(answer)) {
     hits.push("UNSUPPORTED_WAGE_FILING_PREREQUISITE");
   }

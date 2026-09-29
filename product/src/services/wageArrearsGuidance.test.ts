@@ -21,6 +21,26 @@ const retrieval: RagRetrievalResult = {
 };
 
 describe("source-linked wage arrears fallback", () => {
+  it("retains a conditional eighth-day payday in the guarded D1T11 recovery", () => {
+    const query = "김포 근무를 시작했는데 8일에 월급이 안 들어오면 어떤 순서로 확인하나요?";
+    const result = wageArrearsFallback(query, baseline, retrieval);
+    expect(result?.answer).toContain("8일");
+    expect(result?.answer).toContain("들어오지 않으면");
+    expect(result?.answer).toContain("근로기준법 제43조");
+    expect(result?.answer).toContain("노동포털");
+  });
+  it("keeps the eighth-day question when a synthetic raw answer invents an insurance prerequisite", async () => {
+    const query = "김포 근무를 시작했는데 8일에 월급이 안 들어오면 어떤 순서로 확인하나요?";
+    const raw = "8일에 임금이 입금되지 않으면 4대보험 가입 여부를 먼저 확인해야 합니다. 그 뒤 노동포털에서 진정하세요.";
+    const fakeFetch = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: raw }, finish_reason: "stop" }] }), { status: 200 }));
+    const subject = new DualLlmChatProvider([{ id: "upstage", label: "synthetic replay", apiKey: "synthetic", apiUrl: "https://example.test", model: "test" }], new OpenAICompatibleChatClient(fakeFetch, 5000));
+    const response = await subject.compare({ request: { message: query, chat_mode: "wage", recent_messages: [] }, questionIntent: "labor",
+      policyBaseline: baseline, ragRetrieval: retrieval });
+    expect(response.results[0].trace.guardrail_hits).toContain("UNSUPPORTED_WAGE_FILING_PREREQUISITE");
+    expect(response.results[0].answer).toContain("8일");
+    expect(response.results[0].answer).not.toContain("4대보험");
+    expect(response.results[0].sources.map(source => source.citation)).toEqual(retrieval.documents.map(document => document.citation));
+  });
   it("requires a matched retrieval and preserves evidence and practical next steps", () => {
     const query = "월급이 두 달 밀렸는데 무엇부터 해야 하나요?";
     const result = wageArrearsFallback(query, baseline, retrieval)!;

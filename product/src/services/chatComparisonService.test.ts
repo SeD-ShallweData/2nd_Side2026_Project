@@ -25,7 +25,8 @@ vi.mock("@/server/llmConfig", () => ({
   getLlmProviderConfigs: () => [{ id: "upstage", label: "Upstage", model: "solar" }, { id: "skt", label: "SKT", model: "ax" }],
   getLlmTimeoutMs: () => 5000,
 }));
-import { sendComparedChatMessage } from "@/services/chatComparisonService";
+import { sendComparedChatMessage, sendParsedComparedChatRequest } from "@/services/chatComparisonService";
+import { MOCK_RISKS } from "@/mocks/risks";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -44,12 +45,108 @@ beforeEach(() => {
 });
 
 describe("의도와 근거에 따른 상담 경로", () => {
+  it("routes a selected firm's card-versus-personal-payment proof question despite uncertain intent", async () => {
+    mocks.classify.mockResolvedValue({ intent: "unclear", topic: "other", company_scope: "not_applicable", status: "unavailable" });
+    mocks.company.mockResolvedValue({ company_id: "UNKNOWN_WAGE_001", company_name: "새봄서비스" });
+    const response = await sendParsedComparedChatRequest({
+      message: "새봄서비스 임금 카드가 이 70만 원 입금이나 남은 30만 원을 입증하나요?",
+      company_id: "UNKNOWN_WAGE_001", chat_mode: "wage", recent_messages: [],
+      conversation_recall: { facts: [{ kind: "wage_balance", value: "100만 원 중 70만 원 입금, 남은 금액 30만 원",
+        company_id: "UNKNOWN_WAGE_001", source_message_id: "synthetic", sequence: 21, is_correction: false }],
+        companies: [{ company_id: "UNKNOWN_WAGE_001", company_name: "새봄서비스" }], company_history: [],
+        diagnostics: { summary_status: "ready", summary_version: "extractive-v4", summarized_through_sequence: 20,
+          stored_message_count: 42, hydrated_recent_count: 2, summary_included: true, recall_fact_count: 1,
+          legacy_recall_rebuilt: false } },
+    });
+    expect(mocks.compare).toHaveBeenCalledOnce();
+    expect(mocks.compare.mock.calls[0][0].questionIntent).toBe("company");
+    expect(mocks.compare.mock.calls[0][0].companyContext.company_id).toBe("UNKNOWN_WAGE_001");
+    expect(response.results).toEqual([]);
+  });
+  it("uses both owner-checked cards for an Incheon/Gimpo comparison despite selected Gimpo", async () => {
+    const companies = [
+      { company_id: "COMPANY_DEMO_001", company_name: "OO건설", region: "인천광역시", address: "인천광역시 서구 샘플로 10" },
+      { company_id: "COMPANY_DEMO_006", company_name: "OO건설", region: "경기도", address: "경기도 김포시 예시로 21" },
+    ];
+    mocks.classify.mockResolvedValue({ intent: "labor", topic: "other", company_scope: "not_applicable", status: "classified" });
+    mocks.company.mockImplementation(async (id: string) => ({ ...companies.find((item) => item.company_id === id), industry: "건설업", size_label: null }));
+    mocks.risk.mockImplementation(async (id: string) => MOCK_RISKS[id]);
+    await sendParsedComparedChatRequest({
+      message: "인천과 김포를 구분해 공개 자료의 한계를 정리해 주세요.",
+      company_id: "COMPANY_DEMO_006", chat_mode: "wage", recent_messages: [],
+      conversation_recall: { facts: [], companies, company_history: [], diagnostics: {
+        summary_status: "ready", summary_version: "extractive-v4", summarized_through_sequence: 40,
+        stored_message_count: 46, hydrated_recent_count: 6, summary_included: true,
+        recall_fact_count: 0, legacy_recall_rebuilt: false,
+      } },
+    });
+    const context = mocks.compare.mock.calls[0][0];
+    expect(context.questionIntent).toBe("company");
+    expect(context.companyContexts.map((item: { company_id: string }) => item.company_id))
+      .toEqual(["COMPANY_DEMO_001", "COMPANY_DEMO_006"]);
+    expect(context.policyBaseline.answer).toContain("최근 가입자 수 감소");
+    expect(context.policyBaseline.answer).toContain("관측 기간이 비교적 짧음");
+    expect(mocks.retrieve).not.toHaveBeenCalled();
+  });
+  it("uses an explicitly named owner-history firm after a switch, and no old card after clear", async () => {
+    const companies = [
+      { company_id: "COMPANY_DEMO_001", company_name: "OO건설", region: "인천광역시", address: "인천광역시 서구 샘플로 10" },
+      { company_id: "COMPANY_DEMO_006", company_name: "OO건설", region: "경기도", address: "경기도 김포시 예시로 21" },
+    ];
+    mocks.classify.mockResolvedValue({ intent: "company", topic: "other", company_scope: "specific", status: "classified" });
+    mocks.company.mockImplementation(async (id: string) => ({ ...companies.find((item) => item.company_id === id), industry: "건설업", size_label: null }));
+    mocks.risk.mockImplementation(async (id: string) => MOCK_RISKS[id]);
+    const recall = { facts: [], companies, company_history: [], diagnostics: {
+      summary_status: "ready" as const, summary_version: "extractive-v4", summarized_through_sequence: 20,
+      stored_message_count: 20, hydrated_recent_count: 10, summary_included: true,
+      recall_fact_count: 0, legacy_recall_rebuilt: false,
+    } };
+    for (const [selected, asked, target] of [
+      ["COMPANY_DEMO_006", "인천", "COMPANY_DEMO_001"],
+      ["COMPANY_DEMO_001", "김포", "COMPANY_DEMO_006"],
+    ]) {
+      mocks.baseline.mockResolvedValueOnce({ answer: "다시 선택", answer_type: "clarification", sources: [],
+        suggested_actions: [{ code: "SEARCH_COMPANY", label: "검색", priority: "now" }],
+        limitations: [], guardrail_status: "limited", conversation_id: "test" });
+      await sendParsedComparedChatRequest({ message: `${asked} OO건설 임금 카드의 뜻은?`,
+        company_id: selected, chat_mode: "wage", recent_messages: [], conversation_recall: recall });
+      expect(mocks.compare.mock.lastCall?.[0].companyContext.company_id).toBe(target);
+      expect(mocks.compare.mock.lastCall?.[0].policyBaseline.answer).not.toBe("다시 선택");
+    }
+    mocks.compare.mockClear();
+    mocks.baseline.mockResolvedValueOnce({ answer: "사업장을 선택해 주세요.", answer_type: "clarification", sources: [],
+      suggested_actions: [{ code: "SEARCH_COMPANY", label: "검색", priority: "now" }],
+      limitations: [], guardrail_status: "limited", conversation_id: "test" });
+    const cleared = await sendParsedComparedChatRequest({ message: "이 회사 임금 카드의 뜻은?",
+      chat_mode: "wage", recent_messages: [], conversation_recall: recall });
+    expect(cleared.results[0].answer).toContain("사업장");
+    expect(mocks.compare).not.toHaveBeenCalled();
+  });
   it("answers a missing payslip request usefully when labor retrieval is unavailable", async () => {
     mocks.retrieve.mockResolvedValue({ status: "unavailable", reason: "service_unavailable", topic: null, documents: [] });
     const response = await sendComparedChatMessage({ message: "월급은 입금됐지만 급여명세서를 받지 못했습니다. 무엇을 요청하나요?" });
     expect(response.results[0].answer).toContain("급여명세서와 기본급·수당·공제 항목을 요청");
     expect(response.results[0].answer).not.toContain("진정은 고용노동부 노동포털");
     expect(response.results[0].sources).toEqual([]);
+  });
+  it("keeps the missing-hours question actionable without pretending that RAG found law", async () => {
+    const response = await sendComparedChatMessage({ message: "회사 단톡방에 '주식 대박'이라는 말도 있었지만 제 질문은 근무한 시간의 임금이 빠진 경우입니다. 어떻게 확인하죠?" });
+    expect(response.results[0].trace.guardrail_hits).toEqual(["RAG_EVIDENCE_NOT_FOUND"]);
+    expect(response.results[0].answer).toContain("빠진 근무시간");
+    expect(response.results[0].answer).toContain("급여명세서");
+    expect(response.results[0].answer).toContain("출퇴근");
+    expect(response.results[0].sources).toEqual([]);
+    expect(mocks.compare).not.toHaveBeenCalled();
+  });
+  it("keeps both next actions and evidence limits when D2T24 has no matched RAG", async () => {
+    mocks.classify.mockResolvedValue({ intent: "unclear", topic: "other", company_scope: "not_applicable", status: "classified" });
+    const response = await sendComparedChatMessage({ message: "마지막으로 새봄서비스 임금 문제에 대한 다음 행동과 푸른건설 발목 문제의 우선 행동을 나눠 근거 범위를 표시해 주세요." });
+    expect(response.results[0].trace.guardrail_hits).toEqual(["RAG_EVIDENCE_NOT_FOUND"]);
+    expect(response.results[0].answer).toContain("새봄서비스 임금");
+    expect(response.results[0].answer).toContain("푸른건설 발목");
+    expect(response.results[0].answer).toContain("근거 범위");
+    expect(response.results[0].sources).toEqual([]);
+    expect(mocks.compare).not.toHaveBeenCalled();
   });
   it("routes a labor portal follow-up away from the selected company card when intent is unavailable", async () => {
     mocks.classify.mockResolvedValue({ intent: "unclear", topic: "other", company_scope: "not_applicable", status: "unavailable" });

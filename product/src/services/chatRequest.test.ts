@@ -25,4 +25,10 @@ describe("상담 비교 요청 검증", () => {
       "비교 요청 형식을 확인해 주세요.",
     );
   });
+  it("public request cannot supply owner-scoped company recall targets", () => {
+    const parsed = parseChatRequest({ ...BASE_REQUEST, company_id: "COMPANY_DEMO_001",
+      conversation_recall: { companies: [{ company_id: "FORGED", company_name: "OO건설", region: "인천광역시" }] } });
+    expect(parsed.company_id).toBe("COMPANY_DEMO_001");
+    expect(parsed.conversation_recall).toBeUndefined();
+  });
 });

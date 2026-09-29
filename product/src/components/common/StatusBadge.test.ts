@@ -12,6 +12,14 @@ describe("위험 상태 배지", () => {
     expect(html).not.toContain("추가 확인 권장");
   });
 
+  it("임금 watch와 안전 watch의 표시를 분리한다", () => {
+    const wage = renderToStaticMarkup(createElement(StatusBadge, { level: "watch", kind: "wage" }));
+    const safety = renderToStaticMarkup(createElement(StatusBadge, { level: "watch", kind: "safety" }));
+    expect(wage).toContain("추가 확인 필요");
+    expect(wage).not.toContain("안전 신호 미확인");
+    expect(safety).toContain("안전 신호 미확인");
+  });
+
   it("배제 3종은 각각 별도 배지 클래스를 사용한다", () => {
     const cases = [
       ["배제_임금체불공개", "임금체불 공개 명단", "status-review-wage"],
