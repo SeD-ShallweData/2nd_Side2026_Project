@@ -1,4 +1,5 @@
 import type { ChatResponse } from "@/domain/chat";
+import { contractReviewCitations } from "@/domain/contractReviewContext";
 import type {
   ChatComparisonProvider,
   ChatComparisonResponse,
@@ -66,10 +67,12 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   }
   for (const hit of applicabilityGuardrailHits(context.request.message, answer)) hits.add(hit);
   for (const hit of wageArrearsGuardrailHits(context.request.message, answer)) hits.add(hit);
+  // 계약서 진단 요약의 근거 조문(규칙 엔진 목록으로 이미 걸러진 값)도 검증된 인용으로 본다.
+  const contractCitations = contractReviewCitations(context.request.contract_review);
   const unverified = hasUnverifiedCitation(
     answer,
-    context.ragRetrieval.status,
-    context.ragRetrieval.documents.map((document) => document.citation),
+    context.ragRetrieval.status === "matched" || contractCitations.length > 0 ? "matched" : context.ragRetrieval.status,
+    [...context.ragRetrieval.documents.map((document) => document.citation), ...contractCitations],
   );
   if (unverified) hits.add("UNVERIFIED_LAW_CITATION");
   if (context.questionIntent === "company" && context.companyContext) {
@@ -283,6 +286,18 @@ function buildSystemPrompt(context: ComparisonContext): string {
     user_document_status: documentStatus,
     user_document_status_summary: documentQuestion ? documentStatusSummaryForRequest(context.request) : null,
     user_recall_facts: latestRequestedFacts(context, requestedIds),
+    contract_review: context.request.contract_review
+      ? {
+          analysis_status: context.request.contract_review.analysis_status,
+          findings: context.request.contract_review.items.map((item) => ({
+            status: item.status === "detected" ? "확인됨" : item.status === "missing" ? "누락 가능" : "추가 확인",
+            label: item.label,
+            legal_basis: item.legal_basis ?? null,
+          })),
+          questions_to_ask_employer: context.request.contract_review.suggested_questions,
+          rule: "사용자가 계약서 진단 화면에서 받은 규칙 엔진 결과 요약이다. 계약서 원문이 아니다. 각 항목의 legal_basis는 그 항목을 설명하는 문장에서만 괄호 근거로 쓴다. '누락 가능'은 위법 확정이 아니라 계약서에서 찾지 못했다는 뜻이다.",
+        }
+      : null,
   };
 
   const companyOutputContract = context.questionIntent === "company" && context.companyContext

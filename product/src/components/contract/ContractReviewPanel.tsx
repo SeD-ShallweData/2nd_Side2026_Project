@@ -4,10 +4,31 @@ import Link from "next/link";
 import { ChangeEvent, FormEvent, useId, useRef, useState } from "react";
 import type { DataMode } from "@/config/dataMode";
 import type { ContractItem, ContractReviewResult } from "@/domain/contract";
+import {
+  CONTRACT_REVIEW_CONTEXT_STORAGE_KEY,
+  toContractReviewContext,
+  type StoredContractReviewContext,
+} from "@/domain/contractReviewContext";
 import { readApiResponse } from "@/utils/clientApi";
 import { publicClientHeaders } from "@/utils/publicClientId";
 
 const ALLOWED_TYPES = ["application/pdf", "image/png", "image/jpeg"];
+
+/** 진단 결과 요약만 이 탭에 잠시 둔다. 원본 파일·추출 원문·파일명은 넣지 않는다. */
+function rememberReviewForChat(result: ContractReviewResult): boolean {
+  const context = toContractReviewContext(result);
+  try {
+    if (!context) {
+      window.sessionStorage.removeItem(CONTRACT_REVIEW_CONTEXT_STORAGE_KEY);
+      return false;
+    }
+    const stored: StoredContractReviewContext = { saved_at: Date.now(), context };
+    window.sessionStorage.setItem(CONTRACT_REVIEW_CONTEXT_STORAGE_KEY, JSON.stringify(stored));
+    return true;
+  } catch {
+    return false;
+  }
+}
 const MAX_SIZE = 10 * 1024 * 1024;
 
 function ReviewSection({
@@ -50,6 +71,7 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
   const [result, setResult] = useState<ContractReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [chatLinkReady, setChatLinkReady] = useState(false);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const next = event.target.files?.[0] ?? null;
@@ -82,6 +104,7 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
     setLoading(true);
     setError(null);
     setResult(null);
+    setChatLinkReady(false);
     try {
       const form = new FormData();
       if (file) form.append("file", file);
@@ -91,7 +114,9 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
         headers: publicClientHeaders(),
         body: form,
       });
-      setResult(await readApiResponse<ContractReviewResult>(response));
+      const reviewed = await readApiResponse<ContractReviewResult>(response);
+      setResult(reviewed);
+      setChatLinkReady(rememberReviewForChat(reviewed));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "계약서 검토 결과를 불러오지 못했습니다.");
     } finally {
@@ -216,9 +241,17 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
           <div className="contract-followup">
             <div>
               <strong>결과를 이해하기 어려운가요?</strong>
-              <p>검토 결과를 법률 확정판정으로 보지 말고, 궁금한 항목을 공식 근거 기반 AI 상담에서 이어서 물어보세요.</p>
+              <p>
+                검토 결과를 법률 확정판정으로 보지 말고, 궁금한 항목을 공식 근거 기반 AI 상담에서 이어서 물어보세요.
+                {chatLinkReady ? " 이어가면 항목 분류와 근거 조문 요약만 상담에 연결됩니다(원본 파일·원문은 보내지 않음)." : ""}
+              </p>
             </div>
-            <Link href="/chat?mode=contract&amp;prompt=근로계약서+검토+결과에서+확인+필요+항목을+어떻게+질문해야+하나요%3F" className="button button-outline">
+            <Link
+              href={chatLinkReady
+                ? "/chat?mode=contract&contract_review=1&prompt=%EC%A7%84%EB%8B%A8+%EA%B2%B0%EA%B3%BC%EC%97%90%EC%84%9C+%ED%99%95%EC%9D%B8%EC%9D%B4+%ED%95%84%EC%9A%94%ED%95%9C+%ED%95%AD%EB%AA%A9%EC%9D%84+%ED%9A%8C%EC%82%AC%EC%97%90+%EC%96%B4%EB%96%BB%EA%B2%8C+%EB%AC%BC%EC%96%B4%EB%B3%B4%EB%A9%B4+%EB%90%98%EB%82%98%EC%9A%94%3F"
+                : "/chat?mode=contract&prompt=근로계약서+검토+결과에서+확인+필요+항목을+어떻게+질문해야+하나요%3F"}
+              className="button button-outline"
+            >
               AI 상담으로 이어가기
             </Link>
           </div>

@@ -129,6 +129,29 @@ describe("의도와 근거에 따른 상담 경로", () => {
     expect(response.results[0].answer).not.toContain("진정은 고용노동부 노동포털");
     expect(response.results[0].sources).toEqual([]);
   });
+  it("계약서 진단 요약이 연결되면 법령 검색이 비어도 모델 답변으로 이어간다", async () => {
+    const contractReview = {
+      analysis_status: "completed" as const,
+      items: [{ status: "missing" as const, code: "BREAK_TIME", label: "휴게시간", legal_basis: "근로기준법 제54조" }],
+      suggested_questions: [],
+    };
+    await sendParsedComparedChatRequest({
+      message: "진단 결과에서 휴게시간이 누락 가능이라는데 회사에 어떻게 물어보면 되나요?",
+      chat_mode: "contract", recent_messages: [], contract_review: contractReview,
+    });
+    expect(mocks.compare).toHaveBeenCalledOnce();
+    const context = mocks.compare.mock.calls[0][0];
+    expect(context.request.contract_review).toEqual(contractReview);
+    expect(context.policyBaseline.limitations.join(" ")).toContain("계약서 진단 화면의 결과 요약");
+  });
+  it("계약서 진단 요약이 없으면 같은 질문도 근거 없음 안내로 끝난다", async () => {
+    const response = await sendParsedComparedChatRequest({
+      message: "진단 결과에서 휴게시간이 누락 가능이라는데 회사에 어떻게 물어보면 되나요?",
+      chat_mode: "contract", recent_messages: [],
+    });
+    expect(mocks.compare).not.toHaveBeenCalled();
+    expect(response.results[0].trace.guardrail_hits[0]).toMatch(/^RAG_/);
+  });
   it("keeps the missing-hours question actionable without pretending that RAG found law", async () => {
     const response = await sendComparedChatMessage({ message: "회사 단톡방에 '주식 대박'이라는 말도 있었지만 제 질문은 근무한 시간의 임금이 빠진 경우입니다. 어떻게 확인하죠?" });
     expect(response.results[0].trace.guardrail_hits).toEqual(["RAG_EVIDENCE_NOT_FOUND"]);

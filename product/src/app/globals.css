@@ -2362,6 +2362,60 @@ summary:focus-visible {
   text-decoration: underline;
 }
 
+.chat-contract-review-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 15px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 10px 12px;
+}
+
+.chat-contract-review-link > div { display: grid; gap: 2px; min-width: 0; }
+.chat-contract-review-link strong { color: var(--ink); font-size: 0.78rem; }
+.chat-contract-review-link span { color: var(--ink-soft); font-size: 0.72rem; font-weight: 700; }
+.chat-contract-review-link small { color: var(--muted); font-size: 0.66rem; }
+.chat-contract-review-link button {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 5px 11px;
+}
+
+.chat-favorite-companies {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 15px 13px;
+  font-size: 0.68rem;
+}
+
+.chat-favorite-companies > span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.chat-favorite-companies a {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-weight: 800;
+  padding: 4px 10px;
+  text-decoration: none;
+}
+
+.chat-favorite-companies a:hover { border-color: var(--ink); }
+
 /* Checklist */
 
 .checklist-card {

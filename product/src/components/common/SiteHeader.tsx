@@ -35,6 +35,22 @@ type SessionState =
   | { status: "loading" }
   | { status: "ready"; session: SessionResponse };
 
+/**
+ * 사업장 상세를 보는 중이면 AI 상담 진입 링크가 그 사업장을 함께 넘긴다.
+ * 떠 있는 상담 버튼이나 모바일 메뉴로 들어가도 방금 본 사업장 문맥이 끊기지 않게 한다.
+ */
+export function chatHrefForPath(pathname: string): string {
+  const match = /^\/companies\/([^/?#]+)\/?$/.exec(pathname);
+  if (!match) return "/chat";
+  let companyId: string;
+  try {
+    companyId = decodeURIComponent(match[1]);
+  } catch {
+    return "/chat";
+  }
+  return `/chat?company_id=${encodeURIComponent(companyId)}`;
+}
+
 export function Brand() {
   return (
     <span className="brand" aria-label="Co끼리 홈">
@@ -212,7 +228,7 @@ export function SiteHeader() {
         <p className="shell field-error" role="alert">{logoutError}</p>
       ) : null}
       {!isInspector && pathname !== "/chat" ? (
-        <Link href="/chat" className="consumer-floating-chat" aria-label="돈워리 AI에게 상담하기">
+        <Link href={chatHrefForPath(pathname)} className="consumer-floating-chat" aria-label="돈워리 AI에게 상담하기">
           <Image src="/brand/donworry-mascot.png" alt="" width={192} height={192} />
           <span className="consumer-floating-chat-label">돈워리 AI에게 상담하기</span>
         </Link>
@@ -223,7 +239,7 @@ export function SiteHeader() {
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={item.href === "/chat" ? chatHrefForPath(pathname) : item.href}
               className={current ? "is-current" : undefined}
               aria-current={current ? "page" : undefined}
             >

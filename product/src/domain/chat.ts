@@ -1,4 +1,5 @@
 import type { SourceReference } from "@/domain/risk";
+import type { ContractReviewContext } from "@/domain/contractReviewContext";
 import type { ConversationRecallContext } from "@/domain/conversationRecall";
 
 export type ChatMode = "general" | "wage" | "safety" | "contract";
@@ -37,6 +38,11 @@ export interface ChatRequest {
   external_compare_consent?: boolean;
   chat_mode: ChatMode;
   recent_messages: RecentMessage[];
+  /**
+   * 계약서 진단 화면에서 사용자가 이어 온 결과 요약(contract 모드에서만).
+   * 브라우저가 보낸 값이라 parseContractReviewContext 로 다시 검사한 것만 붙는다. 저장하지 않는다.
+   */
+  contract_review?: ContractReviewContext;
   /** 서버 소유 대화방의 ready 요약만 붙는다. 클라이언트 입력은 신뢰하지 않는다. */
   conversation_memory?: ConversationMemoryContext;
   /** Server-only, owner-checked provenance. Raw request parsing drops this field. */

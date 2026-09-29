@@ -13,7 +13,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-import { SiteHeader, isCurrentNavPath } from "@/components/common/SiteHeader";
+import { SiteHeader, chatHrefForPath, isCurrentNavPath } from "@/components/common/SiteHeader";
 
 describe("공통 사이트 헤더", () => {
   it("근로감독관 경로에서도 최신 Co끼리 내비게이션을 사용한다", () => {
@@ -72,5 +72,17 @@ describe("현재 탭 판정", () => {
 
   it("접두사가 겹치는 다른 경로를 현재 탭으로 보지 않는다", () => {
     expect(isCurrentNavPath("/companies-archive", "/companies")).toBe(false);
+  });
+
+  it("사업장 상세에서는 AI 상담 링크가 그 사업장을 함께 넘긴다", () => {
+    expect(chatHrefForPath("/companies/COMPANY_DEMO_008")).toBe("/chat?company_id=COMPANY_DEMO_008");
+    expect(chatHrefForPath("/companies/%ED%95%9C%EB%B9%9B")).toBe("/chat?company_id=%ED%95%9C%EB%B9%9B");
+    expect(chatHrefForPath("/companies")).toBe("/chat");
+    expect(chatHrefForPath("/companies/a/b")).toBe("/chat");
+    expect(chatHrefForPath("/community")).toBe("/chat");
+
+    pathname = "/companies/COMPANY_DEMO_008";
+    const html = renderToStaticMarkup(createElement(SiteHeader));
+    expect(html).toContain('href="/chat?company_id=COMPANY_DEMO_008" class="consumer-floating-chat"');
   });
 });

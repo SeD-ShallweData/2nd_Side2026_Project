@@ -7,7 +7,7 @@ import { getChatExecutionMode } from "@/server/responses/responsesConfig";
 export const metadata: Metadata = { title: "노동 상담" };
 
 interface ChatPageProps {
-  searchParams: Promise<{ company_id?: string; prompt?: string; mode?: string }>;
+  searchParams: Promise<{ company_id?: string; prompt?: string; mode?: string; contract_review?: string }>;
 }
 
 const CHAT_MODES: ChatMode[] = ["general", "wage", "safety", "contract"];
@@ -46,6 +46,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
           suggestedPrompt={prompt}
           chatMode={mode}
           executionMode={executionMode}
+          contractReviewRequested={mode === "contract" && params.contract_review === "1"}
         />
       </div>
     </div>
