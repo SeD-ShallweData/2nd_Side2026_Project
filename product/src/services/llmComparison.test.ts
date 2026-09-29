@@ -10,6 +10,7 @@ import type { ComparisonContext } from "@/domain/chatComparison";
 import type { LlmProviderConfig } from "@/server/llmConfig";
 import { MOCK_RISKS } from "@/mocks/risks";
 import { finalizeConversationResponse } from "@/services/conversationRecallService";
+import { reviewedLaborRetrieval } from "@/services/reviewedLaborGuidance";
 
 const CONFIGS: LlmProviderConfig[] = [
   { id: "upstage", label: "Upstage Solar", apiKey: "test-upstage-secret", apiUrl: "https://upstage.test/chat", model: "solar-test" },
@@ -64,6 +65,37 @@ function payload(answer: string, model: string) {
 }
 
 describe("실제 LLM 비교 Provider", () => {
+  it("replaces a live-observed recall preamble that omits the requested next action", async () => {
+    const message = "한빛테크의 정정한 급여일과 지급 약속을 정리하고 지금 할 일을 알려주세요.";
+    const subject = new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(
+      vi.fn(async () => new Response(JSON.stringify(payload("이 상담에서 말씀하신 내용 기준입니다.", "test")))),
+    ));
+    const result = await subject.compare({ ...CONTEXT, request: { ...CONTEXT.request, message }, ragRetrieval: reviewedLaborRetrieval(message)! });
+    expect(result.results[0].trace.guardrail_hits).toContain("PAYMENT_ACTION_MISSING");
+    expect(result.results[0].status).toBe("guardrail_replaced");
+    expect(result.results[0].answer).toContain("입금");
+    expect(result.results[0].answer).toContain("노동포털");
+  });
+  it("keeps substantive prior guidance in the model context and replaces a citation-only answer", async () => {
+    const bodies: Array<{ messages: { role: string; content: string }[] }> = [];
+    const fakeFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify(payload("(근로기준법 제43조) (고용노동부 노동포털 「체불임금 해결 방법」)", "test")), { status: 200 });
+    });
+    const response = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({
+      ...CONTEXT,
+      request: {
+        ...CONTEXT.request,
+        message: "회사는 27일 지급하겠다는 문자를 보냈습니다. 기억해 주세요.",
+        recent_messages: [{ role: "assistant", content: "급여일이 지난 상태라면 지급일과 미지급액을 확인하세요. (근로기준법 제43조) (고용노동부 노동포털 「체불임금 해결 방법」)" }],
+      },
+      policyBaseline: { ...BASELINE, answer: "문자 원본과 입금 내역을 보관하세요." },
+    });
+    expect(bodies[0].messages[1].content).toContain("지급일과 미지급액을 확인하세요");
+    expect(response.results[0].status).toBe("guardrail_replaced");
+    expect(response.results[0].trace.guardrail_hits).toContain("CITATION_ONLY_ANSWER");
+    expect(response.results[0].answer).not.toMatch(/^\s*\(근로기준법/);
+  });
   it.each([true, false])("separates valid recall from actual unverified-citation replacement (bad citation=%s)", async (badCitation) => {
     const answer = `급여일은 15일이고 회사는 다음 주에 지급하겠다고 말씀하셨습니다.${badCitation ? " 근로기준법 제999조에 따른 안내입니다." : ""}`;
     const fakeFetch = vi.fn(async () => new Response(JSON.stringify(payload(answer, "test")), { status: 200 }));
@@ -359,7 +391,7 @@ describe("실제 LLM 비교 Provider", () => {
     expect(result.results.every((item) => item.status === "success")).toBe(true);
   });
 
-  it("이전 모델 답변은 핵심 근거만 남겨 반복 생성을 줄인다", async () => {
+  it("keeps prior answer bodies as labelled data and the current question as the last user message", async () => {
     const bodies: Array<{ messages?: Array<{ role: string; content: string }> }> = [];
     const verboseAnswer = "먼저 상황을 확인하세요. 근로기준법 제17조에 따라 근로조건은 서면으로 확인해야 합니다. 이후의 매우 긴 설명은 다음 답변에 그대로 복제되면 안 됩니다.";
     const historyContext: ComparisonContext = {
@@ -386,7 +418,11 @@ describe("실제 LLM 비교 Provider", () => {
     expect(messages[0].content).toContain("previously_cited_labor_law");
     expect(messages[0].content).toContain("근로기준법 제17조");
     expect(messages[2].content).not.toContain("이전 답변 근거");
-    expect(messages[2].content).not.toContain("이후의 매우 긴 설명");
+    expect(messages.map(message => message.role)).toEqual(["system", "user", "user"]);
+    expect(messages[1].content).toContain("근로조건은 서면으로 확인해야 합니다");
+    expect(messages[1].content).toContain("이후의 매우 긴 설명");
+    expect(messages[1].content).toContain('"speaker":"assistant"');
+    expect(messages[2].content).toBe(historyContext.request.message);
   });
 
   it("내부 프롬프트 공개 거절 문장은 유출로 오탐하지 않는다", async () => {

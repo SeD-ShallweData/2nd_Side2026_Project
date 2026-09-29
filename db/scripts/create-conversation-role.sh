@@ -4,6 +4,7 @@
 # 이 롤은 대화방·turn·표시 메시지·표시 근거만 읽고 쓴다. users/sessions,
 # 게시글, ML 원천·뷰, 모델 prompt/trace에는 접근하지 않는다.
 set -Eeuo pipefail
+set +x
 
 cd "$(dirname "$0")/.."
 ENV_FILE="${DB_ENV_FILE:-.env.local}"
@@ -28,10 +29,25 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
   fi
 done < "$ENV_FILE"
 
+# Production db.env intentionally contains no application-role passwords.
+# Read the same secret from a separate root-owned file when explicitly supplied;
+# never put it in argv, shell history, or the DB service environment.
+if [[ -n "${CONVERSATION_PASSWORD_FILE:-}" ]]; then
+  [[ -f "$CONVERSATION_PASSWORD_FILE" && ! -L "$CONVERSATION_PASSWORD_FILE" ]] \
+    || { echo "CONVERSATION_PASSWORD_FILE must be a regular file" >&2; exit 1; }
+  [[ "$(stat -c '%u' -- "$CONVERSATION_PASSWORD_FILE")" == "0" ]] \
+    || { echo "CONVERSATION_PASSWORD_FILE must be root-owned" >&2; exit 1; }
+  secret_mode="$(stat -c '%a' -- "$CONVERSATION_PASSWORD_FILE")"
+  [[ "$secret_mode" =~ ^[0-7]{3,4}$ ]] && (( (8#$secret_mode & 077) == 0 )) \
+    || { echo "CONVERSATION_PASSWORD_FILE must be mode 0600 or stricter" >&2; exit 1; }
+  IFS= read -r CONVERSATION_PASSWORD < "$CONVERSATION_PASSWORD_FILE" || [[ -n "${CONVERSATION_PASSWORD:-}" ]]
+fi
+
 if [[ -z "${CONVERSATION_PASSWORD:-}" ]]; then
-  echo "CONVERSATION_PASSWORD 가 .env.local 에 없습니다." >&2
+  echo "CONVERSATION_PASSWORD 또는 CONVERSATION_PASSWORD_FILE 이 필요합니다." >&2
   exit 1
 fi
+[[ ${#CONVERSATION_PASSWORD} -ge 24 ]] || { echo "CONVERSATION_PASSWORD is too short" >&2; exit 1; }
 
 CONVERSATION_USER="${CONVERSATION_USER:-wg_conversation}"
 [[ "$CONVERSATION_USER" =~ ^[a-z_][a-z0-9_]*$ ]] || { echo "CONVERSATION_USER 형식이 안전하지 않습니다" >&2; exit 1; }

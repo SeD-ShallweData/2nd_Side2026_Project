@@ -2,16 +2,19 @@
 
 이 문서는 **준비 절차**다. 운영 설치·migration·서비스 재시작은 이번 작업에서 수행하지 않았다.
 검증 근거와 미확정 정책은 [후속 06](../../docs/qa/2026-09-21-followup-06.md)을 참조한다.
+2026-09-29 로컬 격리 재검증과 실제 운영 미확인 항목, 읽기 전용 명령·조건부 적용/복구안은
+[개인 작업 07](../../docs/qa/2026-09-28-personal-07.md)에 기록했다. 이 결과는 운영 적용
+증거가 아니다.
 
 ## 배포 전 순서
 
 1. 운영 대상·승인·백업 SHA-256·별도 복원 가능 여부를 확인한다. 기존 사용자/복원 DB에 빈 DB용 acceptance를 연결하지 않는다.
 2. [MIGRATION_OPERATIONS.md](MIGRATION_OPERATIONS.md)의 read-only drift 검사로 실제 ledger를 확인한다. 과거 0017 적용 기록은 현재 0018~0020 적용 증거가 아니다. `schema_ahead`, `partial`, `diverged`이면 중단하고 문서의 복구 절차를 따른다.
 3. 이미 적용된 SQL/hash/created_at을 바꾸지 않는다. 승인된 migration만 실행한다. 0018은 즐겨찾기, 0019는 요약 lease, 0020은 요청의 2분 processing lease와 fencing 컬럼·제약을 추가한다. **새 앱·worker보다 먼저 0018~0020을 순서대로 적용**한다.
-4. 해당 환경의 승인된 role 스크립트를 실행한다. `create-auth-role.sh`: users/sessions CRUD 및 favorites SELECT/INSERT/DELETE; `create-conversation-role.sh`: 기존 7개 conversation 테이블 CRUD만. 신규 테이블 생성 전에는 conversation grant를 실행하지 않는다. 0009 조건부 grant와 달리 이 명시적 스크립트는 해당 테이블 migration 이후 실행한다. 역할 비밀번호는 보호된 로컬 env에만 두며 psql argv에 넣지 않는다(`\getenv`, PG16 client 필요).
+4. 해당 환경의 승인된 role 스크립트를 실행한다. `create-auth-role.sh`: users/sessions CRUD 및 favorites SELECT/INSERT/DELETE; `create-conversation-role.sh`: 기존 7개 conversation 테이블 CRUD만. 신규 테이블 생성 전에는 conversation grant를 실행하지 않는다. 0009 조건부 grant와 달리 이 명시적 스크립트는 해당 테이블 migration 이후 실행한다. 운영 `db.env`에는 앱 role 비밀번호를 넣지 않는다. 대화 role은 별도 root 소유 `0600` 한 줄 파일을 `CONVERSATION_PASSWORD_FILE`로 지정하고 psql argv에 넣지 않는다(`\getenv`, PG16 client 필요).
 5. `npm run check:migration-drift`에서 21개 ledger 및 115개 알려진 후조건이 aligned인지 확인한다. 0000~0005의 모든 의미적 제약을 검사한다는 뜻은 아니다.
 6. Node **22** / 잠금 파일 기준 `npm ci` 후 `product`에서 `npm run worker:conversation:build`. 생성물 `.runtime/conversation-worker.mjs`는 Git 제외 서버 번들이다. **배포마다 별도 재빌드**한다. 기존 Next build/자동 배포기가 이 명령을 대신 실행하지 않는다.
-7. 기존 systemd 치환 관례에 맞춰 `infra/systemd/moneyworry-conversation-maintenance.service.in`의 `@PROJECT_ROOT@`, `@WEB_SERVICE_USER@`, `@WEB_SERVICE_GROUP@`, `@NODE_BIN@`, `@CONVERSATION_WORKER_ENV_FILE@`을 운영자가 확정한다. 기존 서비스 경로나 사용자 이름을 추정해 설치하지 않는다.
+7. 실제 web unit의 사용자·그룹·경로를 확인한 뒤 `infra/scripts/render-conversation-maintenance.py`로 별도 service/timer를 렌더링한다. 이 도구는 설치·시작하지 않는다. 기존 서비스 경로나 사용자 이름을 추정해 설치하지 않는다.
 8. worker 전용 EnvironmentFile은 비공개·최소 읽기 권한으로 준비한다. 필요한 값은 `CONVERSATION_DATABASE_URL`(wg_conversation), 환경에 맞는 `DB_SSL`뿐이다. owner URL, AUTH URL, provider 키는 넣지 않는다. 유닛은 `CONVERSATION_DATA_MODE=real`, env/key 파일 자동 탐색 차단을 명시한다.
 9. **별도 운영 승인 후에만** 유닛 렌더링·`systemd-analyze verify`·daemon-reload·oneshot 1회 실행·로그 확인·timer enable을 수행한다. migration 경로 변경은 기존 배포 guarded-halt(exit 3) 대상이다. 자동 배포를 우회하지 않는다.
 

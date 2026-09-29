@@ -18,6 +18,12 @@ POSTGRES_DATA_DIR=/srv/moneyworry/postgres
 DB 서비스 계정 소유 `0600` 또는 `root:DB_GROUP 0640`만 허용한다. `DATABASE_URL`과 외부 API
 key는 넣지 않는다.
 
+`create-conversation-role.sh`를 운영에서 실행해야 할 때에는 DB 서비스 env에 대화 role
+비밀번호를 추가하지 않는다. 별도 root 소유 `0600` 파일에 비밀번호 **한 줄만** 보관하고
+`CONVERSATION_PASSWORD_FILE=/etc/moneyworry/conversation-role.secret`을 명시한다.
+적용한 비밀번호는 web/worker의 `wg_conversation` URL에 인코딩된 값과 같아야 한다.
+이 파일 자체나 값을 로그·명령행·채팅에 출력하지 않는다.
+
 ## `web.env`
 
 ```dotenv
@@ -31,6 +37,8 @@ AUTH_DATA_MODE=real
 COMMUNITY_DATA_MODE=real
 WORKSITE_TIP_DATA_MODE=real
 FAVORITE_DATA_MODE=real
+CONVERSATION_DATA_MODE=real
+CONVERSATION_DATABASE_URL=postgresql://wg_conversation:<URL_ENCODED_CONVERSATION_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 AUTH_DATABASE_URL=postgresql://wg_auth:<URL_ENCODED_AUTH_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 COMMUNITY_DATABASE_URL=postgresql://wg_community:<URL_ENCODED_COMMUNITY_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 TIP_DATABASE_URL=postgresql://wg_tip:<URL_ENCODED_TIP_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
@@ -83,9 +91,9 @@ CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 금지된다. 전용 token은 `web.env`의 같은 이름 값과 일치하고 RAG token과 달라야 한다. 위 목록 외의 endpoint override도 거부한다. production unit이 두 file fallback을
 `/dev/null`로 고정하며 로그·계약서 캐시는 비활성화한다.
 
-## 인증·커뮤니티·현장 제보·즐겨찾기
+## 인증·커뮤니티·현장 제보·즐겨찾기·대화
 
-사용자 데이터 기능의 **네 모드 키는 생략할 수 없다** —
+사용자 데이터 기능의 **다섯 모드 키는 생략할 수 없다** —
 생략하면 `APP_DATA_MODE=real` 을 따라가는데, 연결 문자열 없이 real 이 되면
 로그인·글쓰기가 조용히 503 이 된다. `validate-service-envs.py` 가 명시를 강제한다.
 
@@ -95,6 +103,8 @@ CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 | `COMMUNITY_DATA_MODE` | `real` 또는 `mock` | real 이면 `COMMUNITY_DATABASE_URL` 필수 |
 | `WORKSITE_TIP_DATA_MODE` | `real` 또는 `mock` | real 이면 `TIP_DATABASE_URL`과 고정 저장 경로 필수 |
 | `FAVORITE_DATA_MODE` | `real` 또는 `mock` | real 이면 `wg_auth` 연결로 `user_favorite_firms` 사용 |
+| `CONVERSATION_DATA_MODE` | 운영에서는 `real` | `CONVERSATION_DATABASE_URL`을 명시해 `wg_conversation`으로 저장 |
+| `CONVERSATION_DATABASE_URL` | `postgresql://wg_conversation:…@127.0.0.1:5433/wageguard?sslmode=disable` | 대화 7개 테이블 전용 롤. 운영에서 생략 금지 |
 | `AUTH_DATABASE_URL` | `postgresql://wg_auth:…@127.0.0.1:5433/wageguard?sslmode=disable` | mock 일 때는 **두면 안 된다** |
 | `COMMUNITY_DATABASE_URL` | `postgresql://wg_community:…@127.0.0.1:5433/wageguard?sslmode=disable` | 〃 |
 | `TIP_DATABASE_URL` | `postgresql://wg_tip:…@127.0.0.1:5433/wageguard?sslmode=disable` | 〃 |
@@ -125,3 +135,23 @@ CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 `/srv/moneyworry/worksite-tip-media` 아래에 저장한다. systemd는 웹 프로세스에 이 경로만 추가로
 쓰기 허용한다. 설치기는 경로를 웹 서비스 계정 소유 `0700`으로 만들고, 하위 디렉터리 `0700`,
 파일 `0600`, symlink·특수 파일 없음, 다른 세 서비스 계정의 접근 불가를 시작 전에 확인한다.
+
+## Public quota rollout (Personal08)
+
+The shared quota deployment adds these web.env entries. Keep the Redis URL and proxy token in the owner-readable local env file; never copy their values into tickets or logs.
+
+```dotenv
+PUBLIC_RATE_LIMIT_STORE=redis
+PUBLIC_RATE_LIMIT_REDIS_URL=redis://mwquota:<URL_ENCODED_LOCAL_SECRET>@127.0.0.1:6379/0
+TRUST_PROXY_HEADERS=true
+PUBLIC_RATE_LIMIT_PROXY_TOKEN=<SAME_SECRET_AS_PUBLIC_GATEWAY_ENV>
+PUBLIC_COMPANY_SEARCH_PER_MINUTE=30
+ANONYMOUS_CHAT_PER_HOUR=10
+ANONYMOUS_CHAT_PER_DAY=30
+ANONYMOUS_CHAT_GLOBAL_PER_DAY=1000
+ANONYMOUS_CONTRACT_REVIEW_PER_HOUR=5
+ANONYMOUS_CONTRACT_REVIEW_PER_DAY=15
+ANONYMOUS_CONTRACT_REVIEW_GLOBAL_PER_DAY=300
+```
+
+The last three contract values take effect on 2026-10-02 00:00 KST. Through October 1 KST contract review is exempt from request limits. The 1000/300 request counts are not financial spending limits. The gateway gets only `PUBLIC_GATEWAY_PORT`, `PUBLIC_GATEWAY_UPSTREAM_PORT`, `PUBLIC_GATEWAY_PUBLIC_HOST`, and the same `PUBLIC_RATE_LIMIT_PROXY_TOKEN` in `/etc/moneyworry/public-gateway.env`. Validate both service env files before a gateway switch. See `docs/qa/2026-09-28-personal-08.md` for ordered rollout and rollback.
