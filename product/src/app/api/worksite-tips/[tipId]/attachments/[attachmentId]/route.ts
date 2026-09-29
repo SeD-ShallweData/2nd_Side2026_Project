@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getWorksiteTipAttachment } from "@/services/worksiteTipService";
 import { noStoreError } from "@/server/auth/http";
-import { requireInspectorRequest } from "@/server/auth/inspectorAccess";
+import { requireWorksiteTipReviewerRequest } from "@/server/auth/inspectorAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ interface RouteContext {
 
 export async function GET(request: Request, context: RouteContext): Promise<NextResponse> {
   try {
-    const user = await requireInspectorRequest(request);
+    const user = await requireWorksiteTipReviewerRequest(request);
     const { tipId, attachmentId } = await context.params;
     const attachment = await getWorksiteTipAttachment(tipId, attachmentId, user);
     return new NextResponse(attachment.bytes, {

@@ -34,20 +34,12 @@ const ADMIN: SessionUserDto = {
 };
 
 /*
- * 제보 목록을 읽는 계정. 근로감독 화면은 admin 이 연다 — 배치·ML 운영 기능이
- * 같은 화면에 있어서다(server/auth/inspectorAccess.ts 참고).
+ * 제보 목록을 읽는 계정. 제보 확인은 근로감독관의 일이라 이 역할에게만 열린다
+ * (server/auth/inspectorAccess.ts 의 WORKSITE_TIP_REVIEW_ROLES).
  */
 const INSPECTOR: SessionUserDto = {
   user_id: "10000000-0000-4000-8000-000000000003",
   email: "inspector@mock.donworry.local",
-  display_name: "운영 관리자(근로감독 화면)",
-  role: "admin",
-};
-
-/** 근로감독관 계정. 제보 확인은 이 역할의 일이라 목록을 읽을 수 있다. */
-const LABOR_INSPECTOR: SessionUserDto = {
-  user_id: "10000000-0000-4000-8000-000000000004",
-  email: "legacy-inspector@mock.donworry.local",
   display_name: "근로감독관",
   role: "inspector",
 };
@@ -319,7 +311,7 @@ describe("현장 제보 작성 계약", () => {
     expect(JSON.stringify(afterBody.items)).not.toContain("커뮤니티와 분리할 제보");
   });
 
-  it("비로그인·감독관의 작성과 일반 사용자·관리자의 조회를 차단한다", async () => {
+  it("비로그인·감독관·관리자의 작성과 비로그인·일반 사용자·관리자의 조회를 차단한다", async () => {
     const anonymousCreate = await createTip(submissionRequest({
       title: "비로그인 제보",
       body: "로그인하지 않은 요청은 저장되면 안 됩니다.",
@@ -333,6 +325,13 @@ describe("현장 제보 작성 계약", () => {
     }));
     expect(inspectorCreate.status).toBe(403);
 
+    const adminCreate = await createTip(submissionRequest({
+      cookie: await cookieFor(ADMIN),
+      title: "관리자 작성",
+      body: "운영 관리자 계정은 일반 사용자 제보를 작성하지 않습니다.",
+    }));
+    expect(adminCreate.status).toBe(403);
+
     const anonymousList = await listTips(new Request("http://localhost/api/worksite-tips"));
     expect(anonymousList.status).toBe(403);
 
@@ -341,11 +340,72 @@ describe("현장 제보 작성 계약", () => {
     }));
     expect(userList.status).toBe(403);
 
-    // 근로감독관은 제보를 확인하는 역할이라 막지 않는다.
+    // 제보 열람은 근로감독관의 일이다. 운영 관리자에게는 열지 않는다.
+    const adminList = await listTips(new Request("http://localhost/api/worksite-tips", {
+      headers: { cookie: await cookieFor(ADMIN) },
+    }));
+    expect(adminList.status).toBe(403);
+    expect(await adminList.json()).toMatchObject({
+      error: { code: "FORBIDDEN", retryable: false },
+    });
+
     const inspectorList = await listTips(new Request("http://localhost/api/worksite-tips", {
-      headers: { cookie: await cookieFor(LABOR_INSPECTOR) },
+      headers: { cookie: await cookieFor(INSPECTOR) },
     }));
     expect(inspectorList.status).toBe(200);
+  });
+
+  it("운영 관리자는 근로감독관이 여는 제보 상세와 사진을 열지 못한다", async () => {
+    const createdResponse = await createTip(submissionRequest({
+      cookie: await cookieFor(USER),
+      title: "사진이 있는 제보",
+      body: "관리자에게는 이 제보가 보이면 안 됩니다.",
+      photos: [validImageFile()],
+    }));
+    const receipt = await createdResponse.json() as { tip_id: string };
+    expect(createdResponse.status).toBe(201);
+
+    const inspectorCookie = await cookieFor(INSPECTOR);
+    const inspectorDetail = await getTip(
+      new Request(`http://localhost/api/worksite-tips/${receipt.tip_id}`, {
+        headers: { cookie: inspectorCookie },
+      }),
+      tipContext(receipt.tip_id),
+    );
+    expect(inspectorDetail.status).toBe(200);
+    const detail = await inspectorDetail.json() as {
+      attachments: Array<{ attachment_id: string; content_url: string }>;
+    };
+    const [attachment] = detail.attachments;
+    const inspectorPhoto = await getAttachment(
+      new Request(`http://localhost${attachment.content_url}`, {
+        headers: { cookie: inspectorCookie },
+      }),
+      attachmentContext(receipt.tip_id, attachment.attachment_id),
+    );
+    expect(inspectorPhoto.status).toBe(200);
+
+    const adminCookie = await cookieFor(ADMIN);
+    const adminDetail = await getTip(
+      new Request(`http://localhost/api/worksite-tips/${receipt.tip_id}`, {
+        headers: { cookie: adminCookie },
+      }),
+      tipContext(receipt.tip_id),
+    );
+    expect(adminDetail.status).toBe(403);
+    const adminDetailBody = await adminDetail.json();
+    expect(adminDetailBody).toMatchObject({ error: { code: "FORBIDDEN" } });
+    expect(JSON.stringify(adminDetailBody)).not.toContain("관리자에게는 이 제보가 보이면 안 됩니다.");
+
+    const adminPhoto = await getAttachment(
+      new Request(`http://localhost${attachment.content_url}`, {
+        headers: { cookie: adminCookie },
+      }),
+      attachmentContext(receipt.tip_id, attachment.attachment_id),
+    );
+    expect(adminPhoto.status).toBe(403);
+    expect(adminPhoto.headers.get("content-type")).not.toMatch(/^image\//);
+    expect(await adminPhoto.json()).toMatchObject({ error: { code: "FORBIDDEN" } });
   });
 
   it("다른 출처의 작성 요청을 저장 전에 차단한다", async () => {

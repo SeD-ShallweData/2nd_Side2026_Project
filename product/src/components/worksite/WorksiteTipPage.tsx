@@ -18,7 +18,17 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 }
 
-function SessionGate({ session, onRetry }: { session: SessionResponse; onRetry: () => void }) {
+/*
+ * 역할별로 한 화면만 보인다. 서버 경계(server/auth/inspectorAccess.ts 의
+ * WORKSITE_TIP_REVIEW_ROLES)와 같은 규칙이다 — 그 파일은 "server-only" 라
+ * 여기서 가져올 수 없어 값을 그대로 적는다.
+ *
+ *   비로그인   로그인 안내
+ *   user       접수 폼
+ *   inspector  제보 목록·상세·사진
+ *   admin      대상 아님 안내 (제보 열람은 근로감독관의 일이다)
+ */
+export function SessionGate({ session }: { session: SessionResponse }) {
   if (!session.authenticated) {
     return (
       <div className="worksite-state-card">
@@ -28,13 +38,12 @@ function SessionGate({ session, onRetry }: { session: SessionResponse; onRetry: 
     );
   }
 
-  if (session.user.role === "admin") return <InspectorTipList />;
+  if (session.user.role === "inspector") return <InspectorTipList />;
   if (session.user.role === "user") return <WorksiteTipForm />;
   return (
     <div className="worksite-state-card">
-      <strong>현재 계정은 현장 신고 접수 대상이 아닙니다.</strong>
-      <p>일반 사용자 계정으로 로그인하거나 근로감독관 모드에서 확인해 주세요.</p>
-      <button className="button button-outline" type="button" onClick={onRetry}>다시 확인</button>
+      <strong>현재 계정은 현장 신고 대상이 아닙니다.</strong>
+      <p>현장 신고는 일반 사용자 계정으로 접수하고 근로감독관 계정에서 확인합니다.</p>
     </div>
   );
 }
@@ -205,9 +214,10 @@ export function WorksiteTipPage() {
 
   const role = session?.authenticated ? session.user.role : null;
   const isAdmin = role === "admin";
+  // 제보를 열람하는 쪽. "근로감독관 확인용으로 전달됩니다" 안내는 이 계정에게 필요 없다.
   const isInspector = role === "inspector";
 
   return (
-    <div className="page-section worksite-page"><div className="shell narrow-shell"><div className="page-heading"><span className="eyebrow">현장 위험 요소 제보</span><h1>현장의 목소리를 안전하게 전달하세요</h1>{!isAdmin ? <p>제보는 공개 커뮤니티와 분리되어 근로감독관 확인용으로만 전달됩니다.</p> : null}</div>{!isAdmin && !isInspector ? <div className="worksite-privacy-strip"><strong>안심하세요!</strong><span>제보자의 이메일과 내부 식별정보는 화면에 표시하지 않습니다.</span></div> : null}{error ? <div className="worksite-state-card"><strong>로그인 상태를 확인하지 못했습니다.</strong><p>{error}</p><button type="button" className="button button-outline" onClick={() => { setError(null); setRetry((value) => value + 1); }}>다시 시도</button></div> : session ? <SessionGate session={session} onRetry={() => setRetry((value) => value + 1)} /> : <div className="worksite-state-card">로그인 상태를 확인하는 중입니다.</div>}</div></div>
+    <div className="page-section worksite-page"><div className="shell narrow-shell"><div className="page-heading"><span className="eyebrow">현장 위험 요소 제보</span><h1>현장의 목소리를 안전하게 전달하세요</h1>{!isInspector ? <p>제보는 공개 커뮤니티와 분리되어 근로감독관 확인용으로만 전달됩니다.</p> : null}</div>{!isAdmin && !isInspector ? <div className="worksite-privacy-strip"><strong>안심하세요!</strong><span>제보자의 이메일과 내부 식별정보는 화면에 표시하지 않습니다.</span></div> : null}{error ? <div className="worksite-state-card"><strong>로그인 상태를 확인하지 못했습니다.</strong><p>{error}</p><button type="button" className="button button-outline" onClick={() => { setError(null); setRetry((value) => value + 1); }}>다시 시도</button></div> : session ? <SessionGate session={session} /> : <div className="worksite-state-card">로그인 상태를 확인하는 중입니다.</div>}</div></div>
   );
 }

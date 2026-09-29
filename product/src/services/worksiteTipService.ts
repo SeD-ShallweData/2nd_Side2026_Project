@@ -24,6 +24,7 @@ import type {
   NewWorksiteTipAttachment,
   StoredWorksiteTip,
 } from "@/domain/worksiteTip";
+import { WORKSITE_TIP_REVIEW_ROLES } from "@/server/auth/inspectorAccess";
 import { requireUserRole } from "@/server/auth/permissions";
 import {
   getWorksiteTipRepository,
@@ -54,8 +55,8 @@ function requireSubmitter(user: SessionUserDto): void {
 }
 
 function requireInspector(user: SessionUserDto): void {
-  // 제보 확인은 근로감독관의 일이다. 운영 관리자도 같은 화면을 본다.
-  requireUserRole(user, ["admin", "inspector"]);
+  // 제보 확인은 근로감독관의 일이다. 운영 관리자(admin)에게는 열지 않는다.
+  requireUserRole(user, WORKSITE_TIP_REVIEW_ROLES);
 }
 
 function parseRequiredText(
