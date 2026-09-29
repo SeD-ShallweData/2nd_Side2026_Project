@@ -38,6 +38,29 @@ describe("user statement recall without law retrieval", () => {
     expect(extractRecallFacts({ content: "한빛테크의 급여일은 10일입니다.", company_id: "A",
       companies: [...companies, { company_id: "C", company_name: "한빛테크" }], source_message_id: "m", sequence: 1 })).toEqual([]);
   });
+  it("uses owner-scoped public locations to separate identical company names", () => {
+    const sameNames = [
+      { company_id: "A", company_name: "OO건설", region: "인천광역시", address: "인천광역시 서구 샘플로 10" },
+      { company_id: "B", company_name: "OO건설", region: "경기도", address: "경기도 김포시 예시로 21" },
+    ];
+    const a = extractRecallFacts({ content: "인천의 OO건설 급여일은 매달 23일입니다.",
+      company_id: "B", companies: sameNames, source_message_id: "a", sequence: 1 });
+    const b = extractRecallFacts({ content: "김포 OO건설 급여일은 매달 8일입니다.",
+      company_id: "A", companies: sameNames, source_message_id: "b", sequence: 2 });
+    expect(a).toMatchObject([{ company_id: "A", value: "23일" }]);
+    expect(b).toMatchObject([{ company_id: "B", value: "8일" }]);
+    expect(extractRecallFacts({ content: "이번에는 김포의 OO건설입니다. 여기는 급여일을 매달 8일이라고 들었습니다.",
+      company_id: "A", companies: sameNames, source_message_id: "b2", sequence: 3 }))
+      .toMatchObject([{ company_id: "B", value: "8일" }]);
+    const input = request([], "인천 OO건설과 김포 OO건설의 급여일을 1, 2번으로 알려주세요.");
+    input.company_id = "B";
+    input.conversation_recall = {
+      facts: [...a, ...b], companies: sameNames, company_history: [],
+      diagnostics: { summary_status: "ready", summary_version: "extractive-v4", summarized_through_sequence: 4,
+        stored_message_count: 4, hydrated_recent_count: 0, summary_included: true, recall_fact_count: 2, legacy_recall_rebuilt: false },
+    };
+    expect(recallAnswer(input)?.answer).toMatch(/1\. .*23일[\s\S]*2\. .*8일/);
+  });
   it.each([
     "정정한다. 급여일은 10일이 아니라 15일이고 아직 미지급이다.",
     "정정할게요. 급여일은 10일이 아니라 15일입니다.",
@@ -60,6 +83,26 @@ describe("user statement recall without law retrieval", () => {
     expect(output.trace).toMatchObject({ rag_reason: "conversation_recall_no_retrieval", recall_mode: "user_statement", upstream_request_id: null });
     expect(scanRules(output.answer, CHAT_OUTPUT_GUARDRAILS).size).toBe(0);
     expect(HISTORY[0]).toContain("10일");
+  });
+  it("labels an unknown guest company's corrected date as a user statement and follows a numbered request", () => {
+    const input = request([
+      "가상의 별빛운송에서 급여일은 매월 18일이라고 들었습니다.",
+      "정정합니다. 별빛운송의 급여일은 18일이 아니라 21일입니다.",
+    ], "제가 정정한 급여일은 언제인가요? 1번에 사실, 2번에 확인할 자료를 알려 주세요.");
+    const answer = recallAnswer(input)?.answer;
+    expect(answer).toMatch(/1\. 사실: .*21일/);
+    expect(answer).toContain("2. 확인할 자료:");
+    expect(answer).not.toContain("18일");
+    expect(answer).toContain("말씀하신 내용 기준");
+  });
+  it("does not promote an assistant's guess about an unstated contract into a user fact", () => {
+    const input = request(["가상의 별빛운송에는 월급 입금 내역은 있지만 계약서 교부 여부는 아직 말하지 않았습니다."],
+      "이전 답변이 추정한 것 같습니다. 제가 실제 말한 계약서 상태와 확인할 점은 무엇인가요?");
+    input.recent_messages.push({ role: "assistant", content: "계약서를 받지 못하셨군요." });
+    const result = recallResponse(input, [{ id: "upstage", label: "test", model: "test" }])!;
+    expect(result.results[0].answer).toContain("교부 여부는 아직 말씀하지 않으셨습니다");
+    expect(result.results[0].answer).toContain("월급 입금 내역");
+    expect(result.results[0].answer).not.toContain("계약서를 받지 못하셨");
   });
   it.each([["7", "21"], ["25", "5"], ["10", "15"]])("does not hardcode the target date: %s -> %s", (old, current) => {
     const output = recallAnswer(request([`급여일은 ${old}일입니다.`, `정정할게요. 급여일은 ${old}일이 아니라 ${current}일입니다.`]))!;

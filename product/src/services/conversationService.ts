@@ -23,7 +23,7 @@ import {
 } from "@/services/conversationSummaryService";
 import { ServiceError } from "@/utils/errors";
 import { extractRecallFacts } from "@/services/conversationRecallService";
-import { companyNamesForDetail } from "@/services/conversationCompanyNames";
+import { companyContextsForDetail, companyNamesForDetail } from "@/services/conversationCompanyNames";
 import { publicAnswerContext } from "@/services/publicAnswerContext";
 import { selectRecallFacts } from "@/services/conversationMemorySelection";
 
@@ -265,8 +265,8 @@ export async function hydrateConversationRequest(
     .slice(through)
     .slice(-HISTORY_MESSAGE_LIMIT)
     .map(({ role, content }) => ({ role, content }));
-  const companyNames = await companyNamesForDetail(detail, request.company_id);
-  const companies = [...companyNames].map(([company_id, company_name]) => ({ company_id, company_name }));
+  const companies = await companyContextsForDetail(detail, request.company_id);
+  const companyNames = new Map(companies.map(({ company_id, company_name }) => [company_id, company_name]));
   const legacyRecallRebuilt = through > 0 && (summary?.summary_version !== SUMMARY_VERSION || !summary?.summary.recall_facts);
   // Re-resolve retained owner-checked originals: v2 slots may carry a selected
   // company rather than the statement's subject; a later selection can name it.

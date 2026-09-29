@@ -10,7 +10,7 @@ import type { ConversationMemoryContext } from "@/domain/chat";
 import type { ConversationDocumentStatement } from "@/domain/conversationRecall";
 import { getConversationRepository } from "@/services/userDataProviders";
 import { extractRecallFacts } from "@/services/conversationRecallService";
-import { companyNamesForDetail } from "@/services/conversationCompanyNames";
+import { companyContextsForDetail } from "@/services/conversationCompanyNames";
 import type { RecallCompany } from "@/services/conversationCompanyScope";
 import { mentionedCompanies, statementCompany } from "@/services/conversationCompanyScope";
 import { selectRecallFacts } from "@/services/conversationMemorySelection";
@@ -228,7 +228,7 @@ export async function maybeUpdateConversationSummary(
     );
     // Rebuild the bounded structured slots from retained originals, including legacy
     // checkpoints. This retains corrections/provenance without rewriting history.
-    const names = [...await companyNamesForDetail(detail)].map(([company_id, company_name]) => ({ company_id, company_name }));
+    const names = await companyContextsForDetail(detail);
     summary.user_stated_facts = selectUserFacts(detail, target, names);
     summary.recall_facts = selectRecallFacts(summarizedTurns.flatMap((turn) => turn.messages.flatMap((message, index) =>
       message.role === "user" ? extractRecallFacts({

@@ -1,12 +1,12 @@
 import type { ChatRequest } from "@/domain/chat";
 import type { ChatComparisonResponse, ChatResultProviderId } from "@/domain/chatComparison";
 import type { ConversationRecallFact } from "@/domain/conversationRecall";
-import { mentionedCompanies, statementCompany, type RecallCompany } from "@/services/conversationCompanyScope";
+import { hasCompanyLocationQualifier, mentionedCompanies, statementCompany, type RecallCompany } from "@/services/conversationCompanyScope";
 import { asksNextAction } from "@/services/chatQuestionPurpose";
 
 const PAYDAY = /(?:급여일|월급날|(?:급여|월급|임금)\s*지급일)/;
 const PROMISE = /(?:지급\s*약속|회사\s*(?:답변|응답)|입금\s*약속)/;
-const RECALL = /(?:말한|말했던|말했는지|정정한(?!다)|알려\s*준|기억|회상|다시\s*(?:말|알려|정리)|지금까지|앞서|아까|였나|였죠|였지|정리해)/;
+const RECALL = /(?:말한|말했던|말했는지|정정한(?!다)|알려\s*주|기억|회상|다시\s*(?:말|알려|정리)|지금까지|앞서|아까|였나|였죠|였지|정리해)/;
 const LEGAL = /(?:법적|법률|신고|진정|신청|청구|문의|어디|어떻게|무엇부터|뭘\s*해야|해야\s*하|할\s*수|가산|계산|위법|투자|주식|추천)/;
 const COMPANY_NAME_RECALL = /(?:회사|사업장)\s*(?:이름|명)|어느\s*(?:회사|사업장)|사용한\s*(?:회사|사업장)|연결한\s*(?:회사|사업장)/;
 const COMPANY_CONTEXT_RECALL = /(?:앞선|이전|앞서|아까|순서대로|다시|말해|알려)/;
@@ -34,6 +34,17 @@ function companyContextRecall(request: ChatRequest): { answer: string; found: bo
     answer: `앞선 저장 상담에서 사용한 회사 이름은 순서대로 다음과 같습니다.\n\n${requested.map((item, index) => `${index + 1}. ${item.company_name}`).join("\n")}`,
     found: true,
   };
+}
+
+function documentAdmissionRecall(request: ChatRequest): { answer: string; found: boolean } | null {
+  if (!/계약서/.test(request.message)
+    || !/실제\s*말한|말한\s*적|이전\s*답변|앞선\s*답변|추정/.test(request.message)) return null;
+  const userStatement = request.recent_messages.filter((item) => item.role === "user")
+    .findLast((item) => /계약서/.test(item.content));
+  if (!userStatement || !/계약서.{0,25}(?:여부|받았는지|교부.{0,8})(?:.{0,18})(?:말하지\s*않|확인하지\s*않|모르)|계약서\s*교부\s*여부는\s*아직/.test(userStatement.content)) return null;
+  const deposit = /(?:월급|급여)\s*입금\s*내역/.test(userStatement.content)
+    ? "월급 입금 내역이 있다고 말씀하셨습니다. " : "";
+  return { answer: `사용자 진술 기준으로 ${deposit}근로계약서 교부 여부는 아직 말씀하지 않으셨습니다. 이전 답변의 미교부 추정은 사실로 취급하지 않습니다. 계약서를 실제로 받으셨는지 확인해 주세요.`, found: true };
 }
 
 /** Only normalized dates/time phrases leave this extractor, never arbitrary raw text. */
@@ -102,7 +113,8 @@ export function recallAnswer(request: ChatRequest, allowMixed = false): { answer
       source_message_id: `recent_${index}`, sequence: index + 1, company_id: request.company_id ?? null, companies }) : []);
   const named = mentionedCompanies(request.message, companies);
   if ((named.length < 2 && statementCompany(request.message, request.company_id ?? null, companies).ambiguous)
-    || named.some((item, index) => named.some((other, otherIndex) => index !== otherIndex && item.company_name === other.company_name))) {
+    || named.some((item, index) => named.some((other, otherIndex) => index !== otherIndex && item.company_name === other.company_name))
+      && !named.every((item) => hasCompanyLocationQualifier(request.message, item))) {
     return { answer: "이 상담의 회사별 진술과 질문의 회사 대상을 확실하게 연결하지 못했습니다. 회사 이름과 해당 진술을 함께 알려 주세요.", found: false };
   }
   const selected = named.length ? named
@@ -129,6 +141,10 @@ export function recallAnswer(request: ChatRequest, allowMixed = false): { answer
   return { answer: `${target.company_name ? `${target.company_name}: ` : ""}${parts.join(" ")}`, found };
   });
   const found = answers.some((item) => item.found);
+  if (answers.length === 1 && /1\s*번/.test(request.message) && /2\s*번/.test(request.message)
+    && /자료|기록|증빙/.test(request.message) && wantPayday) {
+    return { answer: `이 상담에서 말씀하신 내용 기준입니다.\n\n1. 사실: ${answers[0].answer}\n2. 확인할 자료: 근로계약서에 적힌 급여일과 실제 입금 내역을 대조하세요.${found ? "" : " 급여일을 다시 알려 주시면 이어서 정리하겠습니다."}`, found };
+  }
   return { answer: `이 상담에서 말씀하신 내용 기준입니다.\n\n${answers.map((item, index) => `${answers.length > 1 ? `${index + 1}. ` : ""}${item.answer}`).join("\n")}${found ? "" : " 해당 내용을 다시 알려 주시면 이어서 정리하겠습니다."}`, found };
 }
 
@@ -136,7 +152,7 @@ export function recallResponse(request: ChatRequest, providers: Array<{
   id: ChatResultProviderId; label: string; model: string;
 }>): ChatComparisonResponse | null {
   const companyRecall = companyContextRecall(request);
-  const recall = companyRecall ?? recallAnswer(request);
+  const recall = companyRecall ?? documentAdmissionRecall(request) ?? recallAnswer(request);
   if (!recall) return null;
   const now = new Date().toISOString();
   return {

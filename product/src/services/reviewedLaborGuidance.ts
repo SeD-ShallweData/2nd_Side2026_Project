@@ -6,7 +6,7 @@ import { asksNextAction, asksWageDocumentUse } from "@/services/chatQuestionPurp
  * Revalidate on law/procedure changes. Provenance and review boundaries: followup-02.md.
  */
 export const LABOR_REVIEW_DATE = "2026-09-21";
-type Topic = "night" | "filing" | "certificate" | "payment";
+type Topic = "night" | "overtime" | "filing" | "certificate" | "payment";
 const PORTAL = "https://labor.moel.go.kr/minwonSysInfo/wagesolway.do";
 const GUIDE = "고용노동부 노동포털 「체불임금 해결 방법」";
 
@@ -72,7 +72,9 @@ export function paymentTimingGuardrailHits(query: string, answer: string): strin
   // Article 36 states a payment period, not a separate 14-day filing window.
   // Limit this check to an asserted filing deadline; "unpaid after 14 days,
   // then file" is a different relation and must not be rejected by this hit.
-  if (/(?:14\s*일|2\s*주)\s*(?:이내|안에)\s*(?:에)?\s*(?:진정|신고)(?:을|를|서)?\s*(?:제기|신청|접수|할\s*수)/.test(text)) {
+  if (/(?:14\s*일|2\s*주)\s*(?:이내|안에)\s*(?:에)?\s*(?:진정|신고)(?:을|를|서)?\s*(?:제기|신청|접수|할\s*수)/.test(text)
+    || /(?:퇴직|퇴사|사망)\s*후\s*(?:14\s*일|2\s*주)\s*(?:이내|안에)[^.。!?\n]{0,25}(?:진정|신고)/.test(text)
+    || /(?:진정|신고)(?:을|를|서)?[^.。!?\n]{0,25}(?:퇴직|퇴사|사망)\s*후\s*(?:14\s*일|2\s*주)\s*(?:이내|안에)/.test(text)) {
     hits.push("PAYMENT_NEW_FILING_DEADLINE");
   }
   return [...new Set(hits)];
@@ -99,11 +101,16 @@ function nightWorkSize(query: string): "under_five" | "five_plus" | "unknown" {
 export function reviewedLaborTopics(query: string): Topic[] {
   const topics: Topic[] = [];
   if (isPaymentTimingQuestion(query)) topics.push("payment");
-  if (/야간|야근|(?:22\s*시|밤\s*(?:10|열)\s*시|오후\s*10\s*시)/.test(query)
+  if (/야간|야근|(?:22\s*시|23\s*시|밤\s*(?:10|11|열|열한)\s*시|오후\s*(?:10|11)\s*시)/.test(query)
     && /근로|근무|수당|가산|일하|시키|퇴근|임금|야근/.test(query)) topics.push("night");
+  if (/연장근로|초과근무|토요일|휴일근로/.test(query)
+    && /가산|수당|임금|근무|일했|일하/.test(query)) topics.push("overtime");
   if (/체불.{0,20}확인서|사업주\s*확인서/.test(query)) topics.push("certificate");
   if ((/\b1350\b|진정(?:서|을|은|에|의|\s|$)|온라인.{0,12}(?:신고|접수)/.test(query)
-    && /체불|임금|월급|급여|노동|진정|상담/.test(query)) || asksWageDocumentUse(query)) topics.push("filing");
+    && /체불|임금|월급|급여|노동|진정|상담/.test(query))
+    || (/노동포털/.test(query) && /(?:회사.{0,16}(?:답.{0,8}(?:안|않|없|못)|응답.{0,8}(?:안|않|없|못))|임금|급여|월급|체불)/.test(query)
+      && /어떻게|방식|이어|접수|제출|신청/.test(query))
+    || (asksWageDocumentUse(query) && /진정|접수|제출|체불|활용|사용|증거/.test(query))) topics.push("filing");
   return topics;
 }
 
@@ -126,6 +133,12 @@ function documents(topic: Topic): RagDocument[] {
     document("근로기준법 제11조", "원칙적으로 상시 5명 이상 근로자를 사용하는 사업장에 적용하며, 상시 4명 이하는 시행령이 정한 일부 규정만 적용한다. 규모 미상이면 가산 의무를 확정하지 말고 상시근로자 수를 확인한다. 회사 규모 라벨이나 당일 출근 인원만으로 판단하지 않는다. 동거 친족만 사용하는 사업장과 가사 사용인 등 적용 범위도 확인한다.", "https://www.law.go.kr/법령/근로기준법/제11조"),
     document("근로기준법 시행령 제7조", "별표 1의 상시 4명 이하 사업장 적용 규정에 제56조는 포함되지 않는다. 따라서 상시 5명 미만은 제56조의 법정 연장·야간·휴일 가산임금 적용 대상이 아니다. 이것은 실제 일한 시간의 기본 임금이나 별도로 정한 지급 약정까지 없어지는 뜻이 아니다.", "https://www.law.go.kr/법령/근로기준법시행령/제7조"),
     document("근로기준법 제4조", "근로조건은 근로자와 사용자의 합의로 정한다. 법정 가산임금 적용 여부와 별도로 근로계약·취업규칙 등에 추가 지급 약정이 있는지, 그 조건을 충족하는지 확인해야 한다. 성별·연령·임신 여부는 입력 없이 추정하지 않는다.", "https://www.law.go.kr/법령/근로기준법/제4조"),
+  ];
+  if (topic === "overtime") return [
+    document("근로기준법 제56조", "연장·야간·휴일 근로 가산 기준은 실제 근로시간과 법 적용 요건에 따라 나뉜다. 토요일이라는 요일만으로 법정 연장근로 또는 휴일근로가 확정되지 않는다.", "https://www.law.go.kr/법령/근로기준법/제56조"),
+    document("근로기준법 제11조", "근로기준법은 원칙적으로 상시 5명 이상 사업장에 적용한다. 상시 4명 이하 사업장은 시행령이 정한 일부 규정만 적용한다.", "https://www.law.go.kr/법령/근로기준법/제11조"),
+    document("근로기준법 시행령 제7조", "상시 4명 이하 사업장에는 제56조의 연장·야간·휴일 가산 규정이 적용되지 않는다. 실제 일한 시간의 기본 임금이나 별도 지급 약정은 구분한다.", "https://www.law.go.kr/법령/근로기준법시행령/제7조"),
+    document("고용노동부 빠른인터넷상담 「5인 미만 사업장 토요일 추가 근무」", "토요일 추가 근무의 가산 여부는 상시근로자 수, 실제 근로시간과 휴일·휴무일 약정에 따라 확인한다.", "https://1350.moel.go.kr/rtmview.do?id=1000018783"),
   ];
   if (topic === "certificate") return [
     document("임금채권보장법 제12조", "임금등을 지급받지 못한 근로자가 대지급금 청구 또는 법률구조 등 소송 절차에 필요한 경우 체불 임금등·사업주 확인서 발급을 신청할 수 있다. 감독사무 처리 과정에서 확인된 체불 내용에 따라 발급하므로 지급 약속일 경과만으로 자동 발급되는 서류가 아니다.", "https://www.law.go.kr/법령/임금채권보장법/제12조"),
@@ -158,6 +171,7 @@ export function reviewedLaborFallback(query: string, baseline: ChatResponse): Ch
       `${nightWorkSize(query) === "under_five" ? "상시 4명인 경우처럼 상시 5명 미만이면 제56조의 법정 야간 가산임금 규정은 적용되지 않습니다. " : ""}상시 5명 이상 사업장에서는 해당 야간근로에 통상임금의 50% 이상을 가산하는 것이 원칙입니다. ${nightWorkSize(query) !== "under_five" ? "상시 5명 미만이면 이 법정 가산임금 규정은 적용되지 않습니다. " : ""}${nightWorkSize(query) === "unknown" ? "상시근로자 수가 몇 명인지 확인해 주시겠어요? " : ""}(근로기준법 제11조, 근로기준법 시행령 제7조, 근로기준법 제56조).`,
       "법정 가산 대상이 아니어도 실제 일한 시간의 임금은 별개이며, 근로계약·취업규칙에 별도 수당 지급 약정이 있는지도 확인하세요(근로기준법 제4조). 출퇴근·휴게 기록과 급여명세서를 대조하고, 22시 이전의 연장근로수당은 실제 근로시간과 적용 요건을 따로 확인하세요(근로기준법 제56조). 상시근로자 수나 기록 해석이 어렵다면 1350에서 상담받을 수 있습니다.",
     ].join("\n\n");
+    if (topic === "overtime") return "토요일에 일했다는 사실만으로 연장근로 가산임금이 무조건 발생하지는 않습니다. 상시근로자 수가 5명 이상인지, 그날이 소정근로일·휴무일·휴일 중 무엇인지, 실제 일한 시간과 휴게시간을 먼저 확인하세요(근로기준법 제11조, 근로기준법 제56조). 상시 5명 미만이면 제56조의 법정 연장·야간·휴일 가산 규정은 적용되지 않지만 실제 일한 시간의 임금과 근로계약·취업규칙의 별도 지급 약정은 구분해 확인해야 합니다(근로기준법 시행령 제7조). 출퇴근 기록·근무표·계약서·급여명세서를 대조하고 적용이 불명확하면 1350에 문의하세요(고용노동부 빠른인터넷상담 「5인 미만 사업장 토요일 추가 근무」).";
     if (topic === "certificate") return [
       "체불 임금등·사업주 확인서는 임금등을 지급받지 못한 근로자가 대지급금 청구 또는 법률구조 등 소송에 필요한 경우 신청하는 서류입니다. 약속한 지급일이 지났다는 이유만으로 자동 발급되지는 않고, 근로감독 과정에서 체불 내용이 확인되어야 합니다(임금채권보장법 제12조).",
       `먼저 미지급 임금·지급일과 근로계약서·급여명세서·입금내역을 정리해 노동포털 온라인 진정 또는 관할 고용노동관서 방문으로 접수하세요. 조사·확인 후 담당 근로감독관에게 사용 목적을 알리고 확인서 발급을 신청합니다. 이미 조사를 받았다면 새 진정부터 반복하기보다 담당자에게 발급 가능 여부를 확인하세요(${GUIDE}).`,
@@ -186,6 +200,8 @@ export function applicabilityGuardrailHits(query: string, answer: string): strin
         ...(size === "unknown" ? [/상시[^.\n]{0,45}(?:확인|몇\s*명)|(?:몇\s*명|확인)[^.\n]{0,30}상시/] : []),
         ...(/약정|계약/.test(query) ? [/약정|계약/] : []),
         ...(/(?:22\s*시|10\s*시|열\s*시)까지/.test(query) ? [/(?:22\s*시|10\s*시|열\s*시)(?:까지|에)[^.\n]{0,100}(?:아니|아닙|않|없)/] : [])]
+      : topic === "overtime"
+        ? [/토요일|연장근로|휴일근로/, /(?:5|다섯)\s*(?:명|인)/, /소정근로일|휴무일|휴일/, /실제\s*(?:일한|근로)/, /계약|취업규칙/]
       : topic === "certificate"
         ? [/대지급금/, /소송|법률구조/, /조사|근로감독/, /확인서[^.\n]{0,40}(?:신청|요청)|발급[^.\n]{0,15}신청/, /지급.{0,15}(?:요건|심사)|요건.{0,12}(?:확인|심사)/]
         : [/1350/, /상담/, /노동포털/, /진정/, /관할|고용노동관서/];
