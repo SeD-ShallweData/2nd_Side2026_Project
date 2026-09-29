@@ -3,6 +3,7 @@ import {
   getAuthDatabaseConnectionString,
   getCommunityDatabaseConnectionString,
   getConversationDatabaseConnectionString,
+  getOpsDatabaseConnectionString,
   getTipDatabaseConnectionString,
 } from "@/server/databaseConfig";
 import { ServiceError } from "@/utils/errors";
@@ -21,7 +22,7 @@ import { ServiceError } from "@/utils/errors";
  * 두 단계를 한 트랜잭션으로 묶을 수 없다.
  */
 
-export type WriteRole = "auth" | "community" | "tip" | "conversation";
+export type WriteRole = "auth" | "community" | "tip" | "conversation" | "ops";
 
 interface RoleSpec {
   getConnectionString: () => string | undefined;
@@ -54,6 +55,12 @@ const ROLE_SPECS: Record<WriteRole, RoleSpec> = {
     applicationName: "donworry-product-conversation",
     notConfiguredCode: "CONVERSATION_DATABASE_NOT_CONFIGURED",
     notConfiguredMessage: "대화 기록 데이터베이스 연결 정보가 설정되지 않았습니다.",
+  },  // wg_ops 는 ops_* 함수 실행만 가능하다. 호출은 server/ops/opsDatabase.ts 에서만 한다.
+  ops: {
+    getConnectionString: getOpsDatabaseConnectionString,
+    applicationName: "donworry-product-ops",
+    notConfiguredCode: "OPS_NOT_CONFIGURED",
+    notConfiguredMessage: "운영 콘솔 데이터베이스 연결이 설정되지 않아 변경 기능을 쓸 수 없습니다.",
   },
 };
 
@@ -147,7 +154,9 @@ function unavailable(role: WriteRole): ServiceError {
       ? "커뮤니티 데이터베이스에 접근하지 못했습니다."
       : role === "tip"
         ? "현장 제보 데이터베이스에 접근하지 못했습니다."
-        : "대화 기록 데이터베이스에 접근하지 못했습니다.";
+        : role === "ops"
+          ? "운영 콘솔 데이터베이스에 접근하지 못했습니다."
+          : "대화 기록 데이터베이스에 접근하지 못했습니다.";
   return new ServiceError(
     "DATABASE_UNAVAILABLE",
     message,
@@ -163,7 +172,9 @@ function commitOutcomeUnknown(role: WriteRole): ServiceError {
       ? "커뮤니티"
       : role === "tip"
         ? "현장 제보"
-        : "대화 기록";
+        : role === "ops"
+          ? "운영 콘솔"
+          : "대화 기록";
   return new ServiceError(
     "DATABASE_COMMIT_OUTCOME_UNKNOWN",
     `${target} 데이터베이스의 저장 결과를 확인하지 못했습니다.`,

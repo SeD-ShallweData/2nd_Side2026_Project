@@ -8,6 +8,7 @@ import {
   getAuthDatabaseConnectionString,
   getCommunityDatabaseConnectionString,
   getConversationDatabaseConnectionString,
+  getOpsDatabaseConnectionString,
   getTipDatabaseConnectionString,
   getDatabaseConnectionString,
 } from "@/server/databaseConfig";
@@ -127,5 +128,17 @@ describe("쓰기 롤 접속 정보", () => {
     expect(
       buildConversationDatabaseUrl({ DB_NAME: "wageguard", CONVERSATION_USER: "wg_conversation" }),
     ).toBeUndefined();
+  });
+
+  it("운영 콘솔 연결은 wg_ops 계정일 때만 받는다", () => {
+    vi.stubEnv("OPS_DATABASE_URL", "postgresql://wg_ops:secret@127.0.0.1:5433/wageguard");
+    expect(getOpsDatabaseConnectionString()).toBe("postgresql://wg_ops:secret@127.0.0.1:5433/wageguard");
+    for (const role of ["pathb_admin", "wg_bot", "wg_auth", "wg_opsx"]) {
+      vi.stubEnv("OPS_DATABASE_URL", `postgresql://${role}:secret@127.0.0.1:5433/wageguard`);
+      expect(getOpsDatabaseConnectionString()).toBeUndefined();
+    }
+    vi.stubEnv("OPS_DATABASE_URL", "");
+    vi.stubEnv("DATABASE_URL", "postgresql://pathb_admin:secret@127.0.0.1:5433/wageguard");
+    expect(getOpsDatabaseConnectionString()).toBeUndefined();
   });
 });

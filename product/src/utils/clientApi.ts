@@ -12,3 +12,14 @@ export async function readApiResponse<T>(response: Response): Promise<T> {
   }
   return body as T;
 }
+
+/** 같은 출처 JSON POST. 운영 콘솔 변경 요청처럼 결과를 바로 읽어야 할 때 쓴다. */
+export async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  return readApiResponse<T>(response);
+}

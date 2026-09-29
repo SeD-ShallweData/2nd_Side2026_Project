@@ -5060,6 +5060,40 @@ summary:focus-visible {
 .prompt-studio-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .prompt-studio-note { flex: 1 1 18rem; margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.6; }
 
+.prompt-validation { margin: 0; border-radius: 10px; padding: 10px 12px; font-size: .74rem; line-height: 1.6; }
+.prompt-validation.is-ok { background: var(--normal-bg); color: var(--normal); font-weight: 750; }
+.prompt-validation.is-failed { background: var(--danger-bg); color: var(--danger); }
+.prompt-validation ul { margin: 4px 0 0; padding-left: 18px; }
+.prompt-history { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.prompt-history > strong { color: var(--inspector-navy); font-size: .82rem; }
+.prompt-history ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.prompt-history li { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.prompt-history li.is-active { border-color: var(--inspector-navy); background: var(--surface); }
+.prompt-history li > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.prompt-history li small { color: var(--muted); font-size: .68rem; }
+.prompt-history li p { margin: 0; color: var(--ink-soft); font-size: .74rem; overflow-wrap: anywhere; }
+.prompt-history-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.prompt-version-pill { border-radius: 999px; background: var(--watch-bg); color: var(--watch); padding: 3px 8px; font-size: .66rem; font-weight: 850; }
+.prompt-version-pill.is-active { background: var(--normal-bg); color: var(--normal); }
+.prompt-version-pill.is-failed { background: var(--danger-bg); color: var(--danger); }
+
+/* ── 운영 콘솔 공통: 사유 입력·변경 결과 ─────────────────── */
+.ops-reason-form { display: grid; gap: 8px; border: 1px solid var(--inspector-navy); border-radius: 12px; background: var(--surface); padding: 14px; margin-bottom: 14px; }
+.ops-reason-summary { margin: 0; color: var(--inspector-navy); font-size: .8rem; font-weight: 750; line-height: 1.6; }
+.ops-reason-form label { color: var(--ink-soft); font-size: .72rem; font-weight: 750; }
+.ops-reason-form input { width: 100%; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--white); color: var(--ink); padding: 10px 12px; font-size: .85rem; }
+.ops-reason-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ops-notice { margin: 0 0 14px; border-radius: 10px; background: var(--info-bg); color: var(--info); padding: 10px 12px; font-size: .76rem; font-weight: 750; }
+.prompt-studio-editor .ops-notice, .prompt-studio-editor .ops-reason-form { margin-bottom: 0; }
+.batch-mode-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); padding: 14px 16px; margin-bottom: 14px; }
+.batch-mode-card.is-pinned { border-color: var(--inspector-navy); }
+.batch-mode-card > div { display: grid; gap: 3px; min-width: 0; }
+.batch-mode-card strong { color: var(--inspector-navy); font-size: .9rem; }
+.batch-mode-card p { margin: 0; color: var(--muted); font-size: .74rem; }
+.batch-mode-label { justify-self: start; border-radius: 999px; background: var(--watch-bg); color: var(--watch); padding: 3px 9px; font-size: .66rem; font-weight: 850; }
+.batch-mode-card.is-pinned .batch-mode-label { background: var(--inspector-navy); color: var(--white); }
+.batch-switch-button { padding: 6px 10px; font-size: .72rem; white-space: nowrap; }
+
 @media (max-width: 900px) {
   .prompt-studio-layout { grid-template-columns: 1fr; }
   .prompt-studio-editor textarea { min-height: 18rem; }

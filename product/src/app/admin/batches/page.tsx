@@ -10,9 +10,9 @@ export default function AdminBatchesPage() {
       <AdminAccessGate>
         <BatchStatusPage
           endpoint="/api/admin/batches"
-          eyebrow="관리자 · 읽기 전용"
+          eyebrow="관리자 · 배치 운영"
           title="Machine Learning 배치 현황"
-          description="실제 데이터베이스의 서비스 배치와 전체 적재 이력을 확인합니다."
+          description="서비스 배치와 전체 적재 이력을 확인하고, 필요하면 서비스할 배치를 고정하거나 자동 선택으로 되돌립니다."
         />
       </AdminAccessGate>
     </div>
