@@ -4234,8 +4234,9 @@ summary:focus-visible {
 .batch-status-pill { border: 1px solid; border-radius: 999px; display: inline-flex; font-size: .67rem; font-weight: 850; padding: 5px 9px; }
 .batch-status-pill.is-active { background: #e7f5ec; border-color: #acd2b9; color: #24633f; }
 .batch-status-pill.is-archived { background: #f1f3f5; border-color: #d4d9df; color: #69727c; }
-.batch-status-table td:last-child { display: flex; flex-direction: column; gap: 3px; }
-.batch-status-table td:last-child span { color: var(--muted); font-size: .68rem; font-weight: 600; }
+/* 규모 칸은 세 줄로 쌓는다. td 자체를 flex 로 만들면 표 칸이 아니게 되어 행 높이를 따라가지 못하므로 안쪽 묶음에 건다. */
+.batch-status-table td.batch-scale-cell > div { display: flex; flex-direction: column; gap: 3px; }
+.batch-status-table td.batch-scale-cell span { color: var(--muted); font-size: .68rem; font-weight: 600; }
 .batch-table-note { border-top: 1px solid var(--line); color: var(--muted); font-size: .72rem; margin: 0; padding: 13px 15px; }
 .batch-state-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); padding: 24px; }
 .batch-state-card strong { color: var(--inspector-navy); display: block; margin-bottom: 5px; }
@@ -4901,16 +4902,14 @@ summary:focus-visible {
   --upload-control-gap: 0.75rem;
 }
 
-/* 아이콘+글자 묶음 자체는 아래 버튼 두 개와 같은 폭으로 가운데 세우되,
-   그 폭 안에서는 첨부 사진처럼 왼쪽 정렬한다 — 아이콘이 왼쪽 끝에 서고
-   글자가 그 오른쪽에 붙는다. 버튼 두 개도 같은 폭이라 왼쪽 끝이 서로
-   맞는다. */
+/* 아이콘+글자 묶음은 아래 버튼 두 개와 같은 폭으로 세운다. 아이콘은 왼쪽 끝에
+   두고, 글자는 간격을 넓혀 화면상 가운데에 보이도록 가운데 정렬한다. */
 .contract-upload .upload-copy {
   width: calc(var(--upload-control-width) * 2 + var(--upload-control-gap));
-  max-width: 100%;
+  text-align: center;
   justify-content: flex-start;
-  gap: 18px;
-  text-align: left;
+  gap: 85px;
+  max-width: 100%;
 }
 
 .contract-upload .upload-icon {

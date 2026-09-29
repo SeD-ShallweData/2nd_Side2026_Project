@@ -149,8 +149,10 @@ export function CompanySearch() {
   }
 
   function applyFilters() {
-    if (!query.trim()) {
-      setValidation("필터를 적용할 사업장명을 먼저 입력해 주세요.");
+    // 지도에서 지역만 고른 뒤 업종을 더하는 흐름이 있어 사업장명 없이도 적용한다.
+    // 사업장명도 필터도 없으면 search() 가 안내 문구를 띄운다.
+    if (!query.trim() && !draftFilters.region && !draftFilters.industry) {
+      setValidation("사업장명을 입력하거나 지역·업종을 하나 이상 골라 주세요.");
       return;
     }
     setFiltersOpen(false);
