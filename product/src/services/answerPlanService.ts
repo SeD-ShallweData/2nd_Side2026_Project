@@ -81,9 +81,10 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
   const outOfScopeTopic = detectedOutOfScopeTopic(request.message);
   const laborPortalProcedure = /노동포털|고용노동관서|근로감독관/.test(request.message)
     && /어떻게|방식|이어|접수|제출|신청|진정/.test(request.message);
-  const selectedCompanyCardQuestion = Boolean(request.company_id)
+  const cardTargetIds = referencedCompanyIds(request.message, request.conversation_recall?.companies ?? [], request.company_id);
+  const selectedCompanyCardQuestion = cardTargetIds.length > 0
     && /(?:임금|안전|산재).{0,12}(?:카드|지표|신호)|(?:카드|지표|신호).{0,12}(?:임금|안전|산재)/.test(request.message)
-    && /(?:뜻|의미|보이|표시|확정|해석|왜|확인)/.test(request.message)
+    && /(?:뜻|의미|보이|표시|확정|해석|왜|확인|입증|증명)/.test(request.message)
     && !hasActualUnpaidWageReport(request.message);
   const publicCompanyComparison = asksPublicCompanyComparison(request.message,
     referencedCompanyIds(request.message, request.conversation_recall?.companies ?? [], request.company_id));

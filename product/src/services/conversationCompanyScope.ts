@@ -43,7 +43,9 @@ export function statementCompany(
       || /^(?:제\s*)?(?:근로계약서|계약서|급여명세서|통장|출퇴근\s*기록)(?:\s*(?:원본|사본))?$/.test(value);
     const subjectMatches = companies.filter((company) => company.company_name === value);
     const locationMatchesNamed = named.length === 1 && hasCompanyLocationQualifier(value, named[0]);
-    if (!contextual && subjectMatches.length !== 1 && !locationMatchesNamed) {
+    const namedSubjectPrefix = named.length === 1 && value.startsWith(named[0].company_name)
+      && /^(?:$|[\s은는의을를에서])/.test(value.slice(named[0].company_name.length));
+    if (!contextual && subjectMatches.length !== 1 && !locationMatchesNamed && !namedSubjectPrefix) {
       // Guest-only history has no server company IDs. Its statements may be
       // repeated as unverified user claims, but must never inherit a selection.
       return { company_id: null, ambiguous: selected !== null || companies.length > 0 };

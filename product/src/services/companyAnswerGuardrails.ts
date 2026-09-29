@@ -48,6 +48,14 @@ export function companyAnswerGuardrailHits(answer: string, context: ComparisonCo
   const cards = context.companyContexts?.length ? context.companyContexts
     : context.companyContext ? [context.companyContext] : [];
   if (context.questionIntent === "company" && cards.length) {
+    if (/(?:입금|잔액|남은\s*금액)/.test(context.request.message)
+      && /입증|증명/.test(context.request.message)
+      && answer.split(/[.!?。\n]/).some((sentence) =>
+        /카드|지표/.test(sentence) && /입금|잔액|남은\s*금액/.test(sentence)
+        && /입증|증명|확인(?:됩|됐|했)/.test(sentence)
+        && !/(?:입증|증명|확인).{0,24}(?:못|않|아니|불가|없)/.test(sentence))) {
+      hits.push("CARD_AS_PERSONAL_PAYMENT_PROOF");
+    }
     if (answer.split(/[.!?。\n]/).some((sentence) =>
       /체불(?:이|로|을|를)?\s*(?:확정|입증|확인)/.test(sentence)
       && !/(?:체불(?:이|로|을|를)?\s*(?:확정|입증|확인).{0,20}(?:아니|아닙|않|못|불가|없))/.test(sentence))) {
