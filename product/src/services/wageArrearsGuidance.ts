@@ -60,8 +60,12 @@ export function wageArrearsFallback(
 
 /** Detect model-added filing prerequisites that are absent from the retrieved wage evidence. */
 export function wageArrearsGuardrailHits(query: string, answer: string): string[] {
-  if (!hasUnpaidWageQuestion(query)) return [];
   const hits: string[] = [];
+  if (/임금|급여|월급|노동포털|진정/.test(query) && answer.split(/[.!?。\n]/).some(sentence =>
+    /체불|진정|접수/.test(sentence) && /계약서|명세서|입금/.test(sentence)
+    && /모두\s*필요|없으면.{0,12}(?:불가|못|할\s*수\s*없)/.test(sentence)
+    && !/필요하지\s*않|모두.{0,12}아니/.test(sentence))) hits.push("WAGE_DOCUMENTS_AS_PREREQUISITE");
+  if (!hasUnpaidWageQuestion(query)) return hits;
   if (/(?:4대보험|고용보험|국민연금).{0,25}(?:가입|가입 여부|확인).{0,20}(?:필요|먼저|해야|하세요)|(?:먼저|필요).{0,20}(?:4대보험|고용보험|국민연금).{0,20}(?:가입|확인)/.test(answer)) {
     hits.push("UNSUPPORTED_WAGE_FILING_PREREQUISITE");
   }

@@ -286,8 +286,10 @@ export class PolicyChatProvider implements ChatProvider {
       .slice(-6).some((item) => ACUTE_INJURY.test(item.content));
     const urgentInjury = ACUTE_INJURY.test(message)
       || (INJURY_FOLLOWUP.test(message) && recentInjury);
+    const locationCorrection = /정정/.test(message) && /(?:일터|작업장).{0,15}아니라/.test(message)
+      && /집\s*계단/.test(message) && /걸을\s*수\s*있/.test(message);
     if (urgentConsciousness || urgentInjury
-      || (containsAny(message, EMERGENCY_SIGNS) && !containsAny(message, EMERGENCY_EXCLUSIONS))) {
+      || (containsAny(message, EMERGENCY_SIGNS) && !containsAny(message, EMERGENCY_EXCLUSIONS) && !locationCorrection)) {
       const answer = urgentConsciousness
         ? "의식이 흐릿하거나 반응이 없는 사람은 즉시 119에 신고하고 현장 위험에서 안전하게 벗어나도록 도와주세요. 무리하게 이동시키지 말고 119 지시에 따르세요. 회사 산재 지표 조회나 서류 확인은 응급 대응 뒤에 하세요."
         : urgentInjury

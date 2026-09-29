@@ -47,6 +47,10 @@ describe("owner-scoped company answer boundaries", () => {
   });
 
   it("does not treat a public wage signal as confirmed personal arrears", () => {
+    expect(companyAnswerGuardrailHits("인천 OO건설 임금 카드는 지역·업종의 집계 통계입니다.", context("임금 카드 뜻")))
+      .toContain("WAGE_CARD_SCOPE_AS_REGION");
+    expect(companyAnswerGuardrailHits("인천 OO건설의 안전 카드는 지역·업종 집계 통계입니다. 임금 카드는 기업별 가입자 변동을 확인합니다.", context("임금 카드 뜻")))
+      .not.toContain("WAGE_CARD_SCOPE_AS_REGION");
     expect(companyAnswerGuardrailHits("인천 OO건설 임금 카드의 신호로 체불이 확정됐습니다. 김포 OO건설은 별도입니다.", context("임금 카드 뜻")))
       .toContain("WAGE_CARD_AS_CONFIRMED_ARREARS");
     expect(companyAnswerGuardrailHits("인천 OO건설의 공개 카드로 체불을 확정합니다.", context("임금 카드 뜻")))

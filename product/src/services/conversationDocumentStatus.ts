@@ -1,7 +1,7 @@
 import type { ConversationDocumentStatement } from "@/domain/conversationRecall";
 import type { ChatRequest } from "@/domain/chat";
 import { referencedCompanyIds } from "@/services/companyAnswerScope";
-import { hasCompanyLocationQualifier, mentionedCompanies, statementCompany } from "@/services/conversationCompanyScope";
+import { hasCompanyLocationQualifier, mentionedCompanies, recallCompanyLabel, statementCompany } from "@/services/conversationCompanyScope";
 
 export type DocumentName = "contract" | "contract_original" | "contract_copy" | "bank_copy" | "pay_slip";
 export type DocumentState = "held" | "lost" | "absent" | "unstated";
@@ -13,8 +13,8 @@ export interface UserDocumentStatus {
 }
 
 const names: DocumentName[] = ["contract", "contract_original", "contract_copy", "bank_copy", "pay_slip"];
-const missing = /없|분실|잃|못\s*받|보유하지\s*않|갖고\s*있지\s*않/;
-const present = /갖고|보유|소지|받았|있습니다|있어요/;
+const missing = /없|분실|잃|못\s*받|(?:보유|보관)하지\s*않|갖고\s*있지\s*않/;
+const present = /갖고|보유|보관|소지|받았|있습니다|있어요/;
 
 function documentClause(text: string, marker: RegExp, nextDocument: RegExp): string {
   const match = text.match(marker);
@@ -84,8 +84,14 @@ export function documentStatusFromStatements(
 /** Caller must supply server-hydrated statements; raw client recall is discarded upstream. */
 export function documentStatusesForRequest(request: ChatRequest): Array<UserDocumentStatus & { company_name: string }> {
   const companies = request.conversation_recall?.companies ?? [];
-  const statements = request.conversation_recall?.document_statements ?? [];
-  if (!companies.length || !statements.length) return [];
+  const statements = [...(request.conversation_recall?.document_statements ?? [])];
+  if (!companies.length) return [];
+  const currentScope = statementCompany(request.message, request.company_id ?? null, companies);
+  if (!currentScope.ambiguous && currentScope.company_id && !/[?？]|알려|정리해|설명해|어떻게/.test(request.message)
+    && /(?:계약서|명세서|통장\s*사본)/.test(request.message) && /(?:습니다|있어요|없어요)[.!。]?\s*$/.test(request.message)) {
+    statements.push({ text:request.message, company_id:currentScope.company_id, source_message_id:"current_request", sequence:Number.MAX_SAFE_INTEGER, is_correction:/정정|분실|아니라/.test(request.message) });
+  }
+  if (!statements.length) return [];
   const ids = referencedCompanyIds(request.message, companies, request.company_id);
   const named = mentionedCompanies(request.message, companies);
   if (named.length > 1 && new Set(named.map(item => item.company_name)).size < named.length
@@ -96,7 +102,7 @@ export function documentStatusesForRequest(request: ChatRequest): Array<UserDocu
     && statuses.some(other => other.company_id === item.company_id
       && (other.document === "contract_original" || other.document === "contract_copy")
       && other.state !== "unstated"))).map(item => ({ ...item,
-    company_name: companies.find(company => company.company_id === item.company_id)!.company_name }));
+    company_name: recallCompanyLabel(companies.find(company => company.company_id === item.company_id)!, companies) }));
 }
 
 export const DOCUMENT_LABELS: Record<DocumentName, string> = {

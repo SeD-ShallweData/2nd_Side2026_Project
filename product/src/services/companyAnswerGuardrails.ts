@@ -20,7 +20,7 @@ function companyAnchor(answer: string, company: RecallCompany): number | undefin
   return candidates.sort((a, b) => b.score - a.score || b.index - a.index)[0]?.index;
 }
 
-function companySection(answer: string, company: RecallCompany, others: RecallCompany[]): string {
+export function companySection(answer: string, company: RecallCompany, others: RecallCompany[]): string {
   const start = companyAnchor(answer, company)
     ?? locationAliases(company).map((alias) => answer.indexOf(alias))
       .filter((index) => index >= 0).sort((a, b) => a - b)[0];
@@ -48,6 +48,10 @@ export function companyAnswerGuardrailHits(answer: string, context: ComparisonCo
   const cards = context.companyContexts?.length ? context.companyContexts
     : context.companyContext ? [context.companyContext] : [];
   if (context.questionIntent === "company" && cards.length) {
+    if (answer.split(/\n\s*\n/).some(paragraph => /임금|급여|체불/.test(paragraph)
+      && /지역[·ㆍ\s]*업종.{0,30}(?:집계|통계)/.test(paragraph) && !/안전|산재|산업재해/.test(paragraph))) {
+      hits.push("WAGE_CARD_SCOPE_AS_REGION");
+    }
     if (/(?:입금|잔액|남은\s*금액)/.test(context.request.message)
       && /입증|증명/.test(context.request.message)
       && answer.split(/[.!?。\n]/).some((sentence) =>

@@ -82,7 +82,7 @@ export function selectDocumentStatements(
     return (message.content.match(/[^.!?。？\n]+[.!?。？]?/g) ?? []).flatMap((part) => {
       const sentence = part.trim();
       if (!sentence || isOpenQuestion(sentence)
-        || !/(?:있|없|보유|갖|분실|잃|받|소지)/.test(sentence)) return [];
+        || !/(?:있|없|보유|보관|갖|분실|잃|받|소지)/.test(sentence)) return [];
       const topics = DOCUMENT_TOPICS.flatMap((pattern, topic) => pattern.test(sentence) ? [topic] : []);
       if (!topics.length) return [];
       const scope = statementCompany(sentence.replace(/^(?:정정합니다[.!]?|사실은)\s*/, ""), selected, companies);

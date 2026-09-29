@@ -33,7 +33,7 @@ import { userFactGuardrailHits } from "@/services/userFactAnswerGuardrails";
 import { recallAnswer } from "@/services/conversationRecallService";
 import { asksSplitWageInjuryActions, splitWageInjuryGuardrailHits, splitWageInjuryGuidance } from "@/services/splitIssueGuidance";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-29-v19";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-29-v20";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -97,8 +97,14 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
 }
 
 function replacementBaseline(context: ComparisonContext, hits: string[] = []): ChatResponse {
-  if (hits.includes("SPLIT_WAGE_INJURY_ACTION_MISSING")) {
-    return splitWageInjuryGuidance(context.request.message, context.policyBaseline);
+  if (hits.includes("WAGE_CARD_SCOPE_AS_REGION")) return { ...context.policyBaseline, guardrail_status:"limited" };
+  if (asksSplitWageInjuryActions(context.request.message)) {
+    return splitWageInjuryGuidance(context.request.message, context.policyBaseline, context.request);
+  }
+  if (/면접/.test(context.request.message) && /질문|묻/.test(context.request.message)
+    && /안전교육/.test(context.request.message) && /보호구/.test(context.request.message)) {
+    return { ...context.policyBaseline, answer:`${context.companyContext ? `${context.companyContext.company_name} 면접에서는 ` : ""}“현장의 안전교육 내용과 주기, 작업별 보호구의 종류·지급 및 착용 절차는 어떻게 되나요?”라고 물어보세요.`,
+      sources:[], suggested_actions:[], guardrail_status:"limited" };
   }
   if (hits.includes("CARD_AS_PERSONAL_PAYMENT_PROOF") && context.companyContext) {
     const balance = [...(context.request.conversation_recall?.facts ?? [])].reverse()
@@ -111,8 +117,9 @@ function replacementBaseline(context: ComparisonContext, hits: string[] = []): C
     const statement = hits.includes("USER_DOCUMENT_STATE_CONTRADICTION")
       ? documentStatusSummaryForRequest(context.request)
       : recallAnswer(context.request, true)?.answer ?? "";
-    return { ...context.policyBaseline,
-      answer: `${statement ? `사용자 진술 기준: ${statement}\n\n` : ""}${context.policyBaseline.answer}`,
+    const scoped = reviewedLaborFallback(context.request.message, context.policyBaseline) ?? context.policyBaseline;
+    return { ...scoped,
+      answer: `${statement ? `사용자 진술 기준: ${statement}\n\n` : ""}${scoped.answer}`,
       guardrail_status: "limited" };
   }
   if (hits.includes("CROSS_COMPANY_TOPIC_LEAK")) {

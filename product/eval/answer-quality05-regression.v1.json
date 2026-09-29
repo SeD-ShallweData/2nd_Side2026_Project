@@ -1,0 +1,229 @@
+{
+  "id": "answer-quality05-regression.v1",
+  "kind": "development_regression",
+  "provider_call_cap": 140,
+  "initial_run_cap": 90,
+  "short_holdout_ids": [
+    "S02",
+    "S03",
+    "S05",
+    "S07",
+    "S17",
+    "S19",
+    "S20",
+    "S21"
+  ],
+  "extra_short_ids": [
+    "D1T11",
+    "D1T19",
+    "D2T10",
+    "D2T19",
+    "D2T24"
+  ],
+  "comparison_ids": [
+    "S05",
+    "D1T19"
+  ],
+  "protocol": {
+    "long_turns": 26,
+    "min_actual_generation_turns": 8,
+    "summary_checkpoints": [
+      10,
+      20,
+      26
+    ],
+    "relogin_before": 13,
+    "restart_before": 17,
+    "excluded_contract": "S21 expected HTTP503; never included as normal success",
+    "rules": "Oracle stays evaluator-only. No call cap increase. Raw/final/usefulness/facts/sources reviewed separately, original Task10 fixed thresholds unchanged."
+  },
+  "dialogues": [
+    {
+      "id": "L",
+      "steps": [
+        {
+          "id": "L01",
+          "message": "인천 OO건설의 급여일은 매달 25일이고 현장 보조 업무입니다. 하루 9시간 일합니다. 근로계약서 원본과 통장 사본을 갖고 있고 급여명세서는 받지 못했습니다.",
+          "expected": "A25일/9시간, 원본·통장사본 보유, 명세서 부재를 사용자 진술로 유지",
+          "planned_generation": false,
+          "company_id": "COMPANY_DEMO_001"
+        },
+        {
+          "id": "L02",
+          "message": "인천 회사 임금 카드의 추가 확인 신호는 실제 체불이 확정됐다는 뜻인가요?",
+          "expected": "인천 추가확인 신호 설명, 체불 확정 아님",
+          "planned_generation": true
+        },
+        {
+          "id": "L03",
+          "message": "김포 OO건설은 급여일이 매달 8일이고 사무 보조 업무입니다. 하루 9시간 일하며 급여명세서는 갖고 있습니다.",
+          "expected": "B8일/9시간/명세서 보유, B계약서·통장은 미진술",
+          "planned_generation": false,
+          "company_id": "COMPANY_DEMO_006",
+          "set_active_company": "COMPANY_DEMO_006"
+        },
+        {
+          "id": "L04",
+          "message": "김포 안전 카드가 좋으면 사무 보조인 저는 사고 걱정이 없다는 뜻인가요?",
+          "expected": "지역업종 자료, 개인 안전 보장 불가",
+          "planned_generation": true
+        },
+        {
+          "id": "L05",
+          "message": "정정합니다. 인천 OO건설의 급여일은 25일이 아니라 23일입니다. 김포의 8일은 그대로입니다.",
+          "expected": "A23일/B8일 회사별 정정",
+          "planned_generation": false
+        },
+        {
+          "id": "L06",
+          "message": "1. 인천 2. 김포 순서로 최신 급여일과 근무시간을 각각 다시 알려주세요.",
+          "expected": "A23일9시간/B8일9시간, 번호 둘",
+          "planned_generation": false
+        },
+        {
+          "id": "L07",
+          "message": "인천 OO건설의 근로계약서 원본은 분실했고 사본만 갖고 있습니다. 통장 사본은 계속 보관 중이며 급여명세서는 없습니다.",
+          "expected": "원본 분실/계약사본·통장사본 보유/명세서 부재",
+          "planned_generation": false,
+          "company_id": "COMPANY_DEMO_001",
+          "set_active_company": "COMPANY_DEMO_001"
+        },
+        {
+          "id": "L08",
+          "message": "김포 OO건설의 하루 근무시간은 9시간이 아니라 5시간으로 정정합니다. 급여일은 8일입니다.",
+          "expected": "B5시간8일/A9시간23일",
+          "planned_generation": false,
+          "company_id": "COMPANY_DEMO_006",
+          "set_active_company": "COMPANY_DEMO_006"
+        },
+        {
+          "id": "L09",
+          "message": "인천 OO건설에서 제가 가진 서류와 분실하거나 없는 서류를 구분하고, 임금체불 진정 자료로 어떻게 활용할지 알려주세요.",
+          "expected": "보유/분실/부재 정확, 자료 활용 행동",
+          "planned_generation": true,
+          "company_id": "COMPANY_DEMO_001",
+          "set_active_company": "COMPANY_DEMO_001"
+        },
+        {
+          "id": "L10",
+          "message": "인천과 김포 OO건설의 공개 임금 카드 신호를 각각 비교해 주세요. 두 곳 모두 이상이 없다고 볼 수 있나요?",
+          "expected": "A추가확인/B관측제한, 둘 이상없음 왜곡 금지",
+          "planned_generation": true,
+          "checkpoint": true
+        },
+        {
+          "id": "L11",
+          "message": "김포 근무를 시작했는데 8일에 월급이 안 들어오면 어떤 순서로 확인하나요?",
+          "expected": "조건부8일/입금근무자료/회사문의/공식접수,4대보험 선행금지",
+          "planned_generation": true,
+          "company_id": "COMPANY_DEMO_006",
+          "set_active_company": "COMPANY_DEMO_006"
+        },
+        {
+          "id": "L12",
+          "message": "잠깐, 게임 설치 오류 해결법도 알려주세요.",
+          "expected": "범위밖 요청 안내",
+          "planned_generation": false
+        },
+        {
+          "id": "L13",
+          "message": "김포 OO건설에서 발목을 다친 곳은 회사 작업장이라고 말해 두겠습니다.",
+          "expected": "B사고장소 사용자 진술",
+          "planned_generation": false,
+          "company_id": "COMPANY_DEMO_006",
+          "set_active_company": "COMPANY_DEMO_006",
+          "relogin_before": true
+        },
+        {
+          "id": "L14",
+          "message": "정정합니다. 김포 일터에서 다친 게 아니라 퇴근 뒤 집 계단에서 발목을 다쳤습니다. 지금은 걸을 수 있고 갑자기 악화되지는 않았습니다.",
+          "expected": "B집계단 정정,업무재해 확정금지",
+          "planned_generation": false
+        },
+        {
+          "id": "L15",
+          "message": "인천 임금 문제로 돌아가겠습니다. 제가 가진 통장 사본과 계약서 사본을 임금체불 진정에 어떻게 활용하고 무엇을 더 확인하나요?",
+          "expected": "통장·계약사본 보유 유지/명세서 요청/행동",
+          "planned_generation": true,
+          "company_id": "COMPANY_DEMO_001",
+          "set_active_company": "COMPANY_DEMO_001"
+        },
+        {
+          "id": "L16",
+          "message": "인천 OO건설의 미지급 임금 100만 원 중 70만 원이 입금됐습니다. 아직 30만 원이 남았습니다.",
+          "expected": "총100/받은70/잔액30, 인천 귀속",
+          "planned_generation": false
+        },
+        {
+          "id": "L17",
+          "message": "1. 인천 2. 김포 순서로 최신 급여일·근무시간·제가 말한 서류 상태를 정리하고 임금체불 진정에 필요한 자료를 알려주세요.",
+          "expected": "A23일9시간계약원본분실사본통장보유명세서없음;B8일5시간명세서보유계약통장미진술;번호/행동",
+          "planned_generation": true,
+          "set_active_company": null,
+          "restart_before": true
+        },
+        {
+          "id": "L18",
+          "message": "인천 OO건설에서 제가 받은 금액과 아직 못 받은 잔액은 각각 얼마인가요?",
+          "expected": "70만 입금/30만 잔액",
+          "planned_generation": false
+        },
+        {
+          "id": "L19",
+          "message": "김포 현장의 안전교육과 보호구 지급을 면접에서 묻는다면 질문을 어떻게 만들까요? 하나면 충분합니다.",
+          "expected": "구체 질문 하나로 충분/무관 출처 금지",
+          "planned_generation": true,
+          "company_id": "COMPANY_DEMO_006",
+          "set_active_company": "COMPANY_DEMO_006"
+        },
+        {
+          "id": "L20",
+          "message": "인천의 남은 임금 30만 원과 김포에서 제가 다친 장소를 각각 확인하고, 두 회사 공개 카드가 이 개인 사실을 입증하는지도 알려주세요.",
+          "expected": "A30만/B집계단/공개카드로 입증불가",
+          "planned_generation": true,
+          "checkpoint": true
+        },
+        {
+          "id": "L21",
+          "message": "인천 회사에 급여명세서를 달라고 했는데 아직 못 받았습니다. 지금 어떤 항목을 요청하고 어떤 기록을 남겨야 하나요?",
+          "expected": "명세서 구성항목/입금·근무/요청기록, 일반회사 설명금지",
+          "planned_generation": true,
+          "company_id": "COMPANY_DEMO_001",
+          "set_active_company": "COMPANY_DEMO_001"
+        },
+        {
+          "id": "L22",
+          "message": "회사가 답을 안 하면 노동포털에서 어떤 순서로 이어가면 될까요?",
+          "expected": "노동포털 진정/준비자료/1350상담과접수구분",
+          "planned_generation": true
+        },
+        {
+          "id": "L23",
+          "message": "1번 인천의 최신 급여일과 남은 금액, 2번 제가 보유한 서류와 추가로 확인할 자료를 알려주세요.",
+          "expected": "23일30만원/서류정확/번호둘",
+          "planned_generation": false
+        },
+        {
+          "id": "L24",
+          "message": "인천 OO건설 임금 문제의 다음 행동과 김포 OO건설 발목 문제의 우선 행동을 나눠 근거 범위를 표시해 주세요.",
+          "expected": "A임금잔액30자료접수/B집계단 진료상담/사용자진술과공개근거구분",
+          "planned_generation": true
+        },
+        {
+          "id": "L25",
+          "message": "그 회사 카드를 다시 설명해 주세요.",
+          "expected": "회사 해제 뒤 불명확한 대상은 확인/임의 이전회사 부착금지",
+          "planned_generation": false,
+          "set_active_company": null
+        },
+        {
+          "id": "L26",
+          "message": "1. 인천 2. 김포 OO건설의 임금 카드 차이와 제가 말한 급여일·근무시간·서류 상태를 각각 정리해 주세요. 공개 자료와 제 진술을 구분해 주세요.",
+          "expected": "A/B카드왜곡없음;A23일9시간문서정정;B8일5시간명세서보유다른서류미진술;번호/사실경계",
+          "planned_generation": true,
+          "checkpoint": true
+        }
+      ]
+    }
+  ]
+}
