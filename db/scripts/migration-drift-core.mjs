@@ -163,6 +163,22 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "index:public.conversation_requests_pending_lease_idx",
     "constraint:public.conversation_requests.conversation_requests_lease_ck",
   ]),
+  "0021_ops_console": Object.freeze([
+    "table:public.prompt_versions",
+    "table:public.ops_audit_log",
+    "column_type:public.batches.is_active_bool_not_null",
+    "index:public.batches_one_active_uq",
+    "index:public.prompt_versions_one_active_uq",
+    "trigger:public.batches.batches_protect_active",
+    "function:public.ops_activate_batch",
+    "function:public.ops_deactivate_batches",
+    "function:public.ops_save_prompt_draft",
+    "function:public.ops_activate_prompt_version",
+    "function:public.ops_reset_prompt",
+    "function:public.ops_active_prompts",
+    "function_public_execute_revoked:public.ops_activate_batch",
+    "view_definition:public.v_current_batch_honors_pinned_batch",
+  ]),
 });
 
 function migrationLabel(migration) {

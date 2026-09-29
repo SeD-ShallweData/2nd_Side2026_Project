@@ -13,7 +13,9 @@ vi.mock("@/services/authService", () => ({
 }));
 vi.mock("@/server/promptLoader", () => ({
   REQUIRED_PROMPTS: ["chat/system", "inspector/system", "rewrite/system"] as const,
-  loadPrompt: (name: string) => `# ${name}\n지침 본문`,
+  loadPromptFile: (name: string) => `# ${name}\n지침 본문`,
+  getPromptOverride: () => undefined,
+  refreshPromptOverrides: async () => undefined,
 }));
 
 import { GET as getPrompts } from "@/app/api/inspector/prompts/route";
@@ -62,10 +64,12 @@ describe("GET /api/inspector/prompts", () => {
     ]);
   });
 
-  it("아직 쓰기를 열지 않았음을 응답에 밝힌다", async () => {
-    // 자산 무결성 해시 때문에 파일 수정 경로는 닫혀 있다(#81).
+  it("운영 DB 연결이 없으면 편집 불가와 파일 출처를 밝힌다", async () => {
+    // 파일은 자산 무결성 해시로 고정돼 있어(#81) 편집은 운영 DB(wg_ops)로만 한다.
     const body = await (await getPrompts(request("admin-token"))).json();
 
     expect(body.editable).toBe(false);
+    expect(body.items.every((item: { source: string }) => item.source === "file")).toBe(true);
+    expect(body.items[0].file_text).toBe(body.items[0].text);
   });
 });

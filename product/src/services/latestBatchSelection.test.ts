@@ -19,6 +19,9 @@ function expectCurrentBatchSelection(sql: unknown): void {
 
   expect(normalized).toContain("WHERE as_of_date IS NOT NULL");
   expect(normalized).toContain(
+    "AND (is_active OR NOT EXISTS (SELECT 1 FROM public.batches pinned WHERE pinned.is_active))",
+  );
+  expect(normalized).toContain(
     "ORDER BY as_of_date DESC, ingested_at DESC, id DESC LIMIT 1",
   );
   expect(normalized).not.toContain("ORDER BY ingested_at DESC, id DESC LIMIT 1");

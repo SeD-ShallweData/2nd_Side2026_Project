@@ -3,6 +3,9 @@ import "server-only";
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
+import { isOpsConsoleEnabled } from "@/server/ops/opsMode";
+import { queryWrite } from "@/server/postgresWrite";
+
 /**
  * 시스템 프롬프트 로더.
  *
@@ -25,6 +28,74 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 
+/** 코드에 고정된 세 가지 프롬프트. 운영 콘솔도 이 이름만 받는다. */
+export const REQUIRED_PROMPTS = ["chat/system", "inspector/system", "rewrite/system"] as const;
+export type PromptName = (typeof REQUIRED_PROMPTS)[number];
+
+export function isPromptName(value: string): value is PromptName {
+  return (REQUIRED_PROMPTS as readonly string[]).includes(value);
+}
+
+export interface PromptOverride {
+  version: number;
+  body: string;
+  sha256: string;
+  activatedAt: string | null;
+}
+
+/*
+ * 운영 콘솔에서 적용한 DB 버전. 파일보다 우선한다.
+ *
+ * loadPrompt 는 동기 함수라 DB를 기다리지 않는다. 적용 직후에는 운영 콘솔이
+ * refreshPromptOverrides(true) 로 즉시 채우고, 그 뒤로는 loadPrompt 가 부를 때마다
+ * 30초가 지났으면 백그라운드로 다시 읽는다(여러 웹 프로세스 사이의 반영).
+ * DB를 읽지 못하면 표를 비우지 않고 마지막 값을 유지한다. 한 번도 읽지 못했으면 파일이 쓰인다.
+ */
+let overrides: ReadonlyMap<PromptName, PromptOverride> = new Map();
+
+export function setPromptOverrides(next: ReadonlyMap<PromptName, PromptOverride>): void {
+  overrides = next;
+}
+
+export function getPromptOverride(name: string): PromptOverride | undefined {
+  return isPromptName(name) ? overrides.get(name) : undefined;
+}
+
+const OVERRIDE_REFRESH_INTERVAL_MS = 30_000;
+let lastRefreshAt = 0;
+let refreshInFlight: Promise<void> | null = null;
+
+export async function refreshPromptOverrides(force = false): Promise<void> {
+  if (!isOpsConsoleEnabled()) return;
+  if (!force && (refreshInFlight || Date.now() - lastRefreshAt < OVERRIDE_REFRESH_INTERVAL_MS)) {
+    return refreshInFlight ?? undefined;
+  }
+  lastRefreshAt = Date.now();
+  const run = (async () => {
+    try {
+      const rows = await queryWrite<{ name: string; version: number; body: string; body_sha256: string; activated_at: string | null }>(
+        "ops",
+        "SELECT name, version, body, body_sha256, activated_at::text AS activated_at FROM ops_active_prompts()",
+      );
+      const next = new Map<PromptName, PromptOverride>();
+      for (const row of rows) {
+        if (isPromptName(row.name)) {
+          next.set(row.name, { version: row.version, body: row.body, sha256: row.body_sha256, activatedAt: row.activated_at });
+        }
+      }
+      setPromptOverrides(next);
+    } catch (error) {
+      console.warn("[prompt] 적용된 DB 프롬프트를 읽지 못해 이전 값을 유지합니다:", (error as Error)?.message);
+    }
+  })();
+  refreshInFlight = run;
+  try {
+    await run;
+  } finally {
+    if (refreshInFlight === run) refreshInFlight = null;
+  }
+}
+
 function promptRoot(): string {
   const configured = process.env.PROMPT_DIR?.trim();
   return configured ? path.resolve(configured) : path.join(process.cwd(), "prompts");
@@ -45,6 +116,15 @@ function assertSafeName(name: string): void {
  * 조용히 넘어가지 않고 즉시 실패시킵니다.
  */
 export function loadPrompt(name: string): string {
+  assertSafeName(name);
+  void refreshPromptOverrides();
+  const override = getPromptOverride(name);
+  if (override) return override.body;
+  return loadPromptFile(name);
+}
+
+/** 파일 기본값만 읽는다. 운영 콘솔이 "파일과 다름"을 보여줄 때 쓴다. */
+export function loadPromptFile(name: string): string {
   assertSafeName(name);
   const file = path.join(promptRoot(), `${name}.md`);
 
@@ -71,6 +151,3 @@ export function loadPrompt(name: string): string {
 export function withRuntimeContext(prompt: string, lines: string[]): string {
   return [prompt, ...lines.filter((line) => line.length > 0)].join("\n");
 }
-
-/** 배포 전 점검용. 필요한 프롬프트가 모두 읽히는지 확인합니다. */
-export const REQUIRED_PROMPTS = ["chat/system", "inspector/system", "rewrite/system"] as const;

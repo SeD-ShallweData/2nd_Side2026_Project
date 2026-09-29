@@ -1,4 +1,5 @@
 import type { MlDashboardDistributionRow, MlDashboardResponse, MlDashboardTab } from "@/domain/mlDashboard";
+import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
 import { queryReadOnly } from "@/server/postgres";
 import { ServiceError } from "@/utils/errors";
 
@@ -102,7 +103,7 @@ export async function getMlDashboard(
            FROM public.v_region_industry_signal
           ORDER BY sido, industry`,
       ),
-      queryReadOnly<MetaRow>(`SELECT as_of_date::text AS data_as_of, target_month::text AS target_label FROM public.batches ORDER BY as_of_date DESC, ingested_at DESC, id DESC LIMIT 1`),
+      queryReadOnly<MetaRow>(`SELECT as_of_date::text AS data_as_of, target_month::text AS target_label FROM public.batches ${LATEST_BATCH_ORDER_SQL}`),
     ]);
     return {
       tab, denominator: rows.reduce((sum, row) => sum + row.firm_count, 0),

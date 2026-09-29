@@ -68,7 +68,7 @@ export function assertSameOriginRequest(request: Request): void {
   }
 }
 
-export async function readJsonBody(request: Request): Promise<unknown> {
+export async function readJsonBody(request: Request, maxBytes = MAX_JSON_BODY_BYTES): Promise<unknown> {
   const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLocaleLowerCase("en-US");
   if (contentType !== "application/json" && !contentType?.endsWith("+json")) {
     throw new ServiceError(
@@ -80,7 +80,7 @@ export async function readJsonBody(request: Request): Promise<unknown> {
   }
 
   const contentLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(contentLength) && contentLength > MAX_JSON_BODY_BYTES) {
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
     throw new ServiceError("REQUEST_BODY_TOO_LARGE", "요청 본문이 너무 큽니다.", 413, false);
   }
 
@@ -94,7 +94,7 @@ export async function readJsonBody(request: Request): Promise<unknown> {
         const { done, value } = await reader.read();
         if (done) break;
         totalBytes += value.byteLength;
-        if (totalBytes > MAX_JSON_BODY_BYTES) {
+        if (totalBytes > maxBytes) {
           await reader.cancel();
           throw new ServiceError("REQUEST_BODY_TOO_LARGE", "요청 본문이 너무 큽니다.", 413, false);
         }

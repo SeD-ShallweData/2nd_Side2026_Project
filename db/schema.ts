@@ -140,8 +140,66 @@ export const batches = pgTable(
     nScored: integer("n_scored").notNull().default(0),
     nQueue: integer("n_queue").notNull().default(0),
     nSafe: integer("n_safe").notNull().default(0),
+    /**
+     * 운영자가 서비스 배치를 고정했는지. 한 번에 최대 한 행만 true(부분 유니크 인덱스).
+     * 아무 배치도 고정되지 않았으면 기존 규칙(기준월이 가장 늦은 배치)이 그대로 적용된다.
+     * 값은 ops_activate_batch / ops_deactivate_batches 함수로만 바꾼다(0021).
+     */
+    isActive: boolean("is_active").notNull().default(false),
   },
-  (t) => [unique("batches_asof_model_uq").on(t.asOfDate, t.modelVersion)],
+  (t) => [
+    unique("batches_asof_model_uq").on(t.asOfDate, t.modelVersion),
+    uniqueIndex("batches_one_active_uq").on(t.isActive).where(sql`${t.isActive}`),
+  ],
+);
+
+/* ── 운영 콘솔(0021): 프롬프트 버전 · 운영 감사 로그 ─────────────── */
+
+/**
+ * 시스템 프롬프트의 DB 버전. 파일(product/prompts)은 기본값이자 비상 복귀점이고,
+ * 이름마다 active 버전이 하나 있으면 그것이 파일보다 우선한다.
+ * 쓰기는 ops_* SECURITY DEFINER 함수로만 한다.
+ */
+export const promptVersions = pgTable(
+  "prompt_versions",
+  {
+    id: bigint({ mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    name: text().notNull(),
+    version: integer().notNull(),
+    body: text().notNull(),
+    bodySha256: text("body_sha256").notNull(),
+    status: text().notNull(),
+    validation: jsonb().$type<Record<string, unknown>>().notNull(),
+    trial: jsonb().$type<Record<string, unknown>>(),
+    reason: text().notNull(),
+    createdBy: uuid("created_by").notNull().references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    activatedAt: timestamp("activated_at", { withTimezone: true }),
+  },
+  (t) => [
+    unique("prompt_versions_name_version_uq").on(t.name, t.version),
+    uniqueIndex("prompt_versions_one_active_uq").on(t.name).where(sql`${t.status} = 'active'`),
+    check("prompt_versions_name_ck", sql`${t.name} in ('chat/system','inspector/system','rewrite/system')`),
+    check("prompt_versions_status_ck", sql`${t.status} in ('draft','active','retired')`),
+    check("prompt_versions_body_ck", sql`char_length(${t.body}) between 1 and 20000`),
+    check("prompt_versions_reason_ck", sql`char_length(btrim(${t.reason})) between 2 and 300`),
+  ],
+);
+
+/** 운영 콘솔에서 일어난 모든 변경(배치 전환, 프롬프트 저장·적용·복귀)의 이력. */
+export const opsAuditLog = pgTable(
+  "ops_audit_log",
+  {
+    id: bigint({ mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    action: text().notNull(),
+    target: text().notNull(),
+    byUserId: uuid("by_user_id").notNull().references(() => users.id),
+    reason: text().notNull(),
+    before: jsonb().$type<Record<string, unknown>>(),
+    after: jsonb().$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("ops_audit_log_created_idx").on(t.createdAt.desc())],
 );
 
 /* ── 전체 활성 사업장 점수 + 39피처 ──────────────────────── */

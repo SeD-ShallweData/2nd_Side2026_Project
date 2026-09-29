@@ -16,6 +16,8 @@ vi.mock("@/server/databaseConfig", () => ({
     "postgresql://wg_conversation:secret@db.test/wageguard",
   getTipDatabaseConnectionString: () =>
     "postgresql://wg_tip:secret@db.test/wageguard",
+  getOpsDatabaseConnectionString: () =>
+    "postgresql://wg_ops:secret@db.test/wageguard",
 }));
 
 vi.mock("pg", () => ({

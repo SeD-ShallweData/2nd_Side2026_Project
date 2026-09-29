@@ -793,6 +793,22 @@ SELECT json_build_object(
       WHERE n.nspname='public' AND c.relname='conversation_requests'
         AND con.conname='conversation_requests_lease_ck' AND con.contype='c'
     )
+  ),
+  '0021_ops_console', json_build_object(
+    'table:public.prompt_versions', EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='prompt_versions' AND c.relkind IN ('r','p')),
+    'table:public.ops_audit_log', EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='ops_audit_log' AND c.relkind IN ('r','p')),
+    'column_type:public.batches.is_active_bool_not_null', EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='batches' AND column_name='is_active' AND udt_name='bool' AND is_nullable='NO'),
+    'index:public.batches_one_active_uq', EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='batches_one_active_uq' AND c.relkind IN ('i','I')),
+    'index:public.prompt_versions_one_active_uq', EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='prompt_versions_one_active_uq' AND c.relkind IN ('i','I')),
+    'trigger:public.batches.batches_protect_active', EXISTS (SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='batches' AND t.tgname='batches_protect_active' AND NOT t.tgisinternal),
+    'function:public.ops_activate_batch', to_regprocedure('public.ops_activate_batch(integer,uuid,text)') IS NOT NULL,
+    'function:public.ops_deactivate_batches', to_regprocedure('public.ops_deactivate_batches(uuid,text)') IS NOT NULL,
+    'function:public.ops_save_prompt_draft', to_regprocedure('public.ops_save_prompt_draft(text,text,jsonb,uuid,text)') IS NOT NULL,
+    'function:public.ops_activate_prompt_version', to_regprocedure('public.ops_activate_prompt_version(bigint,uuid,text)') IS NOT NULL,
+    'function:public.ops_reset_prompt', to_regprocedure('public.ops_reset_prompt(text,uuid,text)') IS NOT NULL,
+    'function:public.ops_active_prompts', to_regprocedure('public.ops_active_prompts()') IS NOT NULL,
+    'function_public_execute_revoked:public.ops_activate_batch', COALESCE(NOT has_function_privilege('public', to_regprocedure('public.ops_activate_batch(integer,uuid,text)'), 'EXECUTE'), false),
+    'view_definition:public.v_current_batch_honors_pinned_batch', COALESCE((SELECT definition ~* 'is_active' FROM (SELECT pg_get_viewdef(to_regclass('public.v_current_batch'), true) AS definition) d), false)
   )
 )::text;
 COMMIT;
