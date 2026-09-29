@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getOptionalSessionUser } from "@/services/authService";
 import { listBatchStatuses } from "@/services/batchService";
 import { noStoreError, noStoreJson } from "@/server/auth/http";
+import { isOpsConsoleEnabled } from "@/server/ops/opsMode";
 import { requireAuthenticatedUser, requireUserRole } from "@/server/auth/permissions";
 import { getSessionTokenFromRequest } from "@/server/auth/sessionCookie";
 
@@ -13,7 +14,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     requireUserRole(user, ["admin"]);
-    return noStoreJson(await listBatchStatuses());
+    return noStoreJson({ ...(await listBatchStatuses()), manageable: isOpsConsoleEnabled() });
   } catch (error) {
     return noStoreError(error);
   }

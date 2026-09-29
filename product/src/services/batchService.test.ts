@@ -27,6 +27,7 @@ describe("배치 현황 조회", () => {
         n_queue: 3000,
         n_safe: 503887,
         is_active: true,
+        is_pinned: false,
       },
       {
         batch_id: 8,
@@ -40,6 +41,7 @@ describe("배치 현황 조회", () => {
         n_queue: 0,
         n_safe: 0,
         is_active: false,
+        is_pinned: false,
       },
     ]);
   });
@@ -51,11 +53,25 @@ describe("배치 현황 조회", () => {
     expect(queryReadOnlyMock).toHaveBeenCalledOnce();
     expect(sql).toContain("FROM public.batches");
     expect(sql).toContain("WHERE as_of_date IS NOT NULL");
+    expect(sql).toContain("AND (is_active OR NOT EXISTS (SELECT 1 FROM public.batches pinned WHERE pinned.is_active))");
+    expect(sql).toContain("b.is_active AS is_pinned");
     expect(sql).toContain("ORDER BY as_of_date DESC, ingested_at DESC, id DESC LIMIT 1");
     expect(sql).toContain("ORDER BY b.as_of_date DESC NULLS LAST, b.ingested_at DESC, b.id DESC");
     expect(result.selection_mode).toBe("auto");
     expect(result.current?.batch_id).toBe(7);
     expect(result.batches.map((batch) => batch.batch_id)).toEqual([7, 8]);
     expect(Number.isNaN(Date.parse(result.generated_at))).toBe(false);
+  });
+
+  it("운영자가 고정한 배치가 있으면 selection_mode 가 pinned 다", async () => {
+    queryReadOnlyMock.mockResolvedValueOnce([
+      { batch_id: 7, data_as_of: "2026-06-01", target_month: "2026-12-01", model_version: "m", model_sha: null,
+        ingested_at: "2026-08-07T06:26:00Z", source: null, n_scored: 1, n_queue: 1, n_safe: 1, is_active: false, is_pinned: false },
+      { batch_id: 6, data_as_of: "2026-05-01", target_month: "2026-11-01", model_version: "m", model_sha: null,
+        ingested_at: "2026-07-07T06:26:00Z", source: null, n_scored: 1, n_queue: 1, n_safe: 1, is_active: true, is_pinned: true },
+    ]);
+    const result = await listBatchStatuses();
+    expect(result.selection_mode).toBe("pinned");
+    expect(result.current?.batch_id).toBe(6);
   });
 });

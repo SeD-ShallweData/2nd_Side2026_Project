@@ -19,14 +19,15 @@ export async function listBatchStatuses(): Promise<BatchStatusListResponse> {
             b.n_scored,
             b.n_queue,
             b.n_safe,
-            COALESCE(b.id = current_batch.id, false) AS is_active
+            COALESCE(b.id = current_batch.id, false) AS is_active,
+            b.is_active AS is_pinned
        FROM public.batches b
        LEFT JOIN current_batch ON true
       ORDER BY b.as_of_date DESC NULLS LAST, b.ingested_at DESC, b.id DESC`,
   );
 
   return {
-    selection_mode: "auto",
+    selection_mode: rows.some((row) => row.is_pinned) ? "pinned" : "auto",
     current: rows.find((row) => row.is_active) ?? null,
     batches: rows,
     generated_at: new Date().toISOString(),

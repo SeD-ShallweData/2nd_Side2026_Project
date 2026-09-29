@@ -180,6 +180,27 @@ drift 확인 → backup 확인 → migration 0018~0020 → role 재적용 → ap
 
 worker와 운영 적용 순서: [CONVERSATION_MAINTENANCE.md](CONVERSATION_MAINTENANCE.md).
 
+### 0021 운영 콘솔 (배치 고정·프롬프트 버전)
+
+0021은 `batches.is_active`(고정 배치, 최대 1개)와 `prompt_versions`·`ops_audit_log`를 추가하고,
+`v_current_batch`가 고정 배치를 따르도록 WHERE 절만 넓힌다(ORDER BY 는 0008 그대로). 쓰기는
+SECURITY DEFINER 함수 `ops_*`로만 하며, 실행 권한은 `create-ops-role.sh`가 `wg_ops`에만 준다.
+
+**순서: migration → 롤 → web.env → 앱.** 새 앱 코드는 `is_active` 컬럼을 읽으므로 0021 없이
+먼저 올라가면 공개 조회가 실패한다. 반대로 이전 앱은 0021의 새 컬럼·테이블을 무시하므로
+앱만 되돌릴 때 컬럼을 DROP 하지 않는다.
+
+```bash
+cd db
+npm run migrate
+./scripts/create-ops-role.sh          # 0021 없이 실행하면 exit 3
+./scripts/activate-batch.sh --status  # 고정 없음(pinned 전부 f)이 정상
+```
+
+고정된 배치는 삭제할 수 없다(트리거). 지우려면 먼저 `--deactivate`로 풀어야 한다.
+배치 전환은 화면(`/admin/batches`)과 CLI(`scripts/activate-batch.sh`)가 같은 함수를 쓰므로
+검사와 감사 로그가 같다.
+
 ### 공통 체크리스트
 
 - 적용된 과거 migration SQL은 수정하지 않고 새 번호를 추가한다.

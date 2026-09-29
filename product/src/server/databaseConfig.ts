@@ -106,3 +106,17 @@ export function getConversationDatabaseConnectionString(): string | undefined {
     buildConversationDatabaseUrl(readDatabaseValues())
   );
 }
+
+/*
+ * 운영 콘솔(배치 전환·프롬프트 적용) 전용 연결. wg_ops 는 ops_* 함수 실행만 가능하다.
+ * 다른 롤로 대체하지 않는다 — 사용자 이름이 wg_ops 가 아니면 설정이 없는 것으로 본다.
+ */
+export function getOpsDatabaseConnectionString(): string | undefined {
+  const url = validDirectUrl(process.env.OPS_DATABASE_URL);
+  if (!url) return undefined;
+  try {
+    return decodeURIComponent(new URL(url).username) === "wg_ops" ? url : undefined;
+  } catch {
+    return undefined;
+  }
+}

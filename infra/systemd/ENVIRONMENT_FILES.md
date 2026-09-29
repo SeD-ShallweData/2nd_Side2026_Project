@@ -34,6 +34,7 @@ FAVORITE_DATA_MODE=real
 AUTH_DATABASE_URL=postgresql://wg_auth:<URL_ENCODED_AUTH_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 COMMUNITY_DATABASE_URL=postgresql://wg_community:<URL_ENCODED_COMMUNITY_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 TIP_DATABASE_URL=postgresql://wg_tip:<URL_ENCODED_TIP_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
+OPS_DATABASE_URL=postgresql://wg_ops:<URL_ENCODED_OPS_SECRET>@127.0.0.1:5433/wageguard?sslmode=disable
 WORKSITE_TIP_STORAGE_ROOT=/srv/moneyworry/worksite-tip-media
 CHAT_EXECUTION_MODE=dual_api
 UPSTAGE_API_KEY=<UPSTAGE_SECRET>
@@ -97,6 +98,7 @@ CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 | `AUTH_DATABASE_URL` | `postgresql://wg_auth:…@127.0.0.1:5433/wageguard?sslmode=disable` | mock 일 때는 **두면 안 된다** |
 | `COMMUNITY_DATABASE_URL` | `postgresql://wg_community:…@127.0.0.1:5433/wageguard?sslmode=disable` | 〃 |
 | `TIP_DATABASE_URL` | `postgresql://wg_tip:…@127.0.0.1:5433/wageguard?sslmode=disable` | 〃 |
+| `OPS_DATABASE_URL` | `postgresql://wg_ops:…@127.0.0.1:5433/wageguard?sslmode=disable` | **선택.** 운영 콘솔(배치 전환·프롬프트 적용). 없으면 화면이 읽기 전용. `AUTH_DATA_MODE=real` 일 때만 허용 |
 | `WORKSITE_TIP_STORAGE_ROOT` | `/srv/moneyworry/worksite-tip-media` | 현장 제보 real 일 때만 사용하며 다른 경로는 거부 |
 | `MOCK_AUTH_*_PASSWORD` 3종 | mock 일 때만 | real 로 바꾸면 **지워야 한다** |
 
@@ -112,6 +114,11 @@ CONTRACT_INTERNAL_TOKEN=<CONTRACT_INTERNAL_SECRET>
 비밀번호 원본은 운영 secret 전달 경로에서 받아 URL component로 percent-encode한다. 저장소나
 명령행에는 넣지 않는다. 현장 제보 DB 롤은 `wg_tip`으로 고정되며 다른 쓰기 롤을 대신 넣어도
 검증기가 거부한다.
+
+운영 콘솔 롤 `wg_ops`는 테이블 권한이 하나도 없고 migration 0021 의 `ops_*` 함수만 실행한다
+(`db/scripts/create-ops-role.sh`). 함수가 admin 여부·사유·프롬프트 해시를 다시 검사하고
+`ops_audit_log`에 기록하므로, 웹이 가진 쓰기 경로는 그 함수 목록으로 한정된다. "웹은 배치·프롬프트
+쓰기 자격증명이 없다"는 원칙의 유일한 예외이며, 롤 이름은 `wg_ops`로 고정돼 검증기가 다른 롤을 거부한다.
 
 현장 제보 저장소는 PostgreSQL 행과 파일을 함께 사용한다. DB에는 제보·첨부 메타데이터와
 `storage_key`, SHA-256을 저장하고, 사진 원본과 EXIF를 제거한 검사관용 사본은 데이터 디스크의
