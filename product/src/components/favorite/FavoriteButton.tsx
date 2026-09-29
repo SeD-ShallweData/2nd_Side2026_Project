@@ -28,6 +28,13 @@ export function FavoriteButton({
 }: FavoriteButtonProps) {
   const pathname = usePathname();
   const [isFavorite, setIsFavorite] = useState(initialIsFavorite);
+  // 부모는 즐겨찾기 목록을 비동기로 불러와 initialIsFavorite 를 나중에 true 로 바꾼다.
+  // useState 초기값은 처음 한 번만 쓰이므로, 값이 바뀌면 렌더 중에 따라간다.
+  const [syncedInitial, setSyncedInitial] = useState(initialIsFavorite);
+  if (initialIsFavorite !== syncedInitial) {
+    setSyncedInitial(initialIsFavorite);
+    setIsFavorite(initialIsFavorite);
+  }
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<{ message: string; requiresLogin: boolean } | null>(null);
 

@@ -156,7 +156,7 @@ export function BatchStatusPage({
                     <td>{dateLabel(batch.target_month)}</td>
                     <td>{batch.model_version}{batch.model_sha ? <span>sha {batch.model_sha.slice(0, 8)}</span> : null}</td>
                     <td>{timestampLabel(batch.ingested_at)}</td>
-                    <td><span>채점 {batch.n_scored.toLocaleString("ko-KR")}</span><span>위험큐 {batch.n_queue.toLocaleString("ko-KR")}</span><span>안정판정 {batch.n_safe.toLocaleString("ko-KR")}</span></td>
+                    <td className="batch-scale-cell"><div><span>채점 {batch.n_scored.toLocaleString("ko-KR")}</span><span>위험큐 {batch.n_queue.toLocaleString("ko-KR")}</span><span>안정판정 {batch.n_safe.toLocaleString("ko-KR")}</span></div></td>
                     {manageable ? (
                       <td>
                         {!batch.is_active && canServe(batch) ? (
