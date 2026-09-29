@@ -7,6 +7,7 @@ import type { ChatRequest } from "@/domain/chat";
 import type { RagRetrievalResult } from "@/domain/rag";
 import type { IntentDecision } from "@/services/chatIntentService";
 import { hasActualUnpaidWageReport, hasUnpaidWageQuestion, reviewedLaborTopics } from "@/services/reviewedLaborGuidance";
+import { asksPublicCompanyComparison, referencedCompanyIds } from "@/services/companyAnswerScope";
 
 const DIRECT_LABOR_TERMS = [
   "체불", "근로계약", "근로시간", "퇴근", "수당", "연차", "해고", "휴가", "야근", "노동",
@@ -84,6 +85,8 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
     && /(?:임금|안전|산재).{0,12}(?:카드|지표|신호)|(?:카드|지표|신호).{0,12}(?:임금|안전|산재)/.test(request.message)
     && /(?:뜻|의미|보이|표시|확정|해석|왜|확인)/.test(request.message)
     && !hasActualUnpaidWageReport(request.message);
+  const publicCompanyComparison = asksPublicCompanyComparison(request.message,
+    referencedCompanyIds(request.message, request.conversation_recall?.companies ?? [], request.company_id));
   if (hasLaborRequest(request.message) && outOfScopeTopic) {
     return {
       request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },
@@ -95,7 +98,7 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
     };
   }
 
-  if (selectedCompanyCardQuestion) {
+  if (selectedCompanyCardQuestion || publicCompanyComparison) {
     return {
       request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },
       parts: [part("company_specific", "선택한 회사의 공개 카드 표시와 한계", request)],

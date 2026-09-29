@@ -179,6 +179,18 @@ describe("챗봇 정책 가드레일", () => {
     expect(response.answer).not.toContain(MOCK_RISKS.COMPANY_DEMO_002.wage_risk.summary);
   });
 
+  it("동명 회사는 선택한 지역을 명시해도 다시 선택하라고 하지 않는다", async () => {
+    for (const [company_id, region] of [["COMPANY_DEMO_001", "인천"], ["COMPANY_DEMO_006", "김포"]]) {
+      const response = await sendChatMessage(parseChatRequest({
+        message: `${region} OO건설의 임금 카드에서 추가 확인은 무슨 뜻인가요?`,
+        company_id, chat_mode: "general", recent_messages: [],
+      }));
+      expect(response.answer_type).toBe("company_context");
+      expect(response.answer).not.toContain("다시 선택");
+      expect(response.answer).toContain("추가");
+    }
+  });
+
   it("근거 없는 노동법 질문은 출처를 만들지 않고 공식 확인을 안내한다", async () => {
     const response = await sendChatMessage(
       parseChatRequest({

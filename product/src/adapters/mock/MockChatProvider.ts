@@ -9,6 +9,7 @@ import type { RiskProvider, SourceReference } from "@/domain/risk";
 import { CHAT_COPY } from "@/mocks/chatResponses";
 import { ServiceError } from "@/utils/errors";
 import { containsAny, normalizeSearchText } from "@/utils/text";
+import { hasCompanyLocationQualifier } from "@/services/conversationCompanyScope";
 
 const SEARCH_ACTION: SuggestedAction = {
   code: "SEARCH_COMPANY",
@@ -256,9 +257,15 @@ async function findOtherReferencedCompany(
   companies: CompanyRepository,
 ) {
   const candidates = [...new Set(message.match(COMPANY_NAME_PATTERN) ?? [])];
+  const selected = await companies.getById(selectedCompanyId);
   for (const candidate of candidates) {
     const results = await companies.search(candidate, 3);
-    const other = results.find((result) => result.company_id !== selectedCompanyId);
+    // A shared display name is not an explicit reference to the other firm.
+    // Only a location that distinguishes it from the selected firm can do so.
+    const other = results.find((result) => result.company_id !== selectedCompanyId
+      && (normalizeSearchText(candidate) !== normalizeSearchText(selected?.company_name ?? "")
+        || (hasCompanyLocationQualifier(message, result)
+          && !hasCompanyLocationQualifier(message, selected!))));
     if (other && normalizeSearchText(other.company_name) === normalizeSearchText(candidate)) return other;
   }
   return null;

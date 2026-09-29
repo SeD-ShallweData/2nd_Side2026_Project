@@ -1,7 +1,7 @@
 import type { SignalLevel, WageVerdict } from "@/domain/risk";
-import { getWageStatusMeta } from "@/domain/riskPresentation";
+import { getWageStatusMeta, SIGNAL_STATUS_META } from "@/domain/riskPresentation";
 
-export function StatusBadge({ level, verdict }: { level: SignalLevel; verdict?: WageVerdict | null }) {
-  const meta = getWageStatusMeta(level, verdict);
+export function StatusBadge({ level, verdict, kind }: { level: SignalLevel; verdict?: WageVerdict | null; kind?: "wage" | "safety" }) {
+  const meta = kind === "wage" || (!kind && verdict) ? getWageStatusMeta(level, verdict) : SIGNAL_STATUS_META[level];
   return <span className={`status-badge ${meta.className}`}>{meta.label}</span>;
 }
