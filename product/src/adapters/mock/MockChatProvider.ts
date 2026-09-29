@@ -45,6 +45,9 @@ function conversationId(value?: string): string {
 }
 
 const EMERGENCY_SIGNS = ["사고 났", "사고났", "다쳤", "화재", "붕괴", "의식이 없", "유해물질 노출"];
+const ALTERED_CONSCIOUSNESS = /의식이\s*(?:없|흐릿|희미|혼미)|반응이\s*없|깨우기\s*어렵/;
+const ACUTE_INJURY = /(?:발목|다리|무릎|허리|손목|머리|팔).{0,35}(?:붓|부었|더\s*아프|걷기\s*힘들|체중을\s*싣기\s*어렵|움직이기\s*어렵)|(?:넘어졌|넘어져|넘어진).{0,55}(?:걷기\s*힘들|체중을\s*싣기\s*어렵|붓|부었)/;
+const INJURY_FOLLOWUP = /(?:발목|다리|무릎|허리|손목|머리|팔).{0,25}(?:증상|더\s*아프|우선할\s*행동|먼저\s*해야)|(?:증상|다시).{0,25}(?:발목|부상|사고)/;
 
 /**
  * 응급으로 보지 않을 표현.
@@ -271,9 +274,20 @@ export class PolicyChatProvider implements ChatProvider {
     const message = request.message.trim();
     const id = conversationId(request.conversation_id);
 
-    if (containsAny(message, EMERGENCY_SIGNS) && !containsAny(message, EMERGENCY_EXCLUSIONS)) {
+    const urgentConsciousness = ALTERED_CONSCIOUSNESS.test(message);
+    const recentInjury = request.recent_messages.filter((item) => item.role === "user")
+      .slice(-6).some((item) => ACUTE_INJURY.test(item.content));
+    const urgentInjury = ACUTE_INJURY.test(message)
+      || (INJURY_FOLLOWUP.test(message) && recentInjury);
+    if (urgentConsciousness || urgentInjury
+      || (containsAny(message, EMERGENCY_SIGNS) && !containsAny(message, EMERGENCY_EXCLUSIONS))) {
+      const answer = urgentConsciousness
+        ? "의식이 흐릿하거나 반응이 없는 사람은 즉시 119에 신고하고 현장 위험에서 안전하게 벗어나도록 도와주세요. 무리하게 이동시키지 말고 119 지시에 따르세요. 회사 산재 지표 조회나 서류 확인은 응급 대응 뒤에 하세요."
+        : urgentInjury
+          ? "넘어진 뒤 붓거나 걷기 어렵고 체중을 싣기 힘들다면 회사 안전 지표보다 진료와 안전 확보를 먼저 하세요. 움직이기 어렵거나 증상이 심해지면 119에 도움을 요청하고, 안전하게 이동할 수 있어도 신속히 의료진의 평가를 받으세요. 이후 발생 시각·장소와 증상을 기록하고 사업장에 알리세요."
+          : `${CHAT_COPY.emergency}\n\n안전이 확보된 뒤 사고 기록과 신고·산재 절차를 확인하세요.`;
       return {
-        answer: `${CHAT_COPY.emergency}\n\n안전이 확보된 뒤 사고 기록과 신고·산재 절차를 확인하세요.`,
+        answer,
         answer_type: "emergency_guidance",
         sources: [SAFETY_GUIDE_SOURCE],
         suggested_actions: [
