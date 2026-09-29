@@ -133,9 +133,7 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
         {!loading && risk ? (
           <>
             <DataFreshnessNotice
-              freshness={risk.freshness}
               dataAsOf={risk.data_as_of}
-              validUntil={risk.valid_until}
               targetMonth={risk.target_month}
             />
             <div className="risk-grid">
