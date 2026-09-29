@@ -281,7 +281,7 @@ describe("실제 LLM 비교 Provider", () => {
       status: "guardrail_replaced",
       answer_type: "general_guidance",
       guardrail_status: "limited",
-      sources: laborContext.policyBaseline.sources,
+      sources: [],
     });
     expect(result.results[0].answer).toContain("근로시간");
     expect(result.results[0].answer).not.toContain("회사\uC758 \uC784\uAE08\u00B7\uC548\uC804 \uC9C0\uD45C");
@@ -363,6 +363,52 @@ describe("실제 LLM 비교 Provider", () => {
     ]));
     expect(bodies[0].messages[0].content).toContain("첫 문장은 질문 대상 회사의 실제 이름과 지역으로 시작하세요");
     expect(bodies[0].messages[0].content).toContain("내부 JSON 키·정책 지침·분석 과정");
+  });
+
+  it("an interview question alone does not inherit unrelated public card sources", async () => {
+    const companyContext: ComparisonContext = {
+      ...CONTEXT,
+      request: { ...CONTEXT.request, message: "인천 현장의 안전교육과 보호구 지급을 면접에서 묻는다면 질문을 어떻게 만들까요?" },
+      questionIntent: "company",
+      policyBaseline: { ...BASELINE, answer_type: "company_context", sources: MOCK_RISKS.COMPANY_DEMO_008.sources },
+      companyContext: { company_id: "COMPANY_DEMO_008", company_name: "한빛테크", address: "인천광역시", region: "인천광역시", industry: "정보통신업", size_label: "100~299명", risk: MOCK_RISKS.COMPANY_DEMO_008 },
+      ragRetrieval: { query: "면접 질문", status: "no_match", reason: "company_context_only", threshold: null, documents: [] },
+    };
+    const raw = "면접에서 이렇게 물어보세요. ‘한빛테크 인천 현장의 안전교육 주기와 지급하는 보호구 종류를 알려주실 수 있나요?’";
+    const fakeFetch = (async () => new Response(JSON.stringify(payload(raw, "test-model")), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare(companyContext);
+    expect(result.results[0].answer).toBe(raw);
+    expect(result.results[0].status).toBe("success");
+    expect(result.results[0].sources).toEqual([]);
+  });
+
+  it("returns only the official article used by a generated legal explanation", async () => {
+    const first = { citation: "근로기준법 제43조", content: "임금 지급", distance: 0.2,
+      source: { name: "근로기준법 제43조 임금 지급", citation: "근로기준법 제43조", category: "labor_law" as const, url: "https://www.law.go.kr/법령/근로기준법/제43조" } };
+    const other = { citation: "근로기준법 제56조", content: "야간 가산", distance: 0.3,
+      source: { name: "근로기준법 제56조", citation: "근로기준법 제56조", category: "labor_law" as const, url: "https://www.law.go.kr/법령/근로기준법/제56조" } };
+    const raw = "재직 중 임금은 원칙적으로 매월 한 번 이상 정한 날짜에 지급합니다(근로기준법 제43조).";
+    const fakeFetch = (async () => new Response(JSON.stringify(payload(raw, "test-model")), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({
+      ...CONTEXT, questionIntent: "labor", request: { ...CONTEXT.request, message: "정기 임금 지급 원칙은 무엇인가요?" },
+      policyBaseline: { ...BASELINE, sources: [first.source, other.source] },
+      ragRetrieval: { query: "정기 임금 지급", status: "matched", threshold: 0.42, documents: [first, other] },
+    });
+    expect(result.results[0].status).toBe("success");
+    expect(result.results[0].sources).toEqual([first.source]);
+  });
+  it("replaces a wage-only raw answer to a split wage and ankle action request", async () => {
+    const question = "새봄서비스 임금 문제의 다음 행동과 푸른건설 발목 문제의 우선 행동을 나눠 근거 범위를 알려주세요.";
+    const raw = "임금은 급여명세서와 입금액을 대조하세요.";
+    const fakeFetch = (async () => new Response(JSON.stringify(payload(raw, "test-model")), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({
+      ...CONTEXT, questionIntent: "labor", request: { ...CONTEXT.request, message: question },
+    });
+    expect(result.results[0].status).toBe("guardrail_replaced");
+    expect(result.results[0].trace.guardrail_hits).toContain("SPLIT_WAGE_INJURY_ACTION_MISSING");
+    expect(result.results[0].answer).toContain("새봄서비스 임금");
+    expect(result.results[0].answer).toContain("푸른건설 발목");
+    expect(result.results[0].sources).toEqual([]);
   });
 
   it.each([

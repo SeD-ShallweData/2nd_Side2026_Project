@@ -31,8 +31,9 @@ import { referencedCompanyIds } from "@/services/companyAnswerScope";
 import { companyAnswerGuardrailHits } from "@/services/companyAnswerGuardrails";
 import { userFactGuardrailHits } from "@/services/userFactAnswerGuardrails";
 import { recallAnswer } from "@/services/conversationRecallService";
+import { asksSplitWageInjuryActions, splitWageInjuryGuardrailHits, splitWageInjuryGuidance } from "@/services/splitIssueGuidance";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-29-v18";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-29-v19";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -91,10 +92,14 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   }
   for (const hit of companyAnswerGuardrailHits(answer, context)) hits.add(hit);
   for (const hit of userFactGuardrailHits(answer, context.request)) hits.add(hit);
+  for (const hit of splitWageInjuryGuardrailHits(context.request.message, answer)) hits.add(hit);
   return [...hits];
 }
 
 function replacementBaseline(context: ComparisonContext, hits: string[] = []): ChatResponse {
+  if (hits.includes("SPLIT_WAGE_INJURY_ACTION_MISSING")) {
+    return splitWageInjuryGuidance(context.request.message, context.policyBaseline);
+  }
   if (hits.includes("CARD_AS_PERSONAL_PAYMENT_PROOF") && context.companyContext) {
     const balance = [...(context.request.conversation_recall?.facts ?? [])].reverse()
       .find(fact => fact.company_id === context.companyContext?.company_id && fact.kind === "wage_balance")?.value;
@@ -171,6 +176,28 @@ function replacementBaseline(context: ComparisonContext, hits: string[] = []): C
     };
   }
   return clarificationFallback(context.policyBaseline);
+}
+
+function supportedResponseSources(answer: string, response: ChatResponse, context: ComparisonContext): ChatResponse["sources"] {
+  if (context.questionIntent === "company") {
+    // An interview question about conditions at a named firm is not a claim
+    // derived from its public wage or accident cards.
+    if (!/카드|지표|공개\s*자료|공식\s*명단|가입자|이직|산업재해\s*(?:집계|자료)|(?:임금|안전)\s*신호/.test(answer)) return [];
+    const wage = /임금|급여|체불|고용|가입자|이직/.test(answer);
+    const safety = /안전|산재|산업재해|사고/.test(answer);
+    return response.sources.filter(source =>
+      (wage && source.category === "wage") || (safety && source.category === "safety"));
+  }
+  if (context.questionIntent === "labor" && context.ragRetrieval.status === "matched") {
+    return response.sources.filter(source => {
+      if ((source.citation && answer.includes(source.citation)) || answer.includes(source.name)) return true;
+      const article = source.name.match(/(?:근로기준법|임금채권보장법)(?:\s*시행령)?\s*제\d+조/);
+      if (article && answer.includes(article[0])) return true;
+      return Boolean(source.url?.startsWith("https://labor.moel.go.kr/")
+        && /노동포털/.test(answer) && /진정|접수|신청/.test(answer));
+    });
+  }
+  return response.sources;
 }
 
 
@@ -270,6 +297,9 @@ function buildSystemPrompt(context: ComparisonContext): string {
     companyOutputContract,
     companyBoundaryContract,
     compositeOutputContract,
+    asksSplitWageInjuryActions(context.request.message)
+      ? "이번 질문은 두 회사의 임금 문제와 발목 문제를 나눠 묻는다. 두 항목에 각각 다음 행동을 쓰고, 사용자 진술·공개 회사 카드·검색된 공식 자료의 근거 범위를 구분한다. 임금 검색 문서를 부상 판단의 근거로 쓰지 않는다. 한 항목을 생략하거나 일반 카드 설명으로 대체하지 않는다."
+      : "",
     documentQuestion
       ? "현재 질문은 사용자 문서의 보유 상태와 활용이다. user_document_status_summary를 답변 전에 회사별로 그대로 확인한다. 이 요약은 소유자 확인을 거친 사용자 진술만 보수적으로 추출한 것이며 서류 자체의 진위 확인은 아니다. '보유·부재를 진술하지 않음'은 원본·사본을 가진 것으로도, 없는 것으로도, 분실한 것으로도 바꾸지 않는다. 오래된 원문은 뒤의 같은 문서 정정으로만 대체한다. 이전 assistant 답변·검색 문서의 일반 준비물·질문에 나열된 문서명은 보유 근거가 아니다. 원문 ID와 내부 키는 출력하지 않는다. 먼저 현재 문서 상태, 그 다음 관련 근거에 맞는 활용·다음 행동을 답한다. 서류를 전부 갖춰야만 진정할 수 있다고 하지 않는다. 법률·진정 절차 문장의 끝에는 이번에 실제 제공된 공식 문서명을 괄호 근거로 붙이고, 답변 끝에 출처 목록만 따로 두지 않는다."
       : "",
@@ -329,7 +359,7 @@ function fallbackResult(
     status: "fallback",
     answer: baseline.answer,
     answer_type: baseline.answer_type,
-    sources: baseline.sources,
+    sources: supportedResponseSources(baseline.answer, baseline, context),
     suggested_actions: baseline.suggested_actions,
     limitations: [...baseline.limitations, "해당 모델 API가 실패하여 정책 기반 안내로 대체했습니다."],
     guardrail_status: "limited",
@@ -377,7 +407,7 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
           status: replaced ? "guardrail_replaced" : "success",
           answer,
           answer_type: responseBaseline.answer_type,
-          sources: responseBaseline.sources,
+          sources: supportedResponseSources(answer, responseBaseline, context),
           suggested_actions: responseBaseline.suggested_actions,
           limitations: replaced
             ? [...responseBaseline.limitations, "모델 답변이 서비스 정책에 맞지 않아 확인 질문으로 교체했습니다."]

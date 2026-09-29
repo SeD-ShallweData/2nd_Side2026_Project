@@ -8,6 +8,7 @@ import type { RagRetrievalResult } from "@/domain/rag";
 import type { IntentDecision } from "@/services/chatIntentService";
 import { hasActualUnpaidWageReport, hasUnpaidWageQuestion, reviewedLaborTopics } from "@/services/reviewedLaborGuidance";
 import { asksPublicCompanyComparison, referencedCompanyIds } from "@/services/companyAnswerScope";
+import { asksSplitWageInjuryActions } from "@/services/splitIssueGuidance";
 
 const DIRECT_LABOR_TERMS = [
   "체불", "근로계약", "근로시간", "퇴근", "수당", "연차", "해고", "휴가", "야근", "노동",
@@ -107,7 +108,7 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
     };
   }
 
-  if (decision.intent === "labor" || laborPortalProcedure
+  if (decision.intent === "labor" || laborPortalProcedure || asksSplitWageInjuryActions(request.message)
     || (hasUnpaidWageQuestion(request.message)
       && (decision.intent !== "company" || hasActualUnpaidWageReport(request.message)))
     || (!outOfScopeTopic && reviewedLaborTopics(request.message).length > 0)) {

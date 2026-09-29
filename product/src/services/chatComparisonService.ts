@@ -20,6 +20,7 @@ import { wageArrearsFallback } from "@/services/wageArrearsGuidance";
 import { finalizeConversationResponse, recallResponse } from "@/services/conversationRecallService";
 import { referencedCompanyIds } from "@/services/companyAnswerScope";
 import { companySignalForAnswer } from "@/services/publicAnswerContext";
+import { asksSplitWageInjuryActions, splitWageInjuryGuidance } from "@/services/splitIssueGuidance";
 import {
   getLlmProviderConfigs,
   getLlmTimeoutMs,
@@ -86,6 +87,18 @@ function laborEvidenceFallback(
   hasOutOfScopePart: boolean,
   question: string,
 ): ChatResponse {
+  if (asksSplitWageInjuryActions(question)) return splitWageInjuryGuidance(question, policyBaseline);
+  if (/(?:근무(?:한)?\s*시간|근로시간)/.test(question)
+    && /(?:임금|급여|수당)/.test(question)
+    && /빠진|누락|덜\s*(?:받|들어)|반영.{0,8}(?:안|않|못)/.test(question)) {
+    return {
+      ...clarificationFallback(policyBaseline,
+        "빠진 근무시간을 확인하려면 날짜별 실제 시작·종료·휴게시간과 급여명세서에 반영된 시간을 나란히 적으세요. 출퇴근 기록·근무표·업무 지시 메시지로 실제 시간을 확인하고, 근로계약의 임금 조건과 입금 내역을 대조해 차이를 남기세요. 회사에 빠진 날짜·시간과 지급액 산정 내역을 서면으로 묻고 답변을 보관하세요. 차이가 해결되지 않으면 그 자료로 1350 또는 관할 노동관서에 확인하세요."),
+      answer_type: "general_guidance",
+      sources: [],
+      limitations: ["이번 요청에서 직접 적용할 공식 노동법 검색 근거를 확인하지 못했으며, 실제 누락 시간과 금액은 기록 대조가 필요합니다."],
+    };
+  }
   if (/(?:급여|임금)\s*명세서/.test(question)
     && /못\s*받|받지\s*못|미교부|안\s*받/.test(question)
     && /입금|지급|월급|급여/.test(question)) {
@@ -299,6 +312,9 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
     policyBaseline.guardrail_status = "passed";
     const wageFallback = wageArrearsFallback(request.message, policyBaseline, ragRetrieval, hasOutOfScopePart);
     if (wageFallback) Object.assign(policyBaseline, wageFallback);
+    if (asksSplitWageInjuryActions(request.message)) {
+      policyBaseline = splitWageInjuryGuidance(request.message, policyBaseline);
+    }
   } else if (primaryScope === "labor" && evidenceState !== "not_needed") {
     const hit = evidenceState === "unavailable"
       ? "RAG_UNAVAILABLE"
