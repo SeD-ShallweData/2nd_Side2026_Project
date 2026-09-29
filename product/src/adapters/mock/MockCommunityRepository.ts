@@ -69,7 +69,7 @@ function createSeedPosts(): Map<string, StoredCommunityPost> {
     {
       post_id: "post_mock_003",
       author_id: "10000000-0000-4000-8000-000000000002",
-      author_display_name: "커뮤니티 관리자",
+      author_display_name: "플랫폼 운영 관리자",
       category: "workplace_safety",
       title: "보호구와 안전교육 여부를 확인한 경험을 나눠요",
       body: "첫 출근 전에 안전교육 일정과 보호구 지급 시점을 문의해도 괜찮았습니다.",

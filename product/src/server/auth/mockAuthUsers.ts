@@ -21,7 +21,7 @@ const MOCK_USERS: readonly MockUserEntry[] = [
   {
     user_id: "10000000-0000-4000-8000-000000000002",
     email: "admin@mock.donworry.local",
-    display_name: "커뮤니티 관리자",
+    display_name: "플랫폼 운영 관리자",
     role: "admin",
     password_environment: "MOCK_AUTH_ADMIN_PASSWORD",
   },
