@@ -316,6 +316,14 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
     if (asksSplitWageInjuryActions(request.message)) {
       policyBaseline = splitWageInjuryGuidance(request.message, policyBaseline, request);
     }
+  } else if (primaryScope === "labor" && request.contract_review) {
+    // 계약서 진단 결과를 이어 온 질문은 법령 검색이 맞지 않아도 그 결과를 근거로 답할 수 있다.
+    // 프롬프트의 "usable contract review evidence" 경로다. 근거 조문은 규칙 엔진 목록만 허용된다.
+    policyBaseline.guardrail_status = "passed";
+    policyBaseline.limitations = [
+      ...policyBaseline.limitations,
+      "계약서 진단 화면의 결과 요약을 바탕으로 설명합니다. 계약서 원문을 다시 읽지 않았으므로 실제 문구는 계약서에서 직접 확인하세요.",
+    ];
   } else if (primaryScope === "labor" && evidenceState !== "not_needed") {
     const hit = evidenceState === "unavailable"
       ? "RAG_UNAVAILABLE"
