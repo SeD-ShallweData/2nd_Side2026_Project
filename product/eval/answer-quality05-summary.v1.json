@@ -1,0 +1,436 @@
+{
+  "schema": "answer-quality05-evidence.v1",
+  "kind": "development_regression_partial",
+  "rows": 73,
+  "calls": 112,
+  "phases": {
+    "classification": 44,
+    "generation": 38,
+    "rewrite": 30
+  },
+  "providers": {
+    "upstage": 108,
+    "skt": 4
+  },
+  "http_statuses": {
+    "200": 112
+  },
+  "tokens": 395296,
+  "rag_http": 13,
+  "rag_statuses": {
+    "matched": 9,
+    "no_match": 4
+  },
+  "generation_file_prompt_match": 38,
+  "generator_finish_reasons": {
+    "stop": 38
+  },
+  "runs": [
+    {
+      "manifest": {
+        "schema": "answer-quality05-run.v1",
+        "started_at": "2026-09-29T10:20:19.690Z",
+        "candidate_head": "fd7e7d549de62ec5082f586eae1e625a2bd0c094",
+        "source_digest_sha256": "e616fad51d852bfb3109812959a1271ba0eee7feda710e33526539ba08d7fcd4",
+        "corpus_sha256": "ea1a957b38efa6957bd2e85a0146126e1b4f7ebc7556342728d94c391dea6082",
+        "acceptance_sha256": "ef77b14b53db3397add9c9d964102ebead89730b3462966273b2b95cc8964e52",
+        "node": "v25.9.0",
+        "platform": "win32",
+        "next": "16.3.5",
+        "provider": "Upstage plus two SKT comparisons",
+        "model": "solar-pro3 / A.X-K1",
+        "execution_mode": "dual_api default single; explicit compare cases",
+        "app_data_mode": "mock except real auth and conversation",
+        "database": "new tmpfs PostgreSQL 16, existing migrations only",
+        "company_data_mode": "mock",
+        "rag_mode": "sealed local BGE-M3/Chroma",
+        "feedback_storage": "off",
+        "provider_call_cap": 140,
+        "run_cap": 90,
+        "used_before": 0,
+        "provider_automatic_retry": "measure actual attempts",
+        "corpus_path": "product/eval/answer-quality05-regression.v1.json",
+        "freeze_path": "product/.runtime/answer-quality05/freeze-before.json",
+        "synthetic_only": true,
+        "runtime": "product/.runtime/answer-quality05/1790677219689-25fd8c",
+        "segment": "before",
+        "prompt_source": "product/prompts files; OPS_DATABASE_URL disabled in child env",
+        "postgres": "16.15 (Debian 16.15-1.pgdg12+2)",
+        "migration_ledger_count": 22,
+        "synthetic_firm_fk_rows": 7,
+        "build_id": "1EI5Fg7m2UyCZVrvdu7k0",
+        "finished_at": "2026-09-29T10:22:51.777Z",
+        "actual_provider_calls": 63,
+        "normal_rows": 39,
+        "planned_fault_rows": 0
+      },
+      "checkpoints": [
+        {
+          "dialog": "L",
+          "at": "L10",
+          "status": 200,
+          "source": "database",
+          "turns": 10,
+          "expected_turns": 10,
+          "memory": {
+            "summary_status": "ready",
+            "summary_version": "extractive-v4",
+            "summarized_through_sequence": 10,
+            "stored_message_count": 18,
+            "hydrated_recent_count": 8,
+            "summary_included": true,
+            "recall_fact_count": 6,
+            "legacy_recall_rebuilt": false
+          }
+        },
+        {
+          "type": "relogin_restore",
+          "conversation_id": "2639ee31-a5a8-429c-9b9e-b8989c2ba897",
+          "status": 200,
+          "source": "database",
+          "turns": 12,
+          "expected_turns": 12
+        },
+        {
+          "type": "app_restart",
+          "at": "2026-09-29T10:22:27.579Z"
+        },
+        {
+          "dialog": "L",
+          "at": "L20",
+          "status": 200,
+          "source": "database",
+          "turns": 20,
+          "expected_turns": 20,
+          "memory": {
+            "summary_status": "ready",
+            "summary_version": "extractive-v4",
+            "summarized_through_sequence": 30,
+            "stored_message_count": 38,
+            "hydrated_recent_count": 8,
+            "summary_included": true,
+            "recall_fact_count": 8,
+            "legacy_recall_rebuilt": false
+          }
+        },
+        {
+          "dialog": "L",
+          "at": "L26",
+          "status": 200,
+          "source": "database",
+          "turns": 26,
+          "expected_turns": 26,
+          "memory": {
+            "summary_status": "ready",
+            "summary_version": "extractive-v4",
+            "summarized_through_sequence": 50,
+            "stored_message_count": 50,
+            "hydrated_recent_count": 0,
+            "summary_included": true,
+            "recall_fact_count": 8,
+            "legacy_recall_rebuilt": false
+          }
+        }
+      ],
+      "cleanup": {
+        "synthetic_account_delete_200": true,
+        "tmpfs_container": "mw-aq05-1790677219697-13605e",
+        "user_data_retained_after_container_stop": false
+      },
+      "rag_assets_after": {
+        "database_files_verified": 5,
+        "manifest_sha256": "f67ceeb88695eb9f681839bee857ea00e6b8f59853981180a13df547323b30d0",
+        "model_files_verified": 10,
+        "model_snapshot": "C:\\Users\\jcu03\\Desktop\\2nd_Side2026_Project\\product\\integrations\\rag-api\\.cache\\huggingface\\hub\\models--BAAI--bge-m3\\snapshots\\5617a9f61b028005a4858fdac845db406aefb181",
+        "ok": true,
+        "seal_verified": true
+      }
+    },
+    {
+      "manifest": {
+        "schema": "answer-quality05-run.v1",
+        "started_at": "2026-09-29T10:43:08.567Z",
+        "candidate_head": "fd7e7d549de62ec5082f586eae1e625a2bd0c094",
+        "source_digest_sha256": "b868070d5fc99108002963ebf31b4602f2d9934827ef031f89d5bc6e139efa4c",
+        "corpus_sha256": "ea1a957b38efa6957bd2e85a0146126e1b4f7ebc7556342728d94c391dea6082",
+        "acceptance_sha256": "ef77b14b53db3397add9c9d964102ebead89730b3462966273b2b95cc8964e52",
+        "node": "v25.9.0",
+        "platform": "win32",
+        "next": "16.3.5",
+        "provider": "Upstage plus two SKT comparisons",
+        "model": "solar-pro3 / A.X-K1",
+        "execution_mode": "dual_api default single; explicit compare cases",
+        "app_data_mode": "mock except real auth and conversation",
+        "database": "new tmpfs PostgreSQL 16, existing migrations only",
+        "company_data_mode": "mock",
+        "rag_mode": "sealed local BGE-M3/Chroma",
+        "feedback_storage": "off",
+        "provider_call_cap": 140,
+        "run_cap": 50,
+        "used_before": 63,
+        "provider_automatic_retry": "measure actual attempts",
+        "corpus_path": "product/eval/answer-quality05-regression.v1.json",
+        "freeze_path": "product/.runtime/answer-quality05/freeze-after.json",
+        "synthetic_only": true,
+        "runtime": "product/.runtime/answer-quality05/1790678588566-3d035d",
+        "segment": "after",
+        "prompt_source": "product/prompts files; OPS_DATABASE_URL disabled in child env",
+        "postgres": "16.15 (Debian 16.15-1.pgdg12+2)",
+        "migration_ledger_count": 22,
+        "synthetic_firm_fk_rows": 7,
+        "build_id": "pFBWUKgID6B4uAXs7kjtz",
+        "finished_at": "2026-09-29T10:44:53.082Z",
+        "actual_provider_calls": 47,
+        "normal_rows": 28,
+        "planned_fault_rows": 0
+      },
+      "checkpoints": [
+        {
+          "dialog": "L",
+          "at": "L10",
+          "status": 200,
+          "source": "database",
+          "turns": 10,
+          "expected_turns": 10,
+          "memory": {
+            "summary_status": "ready",
+            "summary_version": "extractive-v4",
+            "summarized_through_sequence": 10,
+            "stored_message_count": 18,
+            "hydrated_recent_count": 8,
+            "summary_included": true,
+            "recall_fact_count": 7,
+            "legacy_recall_rebuilt": false
+          }
+        },
+        {
+          "type": "relogin_restore",
+          "conversation_id": "d2700d01-61bb-4819-964d-829d875171ac",
+          "status": 200,
+          "source": "database",
+          "turns": 12,
+          "expected_turns": 12
+        },
+        {
+          "type": "app_restart",
+          "at": "2026-09-29T10:44:29.559Z"
+        },
+        {
+          "dialog": "L",
+          "at": "L20",
+          "status": 200,
+          "source": "database",
+          "turns": 20,
+          "expected_turns": 20,
+          "memory": {
+            "summary_status": "ready",
+            "summary_version": "extractive-v4",
+            "summarized_through_sequence": 30,
+            "stored_message_count": 38,
+            "hydrated_recent_count": 8,
+            "summary_included": true,
+            "recall_fact_count": 9,
+            "legacy_recall_rebuilt": false
+          }
+        },
+        {
+          "dialog": "L",
+          "at": "L26",
+          "status": 200,
+          "source": "database",
+          "turns": 26,
+          "expected_turns": 26,
+          "memory": {
+            "summary_status": "ready",
+            "summary_version": "extractive-v4",
+            "summarized_through_sequence": 50,
+            "stored_message_count": 50,
+            "hydrated_recent_count": 0,
+            "summary_included": true,
+            "recall_fact_count": 9,
+            "legacy_recall_rebuilt": false
+          }
+        }
+      ],
+      "cleanup": {
+        "synthetic_account_delete_200": true,
+        "tmpfs_container": "mw-aq05-1790678588576-b22ce9",
+        "user_data_retained_after_container_stop": false
+      },
+      "rag_assets_after": {
+        "database_files_verified": 5,
+        "manifest_sha256": "f67ceeb88695eb9f681839bee857ea00e6b8f59853981180a13df547323b30d0",
+        "model_files_verified": 10,
+        "model_snapshot": "C:\\Users\\jcu03\\Desktop\\2nd_Side2026_Project\\product\\integrations\\rag-api\\.cache\\huggingface\\hub\\models--BAAI--bge-m3\\snapshots\\5617a9f61b028005a4858fdac845db406aefb181",
+        "ok": true,
+        "seal_verified": true
+      }
+    },
+    {
+      "manifest": {
+        "schema": "answer-quality05-run.v1",
+        "started_at": "2026-09-29T10:53:04.067Z",
+        "candidate_head": "fd7e7d549de62ec5082f586eae1e625a2bd0c094",
+        "source_digest_sha256": "ea240942f0d57a4e9c9c50ee2a203d57b807869a38161f6838ad6b86b4b42445",
+        "corpus_sha256": "9fabd8416edebe5c3c050f821ad46e210a3f9fb0d06af16829253ae958f0571c",
+        "acceptance_sha256": "ef77b14b53db3397add9c9d964102ebead89730b3462966273b2b95cc8964e52",
+        "node": "v25.9.0",
+        "platform": "win32",
+        "next": "16.3.5",
+        "provider": "Upstage plus two SKT comparisons",
+        "model": "solar-pro3 / A.X-K1",
+        "execution_mode": "dual_api default single; explicit compare cases",
+        "app_data_mode": "mock except real auth and conversation",
+        "database": "new tmpfs PostgreSQL 16, existing migrations only",
+        "company_data_mode": "mock",
+        "rag_mode": "sealed local BGE-M3/Chroma",
+        "feedback_storage": "off",
+        "provider_call_cap": 140,
+        "run_cap": 3,
+        "used_before": 110,
+        "provider_automatic_retry": "measure actual attempts",
+        "corpus_path": "product/eval/answer-quality05-focused.v1.json",
+        "freeze_path": "product/.runtime/answer-quality05/freeze-final.json",
+        "synthetic_only": true,
+        "runtime": "product/.runtime/answer-quality05/1790679184067-525de1",
+        "segment": "after",
+        "prompt_source": "product/prompts files; OPS_DATABASE_URL disabled in child env",
+        "postgres": "16.15 (Debian 16.15-1.pgdg12+2)",
+        "migration_ledger_count": 22,
+        "synthetic_firm_fk_rows": 7,
+        "build_id": "rnqLVKVXOuwLBtms_f2AO",
+        "finished_at": "2026-09-29T10:54:10.202Z",
+        "actual_provider_calls": 2,
+        "normal_rows": 6,
+        "planned_fault_rows": 0
+      },
+      "checkpoints": [
+        {
+          "dialog": "F",
+          "at": "L01",
+          "status": 200,
+          "source": "database",
+          "turns": 1,
+          "expected_turns": 1,
+          "memory": {
+            "summary_status": "absent",
+            "summary_version": null,
+            "summarized_through_sequence": 0,
+            "stored_message_count": 0,
+            "hydrated_recent_count": 0,
+            "summary_included": false,
+            "recall_fact_count": 0,
+            "legacy_recall_rebuilt": false
+          }
+        },
+        {
+          "dialog": "F",
+          "at": "L03",
+          "status": 200,
+          "source": "database",
+          "turns": 2,
+          "expected_turns": 2,
+          "memory": {
+            "summary_status": "absent",
+            "summary_version": null,
+            "summarized_through_sequence": 0,
+            "stored_message_count": 2,
+            "hydrated_recent_count": 2,
+            "summary_included": false,
+            "recall_fact_count": 2,
+            "legacy_recall_rebuilt": false
+          }
+        },
+        {
+          "dialog": "F",
+          "at": "L05",
+          "status": 200,
+          "source": "database",
+          "turns": 3,
+          "expected_turns": 3,
+          "memory": {
+            "summary_status": "absent",
+            "summary_version": null,
+            "summarized_through_sequence": 0,
+            "stored_message_count": 4,
+            "hydrated_recent_count": 4,
+            "summary_included": false,
+            "recall_fact_count": 4,
+            "legacy_recall_rebuilt": false
+          }
+        },
+        {
+          "dialog": "F",
+          "at": "L07",
+          "status": 200,
+          "source": "database",
+          "turns": 4,
+          "expected_turns": 4,
+          "memory": {
+            "summary_status": "absent",
+            "summary_version": null,
+            "summarized_through_sequence": 0,
+            "stored_message_count": 6,
+            "hydrated_recent_count": 6,
+            "summary_included": false,
+            "recall_fact_count": 5,
+            "legacy_recall_rebuilt": false
+          }
+        },
+        {
+          "dialog": "F",
+          "at": "L08",
+          "status": 200,
+          "source": "database",
+          "turns": 5,
+          "expected_turns": 5,
+          "memory": {
+            "summary_status": "absent",
+            "summary_version": null,
+            "summarized_through_sequence": 0,
+            "stored_message_count": 8,
+            "hydrated_recent_count": 8,
+            "summary_included": false,
+            "recall_fact_count": 5,
+            "legacy_recall_rebuilt": false
+          }
+        },
+        {
+          "type": "app_restart",
+          "at": "2026-09-29T10:54:01.303Z"
+        },
+        {
+          "dialog": "F",
+          "at": "L17",
+          "status": 200,
+          "source": "database",
+          "turns": 6,
+          "expected_turns": 6,
+          "memory": {
+            "summary_status": "ready",
+            "summary_version": "extractive-v4",
+            "summarized_through_sequence": 10,
+            "stored_message_count": 10,
+            "hydrated_recent_count": 0,
+            "summary_included": true,
+            "recall_fact_count": 7,
+            "legacy_recall_rebuilt": false
+          }
+        }
+      ],
+      "cleanup": {
+        "synthetic_account_delete_200": false,
+        "tmpfs_container": "mw-aq05-1790679184078-9a3237",
+        "user_data_retained_after_container_stop": false
+      },
+      "rag_assets_after": {
+        "database_files_verified": 5,
+        "manifest_sha256": "f67ceeb88695eb9f681839bee857ea00e6b8f59853981180a13df547323b30d0",
+        "model_files_verified": 10,
+        "model_snapshot": "C:\\Users\\jcu03\\Desktop\\2nd_Side2026_Project\\product\\integrations\\rag-api\\.cache\\huggingface\\hub\\models--BAAI--bge-m3\\snapshots\\5617a9f61b028005a4858fdac845db406aefb181",
+        "ok": true,
+        "seal_verified": true
+      }
+    }
+  ]
+}

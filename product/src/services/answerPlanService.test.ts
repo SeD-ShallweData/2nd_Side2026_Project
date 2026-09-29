@@ -6,6 +6,12 @@ const REQUEST = { chat_mode: "wage" as const, recent_messages: [] };
 const UNCLEAR = { intent: "unclear" as const, topic: "other" as const, company_scope: "not_applicable" as const, status: "classified" as const };
 
 describe("Answer Plan", () => {
+  it("routes a split wage and ankle next-action request despite uncertain classification", () => {
+    const message = "마지막으로 새봄서비스 임금 문제에 대한 다음 행동과 푸른건설 발목 문제의 우선 행동을 나눠 근거 범위를 표시해 주세요.";
+    const plan = createAnswerPlan({ ...REQUEST, message }, UNCLEAR);
+    expect(plan.parts[0].scope).toBe("labor");
+    expect(plan.requires_clarification).toBe(false);
+  });
   it("routes ordinary unpaid-wage paraphrases to labor even when classification is unclear", () => {
     for (const message of [
       "월급이 두 달 밀렸는데 무엇부터 해야 하나요?",

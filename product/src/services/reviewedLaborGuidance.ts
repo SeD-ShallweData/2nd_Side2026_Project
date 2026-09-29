@@ -6,9 +6,10 @@ import { asksNextAction, asksWageDocumentUse } from "@/services/chatQuestionPurp
  * Revalidate on law/procedure changes. Provenance and review boundaries: followup-02.md.
  */
 export const LABOR_REVIEW_DATE = "2026-09-21";
-type Topic = "night" | "overtime" | "filing" | "certificate" | "payment";
+type Topic = "night" | "overtime" | "filing" | "certificate" | "payment" | "payslip";
 const PORTAL = "https://labor.moel.go.kr/minwonSysInfo/wagesolway.do";
 const GUIDE = "고용노동부 노동포털 「체불임금 해결 방법」";
+const PAYSLIP_GUIDE = "고용노동부 「임금명세서 교부 의무」";
 
 /** Timing/recordkeeping intent, not a claim that retirement or agreement occurred. */
 export function isPaymentTimingQuestion(query: string): boolean {
@@ -100,6 +101,7 @@ function nightWorkSize(query: string): "under_five" | "five_plus" | "unknown" {
 
 export function reviewedLaborTopics(query: string): Topic[] {
   const topics: Topic[] = [];
+  if (/(?:급여|임금)\s*명세서/.test(query) && /받지\s*못|못\s*받|미교부|요청|달라고|항목|공제|계산방법/.test(query)) topics.push("payslip");
   if (isPaymentTimingQuestion(query)) topics.push("payment");
   if (/야간|야근|(?:22\s*시|23\s*시|밤\s*(?:10|11|열|열한)\s*시|오후\s*(?:10|11)\s*시)/.test(query)
     && /근로|근무|수당|가산|일하|시키|퇴근|임금|야근/.test(query)) topics.push("night");
@@ -122,6 +124,10 @@ function document(citation: string, content: string, url: string): RagDocument {
 }
 
 function documents(topic: Topic): RagDocument[] {
+  if (topic === "payslip") return [
+    { ...document(`${PAYSLIP_GUIDE} (근로기준법 제48조)`, "근로기준법 제48조 제2항에 따라 임금 지급 시 구성항목·계산방법·공제내역 등이 적힌 임금명세서를 서면 또는 전자문서로 교부한다. 명세서 교부 의무의 근거는 제43조가 아니다. 이하 서비스의 사실 구분·기록 제안: 명세서를 받지 못했다는 사실만으로 임금이 미지급됐다고 단정하지 않는다. 요청 일시·회신과 실제 입금·근무 기록을 보관하고 구성항목·계산방법·공제내역을 회사에 확인한다.", "https://moel.go.kr/news/cardinfo/view.do?bbs_seq=20260800279"),
+      source: { name:`${PAYSLIP_GUIDE} (근로기준법 제48조)`,citation:PAYSLIP_GUIDE,category:"labor_law",url:"https://moel.go.kr/news/cardinfo/view.do?bbs_seq=20260800279",as_of:"2026-09-29",document_id:"reviewed-20260929:payslip" } },
+  ];
   if (topic === "payment") return [
     document("근로기준법 제43조", "재직 중 정기 임금은 원칙적으로 매월 1회 이상 정한 날짜에 전액 지급한다. 임시 임금 등 법정 예외는 별도로 확인한다. 회사가 일방적으로 다음 지급을 약속한 날은 기존 정기 지급일과 구별한다.", "https://www.law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1029729647"),
     document("근로기준법 제36조", "사망 또는 퇴직한 근로자의 금품 청산에 적용한다. 원칙적 14일은 그 지급 사유(사망·퇴직) 발생 때부터다. 특별한 사정이 있으면 당사자 사이의 합의로 기일을 연장할 수 있다. 회사의 일방적 지급 약속은 연장 합의가 아니며 약속일에서 새 14일을 세지 않는다. 퇴직·사망 사실이 없으면 이 청산기한을 현재 사안에 적용하지 않는다.", "https://www.law.go.kr/LSW/lsSideInfoP.do?docCls=jo&joBrNo=00&joNo=0036&lsiSeq=283457&urlMode=lsScJoRltInfoR"),
@@ -146,6 +152,7 @@ function documents(topic: Topic): RagDocument[] {
   ];
   return [
     document(GUIDE, "임금체불 진정은 고용노동부 노동포털에서 온라인 신청하거나 사업장 소재지 관할 고용노동관서를 방문하여 접수한다. 전화 상담과 진정서 접수는 별개다. 근로계약서, 급여명세서, 입금·근무 기록 등 지급일과 미지급 내역을 확인할 자료를 정리한다.", PORTAL),
+    document("고용노동부 빠른인터넷상담 「임금체불 진정 입증자료 안내」", "입증자료는 사실관계 확인에 도움이 되지만 계약서·명세서·입금 내역을 모두 갖춰야만 진정 가능한 것은 아니다. 별도 증빙이 어려우면 진정 후 담당 감독관 조사에서 확인할 수 있다.", "https://www.moel.go.kr/minwon/fastcounsel/fastcounselView.do?inetDcssMngId=202207131221236051000"),
     document("고용노동부 「고용노동부 고객상담센터 1350」", "1350은 고용노동 분야 전화 상담·안내 창구다. 전화 상담만으로 정식 진정서가 제출·접수된 것으로 안내하지 않는다.", "https://www.moel.go.kr/news/cardinfo/view.do?bbs_seq=20250900032"),
   ];
 }
@@ -165,6 +172,7 @@ export function reviewedLaborFallback(query: string, baseline: ChatResponse): Ch
   const retrieval = reviewedLaborRetrieval(query);
   if (!retrieval) return null;
   const paragraphs = reviewedLaborTopics(query).map((topic) => {
+    if (topic === "payslip") return `회사에 임금명세서의 구성항목·계산방법·공제내역을 서면이나 전자문서로 요청하고, 요청 일시와 회신을 보관하세요. 임금 지급 시 명세서 교부 의무는 근로기준법 제48조 제2항에 따른 것입니다(${PAYSLIP_GUIDE}). 실제 입금액·지급일은 거래내역으로, 근무시간은 출퇴근·근무표로 각각 대조하세요. 명세서가 없다는 사실만으로 임금 미지급을 확정하지 않습니다.`;
     if (topic === "payment") return paymentTimingAnswer(query);
     if (topic === "night") return [
       `${/(?:22\s*시|10\s*시|열\s*시)까지/.test(query) ? "22시까지 일하고 바로 종료했다면 그 사실만으로 야간근로가 되는 것은 아닙니다. " : ""}야간근로는 22시부터 다음 날 6시 사이의 실제 근로이며, 22시 이후 일한 시간이 있는지 구분해야 합니다(근로기준법 제56조).`,
@@ -177,7 +185,8 @@ export function reviewedLaborFallback(query: string, baseline: ChatResponse): Ch
       `먼저 미지급 임금·지급일과 근로계약서·급여명세서·입금내역을 정리해 노동포털 온라인 진정 또는 관할 고용노동관서 방문으로 접수하세요. 조사·확인 후 담당 근로감독관에게 사용 목적을 알리고 확인서 발급을 신청합니다. 이미 조사를 받았다면 새 진정부터 반복하기보다 담당자에게 발급 가능 여부를 확인하세요(${GUIDE}).`,
       `발급받은 뒤 대지급금 청구는 근로복지공단, 법률구조·소송은 대한법률구조공단 등 해당 절차로 이어집니다. 확인서 발급이 곧 지급 확정은 아니며 각 제도의 자격·기한·지급요건은 별도 확인이 필요합니다(${GUIDE}).`,
     ].join("\n\n");
-    return `${/지표|긍정|신호/.test(query) ? "납부·고용 지표는 실제 임금 지급이나 과거 체불 부재를 증명하지 않습니다. 미지급 사실은 지표와 별개로 지급일과 입금내역을 대조해야 합니다.\n\n" : ""}1350은 전화 상담·안내 창구이며, 전화 상담만으로 임금체불 진정서가 정식 접수되는 것은 아닙니다(고용노동부 「고용노동부 고객상담센터 1350」).\n\n진정은 고용노동부 노동포털에서 온라인으로 신청하거나 사업장 소재지 관할 고용노동관서를 방문해 접수하세요. 지급일·미지급 내역과 근로계약서·급여명세서·입금·근무 기록을 정리하고, 접수 후 담당자의 조사 안내를 확인하세요(${GUIDE}).`;
+    const documentUse = asksWageDocumentUse(query) ? "보유한 계약서 사본에서 약정 임금·지급일·근로시간을 확인하세요. 통장 사본만으로 거래내역을 보유했다고 추정하지 말고, 실제 입금 날짜·금액은 은행 거래내역으로 별도 확인하세요. 명세서를 받지 못했다면 구성항목·계산방법·공제내역을 요청하고 요청 기록을 남기세요. 이는 자료 대조 제안이며 서류를 모두 갖춰야만 진정할 수 있다는 뜻은 아닙니다.\n\n" : "";
+    return `${documentUse}${/지표|긍정|신호/.test(query) ? "납부·고용 지표는 실제 임금 지급이나 과거 체불 부재를 증명하지 않습니다. 미지급 사실은 지표와 별개로 지급일과 입금내역을 대조해야 합니다.\n\n" : ""}1350은 전화 상담·안내 창구이며, 전화 상담만으로 임금체불 진정서가 정식 접수되는 것은 아닙니다(고용노동부 「고용노동부 고객상담센터 1350」).\n\n진정은 고용노동부 노동포털에서 온라인으로 신청하거나 사업장 소재지 관할 고용노동관서를 방문해 접수하세요. 지급일·미지급 내역과 근로계약서·급여명세서·입금·근무 기록을 정리하고, 접수 후 담당자의 조사 안내를 확인하세요(${GUIDE}).`;
   });
   return { ...baseline, answer: paragraphs.join("\n\n"), answer_type: "general_guidance",
     sources: retrieval.documents.map((doc) => doc.source), guardrail_status: "limited",
@@ -194,7 +203,9 @@ export function applicabilityGuardrailHits(query: string, answer: string): strin
   for (const topic of reviewedLaborTopics(query)) {
     if (topic === "payment") continue;
     const size = nightWorkSize(query);
-    const requirements = topic === "night"
+    const requirements = topic === "payslip"
+      ? [/명세서/, /요청/, /공제|계산방법|계산\s*내역/, /입금|거래/]
+      : topic === "night"
       ? [/(?:22\s*시|10\s*시|열\s*시)/, /(?:6\s*시|여섯\s*시)/, /(?:5|다섯)\s*(?:명|인)/,
         ...(size === "under_five" ? [/적용(?:되지|하지|\s*제외)|의무.{0,8}없/, /약정|계약|취업규칙/] : [/50\s*%|100분의\s*50/]),
         ...(size === "unknown" ? [/상시[^.\n]{0,45}(?:확인|몇\s*명)|(?:몇\s*명|확인)[^.\n]{0,30}상시/] : []),
@@ -207,6 +218,8 @@ export function applicabilityGuardrailHits(query: string, answer: string): strin
         : [/1350/, /상담/, /노동포털/, /진정/, /관할|고용노동관서/];
     if (requirements.some((pattern) => !pattern.test(text))) hits.push(`APPLICABILITY_${topic.toUpperCase()}_CONDITIONS`);
   }
+  if (reviewedLaborTopics(query).includes("payslip") && text.split(/[.!?。\n]/).some(sentence =>
+    /명세서/.test(sentence) && /제?\s*43\s*조/.test(sentence) && !/제?\s*48\s*조/.test(sentence))) hits.push("PAYSLIP_WRONG_LEGAL_BASIS");
   if (/(?:22\s*시|10\s*시|열\s*시)까지[^.\n]{0,50}(?:야간근로(?:에\s*해당합니다|입니다|로\s*분류됩니다)|야간\s*수당을\s*(?:지급해야|받을\s*수\s*있))/.test(text)) hits.push("NIGHT_END_TIME_CONFUSION");
   if (/(?:5\s*(?:명|인)\s*미만|4\s*(?:명|인)(?:\s*이하)?)[^.\n]{0,60}(?:법정|법적)[^.\n]{0,45}(?:의무가\s*(?:있|적용)|반드시\s*지급|적용됩니다)/.test(text)) hits.push("SMALL_WORKPLACE_PREMIUM_CONFUSION");
   const hotlineFiling = text.split(/[.!?。\n]/).some((sentence) => {

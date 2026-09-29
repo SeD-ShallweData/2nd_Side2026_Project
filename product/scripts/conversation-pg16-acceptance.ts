@@ -294,6 +294,45 @@ try {
     assert((await repository.findConversation(id))!.turns.every((turn) => turn.company_id === null));
     assert.equal((await owner.query("SELECT * FROM conversation_company_events WHERE conversation_id=$1 AND event_kind='manual'", [id])).rowCount, 3);
   });
+  await check("answer-quality-02-corrections-and-partial-payment", async () => {
+    // Real conversation FKs with the matching public Mock display names. The
+    // acceptance-A/B rows above are not part of the Mock company catalog.
+    await owner.query("INSERT INTO firms(firm_id,name,biz_no) VALUES ('UNKNOWN_WAGE_001','새봄서비스','synthetic-aq02-wage'),('UNKNOWN_SAFETY_001','푸른건설','synthetic-aq02-safety')");
+    const turns: Array<[string, string]> = [
+      ["UNKNOWN_WAGE_001", "새봄서비스에서 일했고 지난달 12일에 퇴사했습니다."],
+      ["UNKNOWN_WAGE_001", "정정합니다. 새봄서비스를 그만둔 날은 지난달 12일이 아니라 19일입니다."],
+      ["UNKNOWN_SAFETY_001", "푸른건설의 하루 근무시간은 9시간입니다."],
+      ["UNKNOWN_SAFETY_001", "정정합니다. 푸른건설의 하루 근무시간은 9시간이 아니라 5시간입니다."],
+      ["UNKNOWN_SAFETY_001", "푸른건설 일터가 아니라 퇴근 뒤 집 계단에서 넘어졌습니다."],
+      ["UNKNOWN_WAGE_001", "새봄서비스에서 미지급 임금 100만 원 중 70만 원이 입금됐습니다. 나머지는 아직입니다."],
+    ];
+    for (let i = 6; i < 12; i++) turns.push([i % 2 ? "UNKNOWN_WAGE_001" : "UNKNOWN_SAFETY_001", `합성 상담 주제 전환 ${i}입니다.`]);
+    let id: string | undefined;
+    for (const [company_id, message] of turns) {
+      const key = randomUUID();
+      const claimed = await repository.claimRequest({ owner_user_id: user.user_id, conversation_id: id,
+        request_id: key, company_id, user_message: message });
+      id = claimed.conversation_id;
+      requestLeases.set(`${user.user_id}:${key}`, claimed.lease_token!);
+      await repository.completeRequest({ ...completed(id, key, message), company_id });
+      await maybeUpdateConversationSummary((await repository.findConversation(id))!);
+    }
+    const hydrated = await hydrateConversationRequest({ conversation_id: id,
+      company_id: "UNKNOWN_SAFETY_001", message: "새봄서비스의 미지급 잔액은 얼마인가요?", chat_mode: "wage", recent_messages: [] }, user);
+    assert.equal(hydrated.conversation_recall?.diagnostics.summarized_through_sequence, 20);
+    const balance = recallAnswer(hydrated); assert(balance, "BALANCE_RECALL_MISSING");
+    assert.match(balance.answer, /남은 금액 30만 원/);
+    const accident = recallAnswer({ ...hydrated, message: "푸른건설의 근무시간과 사고 장소를 정리해 주세요." });
+    assert(accident, "ACCIDENT_RECALL_MISSING");
+    assert.match(accident.answer,
+      /하루 5시간.*퇴근 뒤 집 계단/);
+    const resignation = recallAnswer({ ...hydrated, message: "새봄서비스의 퇴사일은 언제인가요?" });
+    assert(resignation, "RESIGNATION_RECALL_MISSING");
+    assert.match(resignation.answer, /지난달 19일/);
+    assert.match(hydrated.conversation_memory!.content, /미지급 잔액=100만 원 중 70만 원 입금, 남은 금액 30만 원/);
+    await assert.rejects(hydrateConversationRequest({ conversation_id: id, message: "새봄서비스의 미지급 잔액은?",
+      chat_mode: "wage", recent_messages: [] }, other), { code: "CONVERSATION_NOT_FOUND" });
+  });
   await check("http-login-app-restart-restore-continue-summary", async () => {
     await startApp();
     let cookie = (await http("/api/auth/login", "", { email, password })).cookie; assert(cookie);
