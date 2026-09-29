@@ -18,15 +18,15 @@ const PUBLIC_HEALTH_PATHS = new Set([
 /*
  * 화면이 브라우저 문맥 없이 직접 여는 /api/ 경로.
  *
- * WorksiteTipPage.tsx:182 가 첨부 사진을 두 가지로 연다
+ * WorksiteTipPage.tsx:191 가 첨부 사진을 두 가지로 연다
  *   <img src={content_url}>                         — 서브리소스
  *   <a href={content_url} target="_blank" rel="noreferrer">  — 새 탭 이동
  *
  * rel="noreferrer" 라 Referer 보루가 듣지 않는다. 경로 모양은
- * worksiteTipService.ts:555 가 만든다:
+ * worksiteTipService.ts:557 가 만든다:
  *   /api/worksite-tips/{tipId}/attachments/{attachmentId}
  *
- * 이 경로는 requireInspectorRequest 로 이미 인가 게이트 뒤에 있으므로
+ * 이 경로는 requireWorksiteTipReviewerRequest 로 이미 인가 게이트 뒤에 있으므로
  * 아래 문맥 검사에서 빼도 노출이 늘지 않는다.
  */
 const ATTACHMENT_PATH = /^\/api\/worksite-tips\/[^/]+\/attachments\/[^/]+$/;

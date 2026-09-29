@@ -16,16 +16,24 @@
 | 동작 | 비로그인 | `user` | `admin` | `inspector` |
 | --- | --- | --- | --- | --- |
 | 제보 접수 | 불가 | 가능 | 불가 | 불가 |
-| 목록 조회 | 불가 | 불가 | 가능 | 불가 |
-| 상세 조회 | 불가 | 불가 | 가능 | 불가 |
-| 사진 조회 | 불가 | 불가 | 가능 | 불가 |
+| 목록 조회 | 불가 | 불가 | 불가 | 가능 |
+| 상세 조회 | 불가 | 불가 | 불가 | 가능 |
+| 사진 조회 | 불가 | 불가 | 불가 | 가능 |
 
-> 2026-09-17 변경: 제보 열람 권한이 `inspector` 에서 `admin` 으로 옮겨졌다.
-> 제보 열람 화면(`/worksite-tips` 의 감독 화면)은 배치 현황·ML 대시보드와 같은
-> `/inspector` 영역에 있고, 그 영역은 모델 재학습 상태를 다루는 플랫폼 운영
-> 기능이다. 근로감독관 계정(고용노동부·사업장 노무 담당자용)이 운영 기능을
-> 여는 것은 역할과 맞지 않아 운영 권한인 `admin` 으로 잠갔다.
-> `users.auth_role` 의 `inspector` 값은 제약조건에 그대로 남아 있다.
+> 2026-09-29 변경: 제보 열람 권한을 `inspector` 로 되돌린다. 제보 확인은
+> 근로감독관의 일이고, 제보자는 "근로감독관 확인용"이라는 고지를 보고 제출한다.
+> `admin`(플랫폼 운영)은 배치·모델·프롬프트 운영을 맡고 제보를 열람하지 않는다.
+> 서버 경계는 `server/auth/inspectorAccess.ts` 의 `WORKSITE_TIP_REVIEW_ROLES` 한 곳이며
+> route(`requireWorksiteTipReviewerRequest`)와 service 가 같은 값을 쓴다.
+> `/worksite-tips` 화면도 같은 규칙으로 `inspector` 에게만 목록을 보여 주고
+> `admin` 에게는 "현장 신고 대상이 아닙니다" 안내만 보여 준다.
+>
+> 이전 기록(2026-09-17): 제보 열람 권한을 `inspector` 에서 `admin` 으로 옮겼다가
+> 2026-09-19 에 감독 업무를 `inspector`·`admin` 공용으로 다시 열었다. 이번 변경으로
+> 제보 열람만 `inspector` 전용이 된다.
+>
+> DB 계정 `wg_tip` 의 권한(`worksite_tips`·`worksite_tip_attachments` SELECT·INSERT)은
+> 앱 역할과 무관하므로 바뀌지 않는다.
 
 제보자는 접수 성공 영수증만 받는다. 현재 범위에는 본인 제보 목록·수정·삭제·철회와 처리 상태 변경이
 포함되지 않는다. 최초 상태는 `received`(접수완료)이며, `in_progress`(처리중)와
@@ -97,7 +105,7 @@
 감독관용 사본의 실제 크기이므로 서로 다를 수 있다. 원본은 API로 제공하지 않으며 서비스 계정만 읽을 수 있는
 별도 경로에 보존한다. 감독관용 사본에는 EXIF 위치·촬영시각·기기정보와 XMP·IPTC를 포함하지 않는다.
 
-사진 URL도 세션의 `admin` 권한을 다시 확인한다. URL의 제보 ID와 사진 ID가 실제 부모·자식 관계가
+사진 URL도 세션의 `inspector` 권한을 다시 확인한다. URL의 제보 ID와 사진 ID가 실제 부모·자식 관계가
 아니면 `404`를 반환한다.
 
 ## 6. 오류 계약
@@ -106,7 +114,7 @@
 | --- | --- | --- |
 | `400` | `VALIDATION_ERROR`, `INVALID_MULTIPART`, `INVALID_IMAGE_FILE` | 입력·파일 형식 오류 |
 | `401` | `AUTHENTICATION_REQUIRED` | 비로그인 사용자의 제보 접수 |
-| `403` | `FORBIDDEN`, `CROSS_SITE_REQUEST_REJECTED` | 감독관 외 조회, 역할 또는 요청 출처 오류 |
+| `403` | `FORBIDDEN`, `CROSS_SITE_REQUEST_REJECTED` | 근로감독관 외(운영 관리자 포함) 조회, 역할 또는 요청 출처 오류 |
 | `404` | `COMPANY_NOT_FOUND`, `WORKSITE_TIP_NOT_FOUND`, `WORKSITE_TIP_ATTACHMENT_NOT_FOUND` | 대상 없음 |
 | `413` | `REQUEST_BODY_TOO_LARGE`, `SANITIZED_IMAGE_TOO_LARGE` | 사진·요청 또는 정제 사본 크기 초과 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | multipart가 아니거나 지원하지 않는 사진 형식 |
