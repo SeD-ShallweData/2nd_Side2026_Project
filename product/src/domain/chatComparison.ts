@@ -109,6 +109,8 @@ export interface ComparisonContext {
     size_label: string | null;
     risk: CompanyRiskResult;
   };
+  /** Public cards resolved from owner-checked history for an explicit comparison. */
+  companyContexts?: NonNullable<ComparisonContext["companyContext"]>[];
   ragRetrieval: RagRetrievalResult;
   /** Internal routing contract. It is never returned as a user-facing answer. */
   answerPlan?: AnswerPlan;

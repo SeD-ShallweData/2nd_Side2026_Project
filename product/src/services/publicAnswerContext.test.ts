@@ -16,6 +16,8 @@ describe("public answer context and indicator interpretation", () => {
     const risk = MOCK_RISKS.COMPANY_DEMO_008;
     const dto = companySignalForAnswer(risk);
     expect(dto.wage_signal.display_label).toBe(getWageStatusMeta(risk.wage_risk.level).label);
+    expect(companySignalForAnswer(MOCK_RISKS.COMPANY_DEMO_001).wage_signal.display_label).toBe("추가 확인 필요");
+    expect(companySignalForAnswer(MOCK_RISKS.COMPANY_DEMO_001).safety_context.display_label).toBe("우선 확인 필요");
     expect(dto.safety_context.display_label).toBe(getSignalStatusLabel(risk.safety_context.level));
     expect(dto.safety_context.display_label).toBe("안전 신호 미확인");
     expect(dto.safety_context.scope).toBe("region_industry");

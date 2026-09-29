@@ -34,7 +34,7 @@ export interface ConversationRecallContext {
   facts: ConversationRecallFact[];
   document_statements?: ConversationDocumentStatement[];
   /** Server-resolved display names for owned-history/current-selection IDs. */
-  companies?: Array<{ company_id: string; company_name: string }>;
+  companies?: Array<{ company_id: string; company_name: string; region?: string | null; address?: string | null }>;
   /** Server-hydrated public display names from owned turns, never client supplied. */
   company_history: Array<{
     company_id: string;

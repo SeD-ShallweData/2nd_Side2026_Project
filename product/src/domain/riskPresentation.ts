@@ -7,6 +7,11 @@ export const SIGNAL_STATUS_META: Record<SignalLevel, { label: string; className:
   unknown: { label: "분석 자료 부족", className: "status-unknown" },
 };
 
+const WAGE_STATUS_META: Record<SignalLevel, { label: string; className: string }> = {
+  ...SIGNAL_STATUS_META,
+  watch: { label: "추가 확인 필요", className: "status-watch" },
+};
+
 export const EXCLUDED_VERDICT_META: Record<Extract<WageVerdict, `배제_${string}`>, { label: string; className: string }> = {
   "배제_임금체불공개": { label: "임금체불 공개 명단", className: "status-review-wage" },
   "배제_공개체납": { label: "공개 체납", className: "status-review-tax" },
@@ -17,7 +22,7 @@ export function getWageStatusMeta(level: SignalLevel, verdict?: WageVerdict | nu
   if (verdict && verdict in EXCLUDED_VERDICT_META) {
     return EXCLUDED_VERDICT_META[verdict as keyof typeof EXCLUDED_VERDICT_META];
   }
-  return SIGNAL_STATUS_META[level];
+  return WAGE_STATUS_META[level];
 }
 
 /** 실제 공개 명단 연계 결과로 표시하는 임금 지표다. */

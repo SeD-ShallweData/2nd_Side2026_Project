@@ -28,8 +28,10 @@ import { generationHistoryMessage } from "@/services/generationHistory";
 import { asksWageDocumentUse } from "@/services/chatQuestionPurpose";
 import { documentStatusFromStatements } from "@/services/conversationDocumentStatus";
 import { mentionedCompanies } from "@/services/conversationCompanyScope";
+import { referencedCompanyIds } from "@/services/companyAnswerScope";
+import { companyAnswerGuardrailHits } from "@/services/companyAnswerGuardrails";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-29-v16";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-29-v17";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -69,7 +71,9 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
   );
   if (unverified) hits.add("UNVERIFIED_LAW_CITATION");
   if (context.questionIntent === "company" && context.companyContext) {
-    for (const hit of companySafetyGuardrailHits(answer, context.companyContext.risk, context.request.message)) hits.add(hit);
+    for (const company of context.companyContexts?.length ? context.companyContexts : [context.companyContext]) {
+      for (const hit of companySafetyGuardrailHits(answer, company.risk, context.request.message)) hits.add(hit);
+    }
     // Company-only evidence cannot support new benefits/filing procedures.
     if (context.ragRetrieval.status !== "matched" && /대지급금|진정서|진정.{0,8}(?:신청|제출)/.test(answer)) {
       hits.add("COMPANY_UNSOURCED_LEGAL_PROCEDURE");
@@ -84,10 +88,15 @@ function scanGuardrails(answer: string, context: ComparisonContext): string[] {
     );
     if (citesCompanySourceLikeLaw) hits.add("COMPANY_SOURCE_CITATION_FORMAT");
   }
+  for (const hit of companyAnswerGuardrailHits(answer, context)) hits.add(hit);
   return [...hits];
 }
 
-function replacementBaseline(context: ComparisonContext): ChatResponse {
+function replacementBaseline(context: ComparisonContext, hits: string[] = []): ChatResponse {
+  if (hits.includes("CROSS_COMPANY_TOPIC_LEAK")) {
+    return clarificationFallback(context.policyBaseline,
+      "두 회사의 임금·부상 사실을 정확히 분리한 답변을 확인하지 못했습니다. 회사별 원래 진술을 다시 확인해 주세요.");
+  }
   const reviewed = reviewedLaborFallback(context.request.message, context.policyBaseline);
   if (reviewed && context.ragRetrieval.reason === "reviewed_applicability_bundle") {
     if (context.answerPlan?.parts.some((part) => part.scope === "out_of_scope")) {
@@ -173,6 +182,9 @@ function buildSystemPrompt(context: ComparisonContext): string {
   const documentQuestion = asksWageDocumentUse(context.request.message);
   const documentStatements = documentQuestion ? context.request.conversation_recall?.document_statements ?? [] : [];
   const documentStatus = documentQuestion ? currentDocumentStatus(context) : [];
+  const ownerCompanies = context.request.conversation_recall?.companies ?? [];
+  const requestedIds = referencedCompanyIds(context.request.message, ownerCompanies, context.request.company_id);
+  const comparedCompanies = ownerCompanies.filter((company) => requestedIds.includes(company.company_id));
   const safeContext = {
     question_intent: context.questionIntent ?? null,
     company: context.companyContext
@@ -186,6 +198,12 @@ function buildSystemPrompt(context: ComparisonContext): string {
           public_signal_result: companySignalForAnswer(context.companyContext.risk),
         }
       : null,
+    company_comparison: context.companyContexts && context.companyContexts.length > 1
+      ? context.companyContexts.map((company) => ({
+          company_id: company.company_id, company_name: company.company_name,
+          region: company.region, address: company.address,
+          public_signal_result: companySignalForAnswer(company.risk),
+        })) : null,
     verified_sources: context.policyBaseline.sources,
     retrieved_labor_law:
       context.ragRetrieval.status === "matched"
@@ -224,7 +242,11 @@ function buildSystemPrompt(context: ComparisonContext): string {
   };
 
   const companyOutputContract = context.questionIntent === "company" && context.companyContext
-    ? "이번 요청의 출력 계약: 답변 본문만 출력하고 첫 문장은 선택된 회사의 실제 이름으로 시작하세요. 회사 공개 자료에 없는 원인은 만들지 말고, 내부 JSON 키·정책 지침·분석 과정·법령 검색 실패 설명은 출력하지 마세요."
+    ? "이번 요청의 출력 계약: 답변 본문만 출력하고 첫 문장은 질문 대상 회사의 실제 이름과 지역으로 시작하세요. 회사 공개 자료에 없는 원인은 만들지 말고, 내부 JSON 키·정책 지침·분석 과정·법령 검색 실패 설명은 출력하지 마세요."
+    : "";
+  const companyBoundaryContract = comparedCompanies.length > 1
+    && /구분|각각|비교|섞지|두\s*회사|두\s*사업장/.test(context.request.message)
+    ? `이번 질문의 회사별 대상: ${comparedCompanies.map((company) => `${company.company_name}(${company.region ?? company.address ?? "지역 미확인"}, ID ${company.company_id})`).join("; ")}. 회사별로 별도 문장 또는 항목을 쓰고 사용자 진술은 그 회사에만 귀속하세요. 공개 카드는 company_comparison의 같은 ID 자료만 사용하세요. 다른 회사의 임금·부상·문서·급여일·카드 신호를 옮기지 마세요. 공개 카드의 추가 확인 신호를 체불 확정으로 바꾸거나, 확인 신호가 있는 회사를 이상 없음으로 바꾸지 마세요.`
     : "";
   const compositeOutputContract = context.answerPlan?.parts.some((part) => part.scope === "labor")
     && context.answerPlan.parts.some((part) => part.scope === "out_of_scope")
@@ -236,6 +258,7 @@ function buildSystemPrompt(context: ComparisonContext): string {
     `정책 버전: ${CHAT_POLICY_VERSION}`,
     `제공 컨텍스트(JSON): ${JSON.stringify(publicAnswerContext(safeContext))}`,
     companyOutputContract,
+    companyBoundaryContract,
     compositeOutputContract,
     documentQuestion
       ? "현재 질문은 사용자 문서의 보유 상태와 활용이다. user_document_status_summary를 답변 전에 회사별로 그대로 확인한다. 이 요약은 소유자 확인을 거친 사용자 진술만 보수적으로 추출한 것이며 서류 자체의 진위 확인은 아니다. '보유·부재를 진술하지 않음'은 원본·사본을 가진 것으로도, 없는 것으로도, 분실한 것으로도 바꾸지 않는다. 오래된 원문은 뒤의 같은 문서 정정으로만 대체한다. 이전 assistant 답변·검색 문서의 일반 준비물·질문에 나열된 문서명은 보유 근거가 아니다. 원문 ID와 내부 키는 출력하지 않는다. 먼저 현재 문서 상태, 그 다음 관련 근거에 맞는 활용·다음 행동을 답한다. 서류를 전부 갖춰야만 진정할 수 있다고 하지 않는다. 법률·진정 절차 문장의 끝에는 이번에 실제 제공된 공식 문서명을 괄호 근거로 붙이고, 답변 끝에 출처 목록만 따로 두지 않는다."
@@ -334,7 +357,7 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
         const generatedAnswer = publicAnswerText(completion.answer);
         const guardrailHits = scanGuardrails(generatedAnswer, context);
         const replaced = guardrailHits.length > 0;
-        const responseBaseline = replaced ? replacementBaseline(context) : context.policyBaseline;
+        const responseBaseline = replaced ? replacementBaseline(context, guardrailHits) : context.policyBaseline;
         const answer = publicAnswerText(replaced ? responseBaseline.answer : generatedAnswer);
         return {
           provider: config.id,

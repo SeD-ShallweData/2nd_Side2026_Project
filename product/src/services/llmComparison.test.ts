@@ -65,6 +65,54 @@ function payload(answer: string, model: string) {
 }
 
 describe("실제 LLM 비교 Provider", () => {
+  it("replaces an Incheon/Gimpo card inversion using both public cards", async () => {
+    const first = { company_id: "COMPANY_DEMO_001", company_name: "OO건설", address: "인천광역시 서구 샘플로 10",
+      region: "인천광역시", industry: "건설업", size_label: null, risk: MOCK_RISKS.COMPANY_DEMO_001 };
+    const second = { company_id: "COMPANY_DEMO_006", company_name: "OO건설", address: "경기도 김포시 예시로 21",
+      region: "경기도", industry: "전문직별 공사업", size_label: null, risk: MOCK_RISKS.COMPANY_DEMO_006 };
+    const bodies: Array<{ messages: { content: string }[] }> = [];
+    const fakeFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify(payload("인천 OO건설의 임금 신호와 안전 신호가 모두 뚜렷한 이상 신호 없음입니다. 김포 OO건설도 같습니다.", "test")), { status: 200 });
+    });
+    const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({
+      ...CONTEXT, questionIntent: "company",
+      request: { ...CONTEXT.request, message: "인천과 김포를 구분해 공개 자료의 한계를 알려주세요.",
+        company_id: second.company_id, conversation_recall: { facts: [], companies: [first, second], company_history: [],
+          diagnostics: { summary_status: "ready", summary_version: "extractive-v4", summarized_through_sequence: 40,
+            stored_message_count: 46, hydrated_recent_count: 6, summary_included: true,
+            recall_fact_count: 0, legacy_recall_rebuilt: false } } },
+      policyBaseline: { ...BASELINE, answer_type: "company_context", answer: "인천 OO건설의 임금 카드는 최근 가입자 수 감소와 이직 변동의 추가 확인 신호가 있습니다. 김포 OO건설은 관측 기간이 짧습니다." },
+      companyContext: first, companyContexts: [first, second],
+      ragRetrieval: { query: "공개 자료", status: "no_match", reason: "company_context_only", threshold: null, documents: [] },
+    });
+    expect(bodies[0].messages[0].content).toContain('"company_comparison"');
+    expect(bodies[0].messages[0].content).toContain("최근 가입자 수 감소");
+    expect(bodies[0].messages[0].content).toContain("관측 기간이 비교적 짧음");
+    expect(result.results[0].status).toBe("guardrail_replaced");
+    expect(result.results[0].trace.guardrail_hits).toContain("WAGE_WATCH_REVERSED");
+    expect(result.results[0].answer).toContain("추가 확인 신호");
+  });
+  it("replaces a wage-document instruction copied into an injury-company summary", async () => {
+    const bodies: Array<{ messages: { content: string }[] }> = [];
+    const fakeFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify(payload("새봄서비스: 마지막 임금이 미지급입니다. 푸른건설: 발목이 붓습니다. 급여명세서와 입금 내역으로 사고를 확인하세요.", "test")), { status: 200 });
+    });
+    const question = "새봄서비스의 임금 문제와 푸른건설 발목 문제를 섞지 않고 정리해 주세요.";
+    const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({
+      ...CONTEXT, questionIntent: "labor", request: { ...CONTEXT.request, message: question,
+        conversation_recall: { facts: [], companies: [
+          { company_id: "W", company_name: "새봄서비스" }, { company_id: "I", company_name: "푸른건설" },
+        ], company_history: [], diagnostics: { summary_status: "ready", summary_version: "extractive-v4",
+          summarized_through_sequence: 10, stored_message_count: 18, hydrated_recent_count: 8,
+          summary_included: true, recall_fact_count: 0, legacy_recall_rebuilt: false } } },
+    });
+    expect(bodies[0].messages[0].content).toContain("회사별로 별도 문장 또는 항목");
+    expect(result.results[0].trace.guardrail_hits).toContain("CROSS_COMPANY_TOPIC_LEAK");
+    expect(result.results[0].status).toBe("guardrail_replaced");
+    expect(result.results[0].answer).not.toContain("급여명세서와 입금 내역으로 사고");
+  });
   it("replaces a live-observed recall preamble that omits the requested next action", async () => {
     const message = "한빛테크의 정정한 급여일과 지급 약속을 정리하고 지금 할 일을 알려주세요.";
     const subject = new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(
@@ -313,7 +361,7 @@ describe("실제 LLM 비교 Provider", () => {
       "INTERNAL_CONTEXT_DISCLOSURE",
       "UNVERIFIED_LAW_CITATION",
     ]));
-    expect(bodies[0].messages[0].content).toContain("첫 문장은 선택된 회사의 실제 이름으로 시작하세요");
+    expect(bodies[0].messages[0].content).toContain("첫 문장은 질문 대상 회사의 실제 이름과 지역으로 시작하세요");
     expect(bodies[0].messages[0].content).toContain("내부 JSON 키·정책 지침·분석 과정");
   });
 

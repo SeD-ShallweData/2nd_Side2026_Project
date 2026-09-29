@@ -18,6 +18,8 @@ import { clarificationFallback } from "@/services/chatFallback";
 import { hasActualUnpaidWageReport, reviewedLaborTopics } from "@/services/reviewedLaborGuidance";
 import { wageArrearsFallback } from "@/services/wageArrearsGuidance";
 import { finalizeConversationResponse, recallResponse } from "@/services/conversationRecallService";
+import { referencedCompanyIds } from "@/services/companyAnswerScope";
+import { companySignalForAnswer } from "@/services/publicAnswerContext";
 import {
   getLlmProviderConfigs,
   getLlmTimeoutMs,
@@ -202,7 +204,7 @@ export async function sendParsedComparedChatRequest(
 }
 
 async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest): Promise<ChatComparisonResponse> {
-  const policyBaseline = await sendChatMessage(parsedRequest);
+  let policyBaseline = await sendChatMessage(parsedRequest);
   const configs = selectProviderConfigs(
     getLlmProviderConfigs(),
     parsedRequest.compare === true,
@@ -237,10 +239,14 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
   const intentDecision = await classifyChatIntent(request, configs);
   const answerPlan = createAnswerPlan(request, intentDecision);
   const primaryScope = primaryAnswerScope(answerPlan);
+  const companyTargetIds = primaryScope === "company_specific"
+    ? referencedCompanyIds(request.message, request.conversation_recall?.companies ?? [], request.company_id)
+    : [];
   const hasOutOfScopePart = answerPlan.parts.some((part) => part.scope === "out_of_scope");
   const companyMismatch = primaryScope === "company_specific" && Boolean(request.company_id)
     && policyBaseline.answer_type === "clarification"
-    && policyBaseline.suggested_actions.some((action) => action.code === "SEARCH_COMPANY");
+    && policyBaseline.suggested_actions.some((action) => action.code === "SEARCH_COMPANY")
+    && !companyTargetIds.some((id) => id !== request.company_id);
   if (primaryScope === "company_general") {
     return policyShortCircuitResponse({
       request,
@@ -319,21 +325,32 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
     ];
   }
   let companyContext;
+  let companyContexts;
 
-  if (request.company_id && primaryScope === "company_specific") {
-    const [company, risk] = await Promise.all([
-      getCompanyById(request.company_id),
-      getCompanyRisk(request.company_id),
-    ]);
-    companyContext = {
-      company_id: company.company_id,
-      company_name: company.company_name,
-      address: company.address,
-      region: company.region,
-      industry: company.industry,
-      size_label: company.size_label,
-      risk,
-    };
+  if (companyTargetIds.length && primaryScope === "company_specific") {
+    companyContexts = await Promise.all(companyTargetIds.slice(0, 3).map(async (id) => {
+      const [company, risk] = await Promise.all([getCompanyById(id), getCompanyRisk(id)]);
+      return { company_id: company.company_id, company_name: company.company_name,
+        address: company.address, region: company.region, industry: company.industry,
+        size_label: company.size_label, risk };
+    }));
+    companyContext = companyContexts[0];
+    if (companyContexts.length === 1 && companyContext.company_id !== request.company_id) {
+      policyBaseline = await sendChatMessage({ ...request, company_id: companyContext.company_id });
+      policyBaseline.answer_type = "company_context";
+    } else if (companyContexts.length > 1) {
+      policyBaseline = {
+        ...policyBaseline,
+        answer_type: "company_context",
+        answer: `${companyContexts.map((item) => {
+          const wage = companySignalForAnswer(item.risk).wage_signal;
+          return `${item.region ?? item.address ?? "지역 미확인"} ${item.company_name}: 임금 카드는 ${wage.summary}${wage.check_points.length ? ` 확인 항목은 ${wage.check_points.join(", ")}입니다.` : ""} 산업안전 자료는 ${item.risk.safety_context.scope === "region_industry" ? "지역·업종 집계" : "사업장 연결 자료"}이며 개별 사고를 확정하지 않습니다.`;
+        }).join("\n")}
+이 공개 지표만으로 개인의 실제 지급 여부나 안전을 확정할 수 없습니다. 회사별 지급일·근로계약·실제 근무 및 입금 기록을 따로 확인하세요.`,
+        sources: companyContexts.flatMap((item) => item.risk.sources)
+          .filter((source, index, all) => all.findIndex((other) => other.name === source.name && other.category === source.category) === index),
+      };
+    }
   }
 
   const provider = new DualLlmChatProvider(
@@ -344,6 +361,7 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
     request,
     policyBaseline,
     companyContext,
+    companyContexts,
     ragRetrieval,
     answerPlan,
     questionIntent: primaryScope === "company_specific" ? "company" : "labor",

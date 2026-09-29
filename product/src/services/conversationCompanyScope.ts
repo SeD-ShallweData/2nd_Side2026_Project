@@ -1,11 +1,11 @@
 export interface RecallCompany {
   company_id: string;
   company_name: string;
-  region?: string;
-  address?: string;
+  region?: string | null;
+  address?: string | null;
 }
 
-function locationAliases(company: RecallCompany): string[] {
+export function locationAliases(company: RecallCompany): string[] {
   const tokens = [company.region, ...(company.address?.split(/\s+/).slice(0, 2) ?? [])]
     .filter((value): value is string => Boolean(value));
   return [...new Set(tokens.flatMap((value) => [value, value.replace(/(?:특별자치도|특별자치시|광역시|특별시|도|시|군|구)$/, "")])
