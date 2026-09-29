@@ -398,6 +398,44 @@ CONTRACT_INTERNAL_TOKEN=ContractInternal_5vN8qT2xM7kP4zC9rL6sW
         self.assert_failed_without_secret(result)
         self.assertIn("TIP_DATABASE_URL is not a pinned loopback write-role URL", result.stderr)
 
+    def test_ops_url_is_optional_and_accepts_dedicated_role(self):
+        result = self.run_validator()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        web = self.values["web"] + (
+            "OPS_DATABASE_URL=postgresql://wg_ops:OpsValue_4tN8mQ2wR6zK9pLx@127.0.0.1:5433/wageguard?sslmode=disable\n"
+        )
+        result = self.run_validator({"web": web})
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_ops_url_requires_exact_dedicated_role(self):
+        for role in ("pathb_admin", "wg_bot", "wg_tip"):
+            web = self.values["web"] + (
+                f"OPS_DATABASE_URL=postgresql://{role}:OpsValue_4tN8mQ2wR6zK9pLx@127.0.0.1:5433/wageguard?sslmode=disable\n"
+            )
+            result = self.run_validator({"web": web})
+            self.assert_failed_without_secret(result)
+            if role in {"pathb_admin", "wg_bot"}:
+                self.assertIn("must not reuse the owner or read-only role", result.stderr)
+            else:
+                self.assertIn("must use the dedicated wg_ops role", result.stderr)
+
+    def test_ops_url_must_be_pinned_loopback(self):
+        web = self.values["web"] + (
+            "OPS_DATABASE_URL=postgresql://wg_ops:OpsValue_4tN8mQ2wR6zK9pLx@10.20.0.5:5433/wageguard?sslmode=disable\n"
+        )
+        result = self.run_validator({"web": web})
+        self.assert_failed_without_secret(result)
+        self.assertIn("OPS_DATABASE_URL is not a pinned loopback write-role URL", result.stderr)
+
+    def test_ops_url_rejected_with_mock_auth(self):
+        web = self.values["web"].replace("AUTH_DATA_MODE=real", "AUTH_DATA_MODE=mock")
+        web = web.replace("WORKSITE_TIP_DATA_MODE=real", "WORKSITE_TIP_DATA_MODE=mock")
+        web = web.replace("FAVORITE_DATA_MODE=real", "FAVORITE_DATA_MODE=mock")
+        web += "OPS_DATABASE_URL=postgresql://wg_ops:OpsValue_4tN8mQ2wR6zK9pLx@127.0.0.1:5433/wageguard?sslmode=disable\n"
+        result = self.run_validator({"web": web})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("OPS_DATABASE_URL requires AUTH_DATA_MODE=real", result.stderr)
+
     def test_real_worksite_tip_requires_exact_storage_path(self):
         web = self.values["web"].replace(
             "WORKSITE_TIP_STORAGE_ROOT=/srv/moneyworry/worksite-tip-media",

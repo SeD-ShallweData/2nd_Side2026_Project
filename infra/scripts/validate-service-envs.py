@@ -237,6 +237,14 @@ def validate_user_data_modes(web: dict[str, str], db: dict[str, str]) -> None:
             "FAVORITE_DATA_MODE=real (favorites use the wg_auth connection)"
         )
 
+    # 운영 콘솔(배치 전환·프롬프트 적용). 선택 항목이다. 없으면 화면이 읽기 전용으로 남는다.
+    # 있으면 real 인증이어야 하고(Mock 은 비밀번호가 env 로 공유된다), 함수 실행 권한만 가진
+    # wg_ops 롤이어야 한다(db/scripts/create-ops-role.sh).
+    if web.get("OPS_DATABASE_URL", "").strip():
+        if web["AUTH_DATA_MODE"] != "real":
+            fail("web.env OPS_DATABASE_URL requires AUTH_DATA_MODE=real (mock admins share env passwords)")
+        validate_write_role_url(web["OPS_DATABASE_URL"], db, "OPS_DATABASE_URL", "wg_ops")
+
     pairs = (
         ("AUTH_DATA_MODE", "AUTH_DATABASE_URL", None),
         ("COMMUNITY_DATA_MODE", "COMMUNITY_DATABASE_URL", None),
@@ -404,10 +412,11 @@ def validate_web(web: dict[str, str], db: dict[str, str]) -> None:
             "COMMUNITY_DATA_MODE",
             "WORKSITE_TIP_DATA_MODE",
             "FAVORITE_DATA_MODE",
+            "CONVERSATION_DATABASE_URL",
             "AUTH_DATABASE_URL",
             "COMMUNITY_DATABASE_URL",
             "TIP_DATABASE_URL",
-            "CONVERSATION_DATABASE_URL",
+            "OPS_DATABASE_URL",
             "WORKSITE_TIP_STORAGE_ROOT",
             "MOCK_AUTH_USER_PASSWORD",
             "MOCK_AUTH_ADMIN_PASSWORD",
