@@ -45,7 +45,9 @@ function detectedOutOfScopeTopic(message: string): OutOfScopeTopic {
 }
 
 function hasLaborRequest(message: string): boolean {
-  return DIRECT_LABOR_TERMS.some((term) => message.includes(term)) || WAGE_TROUBLE_PATTERN.test(message);
+  return DIRECT_LABOR_TERMS.some((term) => message.includes(term))
+    || WAGE_TROUBLE_PATTERN.test(message)
+    || /노동포털|고용노동관서|근로감독관/.test(message);
 }
 
 function part(
@@ -76,6 +78,12 @@ function part(
  */
 export function createAnswerPlan(request: ChatRequest, decision: IntentDecision): AnswerPlan {
   const outOfScopeTopic = detectedOutOfScopeTopic(request.message);
+  const laborPortalProcedure = /노동포털|고용노동관서|근로감독관/.test(request.message)
+    && /어떻게|방식|이어|접수|제출|신청|진정/.test(request.message);
+  const selectedCompanyCardQuestion = Boolean(request.company_id)
+    && /(?:임금|안전|산재).{0,12}(?:카드|지표|신호)|(?:카드|지표|신호).{0,12}(?:임금|안전|산재)/.test(request.message)
+    && /(?:뜻|의미|보이|표시|확정|해석|왜|확인)/.test(request.message)
+    && !hasActualUnpaidWageReport(request.message);
   if (hasLaborRequest(request.message) && outOfScopeTopic) {
     return {
       request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },
@@ -87,7 +95,15 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
     };
   }
 
-  if (decision.intent === "labor"
+  if (selectedCompanyCardQuestion) {
+    return {
+      request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },
+      parts: [part("company_specific", "선택한 회사의 공개 카드 표시와 한계", request)],
+      requires_clarification: false,
+    };
+  }
+
+  if (decision.intent === "labor" || laborPortalProcedure
     || (hasUnpaidWageQuestion(request.message)
       && (decision.intent !== "company" || hasActualUnpaidWageReport(request.message)))
     || (!outOfScopeTopic && reviewedLaborTopics(request.message).length > 0)) {

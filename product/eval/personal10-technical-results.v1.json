@@ -1,0 +1,1372 @@
+{
+  "schema": "personal10-technical-results.v1",
+  "evaluated_at": "2026-09-28T18:12:00.360Z",
+  "candidate": {
+    "head": "a7d25cd7c82dfdb1d7bd2c6df2b7fe1e5acb636b",
+    "branch": "task/reply-prompt-upgrade",
+    "product_status": "M product/prompts/chat/system.md\n M product/src/adapters/real/DualLlmChatProvider.ts\n M product/src/domain/conversationRecall.ts\n M product/src/services/conversationMemorySelection.test.ts\n M product/src/services/conversationService.ts\n M product/src/services/conversationSummaryService.ts\n M product/src/services/generationHistory.test.ts\n?? product/src/services/conversationDocumentStatus.test.ts\n?? product/src/services/conversationDocumentStatus.ts",
+    "source_digest_sha256": "cb2b70b311c667b4d7bef862319b2c3635cec0ef27e91df404e95456bb10271c",
+    "file_count": 410,
+    "build_id": "suZTOMztfFRuw-DIrmX3c",
+    "node": "v25.9.0",
+    "next": "16.3.5",
+    "postgres": "16.15 (Debian 16.15-1.pgdg12+2)",
+    "migration_ledger_count": 21,
+    "provider": "Upstage",
+    "model": "solar-pro3",
+    "app_data_mode": "mock except real auth and conversation",
+    "company_data_mode": "mock",
+    "rag_mode": "sealed local BGE-M3/Chroma",
+    "execution_mode": "dual_api, compare=false"
+  },
+  "frozen_inputs": {
+    "corpus_sha256": "701214f5159947d44ff8191b5676d89b7ffac412e75baef168e1c98cd3ff71e4",
+    "acceptance_sha256": "ef77b14b53db3397add9c9d964102ebead89730b3462966273b2b95cc8964e52",
+    "corpus_items": 72,
+    "single_turns": 24,
+    "dialogues": 2,
+    "dialogue_turns": [
+      24,
+      24
+    ]
+  },
+  "attempts": [
+    {
+      "number": 1,
+      "runtime": "product/.runtime/personal10/1790618584798-09aef2",
+      "segment": "setup",
+      "rows": 0,
+      "proxy_calls": 0,
+      "runner_failure": "SYNTHETIC_SIGNUP_FAILED",
+      "status": "INVALID_RUNNER_PARTIAL",
+      "synthetic_account_delete_200": false,
+      "tmpfs_stopped": true
+    },
+    {
+      "number": 2,
+      "runtime": "product/.runtime/personal10/1790618786371-8b8379",
+      "segment": "setup",
+      "rows": 40,
+      "proxy_calls": 70,
+      "runner_failure": "APP_RESTART_STOP_TIMEOUT",
+      "status": "INVALID_RUNNER_PARTIAL",
+      "synthetic_account_delete_200": false,
+      "tmpfs_stopped": true
+    },
+    {
+      "number": 3,
+      "runtime": "product/.runtime/personal10/1790618993951-1458bb",
+      "segment": "dialogues_only_after_runner_restart_error",
+      "rows": 48,
+      "proxy_calls": 101,
+      "runner_failure": null,
+      "status": "COMPLETE",
+      "synthetic_account_delete_200": true,
+      "tmpfs_stopped": true
+    }
+  ],
+  "invalidation": {
+    "setup_attempt_1": "0 rows, signup fixture exceeded password length; 0 calls",
+    "partial_attempt_2": "D1T01-D1T16 excluded from scored dialogue because Windows signalCode was misread at planned restart; all 40 original rows and 70 calls preserved",
+    "unaffected_singles": "S01-S24 from attempt 2 retained",
+    "scored_dialogues": "D1T01-D2T24 from new attempt 3; both restarted from turn 1"
+  },
+  "technical": {
+    "scored_rows": 72,
+    "http_200": 71,
+    "ordinary_requests": 70,
+    "ordinary_http_200": 69,
+    "ordinary_http_failures": [
+      {
+        "id": "S21",
+        "status": 503
+      }
+    ],
+    "planned_fault_rows": [
+      {
+        "id": "S23",
+        "fault": "citation_only",
+        "http": 200
+      },
+      {
+        "id": "S24",
+        "fault": "upstream_503",
+        "http": 200
+      }
+    ],
+    "authenticated_saved_db": 68,
+    "frozen_history_guest_rows": 3,
+    "guard_actions": {
+      "passed": 23,
+      "replaced": 9,
+      "short_circuit": 38,
+      "no_result": 1,
+      "fallback": 1
+    },
+    "scored_provider_phase_calls": {
+      "classification": 68,
+      "generation": 33,
+      "rewrite": 38
+    },
+    "scored_generation_rows": 33,
+    "scored_no_generation_rows": 39,
+    "scored_zero_provider_rows": 4,
+    "dialogue_generation_rows": [
+      {
+        "id": "D1",
+        "count": 10
+      },
+      {
+        "id": "D2",
+        "count": 9
+      }
+    ],
+    "relogin_restore_checkpoints": 2,
+    "app_restart_checkpoints": 2,
+    "summary_checkpoints": [
+      {
+        "dialog": "D1",
+        "at": "D1T10",
+        "db_turns": 10,
+        "summary_status": "ready",
+        "summarized_through_sequence": 10,
+        "recall_fact_count": 0
+      },
+      {
+        "dialog": "D1",
+        "at": "D1T20",
+        "db_turns": 20,
+        "summary_status": "ready",
+        "summarized_through_sequence": 30,
+        "recall_fact_count": 0
+      },
+      {
+        "dialog": "D1",
+        "at": "D1T24",
+        "db_turns": 24,
+        "summary_status": "ready",
+        "summarized_through_sequence": 40,
+        "recall_fact_count": 0
+      },
+      {
+        "dialog": "D2",
+        "at": "D2T10",
+        "db_turns": 10,
+        "summary_status": "ready",
+        "summarized_through_sequence": 10,
+        "recall_fact_count": 0
+      },
+      {
+        "dialog": "D2",
+        "at": "D2T20",
+        "db_turns": 20,
+        "summary_status": "ready",
+        "summarized_through_sequence": 30,
+        "recall_fact_count": 0
+      },
+      {
+        "dialog": "D2",
+        "at": "D2T24",
+        "db_turns": 24,
+        "summary_status": "ready",
+        "summarized_through_sequence": 40,
+        "recall_fact_count": 0
+      }
+    ],
+    "scored_row_latency_ms": {
+      "count": 72,
+      "mean": 1477,
+      "p50": 1128,
+      "p95": 3776,
+      "max": 5836
+    },
+    "scored_provider_call_latency_ms": {
+      "count": 139,
+      "mean": 660,
+      "p50": 283,
+      "p95": 2066,
+      "max": 4536
+    }
+  },
+  "all_attempt_usage": {
+    "proxy_calls": 171,
+    "actual_external_provider_calls": 169,
+    "synthetic_fault_calls": 2,
+    "actual_external_http_200": 169,
+    "actual_external_failures": [],
+    "phase_calls": {
+      "classification": 82,
+      "generation": 41,
+      "rewrite": 48
+    },
+    "returned_model": {
+      "solar-pro3-260323": 169
+    },
+    "finish_reasons": {
+      "stop": 168,
+      "length": 1
+    },
+    "tokens": {
+      "prompt_tokens": 437913,
+      "completion_tokens": 8649,
+      "total_tokens": 446562,
+      "reported_calls": 170,
+      "missing_usage_calls": 1
+    },
+    "call_latency_ms": {
+      "count": 171,
+      "mean": 666,
+      "p50": 282,
+      "p95": 2066,
+      "max": 4536
+    },
+    "automatic_retries_detected": 0,
+    "billed_amount": null,
+    "ttft_ms": null
+  },
+  "row_index": [
+    {
+      "id": "S01",
+      "scope": "single_api",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 4,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 2502,
+      "final_sha256": "27336e00c617c9ea2e7b64ecbd3595f9ef2ad62a36d52b858734d0cf967a302b"
+    },
+    {
+      "id": "S02",
+      "scope": "single_api",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 4,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1818,
+      "final_sha256": "8740d8df990865a9da6e6a897aa46bdb038e87d0faafe1f75b73d49cdee060ee"
+    },
+    {
+      "id": "S03",
+      "scope": "single_api",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 1,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1925,
+      "final_sha256": "12fab15afbec6735ffd5c31898e633a61d20e60caec63c3f2bdaf38753eacfd5"
+    },
+    {
+      "id": "S04",
+      "scope": "single_api",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 4,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 4496,
+      "final_sha256": "0f431c7f62b1525667fac0c24bdf4d35a0e640994cbe1348fa959aa5e5f3d0be"
+    },
+    {
+      "id": "S05",
+      "scope": "single_api",
+      "http": 200,
+      "status": "guardrail_replaced",
+      "guard": "replaced",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1170,
+      "final_sha256": "749538c2af1d1063a6abf45a50de1bccde4120f10a56255fce6ef8f9985cf26a"
+    },
+    {
+      "id": "S06",
+      "scope": "single_api",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 2263,
+      "final_sha256": "6230bd6a58feff55283d1e3711e7dc0d001fd6150d7b51932b18cb46ed436aaa"
+    },
+    {
+      "id": "S07",
+      "scope": "single_api",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 690,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "S08",
+      "scope": "single_api",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 570,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "S09",
+      "scope": "single_api",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 240,
+      "final_sha256": "f6c89a27d2068be6cbc605d43d7e4ed94020c6e49fe1bff39babd347f4bcdbed"
+    },
+    {
+      "id": "S10",
+      "scope": "single_api",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 2326,
+      "final_sha256": "c5c5e1a2769e7637537e70f48d1ee739e2a8f789767ef04032d743b205f5a39c"
+    },
+    {
+      "id": "S11",
+      "scope": "single_api",
+      "http": 200,
+      "status": "guardrail_replaced",
+      "guard": "replaced",
+      "source_count": 1,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1594,
+      "final_sha256": "0b45853bf832d753b9ed967ccdbd7f0ecdc5802f13c930db5f1bcd0359c7c631"
+    },
+    {
+      "id": "S12",
+      "scope": "single_api",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 911,
+      "final_sha256": "7869f2bae1c4686a1c0c5a2be55e8e332f4a87b16386a648990e1424b0a2f562"
+    },
+    {
+      "id": "S13",
+      "scope": "single_api",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 204,
+      "final_sha256": "6da1250930215e7de7a998c3f040dcd3fbaeeb727979f7a705b8cc249526bb76"
+    },
+    {
+      "id": "S14",
+      "scope": "single_api",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 3626,
+      "final_sha256": "d96cb54b667d8cb03b69df0d69d9612e4249a5131a805bbb7ec5cf6292896b55"
+    },
+    {
+      "id": "S15",
+      "scope": "single_api",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 2868,
+      "final_sha256": "a415cd0991ff4309fd2385bbca9ee4ce3f1a21b131d319f7ae73eb44a2f7a7d7"
+    },
+    {
+      "id": "S16",
+      "scope": "single_api",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 1594,
+      "final_sha256": "84713099e052ec45ff05f95d2a65a1f180f66081a5bdb5ec28465a62714787f3"
+    },
+    {
+      "id": "S17",
+      "scope": "single_api",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 968,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "S18",
+      "scope": "single_api",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 255,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "S19",
+      "scope": "frozen_history",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [],
+      "provider_call_count": 0,
+      "storage": null,
+      "duration_ms": 10,
+      "final_sha256": "0edca9cec2cafe17b7446e41cdcf13bf9df56e9a289c1d0d888233852ef49c6b"
+    },
+    {
+      "id": "S20",
+      "scope": "frozen_history",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": null,
+      "duration_ms": 3322,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "S21",
+      "scope": "single_api",
+      "http": 503,
+      "status": null,
+      "guard": null,
+      "source_count": 0,
+      "provider_phases": [],
+      "provider_call_count": 0,
+      "storage": null,
+      "duration_ms": 23,
+      "final_sha256": null
+    },
+    {
+      "id": "S22",
+      "scope": "frozen_history",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": null,
+      "duration_ms": 2682,
+      "final_sha256": "4174385f6f3b33f1bacda2a2f2f9d2738914321775b94f2cf91f3804aae24aed"
+    },
+    {
+      "id": "S23",
+      "scope": "single_api",
+      "http": 200,
+      "status": "guardrail_replaced",
+      "guard": "replaced",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 692,
+      "final_sha256": "db8ac2dc391b9df52ce854791a3b7603b1062e38d73c64f3f96aae06be328917"
+    },
+    {
+      "id": "S24",
+      "scope": "single_api",
+      "http": 200,
+      "status": "fallback",
+      "guard": "fallback",
+      "source_count": 4,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 248,
+      "final_sha256": "517de9d6ec797d4e4381b8be6cf788fd13682f302b56ac304c4f01c1dbc95b76"
+    },
+    {
+      "id": "D1T01",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 456,
+      "final_sha256": "f6c89a27d2068be6cbc605d43d7e4ed94020c6e49fe1bff39babd347f4bcdbed"
+    },
+    {
+      "id": "D1T02",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "guardrail_replaced",
+      "guard": "replaced",
+      "source_count": 3,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 1363,
+      "final_sha256": "ee44b24c9ce7edc5bc2df72bbc6b4b6364978e856350049de1edac206d58fad6"
+    },
+    {
+      "id": "D1T03",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 961,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "D1T04",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 752,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "D1T05",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 668,
+      "final_sha256": "f6c89a27d2068be6cbc605d43d7e4ed94020c6e49fe1bff39babd347f4bcdbed"
+    },
+    {
+      "id": "D1T06",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 2433,
+      "final_sha256": "9993ad3150b003b9301a9b67d6b51f02208d8b28d6d154c57d6636bc3815e5fe"
+    },
+    {
+      "id": "D1T07",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 597,
+      "final_sha256": "f6c89a27d2068be6cbc605d43d7e4ed94020c6e49fe1bff39babd347f4bcdbed"
+    },
+    {
+      "id": "D1T08",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 1899,
+      "final_sha256": "d7c12f1b7ed96203a00198fb1d566b15d47299cfcf5b82d27b6ff52ea3e7503a"
+    },
+    {
+      "id": "D1T09",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 1242,
+      "final_sha256": "39e9302af22f31fb02bd2a8b93f780e7b7a7ff66e9d533d03d86d76691fccea2"
+    },
+    {
+      "id": "D1T10",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [],
+      "provider_call_count": 0,
+      "storage": "database",
+      "duration_ms": 70,
+      "final_sha256": "0507f9c4bc0de44efb09fd206bc9f7e91c551c2da1a9363f8a94d80d84479e21"
+    },
+    {
+      "id": "D1T11",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "guardrail_replaced",
+      "guard": "replaced",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1797,
+      "final_sha256": "db8ac2dc391b9df52ce854791a3b7603b1062e38d73c64f3f96aae06be328917"
+    },
+    {
+      "id": "D1T12",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 3446,
+      "final_sha256": "6ba81c071ced136fe77629e32d3d279a440a896ca3923f5d1f94e069dabbc481"
+    },
+    {
+      "id": "D1T13",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [],
+      "provider_call_count": 0,
+      "storage": "database",
+      "duration_ms": 35,
+      "final_sha256": "0507f9c4bc0de44efb09fd206bc9f7e91c551c2da1a9363f8a94d80d84479e21"
+    },
+    {
+      "id": "D1T14",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "guardrail_replaced",
+      "guard": "replaced",
+      "source_count": 4,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 5431,
+      "final_sha256": "96e4ec4d374f0ce43a79bd4b62c9d4400d864f39faa4d9798133ee63f41a100e"
+    },
+    {
+      "id": "D1T15",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 2384,
+      "final_sha256": "4ca013a16cce6d8f99332144e5c910d75f4a61cad16bb9dd3c12cff3cea9e2d0"
+    },
+    {
+      "id": "D1T16",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 349,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "D1T17",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1128,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "D1T18",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 2535,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "D1T19",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 3,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 1122,
+      "final_sha256": "3c9e58a80ae197100c41709f23beab7f40a813cb9096f813ac4a80079db896b8"
+    },
+    {
+      "id": "D1T20",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 794,
+      "final_sha256": "f6c89a27d2068be6cbc605d43d7e4ed94020c6e49fe1bff39babd347f4bcdbed"
+    },
+    {
+      "id": "D1T21",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 2151,
+      "final_sha256": "e88529755279eef2b8f3e042950d8c0e8340175a153e0ac2cceda4dbdbc0665f"
+    },
+    {
+      "id": "D1T22",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1046,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "D1T23",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1697,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "D1T24",
+      "scope": "live_accumulated:D1",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 5836,
+      "final_sha256": "18202fd8dc709eac7358443d8178bb382ce9a53b199dcdb7f137c6dd8f45bce0"
+    },
+    {
+      "id": "D2T01",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "guardrail_replaced",
+      "guard": "replaced",
+      "source_count": 4,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 2004,
+      "final_sha256": "517de9d6ec797d4e4381b8be6cf788fd13682f302b56ac304c4f01c1dbc95b76"
+    },
+    {
+      "id": "D2T02",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "guardrail_replaced",
+      "guard": "replaced",
+      "source_count": 4,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 2203,
+      "final_sha256": "517de9d6ec797d4e4381b8be6cf788fd13682f302b56ac304c4f01c1dbc95b76"
+    },
+    {
+      "id": "D2T03",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 836,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "D2T04",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 751,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "D2T05",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 1,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 1390,
+      "final_sha256": "3a1a11d0b094d8a47aa10b8af498cd31752d929e209630a6a9566df2710f4b1e"
+    },
+    {
+      "id": "D2T06",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 608,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "D2T07",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 1890,
+      "final_sha256": "9dbf954e7256ed134a2fb0f103c6bc574edc6d058829e36694ba77b12c771177"
+    },
+    {
+      "id": "D2T08",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 962,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "D2T09",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 1552,
+      "final_sha256": "627875d84464752b0489e927d440c9310ed20dd0fcd855d217217faa312d3121"
+    },
+    {
+      "id": "D2T10",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 4,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 2343,
+      "final_sha256": "3df189fe51c5f911adc07bb5abf833f515bf75260251d8ace353e85859617204"
+    },
+    {
+      "id": "D2T11",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 298,
+      "final_sha256": "6ba81c071ced136fe77629e32d3d279a440a896ca3923f5d1f94e069dabbc481"
+    },
+    {
+      "id": "D2T12",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 474,
+      "final_sha256": "6ba81c071ced136fe77629e32d3d279a440a896ca3923f5d1f94e069dabbc481"
+    },
+    {
+      "id": "D2T13",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1141,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "D2T14",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 556,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "D2T15",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 567,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "D2T16",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "classification"
+      ],
+      "provider_call_count": 1,
+      "storage": "database",
+      "duration_ms": 882,
+      "final_sha256": "cf4a99ae87c29000c486637abee9176f55c4ca93f771551dbf1624a32b3553ab"
+    },
+    {
+      "id": "D2T17",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 675,
+      "final_sha256": "6ba81c071ced136fe77629e32d3d279a440a896ca3923f5d1f94e069dabbc481"
+    },
+    {
+      "id": "D2T18",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 4,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 1683,
+      "final_sha256": "cd87cc93f230819c6a5325bdcf47a2bc60deef2eb05332baac5c4f25698f2573"
+    },
+    {
+      "id": "D2T19",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "guardrail_replaced",
+      "guard": "replaced",
+      "source_count": 1,
+      "provider_phases": [
+        "rewrite",
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 3,
+      "storage": "database",
+      "duration_ms": 3776,
+      "final_sha256": "0b45853bf832d753b9ed967ccdbd7f0ecdc5802f13c930db5f1bcd0359c7c631"
+    },
+    {
+      "id": "D2T20",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 678,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "D2T21",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "success",
+      "guard": "passed",
+      "source_count": 2,
+      "provider_phases": [
+        "classification",
+        "generation"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1606,
+      "final_sha256": "7694d418a341096eb1fba84cc7abb316cecca9f9a7a06fc9a18d98c711e25381"
+    },
+    {
+      "id": "D2T22",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 489,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "D2T23",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 631,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    },
+    {
+      "id": "D2T24",
+      "scope": "live_accumulated:D2",
+      "http": 200,
+      "status": "policy_short_circuit",
+      "guard": "short_circuit",
+      "source_count": 0,
+      "provider_phases": [
+        "rewrite",
+        "classification"
+      ],
+      "provider_call_count": 2,
+      "storage": "database",
+      "duration_ms": 1193,
+      "final_sha256": "de43e50ee1e1fc1346b69a71784b45692ef713f2f4eab0166b328f92d0e58f3e"
+    }
+  ]
+}

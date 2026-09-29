@@ -82,7 +82,19 @@ function laborEvidenceFallback(
   policyBaseline: ChatResponse,
   state: "not_found" | "not_relevant" | "unavailable",
   hasOutOfScopePart: boolean,
+  question: string,
 ): ChatResponse {
+  if (/(?:급여|임금)\s*명세서/.test(question)
+    && /못\s*받|받지\s*못|미교부|안\s*받/.test(question)
+    && /입금|지급|월급|급여/.test(question)) {
+    return {
+      ...clarificationFallback(policyBaseline,
+        "급여가 입금됐더라도 지급 내역을 확인하려면 회사에 해당 기간의 급여명세서와 기본급·수당·공제 항목을 요청하세요. 입금 날짜·금액, 근무시간 기록, 명세서 요청과 회사 답변을 함께 보관해 대조하세요. 누락 항목이나 지급액이 맞지 않으면 회사에 서면으로 확인을 요청하고, 해결되지 않으면 1350에서 절차를 상담받으세요."),
+      answer_type: "general_guidance",
+      sources: [],
+      limitations: ["공식 노동법 검색 근거를 이번 요청에서 확인하지 못했으므로 법적 위반 여부는 단정하지 않습니다."],
+    };
+  }
   const evidenceMessage = state === "unavailable"
     ? "공식 노동법 검색 서비스에 현재 연결하지 못했습니다."
     : state === "not_relevant"
@@ -289,7 +301,7 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
         : "RAG_EVIDENCE_NOT_FOUND";
     return policyShortCircuitResponse({
       request,
-      policyBaseline: laborEvidenceFallback(policyBaseline, evidenceState, hasOutOfScopePart),
+      policyBaseline: laborEvidenceFallback(policyBaseline, evidenceState, hasOutOfScopePart, request.message),
       configs,
       ragRetrieval,
       intentDecision,

@@ -1,0 +1,3 @@
+# Replace the placeholder with a local secret before installation.
+user default off
+user mwquota off >REPLACE_WITH_LOCAL_RANDOM_SECRET ~mw:quota:* +get +mget +incr +pexpire +pttl +eval +ping

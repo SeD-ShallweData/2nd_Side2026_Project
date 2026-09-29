@@ -39,16 +39,35 @@
   metrics/alert를 연결한다. 기본 1,000회는 코드 fallback이며 재무 승인값이 아니다.
 - live DB 삭제는 즉시 반영한다. backup은 최대 30일 뒤 만료하며, restore한 DB는 서비스 개방 전에
   현재 expiry cutoff와 삭제 journal/tombstone을 재적용한다. 실제 backup catalog/TTL/rehearsal은 별도 증거가 필요하다.
+- 2026-09-29 사용자 승인: 복원 시 수동 삭제를 재적용하기 위해 사용자 UUID·대화 UUID(해당 시)·삭제
+  시각만 암호화한 독립 삭제 원장에 최대 30일 보관한다. 이메일·상담 원문은 넣지 않는다. 현재
+  outbox/독립 원장은 구현·운영 적용되지 않았고, 이 승인만으로 복원 안전성이 확보되지는 않는다.
+  [작업09 런북](../../db/docs/RESTORE_DELETION_REPLAY.md)의 순번·완전성 게이트가 필요하다.
 - 외부 LLM은 무학습, 승인된 처리 지역, 계약상 최소 보존 또는 최대 30일 조건을 조달 문서에서 확인한다.
   철회는 미래 전송과 local 식별 데이터 삭제를 즉시 적용하고, 과거 provider 데이터는 해당 계약의
   삭제 API 또는 TTL을 따른다고 고지한다.
 - `SAVE_COMPARISON_FEEDBACK=true` 공개 운영은 금지한다. server-issued comparison ledger 확인,
   원문 없는 90일 TTL, rotation/purge, 필요한 경우에만 pseudonymous user/conversation 연결을 구현한 뒤 켠다.
 
+## 외부 공급자 공개 정책 조사 (2026-09-28)
+
+[개인 후속 06 보고서](../qa/2026-09-28-personal-06.md)가 상품별 공개 근거, 계정 적용 확인, 서비스 정책 대조를 분리해 기록한다. 이 조사는 기존 **무학습·승인 처리 지역·계약상 최소 보존 또는 최대 30일** 조건을 변경하지 않는다.
+
+- 기본 Upstage 동기 Solar API의 [현행 약관 제22조](https://www.upstage.ai/terms-of-service)는 일반적인 개선·학습 배제 원칙과 별도 동의, 서비스 운영상 저장 예외, 무상 서비스의 개선·학습 예외를 구분한다. [최신 개인정보처리방침](https://www.upstage.ai/privacy-policy/updated-sep-21-2026-ko)은 API 로깅 opt-in, 무상 API, 비동기 API, File Search를 각각 별도 항목으로 둔다. 동기 API의 운영/오류 로그 보존 상한과 이 계정의 상품·동의·처리 지역은 공개 문서만으로 확정할 수 없다.
+- SKT A.X-K1은 비교 요청에만 구성된 공급자다. 이 API 상품에 적용되는 보존·학습·지역·삭제 조건의 공식 약관과 계정 적용을 확인하지 못했다. OpenAI Responses는 선택 모드일 뿐 이번 로컬 활성 경로가 아니므로 조사 범위에서 제외했다. 운영 인스턴스 활성 모드는 별도 확인이 필요하다.
+- 사용자 상담 삭제는 로컬 저장소를 지우지만 공급자 과거 데이터까지 즉시 지운다는 의미가 아니다. 공급자 삭제 API/요청 또는 계약상 TTL을 계정별로 확인해야 한다. 미확인 항목을 고지문만 바꿔 충족 처리하지 않는다.
+
 ## 현재 미확인으로 남는 외부 사실
 
-- Upstage, SKT, OpenAI 각 계약의 보존 기간, 학습 제외, 처리 지역, 삭제 요청 지원 여부
+- 활성 Upstage/SKT 계정·개별 계약의 상품 구분, 예외 포함 보존 기간, 학습/로깅 동의, 처리 지역, 삭제 요청 지원 여부. OpenAI는 운영에서 활성화될 때 별도 조사한다.
 - 운영 backup 실제 TTL과 restore 후 삭제 재적용 자동화
 - 운영 gateway의 공유 quota 저장소, trusted proxy header 정규화, budget alert
 
-이 세 항목은 저장소나 `main`에서 확인되지 않았다. 코드 기본값만으로 충족됐다고 판단하지 않는다.
+공개 공급자 정책은 위와 같이 조사했지만 계정 적용과 운영 환경의 세 항목은 아직 확인되지 않았다. 코드 기본값만으로 충족됐다고 판단하지 않는다.
+
+## Personal08 request-protection decision (2026-09-29)
+
+- Existing anonymous chat and company-search request caps remain unchanged. A shared Redis counter and canonical proxy source IP are prepared locally; production deployment and actual ingress configuration are unverified. The per-IP companion key prevents rotating a browser tab marker from bypassing the same per-client cap. Users behind one public IP share that cap.
+- Contract review has no request cap through 2026-10-01 23:59:59 KST for the demo. From 2026-10-02 00:00 KST, apply 5/hour, 15/day and 300/day globally. The exemption does not grant access past proxy authentication.
+- If the shared store fails through the demo date, public AI requests use temporary process-local protection. From 2026-10-02 00:00 KST, public AI requests return 503 until the store recovers. Company lookup continues with a local fallback. This failure mode is weaker across app processes and must be observed.
+- Request counts and returned tokens are not billed amounts. A financial amount-based cutoff is deferred by the owner; the code fallback request counts do not constitute a budget approval.

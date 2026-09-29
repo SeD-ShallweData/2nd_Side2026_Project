@@ -5,7 +5,7 @@ import { assertPublicRateLimit } from "@/server/publicRateLimit";
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
-    assertPublicRateLimit(request, "company_search");
+    await assertPublicRateLimit(request, "company_search");
     const url = new URL(request.url);
     const query = url.searchParams.get("q") ?? "";
     const limitValue = url.searchParams.get("limit");

@@ -1,0 +1,30 @@
+[Unit]
+Description=MoneyWorry authenticated public ingress gateway
+After=network-online.target moneyworry-web.service
+Requires=moneyworry-web.service
+
+[Service]
+Type=simple
+User=@WEB_SERVICE_USER@
+Group=@WEB_SERVICE_GROUP@
+WorkingDirectory=@PROJECT_ROOT@
+EnvironmentFile=/etc/moneyworry/public-gateway.env
+Environment=NODE_ENV=production
+ExecStart=@NODE_BIN@ @PROJECT_ROOT@/infra/scripts/public-quota-gateway.mjs
+Restart=always
+RestartSec=3s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadOnlyPaths=@PROJECT_ROOT@
+RestrictSUIDSGID=yes
+UMask=0027
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moneyworry-public-gateway
+
+[Install]
+WantedBy=multi-user.target
+

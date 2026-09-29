@@ -43,7 +43,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     assertSameOriginRequest(request);
     const user = await getOptionalSessionUser(getSessionTokenFromRequest(request));
-    if (!user) assertPublicRateLimit(request, "anonymous_contract_review");
+    if (!user) await assertPublicRateLimit(request, "anonymous_contract_review");
     const input = await parseRequest(request);
     input.signal = request.signal;
     return NextResponse.json(await reviewContract(input));

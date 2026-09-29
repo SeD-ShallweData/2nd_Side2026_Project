@@ -17,11 +17,15 @@ import { getConversationRepository } from "@/services/userDataProviders";
 import {
   maybeUpdateConversationSummary,
   toConversationMemoryContext,
+  SUMMARY_VERSION,
+  selectDocumentStatements,
+  selectUserFacts,
 } from "@/services/conversationSummaryService";
 import { ServiceError } from "@/utils/errors";
 import { extractRecallFacts } from "@/services/conversationRecallService";
-import { getCompanyById } from "@/services/companyService";
+import { companyContextsForDetail, companyNamesForDetail } from "@/services/conversationCompanyNames";
 import { publicAnswerContext } from "@/services/publicAnswerContext";
+import { selectRecallFacts } from "@/services/conversationMemorySelection";
 
 const MAX_LIST_LIMIT = 50;
 const HISTORY_MESSAGE_LIMIT = 10;
@@ -120,22 +124,6 @@ function toSummary(value: StoredConversationSummary): ConversationSummaryDto {
     expires_at: value.expires_at,
     turn_count: value.turn_count,
   };
-}
-
-async function companyNamesForDetail(value: StoredConversationDetail): Promise<Map<string, string>> {
-  const companyIds = [...new Set([
-    value.active_company_id,
-    ...value.turns.map((turn) => turn.company_id),
-  ].filter((companyId): companyId is string => Boolean(companyId)))];
-  const names = new Map<string, string>();
-  await Promise.all(companyIds.map(async (companyId) => {
-    try {
-      names.set(companyId, (await getCompanyById(companyId)).company_name);
-    } catch {
-      // A deleted/unavailable public company must not make its owned conversation unavailable.
-    }
-  }));
-  return names;
 }
 
 async function toDetail(value: StoredConversationDetail): Promise<ConversationDetailDto> {
@@ -272,21 +260,29 @@ export async function hydrateConversationRequest(
   const detail = await ownerDetail(request.conversation_id, user);
   const summary = await getConversationRepository().findSummary(detail.conversation_id);
   const allMessages = detail.turns.flatMap((turn) => turn.messages);
-  const memory = toConversationMemoryContext(summary);
-  const through = memory?.summarized_through_sequence ?? 0;
+  const through = summary?.summarized_through_sequence ?? 0;
   const history = allMessages
     .slice(through)
     .slice(-HISTORY_MESSAGE_LIMIT)
     .map(({ role, content }) => ({ role, content }));
-  const legacyRecallRebuilt = through > 0 && !summary?.summary.recall_facts;
+  const companies = await companyContextsForDetail(detail, request.company_id);
+  const companyNames = new Map(companies.map(({ company_id, company_name }) => [company_id, company_name]));
+  const legacyRecallRebuilt = through > 0 && (summary?.summary_version !== SUMMARY_VERSION || !summary?.summary.recall_facts);
+  // Re-resolve retained owner-checked originals: v2 slots may carry a selected
+  // company rather than the statement's subject; a later selection can name it.
   const originals = detail.turns.flatMap((turn) => turn.messages.flatMap((message, index) => {
     const sequence = (turn.turn_index - 1) * 2 + index + 1;
-    return message.role === "user" && (sequence > through || legacyRecallRebuilt)
+    return message.role === "user"
       ? extractRecallFacts({ content: message.content, source_message_id: message.message_id,
-        sequence, company_id: turn.company_id ?? null }) : [];
+        sequence, company_id: turn.company_id ?? null, companies }) : [];
   }));
-  const recallFacts = [...(legacyRecallRebuilt ? [] : summary?.summary.recall_facts ?? []), ...originals];
-  const companyNames = await companyNamesForDetail(detail);
+  const recallFacts = selectRecallFacts(originals);
+  const documentStatements = selectDocumentStatements(detail, companies, request.message);
+  const memory = toConversationMemoryContext(summary ? { ...summary,
+    summary: { ...summary.summary,
+      user_stated_facts: selectUserFacts(detail, through, companies, request.message),
+      recall_facts: selectRecallFacts(originals.filter((fact) => fact.sequence <= through)) },
+  } : null, companies);
   const companyHistory = detail.turns.flatMap((turn) => {
     const companyName = turn.company_id ? companyNames.get(turn.company_id) : undefined;
     return turn.company_id && companyName
@@ -300,6 +296,8 @@ export async function hydrateConversationRequest(
     conversation_memory: memory,
     conversation_recall: {
       facts: recallFacts,
+      document_statements: documentStatements,
+      companies,
       company_history: companyHistory,
       diagnostics: {
         summary_status: summary?.status ?? "absent", summary_version: summary?.summary_version ?? null,

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 import type { ChatResponse } from "@/domain/chat";
-import { applicabilityGuardrailHits, hasUnpaidWageQuestion, reviewedLaborFallback, reviewedLaborRetrieval, reviewedLaborTopics } from "./reviewedLaborGuidance";
+import { applicabilityGuardrailHits, hasUnpaidWageQuestion, paymentTimingGuardrailHits, reviewedLaborFallback, reviewedLaborRetrieval, reviewedLaborTopics } from "./reviewedLaborGuidance";
 import { retrieveLaborLawContext } from "./ragService";
 import { createAnswerPlan } from "./answerPlanService";
 import { CHAT_OUTPUT_GUARDRAILS, hasUnverifiedCitation, scanRules } from "@/server/guardrails";
@@ -14,6 +14,40 @@ const baseline: ChatResponse = { answer: "일반 안내", answer_type: "general_
 const query = "상시근로자가 4명인 사업장에서 밤 10시까지 일하면 법정 야간수당을 줘야 하나요?";
 
 describe("source-reviewed applicability bundles (development, not an independent oracle)", () => {
+  it("rejects a new filing deadline counted from an agreed extension even when the answer names the statutory conditions", () => {
+    const question = "퇴직 후 특별한 사정으로 당사자가 지급기일 연장에 합의했다면 14일과 진정은 어떻게 되나요?";
+    const wrong = "퇴직일에 지급 사유가 발생해 원칙적 14일을 셉니다. 특별한 사정이 있으면 당사자 합의로 기일을 연장합니다. 연장된 지급일까지 기다린 후 그 시점부터 14일 이내에 진정을 제기할 수 있습니다.";
+    expect(paymentTimingGuardrailHits(question, wrong)).toContain("PAYMENT_NEW_FILING_DEADLINE");
+    expect(paymentTimingGuardrailHits(question, reviewedLaborFallback(question, baseline)!.answer)).not.toContain("PAYMENT_NEW_FILING_DEADLINE");
+  });
+  it("rejects a filing window asserted from retirement while keeping the payment deadline distinct", () => {
+    const question = "퇴사 후 밀린 급여의 지급 기한과 진정 절차를 알려주세요.";
+    const wrong = "퇴직 금품은 퇴직 후 14일 이내에 지급해야 합니다. 임금체불 진정은 퇴직 후 14일 이내에 제기할 수 있습니다.";
+    expect(paymentTimingGuardrailHits(question, wrong)).toContain("PAYMENT_NEW_FILING_DEADLINE");
+    expect(paymentTimingGuardrailHits(question, reviewedLaborFallback(question, baseline)!.answer)).not.toContain("PAYMENT_NEW_FILING_DEADLINE");
+  });
+  it("keeps a request for a missing payslip on the document path instead of replacing it with complaint instructions", () => {
+    const question = "급여는 입금됐지만 급여명세서를 못 받았습니다. 지급 내역 확인을 위해 어떤 자료를 요청하고 남길까요?";
+    expect(reviewedLaborTopics(question)).not.toContain("filing");
+    expect(applicabilityGuardrailHits(question, "회사에 급여명세서와 공제 내역을 요청하고 입금 기록과 요청 메시지를 보관하세요.")).toEqual([]);
+  });
+  it("requires workplace size and actual hours before promising Saturday premium pay", () => {
+    const question = "작은 매장에서 토요일에 추가로 일하면 연장근로 가산임금을 무조건 받나요?";
+    const wrong = "토요일에 더 일했으므로 통상임금의 50%를 가산해 받아야 합니다.";
+    expect(reviewedLaborTopics(question)).toContain("overtime");
+    expect(applicabilityGuardrailHits(question, wrong)).toContain("APPLICABILITY_OVERTIME_CONDITIONS");
+    const fallback = reviewedLaborFallback(question, baseline)!;
+    expect(fallback.answer).toContain("상시 5명 미만");
+    expect(applicabilityGuardrailHits(question, fallback.answer)).toEqual([]);
+  });
+  it("recognizes late evening work even when the question says 11 p.m. instead of night work", () => {
+    expect(reviewedLaborTopics("밤 11시까지 현장에서 일하면 어떤 기록을 남겨야 하나요?")).toContain("night");
+  });
+  it("uses official filing guidance for an unanswered company message followed by a labor portal question", () => {
+    const question = "회사가 답을 안 하면 노동포털에서 어떤 방식으로 이어가면 될까요?";
+    expect(reviewedLaborTopics(question)).toContain("filing");
+    expect(reviewedLaborFallback(question, baseline)?.answer).toContain("노동포털");
+  });
   it("replays the third live synthetic certificate answer that omitted separate eligibility review", async () => {
     // Recorded generated output for a synthetic question, not user QA/private data.
     const generated = "체불 임금등·사업주 확인서는 체불된 임금을 대지급금으로 청구하거나 법률구조·소송을 진행할 때 필요한 서류입니다. 감독관이 체불 사실을 확인한 후에만 발급받을 수 있으며, 지급 약속일이 지났다고 자동으로 발급되는 것은 아닙니다. 먼저 관할 지방고용노동청에 체불 진정서를 제출하고 조사를 받아야 합니다. 조사가 완료되면 근로감독관에게 확인서 발급 신청을 하면 됩니다. 확인서는 간이대지급금 청구나 법률구조 소송 등에 활용되며, 발급 자체가 임금 지급을 확정하는 것은 아닙니다. 근로계약서·급여명세서·입금내역 등 미지급 자료를 정리하고 담당 근로감독관에게 신청 목적과 절차를 확인하세요. 고용노동부 1350 상담창구를 통해 구체적인 절차와 필요 서류를 안내받을 수 있습니다.";
@@ -78,8 +112,16 @@ describe("source-reviewed applicability bundles (development, not an independent
     ["22시까지 근무는 야간근로에 해당합니다.", "NIGHT_END_TIME_CONFUSION"],
     ["상시 4명인 사업장에도 법정 야간 가산임금 의무가 있습니다.", "SMALL_WORKPLACE_PREMIUM_CONFUSION"],
     ["1350에 전화해서 진정서를 제출하세요.", "HOTLINE_FILING_CONFUSION"],
+    ["고용노동부 1350(전화 상담) 또는 관할 지방고용노동관서 방문을 통해 정식 진정을 접수합니다.", "HOTLINE_FILING_CONFUSION"],
   ])("rejects affirmative relation, not just exact QA sentence: %s", (bad, hit) => {
     expect(applicabilityGuardrailHits(query, bad)).toContain(hit);
+  });
+  it.each([
+    "1350에서 절차를 상담할 수 있습니다. 진정은 노동포털이나 관할 노동관서 방문으로 접수하세요.",
+    "1350에 전화해 상담한 후 노동포털에서 진정서를 접수하세요.",
+    "1350에 전화하는 것만으로 진정서를 접수할 수 있는 것은 아닙니다.",
+  ])("preserves separate consultation and filing: %s", (answer) => {
+    expect(applicabilityGuardrailHits(query, answer)).not.toContain("HOTLINE_FILING_CONFUSION");
   });
   it.each([true, false])("Dual final route: good model answer is preserved=%s", async (good) => {
     const correct = reviewedLaborFallback(query, baseline)!;

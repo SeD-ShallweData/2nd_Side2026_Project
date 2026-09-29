@@ -34,7 +34,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
     const user = await getOptionalSessionUser(getSessionTokenFromRequest(request));
-    if (!user) assertPublicRateLimit(request, "anonymous_chat");
+    if (!user) await assertPublicRateLimit(request, "anonymous_chat");
     let chatRequest = parseChatRequest(parsed.body);
     assertExternalProcessingConsent(chatRequest);
     let persistence: "unavailable" | "guest" | undefined = user ? undefined : "guest";

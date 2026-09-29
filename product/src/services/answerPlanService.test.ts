@@ -15,6 +15,12 @@ describe("Answer Plan", () => {
       expect(plan.parts).toMatchObject([{ scope: "labor", evidence_needed: ["labor_law"] }]);
     }
   });
+  it("keeps a labor portal follow-up on the labor path despite a selected company card", () => {
+    const message = "회사가 답을 안 하면 노동포털에서 어떤 방식으로 이어가면 될까요?";
+    const plan = createAnswerPlan({ ...REQUEST, message, company_id: "COMPANY_DEMO_008" },
+      { ...UNCLEAR, intent: "company", company_scope: "specific" });
+    expect(plan.parts).toMatchObject([{ scope: "labor", evidence_needed: ["labor_law"] }]);
+  });
 
   it("does not turn a company-indicator interpretation into a personal labor search", () => {
     const plan = createAnswerPlan({
@@ -23,6 +29,15 @@ describe("Answer Plan", () => {
       company_id: "COMPANY_DEMO_008",
     }, { ...UNCLEAR, intent: "company", company_scope: "specific" });
     expect(plan.parts).toMatchObject([{ scope: "company_specific", target_company_id: "COMPANY_DEMO_008" }]);
+  });
+
+  it("keeps an explicit selected-company card question when classification is unavailable", () => {
+    const plan = createAnswerPlan({
+      ...REQUEST,
+      message: "이 회사 임금 카드에 추가 확인 신호가 보이는데, 실제 체불이 확정됐다는 뜻인가요?",
+      company_id: "COMPANY_DEMO_001",
+    }, UNCLEAR);
+    expect(plan.parts).toMatchObject([{ scope: "company_specific", target_company_id: "COMPANY_DEMO_001" }]);
   });
 
   it("keeps the answerable labor part when an explicit investment request is mixed in", () => {

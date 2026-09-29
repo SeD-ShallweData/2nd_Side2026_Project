@@ -44,6 +44,42 @@ beforeEach(() => {
 });
 
 describe("의도와 근거에 따른 상담 경로", () => {
+  it("answers a missing payslip request usefully when labor retrieval is unavailable", async () => {
+    mocks.retrieve.mockResolvedValue({ status: "unavailable", reason: "service_unavailable", topic: null, documents: [] });
+    const response = await sendComparedChatMessage({ message: "월급은 입금됐지만 급여명세서를 받지 못했습니다. 무엇을 요청하나요?" });
+    expect(response.results[0].answer).toContain("급여명세서와 기본급·수당·공제 항목을 요청");
+    expect(response.results[0].answer).not.toContain("진정은 고용노동부 노동포털");
+    expect(response.results[0].sources).toEqual([]);
+  });
+  it("routes a labor portal follow-up away from the selected company card when intent is unavailable", async () => {
+    mocks.classify.mockResolvedValue({ intent: "unclear", topic: "other", company_scope: "not_applicable", status: "unavailable" });
+    mocks.retrieve.mockResolvedValue({ status: "matched", reason: "reviewed_applicability_bundle", topic: "filing", documents: [] });
+    await sendComparedChatMessage({ message: "회사가 답하지 않으면 노동포털에서 어떤 방식으로 이어가나요?", company_id: "C1" });
+    expect(mocks.compare.mock.calls[0][0].questionIntent).toBe("labor");
+    expect(mocks.company).not.toHaveBeenCalled();
+  });
+  it.each([
+    "한빛테크에서 제가 보유한 문서와 없는 서류를 구분하고 임금체불 진정에 어떻게 사용하는지 알려주세요.",
+    "한빛테크와 다온제조의 계약서 보유 상태를 구분하고 임금체불 자료로 어떻게 활용하나요?",
+    "1. 한빛테크 2. 다온제조 순서로 제가 말한 계약서 보유 상태를 정리하고 임금체불 진정에 필요한 다음 행동과 출처를 알려주세요.",
+  ])("keeps document-use recall on labor evidence: %s", async message => {
+    mocks.classify.mockResolvedValue({ intent: "company", topic: "other", company_scope: "specific", status: "classified" });
+    mocks.retrieve.mockResolvedValue({ status: "matched", reason: "reviewed_applicability_bundle", documents: [] });
+    await sendComparedChatMessage({ message, company_id: "C1" });
+    expect(mocks.retrieve).toHaveBeenCalledWith(message);
+    expect(mocks.compare.mock.calls[0][0].questionIntent).toBe("labor");
+    expect(mocks.company).not.toHaveBeenCalled();
+  });
+  it.each(["off_topic", "company", "unclear"])("keeps named-company payroll follow-ups on evidence despite %s classification", async (intent) => {
+    const message = "한빛테크의 정정한 급여일과 지급 약속을 정리하고 지금 할 일을 알려주세요.";
+    mocks.classify.mockResolvedValue({ intent, topic: "other", company_scope: "not_applicable", status: "classified" });
+    mocks.rewrite.mockResolvedValue({ query: "약속을 확인", changed: true });
+    mocks.retrieve.mockResolvedValue({ status: "matched", reason: "reviewed_applicability_bundle", documents: [] });
+    await sendComparedChatMessage({ message, recent_messages: [] });
+    expect(mocks.retrieve).toHaveBeenCalledWith(message);
+    expect(mocks.compare.mock.calls[0][0].questionIntent).toBe("labor");
+    expect(mocks.company).not.toHaveBeenCalled();
+  });
   it("actual unpaid wages override company-indicator intent and use the original evidence query", async () => {
     const message = "긍정 지표는 좋다는데 지난달 월급을 못 받았습니다. 지표 때문에 체불이 아닌가요?";
     mocks.classify.mockResolvedValue({ intent: "company", topic: "other", company_scope: "specific", status: "classified" });

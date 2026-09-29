@@ -5,7 +5,7 @@ import { assertPublicRateLimit } from "@/server/publicRateLimit";
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
-    assertPublicRateLimit(request, "company_search");
+    await assertPublicRateLimit(request, "company_search");
     return NextResponse.json(await getCompanyFilterOptions());
   } catch (error) {
     const payload = errorPayload(error);

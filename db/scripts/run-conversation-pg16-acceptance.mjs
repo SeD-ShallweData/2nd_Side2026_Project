@@ -91,9 +91,12 @@ try {
     MW_ACCEPTANCE_OWNER_URL: url(owner, password), MW_ACCEPTANCE_CONTAINER: name, MW_ACCEPTANCE_CREATED: "followup06-new-pg16" };
   await runNode(["scripts/build-conversation-worker.mjs", "--acceptance"], resolve(root, "product"), childEnv);
   await runNode([".runtime/conversation-pg16-acceptance.mjs"], resolve(root, "product"), childEnv);
+  phase = "readonly-operations-probe";
+  psql(readFileSync(resolve(root, "db/scripts/conversation-ops-readonly.sql"), "utf8"));
+  console.log("ACCEPTANCE readonly_operations_probe=PASS");
   phase = "migration-replay-noop";
   await migrate(drizzle(sql), { migrationsFolder: resolve(root, "db/migrations") });
-  if (Number((await sql`SELECT count(*) FROM drizzle.__drizzle_migrations`)[0].count) !== 20) throw new Error("LEDGER_REPLAY");
+  if (Number((await sql`SELECT count(*) FROM drizzle.__drizzle_migrations`)[0].count) !== journal.entries.length) throw new Error("LEDGER_REPLAY");
   console.log("ACCEPTANCE migration_replay_noop=PASS");
   console.log("ACCEPTANCE isolated_pg16=PASS");
 } catch (error) {
