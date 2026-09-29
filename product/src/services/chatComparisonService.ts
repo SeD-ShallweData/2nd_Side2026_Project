@@ -86,8 +86,9 @@ function laborEvidenceFallback(
   state: "not_found" | "not_relevant" | "unavailable",
   hasOutOfScopePart: boolean,
   question: string,
+  request?: ChatRequest,
 ): ChatResponse {
-  if (asksSplitWageInjuryActions(question)) return splitWageInjuryGuidance(question, policyBaseline);
+  if (asksSplitWageInjuryActions(question)) return splitWageInjuryGuidance(question, policyBaseline, request);
   if (/(?:근무(?:한)?\s*시간|근로시간)/.test(question)
     && /(?:임금|급여|수당)/.test(question)
     && /빠진|누락|덜\s*(?:받|들어)|반영.{0,8}(?:안|않|못)/.test(question)) {
@@ -313,7 +314,7 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
     const wageFallback = wageArrearsFallback(request.message, policyBaseline, ragRetrieval, hasOutOfScopePart);
     if (wageFallback) Object.assign(policyBaseline, wageFallback);
     if (asksSplitWageInjuryActions(request.message)) {
-      policyBaseline = splitWageInjuryGuidance(request.message, policyBaseline);
+      policyBaseline = splitWageInjuryGuidance(request.message, policyBaseline, request);
     }
   } else if (primaryScope === "labor" && evidenceState !== "not_needed") {
     const hit = evidenceState === "unavailable"
@@ -323,7 +324,7 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
         : "RAG_EVIDENCE_NOT_FOUND";
     return policyShortCircuitResponse({
       request,
-      policyBaseline: laborEvidenceFallback(policyBaseline, evidenceState, hasOutOfScopePart, request.message),
+      policyBaseline: laborEvidenceFallback(policyBaseline, evidenceState, hasOutOfScopePart, request.message, request),
       configs,
       ragRetrieval,
       intentDecision,

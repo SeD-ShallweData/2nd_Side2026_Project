@@ -4,6 +4,7 @@ import { documentStatusesForRequest } from "@/services/conversationDocumentStatu
 import { extractRecallFacts } from "@/services/conversationRecallService";
 import { asksUserDocumentStatus, asksWageDocumentUse } from "@/services/chatQuestionPurpose";
 import { mentionedCompanies, statementCompany } from "@/services/conversationCompanyScope";
+import { companySection as locatedCompanySection } from "@/services/companyAnswerGuardrails";
 
 function companySection(answer: string, name: string, others: string[]): string {
   const start = answer.indexOf(name);
@@ -19,7 +20,7 @@ function documentContradiction(answer: string, request: ChatRequest): boolean {
   if (!/[?？]/.test(request.message) && /(?:계약서|명세서|통장\s*사본).{0,22}(?:갖고|보유|분실|잃|못\s*받|없)/.test(request.message)) return false;
   const rows = documentStatusesForRequest(request);
   const names = [...new Set(rows.map(row => row.company_name))];
-  if (new Set(rows.map(row => row.company_id)).size > names.length) return false;
+  const companies = request.conversation_recall?.companies ?? [];
   const patterns = {
     contract: /(?:근로)?계약서(?!\s*(?:원본|사본))|계약\s*문서/,
     contract_original: /(?:근로)?계약서\s*원본/,
@@ -27,11 +28,14 @@ function documentContradiction(answer: string, request: ChatRequest): boolean {
     bank_copy: /통장\s*사본/,
     pay_slip: /(?:급여|임금)\s*명세서/,
   };
-  const nextDocument = /(?:근로)?계약서|계약\s*문서|통장\s*사본|(?:급여|임금)\s*명세서/;
+  const nextDocument = /(?:근로)?계약서|계약\s*문서|통장\s*사본|(?:급여|임금)\s*명세서|원본|사본/;
   return rows.some(row => {
     if (row.document === "contract" && row.state === "unstated"
       && rows.some(other => other.company_id === row.company_id && other.document.startsWith("contract_") && other.state !== "unstated")) return false;
-    const section = names.length === 1 ? answer : companySection(answer, row.company_name, names.filter(name => name !== row.company_name));
+    const company = companies.find(item => item.company_id === row.company_id);
+    const sameName = company && companies.some(other => other.company_id !== company.company_id && other.company_name === company.company_name);
+    const section = sameName ? locatedCompanySection(answer, company, companies.filter(other => other.company_id !== company.company_id))
+      : names.length === 1 ? answer : companySection(answer, row.company_name, names.filter(name => name !== row.company_name));
     if (!section) return false;
     const sentences = section.split(/[.!?。\n]/).filter(sentence => patterns[row.document].test(sentence));
     return sentences.some(sentence => {
@@ -40,9 +44,12 @@ function documentContradiction(answer: string, request: ChatRequest): boolean {
       const next = rest.search(nextDocument);
       const clause = sentence.slice(match.index!, next < 0 ? undefined : match.index! + match[0].length + next);
       if (/없다면|없는\s*경우|분실했다면|못\s*받았다면|확인되지|단정할\s*수\s*없/.test(clause)) return false;
-      const assertedMissing = /(?:없습니다|없어요|없다|미보유|미교부|받지\s*못했|못\s*받았|분실했|잃어버렸)/.test(clause);
-      const assertedHeld = /(?:갖고\s*있|보유하고\s*있|받았|소지하고\s*있)/.test(clause);
+      const assertedMissing = /(?:없습니다|없어요|없다|없음|미보유|미교부|받지\s*못했|못\s*받았|분실했|잃어버렸)/.test(clause)
+        || /(?:부재|미보유)\s*서류\s*:/.test(sentence);
+      const assertedHeld = /(?:갖고\s*있|보유하고\s*있|받았|소지하고\s*있)/.test(clause)
+        || /보유\s*서류\s*:/.test(sentence) && !assertedMissing;
       return (row.state === "held" || row.state === "unstated") && assertedMissing
+        || row.state === "unstated" && assertedHeld
         || (row.state === "lost" || row.state === "absent") && assertedHeld;
     });
   });

@@ -1,7 +1,7 @@
 import type { ChatRequest } from "@/domain/chat";
 import type { ChatComparisonResponse, ChatResultProviderId } from "@/domain/chatComparison";
 import type { ConversationRecallFact } from "@/domain/conversationRecall";
-import { hasCompanyLocationQualifier, mentionedCompanies, statementCompany, type RecallCompany } from "@/services/conversationCompanyScope";
+import { hasCompanyLocationQualifier, mentionedCompanies, recallCompanyLabel, statementCompany, type RecallCompany } from "@/services/conversationCompanyScope";
 import { asksNextAction } from "@/services/chatQuestionPurpose";
 import { asksUserDocumentStatus, asksWageDocumentUse } from "@/services/chatQuestionPurpose";
 import { DOCUMENT_LABELS, DOCUMENT_STATE_LABELS, documentStatusesForRequest } from "@/services/conversationDocumentStatus";
@@ -14,12 +14,13 @@ const COMPANY_NAME_RECALL = /(?:회사|사업장)\s*(?:이름|명)|어느\s*(?:�
 const COMPANY_CONTEXT_RECALL = /(?:앞선|이전|앞서|아까|순서대로|다시|말해|알려)/;
 const RESIGNATION = /퇴사일|퇴직일|그만둔\s*날|(?:지난달\s*)?\d{1,2}\s*일에\s*퇴사/;
 const WORK_HOURS = /하루\s*\d{1,2}\s*시간|(?:근무|근로)\s*시간/;
-const ACCIDENT_LOCATION = /사고\s*장소|(?:어디|어느\s*곳).{0,12}(?:넘어|다쳤)|집\s*계단|(?:일터|작업장).{0,15}(?:넘어|다쳤)/;
-const WAGE_BALANCE = /미지급\s*(?:잔액|금액)|남은\s*(?:임금|월급|급여|금액)|나머지|부분\s*입금/;
+const ACCIDENT_LOCATION = /사고\s*장소|다친\s*(?:곳|장소)|(?:어디|어느\s*곳).{0,12}(?:넘어|다쳤)|집\s*계단|(?:일터|작업장).{0,15}(?:넘어|다쳤)/;
+const WAGE_BALANCE = /잔액|미지급\s*금액|(?:남은|받은)\s*(?:임금|월급|급여|금액)|나머지|부분\s*입금/;
 
 function needsEvidence(message: string): boolean {
   // Reporting what was said is recall; "어떻게 신고하나" still needs evidence.
-  return LEGAL.test(message.replace(/어떻게\s*말했는지/g, "말했는지")) || asksNextAction(message);
+  return LEGAL.test(message.replace(/어떻게\s*말했는지/g, "말했는지")) || asksNextAction(message)
+    || /카드|공개\s*자료|지표/.test(message);
 }
 
 function companyContextRecall(request: ChatRequest): { answer: string; found: boolean } | null {
@@ -171,7 +172,7 @@ export function recallAnswer(request: ChatRequest, allowMixed = false): { answer
     })) : [];
   const safeDateFollowup = dateCorrections.length === 1;
   const asksCorrection = /(?:정정|수정|바뀐|최신\s*사실)/.test(request.message);
-  const asksBalance = /(?:미지급\s*잔액|남은\s*(?:금액|임금|월급|급여))/.test(request.message);
+  const asksBalance = WAGE_BALANCE.test(request.message);
   const asksKnownFact = /(?:퇴사일|퇴직일|그만둔\s*날|근무시간|근로시간|사고\s*장소).{0,16}(?:언제|얼마|어디|무엇|몇)/.test(request.message)
     && !/법적|산재\s*여부|신고|진정|신청|청구|계산/.test(request.message);
   if ((!RECALL.test(request.message) && !asksCorrection && !asksBalance && !asksKnownFact && currentFacts.length === 0)
@@ -237,7 +238,9 @@ export function recallAnswer(request: ChatRequest, allowMixed = false): { answer
     const fact = applicable.findLast((item) => item.kind === kind);
     return Boolean((!generalCorrection || fact?.is_correction) && (fact?.value || fact?.state === "denied"));
   });
-  return { answer: `${target.company_name ? `${target.company_name}: ` : ""}${parts.join(" ")}`, found };
+  const company = companies.find(item => item.company_id === target.company_id);
+  const label = company ? recallCompanyLabel(company, companies) : target.company_name;
+  return { answer: `${label ? `${label}: ` : ""}${parts.join(" ")}`, found };
   });
   const found = answers.some((item) => item.found);
   if (answers.length === 1 && /1\s*번/.test(request.message) && /2\s*번/.test(request.message)
@@ -255,7 +258,10 @@ export function recallResponse(request: ChatRequest, providers: Array<{
   id: ChatResultProviderId; label: string; model: string;
 }>): ChatComparisonResponse | null {
   const companyRecall = companyContextRecall(request);
-  const recall = companyRecall ?? documentAdmissionRecall(request) ?? documentStatusRecall(request) ?? recallAnswer(request);
+  const fact = recallAnswer(request);
+  const document = documentStatusRecall(request);
+  const combined = fact && document ? { answer:`${fact.answer}\n\n${document.answer}`, found:fact.found || document.found } : fact ?? document;
+  const recall = companyRecall ?? documentAdmissionRecall(request) ?? combined;
   if (!recall) return null;
   const now = new Date().toISOString();
   return {
@@ -287,6 +293,7 @@ export function finalizeConversationResponse(request: ChatRequest, response: Cha
   const mixedRecall = needsEvidence(request.message) ? recallAnswer(request, true) : null;
   const documentRecall = documentStatusRecall(request, true);
   return { ...response, results: response.results.map((result) => {
+    if (result.trace.recall_mode) return result;
     // Even a legal-generation replacement keeps the separately sourced recall.
     // Emergency answers always retain priority and are not prefixed.
     const recall = result.answer_type === "emergency_guidance" ? null : mixedRecall;
