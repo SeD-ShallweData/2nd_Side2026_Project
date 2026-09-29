@@ -1,6 +1,6 @@
 /** Extracted user statements, never verified legal/company evidence. */
 export interface ConversationRecallFact {
-  kind: "payday" | "payment_promise";
+  kind: "payday" | "payment_promise" | "resignation_date" | "work_hours" | "accident_location" | "wage_balance";
   value: string | null;
   source_message_id: string;
   sequence: number;

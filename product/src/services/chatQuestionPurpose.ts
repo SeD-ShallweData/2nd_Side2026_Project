@@ -9,3 +9,8 @@ export function asksWageDocumentUse(message: string): boolean {
     && /임금|체불|급여|월급/.test(message)
     && /진정|접수|자료|활용|사용|보유|갖고/.test(message);
 }
+
+export function asksUserDocumentStatus(message: string): boolean {
+  return /계약서|명세서|통장\s*사본|서류|문서/.test(message)
+    && /보유|갖고|있는|없는|없다|없나요|분실|상태|진술|말한|말했|정정|구분/.test(message);
+}

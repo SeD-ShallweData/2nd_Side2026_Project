@@ -45,6 +45,24 @@ beforeEach(() => {
 });
 
 describe("의도와 근거에 따른 상담 경로", () => {
+  it("routes a selected firm's card-versus-personal-payment proof question despite uncertain intent", async () => {
+    mocks.classify.mockResolvedValue({ intent: "unclear", topic: "other", company_scope: "not_applicable", status: "unavailable" });
+    mocks.company.mockResolvedValue({ company_id: "UNKNOWN_WAGE_001", company_name: "새봄서비스" });
+    const response = await sendParsedComparedChatRequest({
+      message: "새봄서비스 임금 카드가 이 70만 원 입금이나 남은 30만 원을 입증하나요?",
+      company_id: "UNKNOWN_WAGE_001", chat_mode: "wage", recent_messages: [],
+      conversation_recall: { facts: [{ kind: "wage_balance", value: "100만 원 중 70만 원 입금, 남은 금액 30만 원",
+        company_id: "UNKNOWN_WAGE_001", source_message_id: "synthetic", sequence: 21, is_correction: false }],
+        companies: [{ company_id: "UNKNOWN_WAGE_001", company_name: "새봄서비스" }], company_history: [],
+        diagnostics: { summary_status: "ready", summary_version: "extractive-v4", summarized_through_sequence: 20,
+          stored_message_count: 42, hydrated_recent_count: 2, summary_included: true, recall_fact_count: 1,
+          legacy_recall_rebuilt: false } },
+    });
+    expect(mocks.compare).toHaveBeenCalledOnce();
+    expect(mocks.compare.mock.calls[0][0].questionIntent).toBe("company");
+    expect(mocks.compare.mock.calls[0][0].companyContext.company_id).toBe("UNKNOWN_WAGE_001");
+    expect(response.results).toEqual([]);
+  });
   it("uses both owner-checked cards for an Incheon/Gimpo comparison despite selected Gimpo", async () => {
     const companies = [
       { company_id: "COMPANY_DEMO_001", company_name: "OO건설", region: "인천광역시", address: "인천광역시 서구 샘플로 10" },
