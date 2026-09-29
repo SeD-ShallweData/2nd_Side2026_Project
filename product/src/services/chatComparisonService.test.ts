@@ -129,6 +129,25 @@ describe("의도와 근거에 따른 상담 경로", () => {
     expect(response.results[0].answer).not.toContain("진정은 고용노동부 노동포털");
     expect(response.results[0].sources).toEqual([]);
   });
+  it("keeps the missing-hours question actionable without pretending that RAG found law", async () => {
+    const response = await sendComparedChatMessage({ message: "회사 단톡방에 '주식 대박'이라는 말도 있었지만 제 질문은 근무한 시간의 임금이 빠진 경우입니다. 어떻게 확인하죠?" });
+    expect(response.results[0].trace.guardrail_hits).toEqual(["RAG_EVIDENCE_NOT_FOUND"]);
+    expect(response.results[0].answer).toContain("빠진 근무시간");
+    expect(response.results[0].answer).toContain("급여명세서");
+    expect(response.results[0].answer).toContain("출퇴근");
+    expect(response.results[0].sources).toEqual([]);
+    expect(mocks.compare).not.toHaveBeenCalled();
+  });
+  it("keeps both next actions and evidence limits when D2T24 has no matched RAG", async () => {
+    mocks.classify.mockResolvedValue({ intent: "unclear", topic: "other", company_scope: "not_applicable", status: "classified" });
+    const response = await sendComparedChatMessage({ message: "마지막으로 새봄서비스 임금 문제에 대한 다음 행동과 푸른건설 발목 문제의 우선 행동을 나눠 근거 범위를 표시해 주세요." });
+    expect(response.results[0].trace.guardrail_hits).toEqual(["RAG_EVIDENCE_NOT_FOUND"]);
+    expect(response.results[0].answer).toContain("새봄서비스 임금");
+    expect(response.results[0].answer).toContain("푸른건설 발목");
+    expect(response.results[0].answer).toContain("근거 범위");
+    expect(response.results[0].sources).toEqual([]);
+    expect(mocks.compare).not.toHaveBeenCalled();
+  });
   it("routes a labor portal follow-up away from the selected company card when intent is unavailable", async () => {
     mocks.classify.mockResolvedValue({ intent: "unclear", topic: "other", company_scope: "not_applicable", status: "unavailable" });
     mocks.retrieve.mockResolvedValue({ status: "matched", reason: "reviewed_applicability_bundle", topic: "filing", documents: [] });
