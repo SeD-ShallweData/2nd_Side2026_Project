@@ -19,6 +19,16 @@ import type {
   ProviderComparisonResult,
 } from "@/domain/chatComparison";
 import { executionModeCopy, providerRunStatusLabel } from "@/components/chat/runLabels";
+import type { FavoriteCompanyDto } from "@/app/api/users/me/favorites/favoriteApiContract";
+import {
+  CONTRACT_REVIEW_CONTEXT_STORAGE_KEY,
+  CONTRACT_REVIEW_CONTEXT_TTL_MS,
+  contractReviewCounts,
+  parseContractReviewContext,
+  type ContractReviewContext,
+} from "@/domain/contractReviewContext";
+import { getSession } from "@/services/authClient";
+import { getFavorites } from "@/services/favoriteClient";
 import { readApiResponse } from "@/utils/clientApi";
 import { publicClientHeaders } from "@/utils/publicClientId";
 import { publicAnswerText } from "@/services/publicAnswerContext";
@@ -270,12 +280,15 @@ export function ChatPanel({
   suggestedPrompt,
   chatMode = "general",
   executionMode = "dual_api",
+  contractReviewRequested = false,
 }: {
   companyId?: string;
   companyName?: string;
   suggestedPrompt?: string;
   chatMode?: ChatMode;
   executionMode?: ConfiguredChatExecutionMode;
+  /** 계약서 진단 화면의 "AI 상담으로 이어가기"로 들어온 경우 true. */
+  contractReviewRequested?: boolean;
 }) {
   const inputId = useId();
   const contractFileInputId = useId();
@@ -304,6 +317,8 @@ export function ChatPanel({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [persistenceNotice, setPersistenceNotice] = useState<string | null>(null);
   const [guestImportAvailable, setGuestImportAvailable] = useState(false);
+  const [favoriteCompanies, setFavoriteCompanies] = useState<FavoriteCompanyDto[]>([]);
+  const [contractReview, setContractReview] = useState<ContractReviewContext | null>(null);
 
   const refreshConversationHistory = useCallback(async () => {
     const response = await fetch("/api/conversations?limit=20", { cache: "no-store" });
@@ -337,6 +352,49 @@ export function ChatPanel({
       setGuestImportAvailable(readGuestConversation() !== null);
     }, 0);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  // 계약서 진단 결과 요약은 이 탭의 sessionStorage 에서만 읽는다. 오래됐거나 형식이
+  // 맞지 않으면 연결하지 않는다. 서버도 같은 검사를 다시 한다.
+  useEffect(() => {
+    if (chatMode !== "contract" || !contractReviewRequested) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = window.sessionStorage.getItem(CONTRACT_REVIEW_CONTEXT_STORAGE_KEY);
+        const stored = raw ? (JSON.parse(raw) as { saved_at?: unknown; context?: unknown }) : null;
+        const fresh = typeof stored?.saved_at === "number" && Date.now() - stored.saved_at < CONTRACT_REVIEW_CONTEXT_TTL_MS;
+        setContractReview(fresh ? parseContractReviewContext(stored?.context) ?? null : null);
+      } catch {
+        setContractReview(null);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [chatMode, contractReviewRequested]);
+
+  function detachContractReview() {
+    setContractReview(null);
+    try {
+      window.sessionStorage.removeItem(CONTRACT_REVIEW_CONTEXT_STORAGE_KEY);
+    } catch {
+      // 저장소를 못 써도 이번 화면에서는 연결이 해제된다.
+    }
+  }
+
+  // 관심 사업장은 챗봇이 자동으로 읽지 않는다. 일반 사용자에게 목록을 보여 주고,
+  // 사용자가 고른 한 곳만 기존 company_id 경로로 상담에 연결한다.
+  useEffect(() => {
+    const controller = new AbortController();
+    getSession({ signal: controller.signal })
+      .then((session) => {
+        if (!session.authenticated || session.user.role !== "user") return;
+        return getFavorites({ signal: controller.signal }).then((favorites) => {
+          if (!controller.signal.aborted) setFavoriteCompanies(favorites.items);
+        });
+      })
+      .catch(() => {
+        // 관심 사업장 목록은 보조 기능이다. 불러오지 못해도 상담은 그대로 쓴다.
+      });
+    return () => controller.abort();
   }, []);
 
   async function sendMessage(value: string, retryRequestId?: string) {
@@ -395,6 +453,7 @@ export function ChatPanel({
           external_compare_consent: requestedComparison,
           chat_mode: chatMode,
           recent_messages: recentMessages,
+          ...(chatMode === "contract" && contractReview ? { contract_review: contractReview } : {}),
         });
       }
       const response = await fetch("/api/chat", requestInit);
@@ -618,7 +677,7 @@ export function ChatPanel({
       <div className="chat-panel comparison-chat-panel">
       <div className="chat-topbar">
         <div><span className="online-dot" aria-hidden="true" /><strong>{executionMode === "dual_api" ? compare ? "Upstage·SKT 답변 비교" : "Upstage Solar 단일 상담" : "OpenAI 도구 연결 상담"}</strong></div>
-        <span>{activeCompanyLabel ? `${activeCompanyLabel} 컨텍스트 연결됨` : chatMode === "contract" ? "계약서 후속 상담" : "일반 노동 상담"}</span>
+        <span>{activeCompanyLabel ? `${activeCompanyLabel} 컨텍스트 연결됨` : chatMode === "contract" ? contractReview ? "계약서 진단 결과 연결됨" : "계약서 후속 상담" : "일반 노동 상담"}</span>
       </div>
 
       <div className="chat-body comparison-chat-body" aria-live="polite" aria-busy={loading}>
@@ -732,9 +791,22 @@ export function ChatPanel({
         />
         <span>
           <strong>이번 질문의 외부 AI 전송에 동의</strong>
-          <small>질문, 최근 대화 최대 10개, 30일 요약, 선택한 회사 공개 정보와 현재 공식 근거가 전송됩니다. 동의는 저장하지 않으며 체크를 해제하면 다음 전송을 막습니다.</small>
+          <small>질문, 최근 대화 최대 10개, 30일 요약, 선택한 회사 공개 정보와 현재 공식 근거{contractReview ? ", 연결한 계약서 진단 요약(항목 분류·근거 조문)" : ""}가 전송됩니다. 동의는 저장하지 않으며 체크를 해제하면 다음 전송을 막습니다.</small>
         </span>
       </label>
+
+      {contractReview ? (
+        <section className="chat-contract-review-link" aria-label="연결된 계약서 진단 결과">
+          <div>
+            <strong>계약서 진단 결과 연결됨</strong>
+            <span>
+              확인됨 {contractReviewCounts(contractReview).detected} · 누락 가능 {contractReviewCounts(contractReview).missing} · 추가 확인 {contractReviewCounts(contractReview).review}
+            </span>
+            <small>항목 분류와 근거 조문 요약만 연결됩니다. 계약서 원본·원문은 보내지 않고 대화 기록에도 남기지 않습니다.</small>
+          </div>
+          <button type="button" disabled={loading} onClick={detachContractReview}>연결 해제</button>
+        </section>
+      ) : null}
 
       {error ? <p className="chat-error" role="alert">{error}</p> : null}
       {persistenceNotice ? <p className="chat-persistence-status" role="status">{persistenceNotice}</p> : null}
@@ -778,6 +850,23 @@ export function ChatPanel({
         <p className="chat-company-help">
           특정 회사에 관해 질문하려면 <Link href="/companies">사업장을 먼저 검색해 선택</Link>하세요.
         </p>
+      ) : null}
+      {favoriteCompanies.some((company) => company.company_id !== activeCompanyId) ? (
+        <nav className="chat-favorite-companies" aria-label="관심 사업장으로 상담">
+          <span>관심 사업장으로 상담</span>
+          {favoriteCompanies
+            .filter((company) => company.company_id !== activeCompanyId)
+            .slice(0, 6)
+            .map((company) => (
+              <Link
+                key={company.company_id}
+                href={`/chat?company_id=${encodeURIComponent(company.company_id)}`}
+                title={[company.region, company.industry].filter(Boolean).join(" · ") || undefined}
+              >
+                {company.company_name}
+              </Link>
+            ))}
+        </nav>
       ) : null}
       </div>
       <aside className="question-guide" aria-label="AI 질문 가이드">

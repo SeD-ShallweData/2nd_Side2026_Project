@@ -1,5 +1,6 @@
 import { getDataMode, getMockDelayMs } from "@/config/dataMode";
 import type { ChatMode, ChatRequest, ChatResponse, RecentMessage } from "@/domain/chat";
+import { parseContractReviewContext } from "@/domain/contractReviewContext";
 import { getChatProvider } from "@/services/providers";
 import { delay } from "@/utils/delay";
 import { ServiceError } from "@/utils/errors";
@@ -83,6 +84,7 @@ export function parseChatRequest(value: unknown): ChatRequest {
     external_compare_consent: input.compare === true && input.external_compare_consent === true,
     chat_mode: chatMode as ChatMode,
     recent_messages: normalizeMessages(input.recent_messages),
+    contract_review: chatMode === "contract" ? parseContractReviewContext(input.contract_review) : undefined,
   };
 }
 
