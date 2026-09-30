@@ -5156,6 +5156,13 @@ summary:focus-visible {
   max-width: 600px;
   margin-inline: auto;
 }
+/* 격자 칸 안의 상자와 그 안쪽 칸은 기본값으로 안쪽 내용(460px)보다 좁아지지 않아
+   모바일에서 화면 밖으로 밀렸다. 칸을 화면 폭 안에 가두고, 좁으면 버튼을 한 줄에 하나씩 쌓는다. */
+.refresh-contract-page .contract-upload { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 640px) {
+  .refresh-contract-page .contract-upload { padding: 24px 18px; }
+  .refresh-contract-page .contract-upload .upload-copy { gap: 16px; justify-content: center; }
+}
 
 
 /* 제목 상자의 기본 760px 제한 때문에 '계약서에서 놓친 항목이 있나요?' 와
@@ -5473,4 +5480,52 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
 @media (max-width: 720px) {
   .language-switcher-toggle { padding: 6px 9px; }
   .language-switcher-toggle span:last-child { display: none; }
+}
+
+/* ── 모바일 가운데 정렬(10-01) ─────────────────────────────
+   제목·짧은 소개 문단·안내 띠·빈 화면 안내·버튼 묶음만 가운데로 둔다.
+   상담 말풍선·답변, 목록·체크리스트, 입력 양식, 표·진단 결과·위험 카드·게시글은
+   줄 시작이 흔들리면 읽기 어려워 왼쪽 정렬을 그대로 둔다. */
+@media (max-width: 640px) {
+  /* 페이지 제목 묶음(상담 탭처럼 왼쪽으로 둔 곳 포함) */
+  .page-heading,
+  .page-heading-left,
+  .refresh-chat-shell > .page-heading { margin-inline: auto; text-align: center; }
+
+  /* 첫 화면 소개와 각 절의 제목 묶음 */
+  .refresh-hero-copy { text-align: center; }
+  .refresh-hero-copy > p,
+  .refresh-section-row p,
+  .refresh-split-section > div > p { margin-inline: auto; }
+  .refresh-section-row { flex-direction: column; align-items: center; text-align: center; }
+  .refresh-split-section > div:first-child { text-align: center; }
+  .refresh-button-row,
+  .refresh-hero-copy .refresh-button-row { justify-content: center; }
+
+  /* 첫 화면의 세 단계 소개 카드(아이콘·번호 배지도 가운데로) */
+  .refresh-step-grid article { text-align: center; }
+  .refresh-step-grid i { margin-inline: auto; }
+  .refresh-step-grid b { left: 50%; transform: translateX(-50%); white-space: nowrap; }
+
+  /* 안내 띠: 두 줄로 접히면 글자도 가운데에 모은다 */
+  .mock-banner,
+  .mode-banner,
+  .worksite-privacy-strip { flex-wrap: wrap; justify-content: center; text-align: center; }
+
+  /* 양식·목록의 머리 문단(제목 + 한두 줄 설명) */
+  .worksite-form-intro,
+  .worksite-list-toolbar { flex-direction: column; align-items: center; text-align: center; }
+
+  /* 빈 화면·상태 안내 */
+  .state-card,
+  .worksite-state-card,
+  .community-empty,
+  .chat-company-help { text-align: center; }
+
+  /* 버튼 묶음 */
+  .contract-actions,
+  .community-search-actions { justify-content: center; }
+  /* 520px 이하는 본문 줄바꿈을 풀어 두었다(위 520px 블록). 가운데로 모은 제목은 어절이 쪼개지면
+     "확/인하세요"처럼 읽혀 제목과 짧은 소개 문단만 어절 단위로 되돌린다. 띄어쓰기가 없는 중국어·태국어는 제외한다. */
+  html:not([data-locale="zh"]):not([data-locale="th"]) :is(.page-heading h1, .page-heading p, .refresh-hero-copy h1, .refresh-hero-copy > p, .refresh-section-row h2, .refresh-section-row p, .refresh-split-section h2, .refresh-split-section > div > p, .refresh-step-grid h3, .refresh-step-grid p) { word-break: keep-all; }
 }
