@@ -338,3 +338,52 @@ describe("로그아웃", () => {
     expect(db.queryWrite).not.toHaveBeenCalled();
   });
 });
+
+describe("계정 삭제", () => {
+  function foreignKeyViolation(fields: Record<string, unknown>): Error {
+    return Object.assign(
+      new Error('update or delete on table "users" violates foreign key constraint "worksite_tips_reporter_id_users_id_fk" on table "worksite_tips"'),
+      { code: "23503", ...fields },
+    );
+  }
+
+  it("일반 사용자 본인 세션으로만 지운다", async () => {
+    db.queryWrite.mockResolvedValueOnce([{ id: "user-1" }]);
+
+    await expect(repository.deleteAccount("A".repeat(43))).resolves.toBe(true);
+
+    const sql = String(db.queryWrite.mock.calls[0]?.[1]);
+    expect(sql).toContain("DELETE FROM users");
+    expect(sql).toContain("auth_role = 'user'");
+  });
+
+  /*
+   * worksite_tips.reporter_id 는 ON DELETE RESTRICT 라 제보를 낸 사용자는 탈퇴가 막힌다.
+   * 500 "요청을 처리하는 중 오류"로 두면 사용자는 이유를 알 수 없다.
+   */
+  it.each([
+    ["제약 이름", { constraint: "worksite_tips_reporter_id_users_id_fk", table: "worksite_tips" }],
+    ["참조 테이블만 온 경우", { table: "worksite_tips" }],
+  ])("현장 제보 외래키(23503, %s)에 걸리면 409 로 안내한다", async (_label, fields) => {
+    db.queryWrite.mockRejectedValueOnce(foreignKeyViolation(fields));
+
+    await expect(repository.deleteAccount("A".repeat(43))).rejects.toMatchObject({
+      code: "ACCOUNT_DELETE_BLOCKED_BY_WORKSITE_TIP",
+      status: 409,
+      retryable: false,
+      message: "접수한 현장 제보가 있는 계정은 바로 삭제할 수 없습니다. 운영팀에 문의해 주세요.",
+    });
+  });
+
+  it("다른 외래키 위반과 다른 DB 오류는 안내로 바꾸지 않는다", async () => {
+    db.queryWrite.mockRejectedValueOnce(Object.assign(new Error("fk"), {
+      code: "23503",
+      constraint: "ops_audit_log_by_user_id_users_id_fk",
+      table: "ops_audit_log",
+    }));
+    await expect(repository.deleteAccount("A".repeat(43))).rejects.toMatchObject({ code: "23503" });
+
+    db.queryWrite.mockRejectedValueOnce(Object.assign(new Error("permission denied"), { code: "42501" }));
+    await expect(repository.deleteAccount("A".repeat(43))).rejects.toMatchObject({ code: "42501" });
+  });
+});

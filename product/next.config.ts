@@ -1,7 +1,31 @@
 import type { NextConfig } from "next";
 
+/*
+ * 모든 경로에 붙이는 보안 헤더.
+ *
+ * - 다른 사이트가 우리 화면을 iframe 에 넣지 못하게 한다(클릭재킹). 오래된 브라우저용
+ *   X-Frame-Options 와 표준 CSP frame-ancestors 를 함께 둔다. 앱 안에서 자기 화면을
+ *   iframe 으로 여는 곳은 없다.
+ * - 응답 형식을 브라우저가 추측하지 않게 한다(nosniff).
+ * - 다른 사이트로 나갈 때 주소 전체 대신 출처만 넘긴다.
+ *
+ * 전체 CSP(script-src 등)와 HSTS 는 넣지 않는다. 전체 CSP 는 Next 인라인 스크립트와 맞춰야
+ * 하고, HSTS 는 앞단(Tailscale Funnel)이 TLS 를 맡고 있어 여기서 정할 일이 아니다.
+ */
+const SECURITY_HEADERS: { key: string; value: string }[] = [
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // 응답에 x-powered-by: Next.js 를 싣지 않는다. 프레임워크를 굳이 알릴 이유가 없다.
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+  },
   images: {
     // 시연 서버는 proxy.ts 의 Basic auth 뒤에 있다. 그런데 /_next/image 는 원본을
     // 가져올 때 헤더 없는 내부 요청을 만들어 자기 라우터 핸들러에 다시 넣는다

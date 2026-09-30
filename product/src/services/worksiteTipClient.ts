@@ -4,29 +4,21 @@ import type {
   WorksiteTipListResponse,
   WorksiteTipReceiptDto,
 } from "@/app/api/worksite-tips/worksiteTipApiContract";
+import { readApiResponse } from "@/utils/clientApi";
 
-interface ApiErrorPayload {
-  error?: { message?: string };
-  message?: string;
-}
-
-async function readResponse<T>(response: Response): Promise<T> {
-  const payload = (await response.json()) as T | ApiErrorPayload;
-  if (!response.ok) {
-    const error = payload as ApiErrorPayload;
-    throw new Error(error.error?.message ?? error.message ?? "요청을 처리하지 못했습니다.");
-  }
-  return payload as T;
-}
+/*
+ * 응답 읽기는 공용 도우미(readApiResponse)를 쓴다. 빈 본문 502 나 HTML 오류 페이지를 받아도
+ * 브라우저의 JSON 해석 오류 원문 대신 한국어 안내가 뜬다.
+ */
 
 export async function getSession(signal?: AbortSignal): Promise<SessionResponse> {
   const response = await fetch("/api/auth/session", { signal, cache: "no-store" });
-  return readResponse<SessionResponse>(response);
+  return readApiResponse<SessionResponse>(response);
 }
 
 export async function submitWorksiteTip(form: FormData): Promise<WorksiteTipReceiptDto> {
   const response = await fetch("/api/worksite-tips", { method: "POST", body: form });
-  return readResponse<WorksiteTipReceiptDto>(response);
+  return readApiResponse<WorksiteTipReceiptDto>(response);
 }
 
 export async function listWorksiteTips(page: number, signal?: AbortSignal): Promise<WorksiteTipListResponse> {
@@ -34,10 +26,10 @@ export async function listWorksiteTips(page: number, signal?: AbortSignal): Prom
     signal,
     cache: "no-store",
   });
-  return readResponse<WorksiteTipListResponse>(response);
+  return readApiResponse<WorksiteTipListResponse>(response);
 }
 
 export async function getWorksiteTip(tipId: string): Promise<WorksiteTipDto> {
   const response = await fetch(`/api/worksite-tips/${encodeURIComponent(tipId)}`, { cache: "no-store" });
-  return readResponse<WorksiteTipDto>(response);
+  return readApiResponse<WorksiteTipDto>(response);
 }

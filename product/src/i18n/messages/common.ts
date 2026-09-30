@@ -2,7 +2,7 @@ import { defineMessages } from "@/i18n/defineMessages";
 import { EXCLUDED_VERDICT_META, SIGNAL_STATUS_META, getWageStatusMeta } from "@/domain/riskPresentation";
 
 /*
- * 여러 화면이 함께 쓰는 공통 부품 문구(불러오기·오류 상태, 출처, 기준일, 체크리스트, 상태 배지, 하단, 404).
+ * 여러 화면이 함께 쓰는 공통 부품 문구(불러오기·오류 상태, 출처, 기준일, 체크리스트, 상태 배지, 하단, 404, 화면 오류).
  * 한국어 상태 배지 문구는 도메인 상수를 그대로 가져와 상담 문맥(publicAnswerContext)과 어긋나지 않게 한다.
  */
 export const commonMessages = defineMessages({
@@ -68,6 +68,13 @@ export const commonMessages = defineMessages({
       desc: "사업장 검색에서 이름, 지역, 업종을 다시 확인해 주세요.",
       action: "사업장 다시 검색",
     },
+    appError: {
+      title: "화면을 불러오지 못했습니다",
+      desc: "일시적인 문제로 이 화면을 보여 드리지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      reference: "문의 코드 {code}",
+      retry: "다시 시도",
+      home: "첫 화면으로",
+    },
   },
   "ko-easy": {
     async: {
@@ -100,6 +107,13 @@ export const commonMessages = defineMessages({
       title: "찾는 회사가 없어요",
       desc: "회사 이름, 지역, 업종을 다시 확인해 주세요.",
       action: "다시 찾기",
+    },
+    appError: {
+      title: "화면을 열지 못했어요",
+      desc: "잠깐 문제가 생겼어요. 조금 뒤에 다시 해 보세요.",
+      reference: "물어볼 때 알려 줄 번호 {code}",
+      retry: "다시 하기",
+      home: "처음 화면으로",
     },
   },
   en: {
@@ -164,6 +178,13 @@ export const commonMessages = defineMessages({
       desc: "Please check the name, region and industry again in workplace search.",
       action: "Search workplaces again",
     },
+    appError: {
+      title: "We couldn't load this page",
+      desc: "A temporary problem kept this page from loading. Please try again shortly.",
+      reference: "Reference code {code}",
+      retry: "Try again",
+      home: "Go to the home page",
+    },
   },
   zh: {
     async: {
@@ -226,6 +247,13 @@ export const commonMessages = defineMessages({
       title: "找不到您要查找的工作单位",
       desc: "请在工作单位搜索中重新确认名称、地区和行业。",
       action: "重新搜索工作单位",
+    },
+    appError: {
+      title: "未能加载此页面",
+      desc: "由于临时问题,无法显示此页面。请稍后再试。",
+      reference: "查询代码 {code}",
+      retry: "重试",
+      home: "返回首页",
     },
   },
   vi: {
@@ -290,6 +318,13 @@ export const commonMessages = defineMessages({
       desc: "Vui lòng kiểm tra lại tên, khu vực và ngành trong mục tìm nơi làm việc.",
       action: "Tìm lại nơi làm việc",
     },
+    appError: {
+      title: "Không thể tải trang này",
+      desc: "Đã xảy ra sự cố tạm thời nên không thể hiển thị trang này. Vui lòng thử lại sau.",
+      reference: "Mã tham chiếu {code}",
+      retry: "Thử lại",
+      home: "Về trang đầu",
+    },
   },
   th: {
     async: {
@@ -352,6 +387,13 @@ export const commonMessages = defineMessages({
       title: "ไม่พบสถานที่ทำงานที่คุณค้นหา",
       desc: "โปรดตรวจสอบชื่อ พื้นที่ และอุตสาหกรรมอีกครั้งในหน้าค้นหาสถานที่ทำงาน",
       action: "ค้นหาสถานที่ทำงานอีกครั้ง",
+    },
+    appError: {
+      title: "ไม่สามารถโหลดหน้านี้ได้",
+      desc: "เกิดปัญหาชั่วคราวจึงแสดงหน้านี้ไม่ได้ โปรดลองอีกครั้งภายหลัง",
+      reference: "รหัสอ้างอิง {code}",
+      retry: "ลองอีกครั้ง",
+      home: "กลับหน้าแรก",
     },
   },
 });

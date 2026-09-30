@@ -83,6 +83,36 @@ describe("chat HTTP 입력 계약", () => {
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
+  it("깨진 JSON 은 500 이 아니라 400(INVALID_JSON)으로 거부한다", async () => {
+    await expect(
+      parseChatHttpRequest(
+        new Request("http://localhost/api/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json; charset=utf-8" },
+          body: "{\"message\":",
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "INVALID_JSON", status: 400 });
+  });
+
+  it("이전 답변 8개를 실은 긴 세션 요청도 받아들인다", async () => {
+    // 한글 한 글자는 3바이트다. 답변 8개 × 10,000자면 약 240KB 로 기본 상한(64KB)을 넘는다.
+    const body = {
+      message: "이어서 질문합니다",
+      chat_mode: "wage",
+      recent_messages: Array.from({ length: 8 }, () => ({ role: "assistant", content: "가".repeat(10_000) })),
+    };
+    const parsed = await parseChatHttpRequest(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+
+    expect(parsed).toEqual({ body });
+  });
+
   it("지원하지 않는 Content-Type을 415 오류로 거부한다", async () => {
     await expect(
       parseChatHttpRequest(

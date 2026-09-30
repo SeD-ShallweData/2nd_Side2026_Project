@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { AdminAccessGate } from "@/components/admin/AdminAccessGate";
 import { BatchStatusPage } from "@/components/inspector/BatchStatusPage";
+import { requireOperatorPage } from "@/server/auth/pageGuards";
 
 export const metadata: Metadata = { title: "Machine Learning 배치 현황" };
 
-export default function AdminBatchesPage() {
+/* 배치 운영은 운영 관리자만 연다. 서버에서 먼저 확인하고, 아니면 403 화면을 낸다. */
+export default async function AdminBatchesPage() {
+  await requireOperatorPage();
+
   return (
     <div className="inspector-page">
       <AdminAccessGate>

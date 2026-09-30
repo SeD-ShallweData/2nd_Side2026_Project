@@ -56,6 +56,39 @@ afterEach(() => {
   state.reviewCalls = 0;
 });
 
+describe("계약서 진단 JSON 요청", () => {
+  function jsonRequest(body: string): Request {
+    return new Request("http://localhost/api/contracts/review", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: "donworry_session=user-token" },
+      body,
+    });
+  }
+
+  it("깨진 JSON 은 500 이 아니라 400 으로 돌려준다", async () => {
+    const response = await POST(jsonRequest("{\"scenario_id\":"));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: "INVALID_JSON" } });
+    expect(state.reviewCalls).toBe(0);
+  });
+
+  it("객체가 아닌 JSON 도 400 으로 돌려준다", async () => {
+    const response = await POST(jsonRequest("null"));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: "VALIDATION_ERROR" } });
+    expect(state.reviewCalls).toBe(0);
+  });
+
+  it("올바른 JSON 은 그대로 진단으로 넘긴다", async () => {
+    const response = await POST(jsonRequest(JSON.stringify({ scenario_id: "default" })));
+
+    expect(response.status).toBe(200);
+    expect(state.reviewCalls).toBe(1);
+  });
+});
+
 describe("계약서 진단 호출 한도", () => {
   it("익명 사용자는 IP별로 세고 같은 IP의 브라우저 표시값 교체를 막는다", async () => {
     expect((await POST(request({ clientId: BROWSER_A }))).status).toBe(200);

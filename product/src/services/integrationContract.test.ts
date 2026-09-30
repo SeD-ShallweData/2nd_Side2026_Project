@@ -5,6 +5,7 @@ import { toWageRiskPublic } from "@/adapters/real/MlRiskProvider";
 import { getCompanyDataMode, getContractDataMode } from "@/config/dataMode";
 import { buildBotDatabaseUrl, getDatabaseConnectionString } from "@/server/databaseConfig";
 import { queryReadOnly } from "@/server/postgres";
+import { errorPayload, resetApiErrorLogForTests } from "@/utils/errors";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -321,22 +322,129 @@ describe("계약서 분석 내부 계약", () => {
     expect(result.detected_items[0]).toMatchObject({ code: "working_hours" });
   });
 
-  it("CSH 문자열 오류를 사용자용 공급자 오류로 전달한다", async () => {
-    vi.stubEnv("CONTRACT_ANALYSIS_URL", "http://contract.test");
-    const fakeFetch = (async () => new Response(JSON.stringify({
-      error: "Upstage API 키가 없습니다.",
-    }), { status: 503, headers: { "Content-Type": "application/json" } })) as typeof fetch;
-    const file = new File(["pdf"], "contract.pdf", { type: "application/pdf" });
+  /*
+   * 상류(contract-api) 문구에는 공급자 HTTP 오류 본문, requests 예외의 호스트·주소, 파일 경로,
+   * 환경변수 이름이 섞여 온다. 사용자·상담 도구에는 허용목록의 고정 문구만 가고,
+   * 원문은 정리해서 서버 로그에만 남는다.
+   */
+  describe("상류 오류 문구를 그대로 전달하지 않는다", () => {
+    function upstream(status: number, body: unknown): typeof fetch {
+      return (async () => new Response(
+        typeof body === "string" ? body : JSON.stringify(body),
+        { status, headers: { "Content-Type": "application/json" } },
+      )) as typeof fetch;
+    }
 
-    await expect(new RealContractReviewProvider(fakeFetch).review({ file })).rejects.toThrow("Upstage API 키가 없습니다.");
+    async function reviewFailure(fakeFetch: typeof fetch): Promise<unknown> {
+      vi.stubEnv("CONTRACT_ANALYSIS_URL", "http://contract.test");
+      const file = new File(["pdf"], "contract.pdf", { type: "application/pdf" });
+      try {
+        await new RealContractReviewProvider(fakeFetch).review({ file });
+      } catch (error) {
+        return error;
+      }
+      throw new Error("계약서 분석이 실패해야 합니다.");
+    }
+
+    function loggedEvents(spy: ReturnType<typeof vi.spyOn>): Record<string, unknown>[] {
+      return spy.mock.calls.map((call) => JSON.parse(String(call[0])) as Record<string, unknown>);
+    }
+
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      resetApiErrorLogForTests();
+      errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    });
+    afterEach(() => {
+      errorSpy.mockRestore();
+    });
+
+    it("공급자 HTTP 오류 본문과 키 조각은 응답에 싣지 않고 정리해서 로그에만 남긴다", async () => {
+      const raw = 'upstage HTTP 401: {"error":{"message":"Incorrect API key provided: up_live_0123456789abcdef","type":"invalid_request_error"}}';
+      const error = await reviewFailure(upstream(502, { error: raw }));
+
+      expect(error).toMatchObject({ code: "CONTRACT_ANALYSIS_FAILED", status: 502, retryable: true });
+      const body = JSON.stringify(errorPayload(error).body);
+      expect(body).toContain("계약서를 분석하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      expect(body).not.toContain("HTTP 401");
+      expect(body).not.toContain("upstage");
+      expect(body).not.toContain("up_live");
+
+      const events = loggedEvents(errorSpy);
+      // errorPayload 는 같은 실패를 다시 남기지 않는다(한 줄만).
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ event: "contract_upstream_failed", http_status: 502 });
+      expect(String(events[0].upstream)).toContain("upstage HTTP 401");
+      expect(String(events[0].upstream)).not.toContain("up_live_0123456789abcdef");
+    });
+
+    it("파일 경로가 든 OSError 문구도 응답에 싣지 않는다", async () => {
+      const error = await reviewFailure(upstream(400, {
+        error: "파일을 읽지 못했습니다: [Errno 2] No such file or directory: '/srv/moneyworry/contract/cache/abc.json'",
+      }));
+
+      expect(error).toMatchObject({ code: "CONTRACT_ANALYSIS_FAILED", status: 502 });
+      expect(JSON.stringify(errorPayload(error).body)).not.toContain("/srv");
+    });
+
+    it("requests 예외의 상류 호스트·주소는 응답에 싣지 않는다", async () => {
+      const error = await reviewFailure(upstream(400, {
+        error: "Document Parse 연결 실패: HTTPSConnectionPool(host='api.upstage.ai', port=443): Read timed out. (read timeout=120)",
+      }));
+
+      expect(error).toMatchObject({ code: "CONTRACT_ANALYSIS_FAILED" });
+      const body = JSON.stringify(errorPayload(error).body);
+      expect(body).not.toContain("api.upstage.ai");
+      expect(body).not.toContain("Document Parse");
+    });
+
+    it("설정 문제(503)는 환경변수·파일 이름 없이 일시 사용 불가로 안내한다", async () => {
+      const error = await reviewFailure(upstream(503, {
+        error: "문서 인식에 필요한 Upstage API 키가 없습니다. /etc/moneyworry/team.env를 확인하세요.",
+      }));
+
+      expect(error).toMatchObject({ code: "CONTRACT_PROVIDER_UNAVAILABLE", status: 503, retryable: true });
+      const message = (error as Error).message;
+      expect(message).toBe("계약서 분석 서비스를 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+      expect(message).not.toContain("Upstage");
+      expect(message).not.toContain("team.env");
+    });
+
+    it.each([
+      ["문서에서 글자를 찾지 못했습니다. 빈 페이지이거나 해상도가 너무 낮을 수 있습니다.", "CONTRACT_TEXT_NOT_FOUND", 422, "문서에서 글자를 찾지 못했습니다. 빈 페이지이거나 해상도가 너무 낮을 수 있습니다."],
+      ["지원하지 않는 형식입니다: .txt. .docx, .hwp, .jpeg 중 하나로 올려 주세요.", "UNSUPPORTED_MEDIA_TYPE", 415, "PDF, PNG, JPG 파일만 업로드할 수 있습니다. 파일 확장자를 확인해 주세요."],
+      ["빈 파일입니다.", "CONTRACT_FILE_EMPTY", 400, "빈 파일은 분석할 수 없습니다. 계약서 파일을 다시 선택해 주세요."],
+      ["계약서 파일이 없습니다.", "CONTRACT_FILE_REQUIRED", 400, "계약서 파일을 받지 못했습니다. 파일을 다시 선택해 주세요."],
+      ["파일이 너무 큽니다 (21.3MB). 20MB 이하로 올려 주세요.", "FILE_TOO_LARGE", 413, "파일은 15MB 이하만 업로드할 수 있습니다."],
+    ])("알려진 입력 오류 '%s'는 제품의 고정 안내로 바꾼다", async (raw, code, status, message) => {
+      const error = await reviewFailure(upstream(400, { error: raw }));
+
+      expect(error).toMatchObject({ code, status, retryable: false, message });
+    });
+
+    it("JSON 이 아닌 빈 응답도 일반 안내로 바꾸고 원문 없음으로 기록한다", async () => {
+      const error = await reviewFailure(upstream(502, ""));
+
+      expect(error).toMatchObject({ code: "CONTRACT_ANALYSIS_FAILED", status: 502 });
+      expect(loggedEvents(errorSpy)[0]).toMatchObject({ event: "contract_upstream_failed", upstream: null });
+    });
+
+    it("로그에 남기는 상류 원문은 200자로 자른다", async () => {
+      await reviewFailure(upstream(502, { error: `skt HTTP 500: ${"가".repeat(1_000)}` }));
+
+      const logged = String(loggedEvents(errorSpy)[0].upstream);
+      expect(logged.length).toBeLessThanOrEqual(200);
+      expect(logged.startsWith("skt HTTP 500:")).toBe(true);
+    });
   });
 
-  it("근로계약서가 아닌 문서는 명시적인 사용자 오류로 구분한다", async () => {
+  it("근로계약서가 아닌 문서는 명시적인 사용자 오류로 구분하고 안내 문구를 유지한다", async () => {
     vi.stubEnv("CONTRACT_ANALYSIS_URL", "http://contract.test");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const fakeFetch = (async () => new Response(JSON.stringify({
       ok: false,
       reason: "not_a_contract",
-      message: "근로계약서로 볼 만한 내용을 찾지 못했습니다.",
+      message: "올려주신 문서에서 근로계약서로 볼 만한 내용을 찾지 못했습니다. 근로계약서 원본(사진·스캔본도 가능)을 올려 주세요.",
     }), { status: 422, headers: { "Content-Type": "application/json" } })) as typeof fetch;
     const file = new File(["image"], "not-contract.png", { type: "image/png" });
 
@@ -344,7 +452,11 @@ describe("계약서 분석 내부 계약", () => {
       code: "NOT_A_CONTRACT",
       status: 422,
       retryable: true,
+      message: "올려주신 문서에서 근로계약서로 볼 만한 내용을 찾지 못했습니다. 근로계약서 원본(사진·스캔본도 가능)을 올려 주세요.",
     });
+    // 다른 문서를 올린 것은 장애가 아니라 로그를 남기지 않는다.
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it.each([

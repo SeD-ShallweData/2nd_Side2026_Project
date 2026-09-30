@@ -64,6 +64,16 @@ describe("GET /api/inspector/prompts", () => {
     ]);
   });
 
+  it("프롬프트 전문이 실리므로 성공·거부 응답 모두 캐시에 남기지 않는다", async () => {
+    const allowed = await getPrompts(request("admin-token"));
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get("cache-control")).toBe("no-store");
+
+    const denied = await getPrompts(request("user-token"));
+    expect(denied.status).toBe(403);
+    expect(denied.headers.get("cache-control")).toBe("no-store");
+  });
+
   it("운영 DB 연결이 없으면 편집 불가와 파일 출처를 밝힌다", async () => {
     // 파일은 자산 무결성 해시로 고정돼 있어(#81) 편집은 운영 DB(wg_ops)로만 한다.
     const body = await (await getPrompts(request("admin-token"))).json();

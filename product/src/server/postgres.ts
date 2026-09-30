@@ -1,7 +1,8 @@
 import { Pool, type QueryResultRow } from "pg";
 import { getDatabaseConnectionString } from "@/server/databaseConfig";
 import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
-import { ServiceError } from "@/utils/errors";
+import { markErrorLogged, ServiceError } from "@/utils/errors";
+import { redactErrorText } from "@/utils/redactErrorText";
 
 let pool: Pool | undefined;
 
@@ -52,11 +53,7 @@ export function describeQueryFailure(error: unknown): { code: string | null; mes
   const candidate = error as { code?: unknown; message?: unknown } | null;
   const code = typeof candidate?.code === "string" ? candidate.code : null;
   const raw = typeof candidate?.message === "string" ? candidate.message : "unknown error";
-  const message = raw
-    .replace(/postgres(?:ql)?:\/\/\S+/gi, "[connection-string]")
-    .replace(/password\s*=\s*\S+/gi, "password=[redacted]")
-    .slice(0, 200);
-  return { code, message };
+  return { code, message: redactErrorText(raw) };
 }
 
 export async function queryReadOnly<T extends QueryResultRow>(
@@ -77,12 +74,13 @@ export async function queryReadOnly<T extends QueryResultRow>(
       pg_code: failure.code,
       message: failure.message,
     }));
-    throw new ServiceError(
+    // 원인은 바로 위에서 남겼다. errorPayload 가 같은 장애를 한 줄 더 남기지 않게 표시한다.
+    throw markErrorLogged(new ServiceError(
       "DATABASE_UNAVAILABLE",
       "사업장 데이터베이스를 읽지 못했습니다.",
       503,
       true,
-    );
+    ));
   }
 }
 
