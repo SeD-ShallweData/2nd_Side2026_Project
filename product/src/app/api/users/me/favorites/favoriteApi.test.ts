@@ -7,6 +7,7 @@ import { DELETE, PUT } from "@/app/api/users/me/favorites/[companyId]/route";
 import { GET } from "@/app/api/users/me/favorites/route";
 import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 import { resetMockFavoritesForTests } from "@/services/userDataProviders";
+import { silenceServerErrorLogs } from "@/testing/silenceServerErrorLogs";
 import { ACCOUNT_RATE_LIMITS, resetAccountRateLimitsForTests } from "@/server/accountRateLimit";
 
 const USER: SessionUserDto = {
@@ -62,6 +63,9 @@ function mutationRequest(
     },
   });
 }
+
+// 일부러 5xx 를 내는 경우가 있어 서버 오류 기록 줄(JSON)만 테스트 출력에서 뺀다.
+silenceServerErrorLogs();
 
 beforeEach(() => {
   vi.stubEnv("APP_DATA_MODE", "mock");

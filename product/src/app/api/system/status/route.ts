@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 import {
   getCompanyDataMode,
   getContractDataMode,
   getDataMode,
 } from "@/config/dataMode";
+import { noStoreError, noStoreJson } from "@/server/auth/http";
 import { requireOperatorRequest } from "@/server/auth/inspectorAccess";
 import { isContractHealthReady } from "@/server/contractHealth";
 import { getLlmProviderConfigs } from "@/server/llmConfig";
@@ -18,7 +19,6 @@ import {
   getActiveChatLlmStatus,
   getOpenAIResponsesReadiness,
 } from "@/server/responses/responsesHealth";
-import { errorPayload } from "@/utils/errors";
 
 type IntegrationStatus = "ready" | "configured_unreachable" | "unavailable";
 
@@ -42,6 +42,7 @@ async function probe(
   }
 }
 
+/* 운영 관리자 전용 연동 상태. 다른 관리자 API 처럼 브라우저·중간 캐시에 남기지 않는다(no-store). */
 export async function GET(request: Request): Promise<NextResponse> {
   try {
     await requireOperatorRequest(request);
@@ -65,7 +66,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       openAIResponses,
     });
 
-    return NextResponse.json({
+    return noStoreJson({
       api_contract: "donworry.v2",
       chat_execution_mode: chatExecutionMode,
       data_mode: getDataMode(),
@@ -84,7 +85,6 @@ export async function GET(request: Request): Promise<NextResponse> {
       },
     });
   } catch (error) {
-    const payload = errorPayload(error);
-    return NextResponse.json(payload.body, { status: payload.status });
+    return noStoreError(error);
   }
 }

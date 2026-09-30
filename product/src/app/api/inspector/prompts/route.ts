@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 
+import { noStoreError, noStoreJson } from "@/server/auth/http";
 import { requireOperatorRequest } from "@/server/auth/inspectorAccess";
 import { isOpsConsoleEnabled } from "@/server/ops/opsMode";
 import { REQUIRED_PROMPTS, getPromptOverride, loadPromptFile, refreshPromptOverrides } from "@/server/promptLoader";
-import { errorPayload } from "@/utils/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,8 @@ export const dynamic = "force-dynamic";
  * 파일은 고치지 않는다. 프롬프트 파일은 자산 무결성 해시로 고정돼 있고(#81) 웹 유닛은
  * 파일을 쓸 수 없다. 편집은 운영 콘솔이 DB에 버전으로 저장·적용하며(migration 0021),
  * 적용된 DB 버전이 있으면 파일보다 우선한다. source 가 어느 쪽이 쓰이는지 알려 준다.
+ *
+ * 응답에 프롬프트 전문이 실리므로 다른 관리자 API 처럼 브라우저·중간 캐시에 남기지 않는다(no-store).
  */
 const LABELS: Record<(typeof REQUIRED_PROMPTS)[number], { title: string; usage: string }> = {
   "chat/system": { title: "노동 상담 시스템 프롬프트", usage: "일반 사용자 AI 상담" },
@@ -46,9 +48,8 @@ export async function GET(request: Request): Promise<NextResponse> {
         file_text: fileText,
       };
     });
-    return NextResponse.json({ editable, items });
+    return noStoreJson({ editable, items });
   } catch (error) {
-    const payload = errorPayload(error);
-    return NextResponse.json(payload.body, { status: payload.status });
+    return noStoreError(error);
   }
 }

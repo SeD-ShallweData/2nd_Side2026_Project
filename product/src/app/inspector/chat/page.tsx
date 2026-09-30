@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { InspectorChatPanel } from "@/components/inspector/InspectorChatPanel";
 import { InspectorNav } from "@/components/inspector/InspectorNav";
+import { requireInspectorPage } from "@/server/auth/pageGuards";
 
 export const metadata: Metadata = { title: "근로감독관 AI 점검 보조" };
 
@@ -9,6 +10,8 @@ interface InspectorChatPageProps {
 }
 
 export default async function InspectorChatPage({ searchParams }: InspectorChatPageProps) {
+  // 레이아웃 검사와 별개로 페이지에서도 권한을 다시 확인한다(server/auth/pageGuards.ts).
+  await requireInspectorPage();
   const params = await searchParams;
   return (
     <div className="inspector-page inspector-chat-page">

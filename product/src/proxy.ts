@@ -85,8 +85,8 @@ function hasBrowserContext(request: NextRequest): boolean {
 /*
  * 차단 응답. utils/errors.ts 의 봉투를 그대로 쓴다.
  *
- * clientApi.ts:7-13 이 응답 본문을 무조건 response.json() 으로 읽으므로,
- * 평문을 돌려주면 화면에 'Unexpected token …' 이 그대로 뜬다.
+ * 화면의 응답 도우미(utils/clientApi.ts 등)는 봉투의 message 를 그대로 보여 준다.
+ * 평문을 돌려주면 이유 대신 일반 안내("요청을 처리하지 못했습니다.")만 뜬다.
  */
 function blockedResponse(): NextResponse {
   const payload = errorPayload(

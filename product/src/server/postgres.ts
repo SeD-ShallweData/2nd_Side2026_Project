@@ -1,7 +1,8 @@
 import { Pool, type QueryResultRow } from "pg";
 import { getDatabaseConnectionString } from "@/server/databaseConfig";
 import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
-import { ServiceError } from "@/utils/errors";
+import { markErrorLogged, ServiceError, takeApiErrorLogSlot } from "@/utils/errors";
+import { redactErrorText } from "@/utils/redactErrorText";
 
 let pool: Pool | undefined;
 
@@ -52,11 +53,7 @@ export function describeQueryFailure(error: unknown): { code: string | null; mes
   const candidate = error as { code?: unknown; message?: unknown } | null;
   const code = typeof candidate?.code === "string" ? candidate.code : null;
   const raw = typeof candidate?.message === "string" ? candidate.message : "unknown error";
-  const message = raw
-    .replace(/postgres(?:ql)?:\/\/\S+/gi, "[connection-string]")
-    .replace(/password\s*=\s*\S+/gi, "password=[redacted]")
-    .slice(0, 200);
-  return { code, message };
+  return { code, message: redactErrorText(raw) };
 }
 
 export async function queryReadOnly<T extends QueryResultRow>(
@@ -70,19 +67,25 @@ export async function queryReadOnly<T extends QueryResultRow>(
     return result.rows;
   } catch (error) {
     if (error instanceof ServiceError) throw error;
-    const failure = describeQueryFailure(error);
-    console.error(JSON.stringify({
-      event: "readonly_query_failed",
-      relation: options.relation ?? "unlabeled",
-      pg_code: failure.code,
-      message: failure.message,
-    }));
-    throw new ServiceError(
+    const unavailable = new ServiceError(
       "DATABASE_UNAVAILABLE",
       "사업장 데이터베이스를 읽지 못했습니다.",
       503,
       true,
     );
+    // DB 장애 때는 요청마다 같은 줄이 쌓이므로 5xx 기록과 같은 속도 상한(utils/errors.ts)을 거친다.
+    if (takeApiErrorLogSlot()) {
+      const failure = describeQueryFailure(error);
+      console.error(JSON.stringify({
+        event: "readonly_query_failed",
+        relation: options.relation ?? "unlabeled",
+        pg_code: failure.code,
+        message: failure.message,
+      }));
+      // 원인은 바로 위에서 남겼다. errorPayload 는 원인 문구 없이 request_id·코드만 남긴다.
+      markErrorLogged(unavailable);
+    }
+    throw unavailable;
   }
 }
 

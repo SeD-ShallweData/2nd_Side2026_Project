@@ -74,6 +74,53 @@ describe("resolveSafeNextPath — open redirect 방지", () => {
     expect(resolveSafeNextPath("")).toBeNull();
     expect(resolveSafeNextPath(null)).toBeNull();
   });
+
+  /*
+   * URL 파서는 탭·개행을 지우고 "\"를 "/"로 읽는다. 모양 검사만 하던 때에는
+   * /login?next=/%09/evil.example 로 로그인하면 외부 사이트로 이동했다.
+   */
+  it.each([
+    ["탭(주소창 %09)", "/\t/evil.example"],
+    ["개행(주소창 %0A)", "/\n/evil.example"],
+    ["캐리지 리턴(주소창 %0D)", "/\r/evil.example"],
+    ["NUL", "/\u0000/evil.example"],
+    ["DEL", "/\u007f/evil.example"],
+    ["백슬래시", "/\\evil"],
+    ["백슬래시 두 개", "\\\\evil.example"],
+    ["프로토콜 상대 주소", "//evil"],
+    ["절대 주소", "https://evil"],
+    ["javascript: 주소", "javascript:alert(1)"],
+    ["data: 주소", "data:text/html,<script>alert(1)</script>"],
+    ["한 번 더 인코딩한 탭", "/%09/evil.example"],
+    ["한 번 더 인코딩한 백슬래시", "/%5Cevil.example"],
+    ["한 번 더 인코딩한 슬래시", "/%2F/evil.example"],
+    ["점 경로로 만든 //", "/.//evil.example"],
+    ["상위 경로로 만든 //", "/..//evil.example"],
+    ["인코딩한 점 경로로 만든 //", "/%2e%2e//evil.example"],
+    ["풀 수 없는 인코딩", "/%E0%A4%A"],
+  ])("%s 우회 시도를 거부한다", (_label, next) => {
+    expect(resolveSafeNextPath(next)).toBeNull();
+    expect(resolveSafeNextPath(next, "https://moneyworry-demo.example.ts.net")).toBeNull();
+    expect(resolveLoginRedirect({ hasGuestConversation: false, nextPath: next })).toBe("/community");
+  });
+
+  it("주소창에서 읽은 %09 우회 값도 거부한다", () => {
+    const decoded = new URLSearchParams("next=/%09/evil.example").get("next");
+    expect(decoded).toBe("/\t/evil.example");
+    expect(resolveSafeNextPath(decoded)).toBeNull();
+  });
+
+  it("현재 출처 기준으로 해석한 경로·쿼리·해시만 돌려준다", () => {
+    expect(resolveSafeNextPath("/chat?company_id=COMPANY_DEMO_008#answer", "https://moneyworry-demo.example.ts.net"))
+      .toBe("/chat?company_id=COMPANY_DEMO_008#answer");
+    expect(resolveSafeNextPath("/companies/%ED%95%9C%EB%B9%9B")).toBe("/companies/%ED%95%9C%EB%B9%9B");
+    // 같은 출처 안의 상위 경로는 정리된 경로로 돌려준다.
+    expect(resolveSafeNextPath("/community/../favorites")).toBe("/favorites");
+  });
+
+  it("지나치게 긴 값은 거부한다", () => {
+    expect(resolveSafeNextPath(`/${"a".repeat(2_048)}`)).toBeNull();
+  });
 });
 
 describe("readNextPathFromLocation — mount 시점 캐싱 없이 매번 새로 읽는다", () => {
@@ -98,6 +145,16 @@ describe("readNextPathFromLocation — mount 시점 캐싱 없이 매번 새로 
   it("window가 없으면(서버 렌더) null을 반환한다", () => {
     vi.stubGlobal("window", undefined);
     expect(readNextPathFromLocation()).toBeNull();
+  });
+
+  it("주소창의 우회 값은 현재 출처로 해석해도 버린다", () => {
+    for (const search of ["?next=/%09/evil.example", "?next=/%0a/evil.example", "?next=%2F%5Cevil", "?next=//evil", "?next=https://evil"]) {
+      vi.stubGlobal("window", { location: { search, origin: "https://moneyworry-demo.example.ts.net" } });
+      expect(readNextPathFromLocation()).toBeNull();
+    }
+
+    vi.stubGlobal("window", { location: { search: "?next=%2Ffavorites", origin: "https://moneyworry-demo.example.ts.net" } });
+    expect(readNextPathFromLocation()).toBe("/favorites");
   });
 });
 

@@ -28,6 +28,7 @@ import { POST as draftRoute } from "@/app/api/admin/prompts/drafts/route";
 import { POST as resetRoute } from "@/app/api/admin/prompts/reset/route";
 import { POST as activatePromptRoute } from "@/app/api/admin/prompts/versions/[versionId]/activate/route";
 import { REQUIRED_POLICY_PHRASES } from "@/server/promptPolicy";
+import { silenceServerErrorLogs } from "@/testing/silenceServerErrorLogs";
 
 function post(path: string, token: string | null, body: unknown, site = "same-origin"): Request {
   const headers = new Headers({ "content-type": "application/json", "sec-fetch-site": site });
@@ -37,6 +38,9 @@ function post(path: string, token: string | null, body: unknown, site = "same-or
 
 const batchCtx = (batchId: string) => ({ params: Promise.resolve({ batchId }) });
 const versionCtx = (versionId: string) => ({ params: Promise.resolve({ versionId }) });
+
+// 일부러 5xx 를 내는 경우가 있어 서버 오류 기록 줄(JSON)만 테스트 출력에서 뺀다.
+silenceServerErrorLogs();
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -61,12 +65,14 @@ describe("운영 콘솔 변경 API 권한", () => {
       deactivateRoute(post("/api/admin/batches/deactivate", token, { reason: "고정 해제" })),
       activatePromptRoute(post("/api/admin/prompts/versions/3/activate", token, { reason: "적용" }), versionCtx("3")),
       resetRoute(post("/api/admin/prompts/reset", token, { name: "chat/system", reason: "복귀" })),
+      draftRoute(post("/api/admin/prompts/drafts", token, { name: "rewrite/system", body: "초안", reason: "수정" })),
     ]);
     for (const response of responses) expect(response.status).toBe(403);
     expect(state.activateBatch).not.toHaveBeenCalled();
     expect(state.deactivateBatches).not.toHaveBeenCalled();
     expect(state.activatePromptVersion).not.toHaveBeenCalled();
     expect(state.resetPrompt).not.toHaveBeenCalled();
+    expect(state.savePromptDraft).not.toHaveBeenCalled();
   });
 
   it("다른 사이트에서 온 요청은 admin 세션이어도 막는다", async () => {

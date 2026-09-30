@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { ContractReviewRequest } from "@/domain/contract";
 import { getOptionalSessionUser } from "@/services/authService";
 import { reviewContract } from "@/services/contractService";
-import { assertSameOriginRequest } from "@/server/auth/http";
+import { assertSameOriginRequest, LARGE_JSON_BODY_MAX_BYTES, readJsonBody } from "@/server/auth/http";
 import { getSessionTokenFromRequest } from "@/server/auth/sessionCookie";
 import { assertAccountRateLimit } from "@/server/accountRateLimit";
 import { assertPublicRateLimit } from "@/server/publicRateLimit";
@@ -30,7 +30,18 @@ async function parseRequest(request: Request): Promise<ContractReviewRequest> {
     };
   }
   if (contentType.includes("application/json")) {
-    return (await request.json()) as ContractReviewRequest;
+    // 테스트 텍스트는 20,000자까지 받는다. 한글이면 기본 상한(64KB)에 닿을 수 있어 긴 글용 상한을
+    // 쓴다. 깨진 JSON 은 500 이 아니라 400(INVALID_JSON)으로 돌려준다.
+    const body = await readJsonBody(request, LARGE_JSON_BODY_MAX_BYTES);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        "검토할 계약서 파일 또는 테스트 텍스트를 입력해 주세요.",
+        400,
+        false,
+      );
+    }
+    return body as ContractReviewRequest;
   }
   throw new ServiceError(
     "UNSUPPORTED_MEDIA_TYPE",

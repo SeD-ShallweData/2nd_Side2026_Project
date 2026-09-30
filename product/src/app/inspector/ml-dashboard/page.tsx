@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 
 import { InspectorNav } from "@/components/inspector/InspectorNav";
 import { MlDashboardPage } from "@/components/inspector/MlDashboardPage";
 import { canOperatePlatform } from "@/server/auth/inspectorAccess";
-import { SESSION_COOKIE_NAME } from "@/server/auth/sessionCookie";
-import { getOptionalSessionUser } from "@/services/authService";
+import { requireInspectorPage } from "@/server/auth/pageGuards";
 
 export const metadata: Metadata = { title: "Machine Learning 대시보드" };
 
@@ -15,13 +13,13 @@ export const metadata: Metadata = { title: "Machine Learning 대시보드" };
  * 오면 그 경로도 admin 으로 좁혀야 한다.
  */
 export default async function MlDashboardRoute() {
-  const cookieStore = await cookies();
-  const user = await getOptionalSessionUser(cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null);
+  // 레이아웃 검사와 별개로 페이지에서도 권한을 다시 확인한다(server/auth/pageGuards.ts).
+  const user = await requireInspectorPage();
 
   return (
     <div className="inspector-page">
       <InspectorNav current="ml-dashboard" />
-      <MlDashboardPage canOperate={canOperatePlatform(user?.role)} />
+      <MlDashboardPage canOperate={canOperatePlatform(user.role)} />
     </div>
   );
 }

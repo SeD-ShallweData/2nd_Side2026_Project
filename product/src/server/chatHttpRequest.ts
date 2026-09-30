@@ -1,3 +1,4 @@
+import { LARGE_JSON_BODY_MAX_BYTES, readJsonBody } from "@/server/auth/http";
 import type { ToolExecutionContext } from "@/server/responses/toolContracts";
 import { validateContractRequest } from "@/services/contractService";
 import { ServiceError } from "@/utils/errors";
@@ -79,7 +80,8 @@ export async function parseChatHttpRequest(
   const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
   if (contentType.includes("multipart/form-data")) return parseMultipart(request);
   if (contentType.includes("application/json")) {
-    return { body: (await request.json()) as unknown };
+    // 공용 본문 읽기로 크기 상한을 두고, 깨진 JSON 은 500 이 아니라 400(INVALID_JSON)으로 돌려준다.
+    return { body: await readJsonBody(request, LARGE_JSON_BODY_MAX_BYTES) };
   }
   throw new ServiceError(
     "UNSUPPORTED_MEDIA_TYPE",

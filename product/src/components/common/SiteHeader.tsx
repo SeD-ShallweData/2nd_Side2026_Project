@@ -40,6 +40,20 @@ type SessionState =
   | { status: "loading" }
   | { status: "ready"; session: SessionResponse };
 
+/*
+ * 계정 삭제 실패 안내. 대부분은 "잠시 후 다시"로 충분하지만, 현장 제보를 낸 계정은
+ * 다시 시도해도 계속 막히므로(서버 409) 이유를 따로 알려 준다.
+ */
+export function deleteAccountErrorMessage(
+  error: unknown,
+  m: { deleteFailed: string; deleteBlockedByWorksiteTip: string },
+): string {
+  if (error instanceof AuthApiError && error.code === "ACCOUNT_DELETE_BLOCKED_BY_WORKSITE_TIP") {
+    return m.deleteBlockedByWorksiteTip;
+  }
+  return m.deleteFailed;
+}
+
 /**
  * 사업장 상세를 보는 중이면 AI 상담 진입 링크가 그 사업장을 함께 넘긴다.
  * 떠 있는 상담 버튼이나 모바일 메뉴로 들어가도 방금 본 사업장 문맥이 끊기지 않게 한다.
@@ -140,9 +154,9 @@ export function SiteHeader() {
     try {
       await deleteAccount();
       window.location.assign(`//${window.location.host}/`);
-    } catch {
+    } catch (error) {
       setDeletingAccount(false);
-      setLogoutError(m.deleteFailed);
+      setLogoutError(deleteAccountErrorMessage(error, m));
     }
   }
 

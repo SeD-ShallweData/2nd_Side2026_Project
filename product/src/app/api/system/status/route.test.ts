@@ -88,7 +88,18 @@ describe("system status 접근 권한", () => {
     const response = await GET(request(token));
 
     expect(response.status).toBe(403);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toMatchObject({ error: { code: "FORBIDDEN" } });
+  });
+
+  it("운영 관리자 응답도 캐시에 남기지 않는다", async () => {
+    vi.stubEnv("RAG_API_URL", "");
+    vi.stubEnv("CONTRACT_ANALYSIS_URL", "");
+
+    const response = await GET(request("admin-token"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
   });
 });
 

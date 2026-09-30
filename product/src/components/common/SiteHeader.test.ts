@@ -15,7 +15,9 @@ vi.mock("next/link", () => ({
 }));
 
 import { AccountMenu } from "@/components/common/AccountMenu";
-import { SiteHeader, chatHrefForPath, isCurrentNavPath } from "@/components/common/SiteHeader";
+import { SiteHeader, chatHrefForPath, deleteAccountErrorMessage, isCurrentNavPath } from "@/components/common/SiteHeader";
+import { headerMessages } from "@/i18n/messages/header";
+import { AuthApiError } from "@/services/authClient";
 
 describe("공통 사이트 헤더", () => {
   it("근로감독관 경로에서도 최신 Co끼리 내비게이션을 사용한다", () => {
@@ -121,5 +123,35 @@ describe("현재 탭 판정", () => {
     pathname = "/companies/COMPANY_DEMO_008";
     const html = renderToStaticMarkup(createElement(SiteHeader));
     expect(html).toContain('href="/chat?company_id=COMPANY_DEMO_008" class="consumer-floating-chat"');
+  });
+});
+
+describe("계정 삭제 실패 안내", () => {
+  const m = headerMessages.ko;
+
+  it("현장 제보 때문에 막힌 삭제(409)는 다시 시도하라는 대신 이유를 알려 준다", () => {
+    const error = new AuthApiError(
+      409,
+      "ACCOUNT_DELETE_BLOCKED_BY_WORKSITE_TIP",
+      "접수한 현장 제보가 있는 계정은 바로 삭제할 수 없습니다. 운영팀에 문의해 주세요.",
+      false,
+      "req_test",
+    );
+
+    expect(deleteAccountErrorMessage(error, m)).toBe(m.deleteBlockedByWorksiteTip);
+    expect(m.deleteBlockedByWorksiteTip).toContain("현장 제보");
+  });
+
+  it("그 밖의 실패와 네트워크 오류는 기존 안내를 그대로 쓴다", () => {
+    const serverError = new AuthApiError(500, "INTERNAL_ERROR", "요청을 처리하는 중 오류가 발생했습니다.", true, "req_test");
+
+    expect(deleteAccountErrorMessage(serverError, m)).toBe(m.deleteFailed);
+    expect(deleteAccountErrorMessage(new TypeError("Failed to fetch"), m)).toBe(m.deleteFailed);
+  });
+
+  it("모든 화면 언어에 안내 문구가 있다", () => {
+    for (const locale of ["en", "zh", "vi", "th"] as const) {
+      expect(headerMessages[locale].deleteBlockedByWorksiteTip.length).toBeGreaterThan(0);
+    }
   });
 });

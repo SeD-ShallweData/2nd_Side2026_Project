@@ -4,8 +4,14 @@ import type { NextResponse } from "next/server";
 
 export const SESSION_COOKIE_NAME = "donworry_session";
 
-export function getSessionTokenFromRequest(request: Request): string | null {
-  const cookieHeader = request.headers.get("cookie");
+/*
+ * Cookie 헤더에서 세션 토큰을 꺼낸다. API(getSessionTokenFromRequest)와 화면 가드(pageGuards.ts)가
+ * 이 함수 하나를 함께 쓴다.
+ *
+ * 이름이 같은 쿠키가 여럿 오면(Path 가 다른 donworry_session 등) 첫 값을 쓴다. next/headers 의
+ * cookies() 는 마지막 값을 고르므로, 화면에서 그것을 쓰면 화면 가드와 API 가 서로 다른 세션을 볼 수 있다.
+ */
+export function parseSessionToken(cookieHeader: string | null | undefined): string | null {
   if (!cookieHeader) return null;
 
   for (const part of cookieHeader.split(";")) {
@@ -21,6 +27,10 @@ export function getSessionTokenFromRequest(request: Request): string | null {
     }
   }
   return null;
+}
+
+export function getSessionTokenFromRequest(request: Request): string | null {
+  return parseSessionToken(request.headers.get("cookie"));
 }
 
 export function setSessionCookie(response: NextResponse, token: string, expiresAt: string): void {

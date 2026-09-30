@@ -223,3 +223,73 @@ describe.each(worksiteTipReviewEndpoints)("M2 $name 권한 (제보 열람)", ({ 
     expect(service).toHaveBeenCalledOnce();
   });
 });
+
+/*
+ * 점검 보조는 사업장 내부 자료를 외부 모델로 보낸다. 다른 변경 요청과 같은 출처 검사를
+ * 거치고, 본문은 공용 JSON 읽기(크기 상한·깨진 JSON 400)로 읽는다.
+ */
+describe("M2 POST /api/inspector/chat 요청 검사", () => {
+  function chatRequest(init: RequestInit & { token?: string | null } = {}): Request {
+    const { token = "inspector-token", ...rest } = init;
+    return request("/api/inspector/chat", token, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(rest.headers as Record<string, string> | undefined) },
+      body: rest.body ?? JSON.stringify({ message: "점검" }),
+    });
+  }
+
+  it("다른 사이트에서 보낸 요청은 권한 확인 전에 403 으로 막는다", async () => {
+    const response = await postInspectorChat(chatRequest({ headers: { "sec-fetch-site": "cross-site" } }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { code: "CROSS_SITE_REQUEST_REJECTED" } });
+    expect(authState.getOptionalSessionUser).not.toHaveBeenCalled();
+    expect(inspectorServices.sendInspectorChatMessage).not.toHaveBeenCalled();
+  });
+
+  it("같은 출처 요청은 통과한다", async () => {
+    const response = await postInspectorChat(chatRequest({ headers: { "sec-fetch-site": "same-origin" } }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(inspectorServices.sendInspectorChatMessage).toHaveBeenCalledWith({ message: "점검" });
+  });
+
+  it("깨진 JSON 은 500 이 아니라 400 으로 돌려준다", async () => {
+    const response = await postInspectorChat(chatRequest({ body: "{\"message\":" }));
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toMatchObject({ error: { code: "INVALID_JSON" } });
+    expect(inspectorServices.sendInspectorChatMessage).not.toHaveBeenCalled();
+  });
+
+  it("JSON 이 아닌 형식은 415 로 돌려준다", async () => {
+    const response = await postInspectorChat(chatRequest({ headers: { "content-type": "text/plain" } }));
+
+    expect(response.status).toBe(415);
+    expect(inspectorServices.sendInspectorChatMessage).not.toHaveBeenCalled();
+  });
+
+  it("긴 세션의 이전 답변 6개(수백 KB)는 받아들이고, 상한(1MB)을 넘으면 413 이다", async () => {
+    // 한글 한 글자는 3바이트다. 답변 6개 × 20,000자면 약 360KB 로 기본 상한(64KB)을 훌쩍 넘는다.
+    const recentMessages = Array.from({ length: 6 }, () => ({ role: "assistant", content: "가".repeat(20_000) }));
+    const accepted = await postInspectorChat(chatRequest({
+      body: JSON.stringify({ message: "점검", recent_messages: recentMessages }),
+    }));
+    expect(accepted.status).toBe(200);
+
+    const tooLarge = await postInspectorChat(chatRequest({
+      body: JSON.stringify({ message: "점검", padding: "a".repeat(1024 * 1024) }),
+    }));
+    expect(tooLarge.status).toBe(413);
+    expect(await tooLarge.json()).toMatchObject({ error: { code: "REQUEST_BODY_TOO_LARGE" } });
+  });
+
+  it("권한 없는 요청은 본문을 읽기 전에 막는다", async () => {
+    const response = await postInspectorChat(chatRequest({ token: "user-token", body: "{\"message\":" }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { code: "FORBIDDEN" } });
+  });
+});

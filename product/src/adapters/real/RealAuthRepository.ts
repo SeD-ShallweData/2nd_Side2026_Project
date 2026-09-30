@@ -101,6 +101,30 @@ function toSignupError(error: unknown): unknown {
   return error;
 }
 
+/*
+ * 현장 제보를 낸 사용자는 탈퇴 DELETE 가 외래키에 걸린다.
+ *
+ * worksite_tips.reporter_id 는 ON DELETE RESTRICT 다(0010). 근로감독관이 확인할 제보를
+ * 탈퇴와 함께 지우지 않으려는 것이다. 그대로 두면 pg 오류(23503)가 500 "요청을 처리하는 중
+ * 오류가 발생했습니다"로 보여 사용자가 이유를 알 수 없다. 스키마(보관 정책)는 바꾸지 않고
+ * 안내만 409 로 바꾼다. wg_auth 는 worksite_tips 를 읽을 권한이 없어 미리 조회하지 않고
+ * DELETE 가 돌려준 오류를 보고 판단한다. 다른 외래키 위반은 모르는 상황이라 그대로 올려보낸다.
+ */
+const WORKSITE_TIP_REPORTER_FK = "worksite_tips_reporter_id_users_id_fk";
+
+function toDeleteAccountError(error: unknown): unknown {
+  if (!isDatabaseError(error) || error.code !== "23503") return error;
+  // pg 의 DatabaseError 는 제약 이름과 참조하는 쪽 테이블을 따로 싣는다. isDatabaseError 타입에는 없어 직접 읽는다.
+  const { constraint, table } = error as { constraint?: unknown; table?: unknown };
+  if (constraint !== WORKSITE_TIP_REPORTER_FK && table !== "worksite_tips") return error;
+  return new ServiceError(
+    "ACCOUNT_DELETE_BLOCKED_BY_WORKSITE_TIP",
+    "접수한 현장 제보가 있는 계정은 바로 삭제할 수 없습니다. 운영팀에 문의해 주세요.",
+    409,
+    false,
+  );
+}
+
 export class RealAuthRepository implements AuthRepository {
   assertAvailable(): void {
     if (!isWriteDatabaseConfigured("auth")) {
@@ -285,18 +309,23 @@ export class RealAuthRepository implements AuthRepository {
 
   async deleteAccount(token: string): Promise<boolean> {
     if (!token || !isValidTokenShape(token)) return false;
-    const rows = await queryWrite<{ id: string }>(
-      "auth",
-      `DELETE FROM users
-        WHERE id = (
-          SELECT s.user_id FROM sessions s
-          WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
-          LIMIT 1
-        )
-          AND auth_role = 'user'
-        RETURNING id::text`,
-      [hashToken(token)],
-    );
+    let rows: { id: string }[];
+    try {
+      rows = await queryWrite<{ id: string }>(
+        "auth",
+        `DELETE FROM users
+          WHERE id = (
+            SELECT s.user_id FROM sessions s
+            WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
+            LIMIT 1
+          )
+            AND auth_role = 'user'
+          RETURNING id::text`,
+        [hashToken(token)],
+      );
+    } catch (error) {
+      throw toDeleteAccountError(error);
+    }
     return rows.length === 1;
   }
 }

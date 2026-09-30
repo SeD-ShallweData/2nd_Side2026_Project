@@ -7,6 +7,16 @@ import { errorPayload, retryAfterHeaders, ServiceError } from "@/utils/errors";
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 const MAX_JSON_BODY_BYTES = 64 * 1024;
 
+/*
+ * 긴 글을 싣는 JSON 요청의 본문 상한. 상담(/api/chat), 감독관 점검 보조(/api/inspector/chat),
+ * 계약서 테스트 텍스트(/api/contracts/review)가 쓴다.
+ *
+ * 상담 화면은 최근 답변 전문을 최대 8개(점검 보조는 6개) 싣고, 서버는 파싱한 뒤에야 한 개당
+ * 2,000자로 자른다. 계약서 텍스트는 20,000자까지 받는다. 한글은 UTF-8 로 한 글자가 3바이트라
+ * 기본 상한(64KB)을 넘을 수 있다. 실제 요청(수백 KB 이하)보다 넉넉하게 잡되 한도는 둔다.
+ */
+export const LARGE_JSON_BODY_MAX_BYTES = 1024 * 1024;
+
 export function noStoreJson(body: unknown, status = 200): NextResponse {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }

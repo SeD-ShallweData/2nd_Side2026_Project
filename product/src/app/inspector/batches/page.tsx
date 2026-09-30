@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
-import { forbidden } from "next/navigation";
 import { InspectorNav } from "@/components/inspector/InspectorNav";
 import { BatchStatusPage } from "@/components/inspector/BatchStatusPage";
-import { canOperatePlatform } from "@/server/auth/inspectorAccess";
-import { SESSION_COOKIE_NAME } from "@/server/auth/sessionCookie";
-import { getOptionalSessionUser } from "@/services/authService";
+import { requireOperatorPage } from "@/server/auth/pageGuards";
 
 export const metadata: Metadata = { title: "배치 현황" };
 
@@ -14,9 +10,7 @@ export const metadata: Metadata = { title: "배치 현황" };
  * 좁힌다. 메뉴에서 감추는 것만으로는 주소를 직접 쳐서 들어올 수 있다.
  */
 export default async function InspectorBatchesPage() {
-  const cookieStore = await cookies();
-  const user = await getOptionalSessionUser(cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null);
-  if (!canOperatePlatform(user?.role)) forbidden();
+  await requireOperatorPage();
 
   return (
     <div className="inspector-page">

@@ -23,6 +23,7 @@ import {
   resetMockWorksiteTipsForTests,
   WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER,
 } from "@/services/worksiteTipService";
+import { silenceServerErrorLogs } from "@/testing/silenceServerErrorLogs";
 
 const USER: SessionUserDto = {
   user_id: "10000000-0000-4000-8000-000000000001",
@@ -149,6 +150,9 @@ function attachmentContext(
 ): { params: Promise<{ tipId: string; attachmentId: string }> } {
   return { params: Promise.resolve({ tipId, attachmentId }) };
 }
+
+// 일부러 5xx 를 내는 경우가 있어 서버 오류 기록 줄(JSON)만 테스트 출력에서 뺀다.
+silenceServerErrorLogs();
 
 beforeEach(() => {
   vi.stubEnv("APP_DATA_MODE", "mock");

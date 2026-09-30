@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
 import { AdminAccessGate } from "@/components/admin/AdminAccessGate";
 import { ModerationReportList } from "@/components/admin/ModerationReportList";
+import { requireOperatorPage } from "@/server/auth/pageGuards";
 
 export const metadata: Metadata = { title: "커뮤니티 신고 관리" };
 
-export default function AdminPage() {
+/*
+ * 서버에서 먼저 운영 관리자 세션을 확인하고, 아니면 403 화면을 낸다(/inspector 와 같은 방식).
+ * AdminAccessGate 는 화면을 연 뒤 세션이 끝난 경우를 안내하는 용도로 남겨 둔다.
+ * 신고 데이터와 처리는 moderation API 가 따로 401/403 으로 막는다.
+ */
+export default async function AdminPage() {
+  await requireOperatorPage();
+
   return (
     <div className="page-section community-page">
       <div className="shell community-shell">
