@@ -146,12 +146,12 @@ PUBLIC_RATE_LIMIT_REDIS_URL=redis://mwquota:<URL_ENCODED_LOCAL_SECRET>@127.0.0.1
 TRUST_PROXY_HEADERS=true
 PUBLIC_RATE_LIMIT_PROXY_TOKEN=<SAME_SECRET_AS_PUBLIC_GATEWAY_ENV>
 PUBLIC_COMPANY_SEARCH_PER_MINUTE=30
-ANONYMOUS_CHAT_PER_HOUR=10
-ANONYMOUS_CHAT_PER_DAY=30
+ANONYMOUS_CHAT_PER_HOUR=30
+ANONYMOUS_CHAT_PER_DAY=100
 ANONYMOUS_CHAT_GLOBAL_PER_DAY=1000
-ANONYMOUS_CONTRACT_REVIEW_PER_HOUR=5
-ANONYMOUS_CONTRACT_REVIEW_PER_DAY=15
-ANONYMOUS_CONTRACT_REVIEW_GLOBAL_PER_DAY=300
+ANONYMOUS_CONTRACT_REVIEW_PER_HOUR=10
+ANONYMOUS_CONTRACT_REVIEW_PER_DAY=50
+ANONYMOUS_CONTRACT_REVIEW_GLOBAL_PER_DAY=500
 ```
 
-The last three contract values take effect on 2026-10-02 00:00 KST. Through October 1 KST contract review is exempt from request limits. The 1000/300 request counts are not financial spending limits. The gateway gets only `PUBLIC_GATEWAY_PORT`, `PUBLIC_GATEWAY_UPSTREAM_PORT`, `PUBLIC_GATEWAY_PUBLIC_HOST`, and the same `PUBLIC_RATE_LIMIT_PROXY_TOKEN` in `/etc/moneyworry/public-gateway.env`. Validate both service env files before a gateway switch. See `docs/qa/2026-09-28-personal-08.md` for ordered rollout and rollback.
+All three public request scopes (anonymous chat, anonymous contract review, and company lookup) are exempt from quota checks through October 1 KST. These configured values take effect on 2026-10-02 00:00 KST. The 1000/500 request counts are not financial spending limits. The gateway gets only `PUBLIC_GATEWAY_PORT`, `PUBLIC_GATEWAY_UPSTREAM_PORT`, `PUBLIC_GATEWAY_PUBLIC_HOST`, and the same `PUBLIC_RATE_LIMIT_PROXY_TOKEN` in `/etc/moneyworry/public-gateway.env`. Validate both service env files before a gateway switch. See `docs/qa/2026-09-28-personal-08.md` for ordered rollout and rollback.

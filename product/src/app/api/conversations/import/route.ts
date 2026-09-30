@@ -12,7 +12,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const user = requireAuthenticatedUser(
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
-    return noStoreJson(await importGuestConversation(await readJsonBody(request), user));
+    return noStoreJson(await importGuestConversation(await readJsonBody(request, 1024 * 1024), user));
   } catch (error) {
     return noStoreError(error);
   }

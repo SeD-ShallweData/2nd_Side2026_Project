@@ -16,10 +16,15 @@ describe("public company search request bounds", () => {
 
   it.each([
     ["회사", 21, 1],
-    ["회사", 20, 51],
+    ["회사", 20, 101],
   ] as const)("rejects an out-of-bound public search (%s, %i, %i)", async (query, limit, page) => {
     vi.stubEnv("APP_DATA_MODE", "mock");
     await expect(searchCompanies(query, limit, page)).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("accepts page 100 at the expanded search boundary", async () => {
+    vi.stubEnv("APP_DATA_MODE", "mock");
+    await expect(searchCompanies("회사", 20, 100)).resolves.toMatchObject({ page: 100 });
   });
 
   it.each([

@@ -92,7 +92,7 @@ function parseUpdateConversation(value: unknown): UpdateConversationRequest {
 function parseGuestImport(value: unknown): ImportGuestConversationRequest {
   const record = asRecord(value);
   if (!record || typeof record.import_id !== "string" || !REQUEST_KEY_PATTERN.test(record.import_id)
-    || !Array.isArray(record.turns) || record.turns.length < 1 || record.turns.length > 10) {
+    || !Array.isArray(record.turns) || record.turns.length < 1 || record.turns.length > 30) {
     throw new ServiceError("VALIDATION_ERROR", "가져올 익명 상담을 확인해 주세요.", 400, false);
   }
   const turns = record.turns.map((value) => {
