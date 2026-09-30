@@ -72,7 +72,7 @@ RAG_INTERNAL_TOKEN=<RAG_INTERNAL_SECRET>
 unit은 sealed Chroma source를 `/srv/moneyworry/rag-db`, 매 부팅 writable copy를
 `/run/moneyworry-rag/chroma`로 고정한다. 허용된 튜닝 키
 외의 임의 환경변수도 거부한다. 모델 ID/revision, manifest, `HF_HOME`, offline/local-only,
-collection 583건과 1024차원 계약은 unit과 `run-gunicorn.sh`가 고정하므로 이 파일에 다시 쓰지
+collection 806건과 1024차원 계약은 unit과 `run-gunicorn.sh`가 고정하므로 이 파일에 다시 쓰지
 않는다. `/srv/moneyworry/hf`와 `/srv/moneyworry/rag-db`는 사전 준비가 끝난 뒤 RAG 계정에
 read-only여야 한다.
 

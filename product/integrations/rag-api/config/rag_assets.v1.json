@@ -59,7 +59,7 @@
   },
   "collection": {
     "name": "labor_law",
-    "document_count": 583,
+    "document_count": 806,
     "embedding_dimension": 1024,
     "probe": {
       "query": "제43조(임금 지급) ① 임금은 통화(通貨)로 직접 근로자에게 그 전액을 지급하여야 한다. 다만, 법령 또는 단체협약에 특별한 규정이 있는 경우에는 임금의 일부를 공제하거나 통화 이외의 것으로 지급할 수 있다.\n② 임금은 매월 1회 이상 일정한 날짜를 정하여 지급하여야 한다. 다만, 임시로 지급하는 임금, 수당, 그 밖에 이에 준하는 것 또는 대통령령으로 정하는 임금에 대하여는 그러하지 아니하다.",
@@ -72,13 +72,13 @@
     "files": [
       {
         "path": "chroma.sqlite3",
-        "size": 7028736,
-        "sha256": "4e2f39e7be02ca55f79ddaf6b790cb9a2210f3bcf282daf7705dc86e54b33741"
+        "size": 9732096,
+        "sha256": "af7ced2cd3b799839894a2bbe1aba82ff976271c87f49ff76901285bb192cea4"
       },
       {
         "path": "6c1e8e89-4864-41ee-95ce-4f703f458f13/data_level0.bin",
         "size": 423600,
-        "sha256": "41b1d6558680207762d59e507f9dcba0cb9fbbd4c23c79e14025206d3742e17f"
+        "sha256": "8518111d4ccbc873a4e83a6c46e9a54df0b40fac55f0a7052842a33c1efc875e"
       },
       {
         "path": "6c1e8e89-4864-41ee-95ce-4f703f458f13/header.bin",

@@ -137,7 +137,7 @@ RAG 모델·컬렉션 무결성과 고정 질의 호환성을 검증했습니다
 Running on http://127.0.0.1:5051
 ```
 
-모델 hash, Chroma 583건, 1024차원 embedding, 실제 고정 query 중 하나라도 맞지 않으면 RAG 서버는
+모델 hash, Chroma 806건, 1024차원 embedding, 실제 고정 query 중 하나라도 맞지 않으면 RAG 서버는
 시작되지 않습니다. 모델 준비와 운영 서버 권한 절차는
 [`integrations/rag-api/README.md`](integrations/rag-api/README.md)를 따릅니다.
 

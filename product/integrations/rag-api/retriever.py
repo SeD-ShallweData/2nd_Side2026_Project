@@ -26,11 +26,11 @@ from asset_manifest import (  # noqa: E402
 ROOT = Path(__file__).resolve().parent
 PINNED_MODEL_NAME = "BAAI/bge-m3"
 PINNED_MODEL_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
-PINNED_DOCUMENT_COUNT = 583
+PINNED_DOCUMENT_COUNT = 806
 PINNED_EMBEDDING_DIMENSION = 1024
 PINNED_DISTANCE_THRESHOLD = 0.42
 PINNED_STRONG_MATCH_DISTANCE = 0.30
-PINNED_ASSET_MANIFEST_SHA256 = "f67ceeb88695eb9f681839bee857ea00e6b8f59853981180a13df547323b30d0"
+PINNED_ASSET_MANIFEST_SHA256 = "7ac893fba1819472129ac6056ca91a73edcc32e1746ce50de282668a85ead4ea"
 ASSET_MANIFEST_PATH = Path(
     os.getenv("RAG_ASSET_MANIFEST", ROOT / "config" / "rag_assets.v1.json")
 )
@@ -139,7 +139,148 @@ QUERY_EXPANSION_RULES = (
         "exclude": (),
         "expansion": "고용보험 적용 범위 적용 제외 근로자 고용보험법 제8조 제10조",
     },
+    # ---- 산업재해보상보험법: 생활어 '산재'와 조문 용어(업무상의 재해·요양급여)가 다르다.
+    # 신청 절차와 인정 여부는 서로 다른 조문(제41조·제36조 / 제37조)이라 규칙을 나눈다.
+    {
+        "triggers": (
+            "산재 신청", "산재신청", "산재 처리", "산재처리", "산재 접수", "산재를 신청",
+            "산재 청구", "산재를 청구",
+        ),
+        "exclude": (),
+        "expansion": "업무상의 재해 요양급여의 신청 보험급여 청구 근로복지공단 산업재해보상보험법 제41조 제36조",
+    },
+    {
+        "triggers": (
+            "산재 승인", "산재 인정", "산재로 인정", "산재 되나", "산재가 되나", "산재가 될",
+            "산재 해당", "산재에 해당", "업무상 재해로 인정", "업무상 재해가 되",
+        ),
+        "exclude": (),
+        "expansion": "업무상의 재해의 인정 기준 업무상 사고 업무상 질병 산업재해보상보험법 제37조",
+    },
+    {
+        "triggers": ("일하다 다쳤", "일하다가 다쳤", "일하다 다친", "작업 중 다쳤", "근무 중 다쳤", "업무 중 다쳤", "출근길", "퇴근길", "출퇴근 중"),
+        "exclude": (),
+        "expansion": "업무상의 재해의 인정 기준 업무상 사고 출퇴근 재해 산업재해보상보험법 제37조",
+    },
+    {
+        "triggers": ("치료비", "병원비", "수술비", "진료비"),
+        "exclude": ("건강보험", "실손"),
+        "expansion": "업무상의 재해 요양급여 요양비 산업재해보상보험법 제40조",
+    },
+    {
+        "triggers": ("휴업급여", "다쳐서 일을 못", "다쳐서 쉬", "치료받는 동안", "요양 기간", "요양하는 동안", "입원한 동안"),
+        "exclude": (),
+        "expansion": "휴업급여 요양으로 취업하지 못한 기간 평균임금 100분의 70 산업재해보상보험법 제52조",
+    },
+    # 보험급여 종류별 조문. 근로기준법 재해보상(제78조~)과 이름이 겹치므로 산재 맥락에서만 붙인다.
+    {
+        "triggers": ("장해",),
+        "requires": "iaci",
+        "exclude": (),
+        "expansion": "장해급여 장해등급 장해보상연금 장해보상일시금 산업재해보상보험법 제57조",
+    },
+    {
+        "triggers": ("유족",),
+        "requires": "iaci",
+        "exclude": (),
+        "expansion": "유족급여 유족보상연금 유족보상일시금 산업재해보상보험법 제62조",
+    },
+    {
+        "triggers": ("불승인", "이의", "심사 청구", "심사청구", "재심사"),
+        "requires": "iaci",
+        "exclude": (),
+        "expansion": "보험급여 결정에 대한 심사 청구 재심사 청구 산업재해보상보험법 제103조 제106조",
+    },
+    # ---- 외국인근로자의 고용 등에 관한 법률
+    {
+        "triggers": (
+            "사업장 변경", "사업장을 변경", "사업장 이동", "사업장을 옮", "사업장 바꾸", "사업장을 바꾸",
+        ),
+        "exclude": (),
+        "expansion": "외국인근로자 사업 또는 사업장 변경의 허용 변경 신청 횟수 외국인근로자의 고용 등에 관한 법률 제25조",
+    },
+    {
+        # 내국인의 이직 질문에는 붙이지 않는다.
+        "triggers": ("회사를 옮기", "회사를 바꾸", "직장을 옮기", "직장을 바꾸", "이직"),
+        "requires": "foreign",
+        "exclude": (),
+        "expansion": "외국인근로자 사업 또는 사업장 변경의 허용 변경 신청 횟수 외국인근로자의 고용 등에 관한 법률 제25조",
+    },
+    {
+        "triggers": ("출국만기",),
+        "exclude": (),
+        "expansion": "출국만기보험 신탁 퇴직금 지급 외국인근로자의 고용 등에 관한 법률 제13조",
+    },
+    {
+        "triggers": ("퇴직금",),
+        "requires": "foreign",
+        "exclude": (),
+        "expansion": "출국만기보험 신탁 퇴직금 지급 외국인근로자의 고용 등에 관한 법률 제13조",
+    },
+    {
+        "triggers": ("귀국비용", "귀국 비용", "귀국할 때 비용", "귀국 항공"),
+        "exclude": (),
+        "expansion": "귀국비용보험 신탁 귀국 경비 외국인근로자의 고용 등에 관한 법률 제15조",
+    },
+    {
+        "triggers": ("보증보험",),
+        "exclude": (),
+        "expansion": "보증보험 가입 임금체불 외국인근로자 사업주 외국인근로자의 고용 등에 관한 법률 제23조",
+    },
+    {
+        "triggers": ("상해보험",),
+        "exclude": (),
+        "expansion": "상해보험 가입 업무상 재해 외의 사망 질병 외국인근로자의 고용 등에 관한 법률 제23조",
+    },
+    {
+        "triggers": ("고용 제한", "고용제한", "고용이 제한", "고용을 제한", "고용허가를 제한", "고용허가 제한"),
+        "exclude": (),
+        "expansion": "외국인근로자 고용의 제한 고용허가 외국인근로자의 고용 등에 관한 법률 제20조",
+    },
+    {
+        "triggers": ("차별", "적게 줘", "적게 주", "덜 줘", "덜 주", "이라는 이유로", "라는 이유로"),
+        "requires": "foreign",
+        "exclude": (),
+        "expansion": "외국인근로자라는 이유로 부당하게 차별하여 처우 금지 외국인근로자의 고용 등에 관한 법률 제22조",
+    },
+    {
+        # 외국인근로자의 최저임금은 최저임금법이 그대로 적용된다(외국인고용법 조문만 앞서지 않게).
+        "triggers": ("최저임금",),
+        "requires": "foreign",
+        "exclude": (),
+        "expansion": "최저임금법 적용 범위 최저임금의 효력 최저임금법 제3조 제6조 외국인근로자 차별 금지 제22조",
+    },
 )
+
+# 산재보험법·외국인고용법 조문은 질문이 그 맥락을 말할 때만 먼저 고르고, 아니면 빈자리만 채운다.
+# (휴업수당·상시근로자 수 같은 일반 근로기준법 질문에 산재 휴업급여·적용 제외 조문이 앞서지 않게 한다.)
+IACI_CONTEXT_KEYWORDS = (
+    "산재", "산업재해", "업무상", "재해", "다쳐", "다쳤", "다치", "다친", "부상", "사고", "질병",
+    "직업병", "요양", "휴업급여", "장해급여", "장해보상연금", "유족급여", "유족보상연금",
+    "간병급여", "상병보상연금", "장례비", "근로복지공단",
+    "출퇴근", "출근길", "퇴근길", "진폐", "치료", "병원",
+)
+FOREIGN_WORKER_CONTEXT_KEYWORDS = (
+    "외국인", "이주노동", "이주 노동", "E-9", "E9", "H-2", "H2", "비전문취업", "방문취업",
+    "고용허가", "출국만기", "귀국비용", "불법체류", "미등록", "체류자격", "체류 자격", "비자",
+    "사업장 변경", "사업장을 변경",
+)
+IACI_LAWS = frozenset(("산업재해보상보험법", "산업재해보상보험법 시행령"))
+FOREIGN_WORKER_LAWS = frozenset((
+    "외국인근로자의 고용 등에 관한 법률",
+    "외국인근로자의 고용 등에 관한 법률 시행령",
+))
+
+
+def _has_iaci_context(query):
+    return any(keyword in query for keyword in IACI_CONTEXT_KEYWORDS)
+
+
+def _has_foreign_worker_context(query):
+    return any(keyword in query for keyword in FOREIGN_WORKER_CONTEXT_KEYWORDS)
+
+
+_RULE_CONTEXTS = {"iaci": _has_iaci_context, "foreign": _has_foreign_worker_context}
 
 NARROW_RULES = (
     {
@@ -178,15 +319,28 @@ OUT_OF_SCOPE_TOPICS = (
         "keywords": ("파이썬 코딩", "파이썬 코드", "파이썬 프로그램", "파이썬 배우", "Python 코드", "Python programming"),
     },
     {
-        "name": "산업재해·산업안전",
+        # 산업재해보상보험법은 수록했지만 산업안전보건법·중대재해처벌법은 DB 밖이다.
+        "name": "산업안전·중대재해",
         "keywords": (
-            "산재보험", "산업재해보상", "근로복지공단", "산업안전보건", "중대재해",
-            "산재 신청", "산재신청",
+            "산업안전보건", "산안법", "중대재해", "안전보건교육", "안전보건관리",
+            "안전관리자", "보건관리자", "작업중지", "안전조치",
         ),
     },
     {
         "name": "4대보험",
-        "keywords": ("4대보험", "사대보험", "국민연금", "건강보험", "장기요양보험"),
+        "keywords": ("4대보험", "사대보험", "국민연금", "장기요양보험"),
+    },
+    {
+        "name": "4대보험",
+        "keywords": ("건강보험",),
+        # 외국인근로자의 고용 등에 관한 법률 제14조(건강보험 적용 특례)만 DB 안에 있다.
+        "unless": ("외국인",),
+    },
+    {
+        # 근로소득 연말정산은 소득세법 소관이다. 세금 주제와 달리 노동 질문처럼 보여
+        # 산재보험법 연금 지급 시기 조문(거리 0.41)이 붙는 일이 있어 강한 일치가 없으면 막는다.
+        "name": "연말정산",
+        "keywords": ("연말정산",),
     },
     {
         "name": "노동조합",
@@ -495,6 +649,8 @@ def _expand_query(query):
     for rule in QUERY_EXPANSION_RULES:
         if any(keyword in query for keyword in rule["exclude"]):
             continue
+        if "requires" in rule and not _RULE_CONTEXTS[rule["requires"]](query):
+            continue
         if any(keyword in query for keyword in rule["triggers"]):
             expansions.append(rule["expansion"])
     if _is_wage_arrears_query(query):
@@ -504,6 +660,18 @@ def _expand_query(query):
             expansions.append("임금체불 진정 입증자료 근로계약서 급여자료 근로시간 자료")
     if _looks_like_unpaid_late_work(query):
         expansions.append("연장 야간 근로 가산임금 지급 근로기준법 제56조")
+    if _has_foreign_worker_context(query) and _has_iaci_context(query) and not any(
+        keyword in query for keyword in ("상해보험", "보증보험", "출국만기", "귀국비용")
+    ):
+        # 체류자격·국적과 관계없이 근로자면 산재보험이 적용된다는 근거(적용 범위·근로자 정의).
+        expansions.append(
+            "근로자를 사용하는 모든 사업 또는 사업장에 적용 산업재해보상보험법 제6조 적용 범위 근로자 제5조"
+        )
+    if _looks_like_small_primary_industry_iaci(query):
+        expansions.append(
+            "산업재해보상보험법 적용 제외 사업 법인이 아닌 농업 임업 어업 상시근로자 수 5명 미만 "
+            "산업재해보상보험법 시행령 제2조"
+        )
     return f"{query} {' '.join(expansions)}" if expansions else query
 
 
@@ -515,6 +683,8 @@ def _is_wage_arrears_query(query):
         "퇴직", "퇴사", "사망", "금품청산", "금품 청산", "제36조", "퇴직연금", "실업급여", "구직급여", "최저임금", "임금명세", "포괄임금",
         "나라에서 대신", "파산", "망했", "지연이자", "소멸시효", "언제까지 청구",
         "도급", "원청", "하청", "직상 수급인",
+        # 산재보험 급여·외국인근로자 보험은 각자 수록 법령의 조문이 있다.
+        "산재", "휴업급여", "요양급여", "다쳐", "다친", "보증보험", "출국만기", "귀국비용",
     )
     if any(topic in query for topic in specific_topics):
         return False
@@ -548,6 +718,14 @@ def _looks_like_unpaid_late_work(query):
     )
 
 
+def _looks_like_small_primary_industry_iaci(query):
+    """농·임·어업 소규모 사업장의 산재보험 적용 여부 질문."""
+    return (
+        any(keyword in query for keyword in ("농업", "농장", "농사", "농가", "과수원", "비닐하우스", "축사", "양식장", "어업", "어선", "임업"))
+        and any(keyword in query for keyword in ("산재", "산업재해", "다쳤", "다치", "보험", "적용"))
+    )
+
+
 def _has_labor_request_signal(query):
     if _is_wage_arrears_query(query):
         return True
@@ -561,6 +739,11 @@ def _has_labor_request_signal(query):
 
 def _narrow_allowed(meta, query):
     """특수대상 전용 조문은 질문이 같은 대상을 직접 말한 경우에만 우선 노출한다."""
+    law = meta.get("law")
+    if law in IACI_LAWS and not _has_iaci_context(query):
+        return False
+    if law in FOREIGN_WORKER_LAWS and not _has_foreign_worker_context(query):
+        return False
     article_context = f"{meta.get('title') or ''} {meta.get('chapter') or ''}"
     matched_rules = [
         rule for rule in NARROW_RULES
@@ -579,6 +762,8 @@ def _out_of_scope_topic(query, top_distance):
         return None
     for topic in OUT_OF_SCOPE_TOPICS:
         if any(keyword in query for keyword in topic["keywords"]):
+            if any(keyword in query for keyword in topic.get("unless", ())):
+                continue
             # Topic hints must not discard otherwise eligible labor evidence.
             if topic["name"] in NON_LABOR_TOPICS and _has_labor_request_signal(query):
                 continue
