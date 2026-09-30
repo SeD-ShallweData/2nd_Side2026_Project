@@ -1,5 +1,5 @@
 import type { ChatRequest, ChatResponse } from "@/domain/chat";
-import { locationAliases } from "@/services/conversationCompanyScope";
+import { locationAliases, statementCompanies } from "@/services/conversationCompanyScope";
 
 /** The two actions are already explicit in the user's question; no classifier guess is needed. */
 export function asksSplitWageInjuryActions(message: string): boolean {
@@ -10,7 +10,7 @@ export function asksSplitWageInjuryActions(message: string): boolean {
 }
 
 export function splitWageInjuryGuidance(message: string, baseline: ChatResponse, request?: ChatRequest): ChatResponse {
-  const companies = request?.conversation_recall?.companies ?? [];
+  const companies = request ? statementCompanies(request) : [];
   const label = (pattern: RegExp) => {
     const match = message.match(pattern);
     if (!match) return undefined;

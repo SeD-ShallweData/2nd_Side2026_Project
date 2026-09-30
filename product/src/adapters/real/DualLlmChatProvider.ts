@@ -34,8 +34,9 @@ import { userFactGuardrailHits } from "@/services/userFactAnswerGuardrails";
 import { recallAnswer } from "@/services/conversationRecallService";
 import { asksSplitWageInjuryActions, splitWageInjuryGuardrailHits, splitWageInjuryGuidance } from "@/services/splitIssueGuidance";
 import { correctAgencyContacts } from "@/services/agencyContactCorrection";
+import { defaultStatementSubject, statementCompanies } from "@/services/conversationCompanyScope";
 
-export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-29-v20";
+export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-10-01-v21";
 const EMPTY_USAGE: TokenUsage = {
   prompt_tokens: null,
   completion_tokens: null,
@@ -234,10 +235,10 @@ function supportedResponseSources(answer: string, response: ChatResponse, contex
 
 const isDocumentQuestion = (message: string) => asksWageDocumentUse(message) || asksUserDocumentStatus(message);
 
-function latestRequestedFacts(context: ComparisonContext, requestedIds: string[]) {
+function latestRequestedFacts(context: ComparisonContext, requestedIds: Array<string | null>) {
   const latest = new Map<string, NonNullable<ComparisonContext["request"]["conversation_recall"]>["facts"][number]>();
   for (const fact of context.request.conversation_recall?.facts ?? []) {
-    if (requestedIds.includes(fact.company_id ?? "")) latest.set(`${fact.company_id}:${fact.kind}`, fact);
+    if (requestedIds.includes(fact.company_id)) latest.set(`${fact.company_id}:${fact.kind}`, fact);
   }
   return [...latest.values()].sort((a, b) => a.sequence - b.sequence).map((fact) => ({
     kind: fact.kind, value: fact.value, state: fact.state ?? null,
@@ -249,8 +250,9 @@ function buildSystemPrompt(context: ComparisonContext): string {
   const documentQuestion = isDocumentQuestion(context.request.message);
   const documentStatements = documentQuestion ? context.request.conversation_recall?.document_statements ?? [] : [];
   const documentStatus = documentQuestion ? documentStatusesForRequest(context.request) : [];
-  const ownerCompanies = context.request.conversation_recall?.companies ?? [];
-  const requestedIds = referencedCompanyIds(context.request.message, ownerCompanies, context.request.company_id);
+  const ownerCompanies = statementCompanies(context.request);
+  const requestedIds: Array<string | null> = referencedCompanyIds(context.request.message, ownerCompanies, defaultStatementSubject(context.request) ?? undefined);
+  if (!requestedIds.length && !ownerCompanies.length) requestedIds.push(null);
   const comparedCompanies = ownerCompanies.filter((company) => requestedIds.includes(company.company_id));
   const safeContext = {
     question_intent: context.questionIntent ?? null,
@@ -307,6 +309,10 @@ function buildSystemPrompt(context: ComparisonContext): string {
     user_document_status: documentStatus,
     user_document_status_summary: documentQuestion ? documentStatusSummaryForRequest(context.request) : null,
     user_recall_facts: latestRequestedFacts(context, requestedIds),
+    user_statement_subjects: comparedCompanies.map(company => ({
+      subject_key: company.company_id, name: company.company_name, region: company.region ?? null,
+      public_company_linked: !company.company_id.startsWith("statement:"),
+    })),
     contract_review: context.request.contract_review
       ? {
           analysis_status: context.request.contract_review.analysis_status,
@@ -346,7 +352,7 @@ function buildSystemPrompt(context: ComparisonContext): string {
     documentQuestion
       ? "현재 질문은 사용자 문서의 보유 상태와 활용이다. user_document_status_summary를 답변 전에 회사별로 그대로 확인한다. 이 요약은 소유자 확인을 거친 사용자 진술만 보수적으로 추출한 것이며 서류 자체의 진위 확인은 아니다. '보유·부재를 진술하지 않음'은 원본·사본을 가진 것으로도, 없는 것으로도, 분실한 것으로도 바꾸지 않는다. 오래된 원문은 뒤의 같은 문서 정정으로만 대체한다. 이전 assistant 답변·검색 문서의 일반 준비물·질문에 나열된 문서명은 보유 근거가 아니다. 원문 ID와 내부 키는 출력하지 않는다. 먼저 현재 문서 상태, 그 다음 관련 근거에 맞는 활용·다음 행동을 답한다. 서류를 전부 갖춰야만 진정할 수 있다고 하지 않는다. 법률·진정 절차 문장의 끝에는 이번에 실제 제공된 공식 문서명을 괄호 근거로 붙이고, 답변 끝에 출처 목록만 따로 두지 않는다."
       : "",
-    "사용자 진술의 최신 정정과 금액 관계는 현재 질문의 새 진술을 먼저, 그다음 user_recall_facts의 같은 회사·항목에서 가장 나중 순서를 우선한다. 오래된 assistant 문장은 사용자 사실이 아니다. 입금액과 남은 금액을 뒤바꾸지 않고, 두 금액이 없으면 잔액을 추정하지 않는다. 순수 사실 회상과 확인 자료를 번호로 요구하면 각 번호에 답한다.",
+    "사용자 진술의 최신 정정과 금액 관계는 현재 질문의 새 진술을 먼저, 그다음 user_recall_facts의 같은 회사·항목에서 가장 나중 순서를 우선한다. user_statement_subjects의 public_company_linked=false는 이 상담에서 사용자가 붙인 이름과 지역일 뿐 공공 DB에서 확인한 회사가 아니다. 이를 company 자료와 연결하거나 실제 회사 사실로 단정하지 않는다. 오래된 assistant 문장은 사용자 사실이 아니다. 입금액과 남은 금액을 뒤바꾸지 않고, 두 금액이 없으면 잔액을 추정하지 않는다. 순수 사실 회상과 확인 자료를 번호로 요구하면 각 번호에 답한다.",
   ]);
 }
 
