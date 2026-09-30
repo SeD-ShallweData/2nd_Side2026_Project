@@ -27,6 +27,19 @@ describe("상담 경로의 외국어 긴급 안내", () => {
     expect(response.answer).toContain("Gọi 119");
   });
 
+  it("성조 없이 쓴 베트남어 트랙터 전복 신고에도 베트남어로 답한다", async () => {
+    const response = await provider.sendMessage(parseChatRequest({ message: "lat may cay, anh ay bi de", chat_mode: "general" }));
+    expect(response.answer_type).toBe("emergency_guidance");
+    expect(response.answer).toContain("Gọi 119");
+  });
+
+  it("한국어 농약 중독 신고는 한국어 긴급 안내로 답한다", async () => {
+    const response = await provider.sendMessage(parseChatRequest({ message: "동료가 농약을 마셨어요", chat_mode: "general" }));
+    expect(response.answer_type).toBe("emergency_guidance");
+    expect(response.answer).toContain("119");
+    expect(response.answer).not.toContain("(한국어)");
+  });
+
   it("지원 예정 언어의 긴급 신고는 영어로 답한다", async () => {
     const response = await provider.sendMessage(parseChatRequest({ message: "он без сознания", chat_mode: "general" }));
     expect(response.answer).toContain("Call 119");

@@ -1,13 +1,14 @@
 import "server-only";
 
 import { MOCK_COMPANIES } from "@/mocks/companies";
-import type {
-  NewWorksiteTip,
-  StoredWorksiteTip,
-  StoredWorksiteTipAttachment,
-  StoredWorksiteTipAttachmentContent,
-  WorksiteTipPage,
-  WorksiteTipRepository,
+import {
+  KOREAN_WORKSITE_TIP_TRANSLATION,
+  type NewWorksiteTip,
+  type StoredWorksiteTip,
+  type StoredWorksiteTipAttachment,
+  type StoredWorksiteTipAttachmentContent,
+  type WorksiteTipPage,
+  type WorksiteTipRepository,
 } from "@/domain/worksiteTip";
 import type {
   WorksiteTipApiSource,
@@ -111,6 +112,7 @@ function cloneTip(tip: MockStoredTip): StoredWorksiteTip {
     company_context: tip.company_context ? { ...tip.company_context } : null,
     submitted_at: tip.submitted_at,
     attachments: tip.attachments.map(attachmentMetadata),
+    translation: { ...tip.translation },
   };
 }
 
@@ -156,6 +158,7 @@ export class MockWorksiteTipRepository implements WorksiteTipRepository {
         ...attachmentMetadata(attachment),
         inspector_bytes: attachment.inspector_bytes.slice(),
       })),
+      translation: { ...(input.translation ?? KOREAN_WORKSITE_TIP_TRANSLATION) },
     };
     memoryState.tips.set(stored.tip_id, stored);
     return cloneTip(stored);

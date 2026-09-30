@@ -4,17 +4,20 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   COMMUNITY_CATEGORIES,
+  COMMUNITY_POST_LANGUAGES,
   type CommunityCategory,
+  type CommunityPostLanguage,
   type CommunityPostListResponse,
 } from "@/app/api/community/communityApiContract";
 import { ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
-import { companyContextLabel, relativeTimeLabel } from "@/components/community/communityFormat";
+import { companyContextLabel, postLanguageLabel, relativeTimeLabel } from "@/components/community/communityFormat";
 import { format } from "@/i18n/defineMessages";
 import { useMessages } from "@/i18n/LocaleProvider";
 import { communityMessages } from "@/i18n/messages/community";
 import { listCommunityPosts } from "@/services/communityClient";
 
 type CategoryFilter = CommunityCategory | "all";
+type LanguageFilter = CommunityPostLanguage | "all";
 
 interface LoadedList {
   key: string;
@@ -32,11 +35,12 @@ export function CommunityBoard() {
   const [query, setQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("all");
+  const [language, setLanguage] = useState<LanguageFilter>("all");
   const [page, setPage] = useState(1);
   const [reloadToken, setReloadToken] = useState(0);
   const [loaded, setLoaded] = useState<LoadedList | null>(null);
 
-  const requestKey = `${reloadToken}|${category}|${page}|${searchTerm}`;
+  const requestKey = `${reloadToken}|${category}|${language}|${page}|${searchTerm}`;
   // 요청 조건이 바뀌면 아직 도착하지 않은 결과이므로 로딩으로 본다.
   const loading = loaded?.key !== requestKey;
   const result = loading ? null : loaded?.result ?? null;
@@ -53,6 +57,7 @@ export function CommunityBoard() {
       {
         q: searchTerm || undefined,
         category: category === "all" ? null : category,
+        language: language === "all" ? null : language,
         page,
       },
       { signal: controller.signal },
@@ -67,7 +72,7 @@ export function CommunityBoard() {
         });
       });
     return () => controller.abort();
-  }, [requestKey, searchTerm, category, page, loadFailedMessage]);
+  }, [requestKey, searchTerm, category, language, page, loadFailedMessage]);
 
   function changeQuery(value: string) {
     setQuery(value);
@@ -76,6 +81,11 @@ export function CommunityBoard() {
 
   function changeCategory(next: CategoryFilter) {
     setCategory(next);
+    setPage(1);
+  }
+
+  function changeLanguage(next: LanguageFilter) {
+    setLanguage(next);
     setPage(1);
   }
 
@@ -89,6 +99,15 @@ export function CommunityBoard() {
             </button>
           ))}
         </div>
+        <label className="community-language-filter">
+          <span>{m.postLanguage.filterLabel}</span>
+          <select value={language} onChange={(event) => changeLanguage(event.target.value as LanguageFilter)} aria-label={m.postLanguage.filterAria}>
+            <option value="all">{m.postLanguage.all}</option>
+            {COMMUNITY_POST_LANGUAGES.map((item) => (
+              <option key={item} value={item} lang={item === "other" ? undefined : item}>{m.postLanguage.names[item]}</option>
+            ))}
+          </select>
+        </label>
         <div className="community-search-actions">
           <label className="community-search-field"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => changeQuery(event.target.value)} placeholder={m.board.searchPlaceholder} aria-label={m.board.searchAria} /></label>
           {result?.capabilities.write ? <Link href="/community/new" className="button button-dark">{m.board.write}</Link> : null}
@@ -112,12 +131,12 @@ export function CommunityBoard() {
             <div>
               <span>{m.categories[post.category] ?? post.category_label}</span>
               <small>
-                {[companyContextLabel(post.company_context, m.format), post.author_label ?? m.post.anonymous, relativeTimeLabel(post.created_at, m.format)]
+                {[companyContextLabel(post.company_context, m.format), post.author_label ?? m.post.anonymous, relativeTimeLabel(post.created_at, m.format), postLanguageLabel(post.language, m.postLanguage)]
                   .filter((part): part is string => Boolean(part))
                   .join(" · ")}
               </small>
             </div>
-            <h2><Link href={`/community/${encodeURIComponent(post.post_id)}`}>{post.title}</Link></h2><p>{post.body}</p>
+            <h2 lang={post.language === "other" ? undefined : post.language}><Link href={`/community/${encodeURIComponent(post.post_id)}`}>{post.title}</Link></h2><p lang={post.language === "other" ? undefined : post.language}>{post.body}</p>
             <strong>{post.like_count === null ? null : `${format(m.post.likes, { count: post.like_count })}　`}{format(m.post.comments, { count: post.comment_count })}</strong>
           </article>
         ))}

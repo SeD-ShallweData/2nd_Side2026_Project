@@ -809,6 +809,35 @@ SELECT json_build_object(
                         '강원도', '전라북도', '제주도', '세종시')
       )
   ),
+  '0023_i18n_translation', json_build_object(
+    'column_type:public.conversation_messages.content_ko_text', EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='conversation_messages'
+         AND column_name='content_ko' AND udt_name='text'
+    ),
+    'column_type:public.conversation_messages.locale_text', EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='conversation_messages'
+         AND column_name='locale' AND udt_name='text'
+    ),
+    'column_type:public.worksite_tips.translation_status_text_not_null', EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='worksite_tips'
+         AND column_name='translation_status' AND udt_name='text' AND is_nullable='NO'
+    ),
+    'column_type:public.worksite_tips.title_ko_body_ko_source_language', (
+      SELECT count(*) = 3 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='worksite_tips'
+         AND column_name IN ('title_ko','body_ko','source_language') AND udt_name='text'
+    ),
+    'constraint:public.prompt_versions_name_ck_allows_translate', EXISTS (
+      SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+       WHERE n.nspname='public' AND c.relname='prompt_versions'
+         AND con.conname='prompt_versions_name_ck' AND con.contype='c'
+         AND pg_get_constraintdef(con.oid) LIKE '%translate/system%'
+    )
+  ),
   '0021_ops_console', json_build_object(
     'table:public.prompt_versions', EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='prompt_versions' AND c.relkind IN ('r','p')),
     'table:public.ops_audit_log', EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='ops_audit_log' AND c.relkind IN ('r','p')),

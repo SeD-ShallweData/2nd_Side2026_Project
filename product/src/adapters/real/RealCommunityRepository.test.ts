@@ -22,7 +22,7 @@ vi.mock("@/server/postgresWrite", () => ({
   ) => run({ query: db.transactionQuery }),
 }));
 
-import { RealCommunityRepository } from "@/adapters/real/RealCommunityRepository";
+import { POST_LANGUAGE_CASE, POST_LANGUAGE_JOIN, RealCommunityRepository } from "@/adapters/real/RealCommunityRepository";
 
 const repository = new RealCommunityRepository();
 const POST_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -221,6 +221,33 @@ describe("게시글 읽기", () => {
 
     expect(db.queryWrite.mock.calls[0]?.[2]?.[1]).toBe("100\\%\\_확인");
     expect(String(db.queryWrite.mock.calls[0]?.[1])).toContain("ESCAPE");
+  });
+});
+
+describe("작성 언어 필터", () => {
+  it("필터가 없으면 언어 계산을 붙이지 않는다", async () => {
+    db.queryWrite.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total_count: "0" }]);
+
+    await repository.listPublishedPosts({ query: "", category: null, language: null, limit: 10, page: 1 });
+
+    expect(String(db.queryWrite.mock.calls[0]?.[1])).not.toContain("LATERAL");
+    expect(db.queryWrite.mock.calls[0]?.[2]).toEqual([null, "", 10, 0]);
+    expect(db.queryWrite.mock.calls[1]?.[2]).toEqual([null, ""]);
+  });
+
+  it("목록과 건수 쿼리에 같은 언어 조건을 붙인다", async () => {
+    db.queryWrite.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total_count: "0" }]);
+
+    await repository.listPublishedPosts({ query: "", category: "wage", language: "vi", limit: 10, page: 2 });
+
+    for (const call of db.queryWrite.mock.calls) {
+      expect(String(call[1])).toContain(POST_LANGUAGE_JOIN.trim());
+      expect(String(call[1])).toContain(POST_LANGUAGE_CASE);
+    }
+    expect(String(db.queryWrite.mock.calls[0]?.[1])).toContain(`${POST_LANGUAGE_CASE} = $5`);
+    expect(db.queryWrite.mock.calls[0]?.[2]).toEqual(["wage", "", 10, 10, "vi"]);
+    expect(String(db.queryWrite.mock.calls[1]?.[1])).toContain(`${POST_LANGUAGE_CASE} = $3`);
+    expect(db.queryWrite.mock.calls[1]?.[2]).toEqual(["wage", "", "vi"]);
   });
 });
 

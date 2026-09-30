@@ -32,11 +32,12 @@ export const LATEST_DRIFT_CHECK: DriftCheckRecord = {
   postconditions_total: 129,
   warning_count: 0,
   unverifiable_count: 6,
-  unrecorded_migrations: ["0022_current_sido_names"],
+  unrecorded_migrations: ["0022_current_sido_names", "0023_i18n_translation"],
   recorded_by: "운영 담당(수동 기입)",
   notes: [
     "경고 0건 = 적용 대기 migration 0건(검사기에는 별도 경고 등급이 없음).",
     "검사 불가 6건 = 후조건이 없는 0000~0005 migration. 원장 hash 는 일치하지만 실물 객체는 확인하지 않는다.",
     "이 기록 이후 0022_current_sido_names(#146, 2026-09-30 병합)가 운영에 적용됐는지는 기록되지 않았다. 적용 후 재검사 전까지 현재 정합성은 미확인이다.",
+    "0023_i18n_translation(언어 지원 2·3단계 번역 컬럼)도 이 기록 이후 병합됐다. 운영 적용 뒤 재검사 결과로 이 기록을 갱신한다.",
   ],
 };

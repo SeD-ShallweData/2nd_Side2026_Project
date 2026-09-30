@@ -183,6 +183,13 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "column_type:public.firms.sido_source_text",
     "data:public.firms.no_former_sido_names",
   ]),
+  "0023_i18n_translation": Object.freeze([
+    "column_type:public.conversation_messages.content_ko_text",
+    "column_type:public.conversation_messages.locale_text",
+    "column_type:public.worksite_tips.translation_status_text_not_null",
+    "column_type:public.worksite_tips.title_ko_body_ko_source_language",
+    "constraint:public.prompt_versions_name_ck_allows_translate",
+  ]),
 });
 
 function migrationLabel(migration) {

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 /*
  * 운영 관리자에게 현재 적용 중인 시스템 프롬프트를 보여준다.
  *
- * 이름은 REQUIRED_PROMPTS 에 박힌 세 가지만 받는다. 요청에서 받은 문자열로
+ * 이름은 REQUIRED_PROMPTS 에 박힌 네 가지만 받는다. 요청에서 받은 문자열로
  * 파일을 여는 길을 열어 두면 경로 조작이 들어온다.
  *
  * 파일은 고치지 않는다. 프롬프트 파일은 자산 무결성 해시로 고정돼 있고(#81) 웹 유닛은
@@ -21,6 +21,7 @@ const LABELS: Record<(typeof REQUIRED_PROMPTS)[number], { title: string; usage: 
   "chat/system": { title: "노동 상담 시스템 프롬프트", usage: "일반 사용자 AI 상담" },
   "inspector/system": { title: "점검 보조 시스템 프롬프트", usage: "근로감독관 AI 점검 보조" },
   "rewrite/system": { title: "질문 재작성 프롬프트", usage: "검색 전 질문 정규화" },
+  "translate/system": { title: "상담 번역 프롬프트", usage: "외국어 질문·답변 번역(한국어 경유)과 현장 제보 번역" },
 };
 
 export async function GET(request: Request): Promise<NextResponse> {

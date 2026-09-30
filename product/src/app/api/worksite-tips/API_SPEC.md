@@ -108,6 +108,21 @@
 사진 URL도 세션의 `inspector` 권한을 다시 확인한다. URL의 제보 ID와 사진 ID가 실제 부모·자식 관계가
 아니면 `404`를 반환한다.
 
+### 5.1 외국어 제보 번역 (언어 지원 3단계, migration 0023)
+
+한국어가 아닌 제보는 **저장 전에** 제목·본문을 한국어로 기계 번역해 원문과 함께 한 번의 INSERT로 남긴다
+(`wg_tip`에는 UPDATE 권한이 없어 나중에 덧붙일 수 없다). 언어 판별은 제보자의 화면 언어 쿠키
+(`donworry_locale`)와 글자 체계로 한다(`domain/worksiteTipLanguage.ts`). 접수 폼은 같은 규칙으로 번역 전송
+안내를 먼저 보여 준다. 번역은 상한 8초이며, 실패·시간 초과·미설정이어도 접수는 성공하고 원문만 저장한다.
+
+목록·상세 응답에 다음 필드가 추가된다. 제보자 영수증에는 넣지 않는다.
+
+- `source_language` — 제보 언어 추정값(`en`·`zh`·`vi`·`th` 등). `null`이면 한국어
+- `translation_status` — `not_needed`(한국어) · `translated` · `failed`(원문만 있음)
+- `title_ko`, `body_ko`(상세) / `title_ko`, `body_preview_ko`(목록) — `translated`일 때만 값이 있다
+
+번역 경로가 없는 글자 체계(키릴 등)는 모델에 보내지 않고 `failed`로 둔다.
+
 ## 6. 오류 계약
 
 | 상태 | 주요 코드 | 의미 |

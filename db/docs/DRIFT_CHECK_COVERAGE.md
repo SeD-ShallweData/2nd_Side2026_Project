@@ -223,3 +223,10 @@ ledger20행 aligned를 확인했다. 기존 Windows psql CLI 부재는 컨테이
 `firms.sido`에 구 명칭이 남지 않았는지를 후조건으로 등록했다. 데이터 후조건은
 컬럼이 있을 때만 참이 될 수 있게 하여 정상적인 적용 대기를 부분 적용으로 오판하지 않는다.
 이 검사는 실제 DB의 사업장 수·ID 보존이나 운영 적용을 대신하지 않는다.
+
+## 2026-09-30 추가 — 번역 경로 스키마
+
+`0023_i18n_translation`은 언어 지원 2·3단계용이다. 상담 기록의 한국어 원문(`conversation_messages.content_ko`, `locale`),
+현장 제보의 한국어 번역본(`worksite_tips.title_ko`, `body_ko`, `source_language`, `translation_status`),
+운영 콘솔의 네 번째 프롬프트(`translate/system`)를 허용하는 `prompt_versions_name_ck` 를 후조건 5개로 등록했다.
+모두 nullable 추가 또는 기본값이 있는 컬럼이라 이전 앱은 새 컬럼을 무시하고 그대로 동작한다.

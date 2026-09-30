@@ -1,3 +1,4 @@
+import type { TextLanguage } from "@/domain/textLanguage";
 import type {
   CommunityApiSource,
   CommunityCategory,
@@ -61,6 +62,8 @@ export interface CommunityPage<T> {
 export interface PostListQuery {
   query: string;
   category: CommunityCategory | null;
+  /** 작성 언어 필터(domain/textLanguage). 없거나 null 이면 거르지 않는다. */
+  language?: TextLanguage | null;
   limit: number;
   page: number;
 }
