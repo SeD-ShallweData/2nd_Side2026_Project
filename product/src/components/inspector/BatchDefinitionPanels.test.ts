@@ -82,15 +82,19 @@ describe("배치 현황 정의서 항목 화면", () => {
   it("드리프트 결과는 '수동 기입' 표시와 함께 정상 옆에 경고·검사 불가 건수를 항상 보인다", () => {
     const html = text(renderToStaticMarkup(createElement(DriftCheckCard, { record: LATEST_DRIFT_CHECK })));
     expect(html).toContain("수동 기입");
-    expect(html).toContain("최근 검사 2026-09-29");
+    expect(html).toContain(`최근 검사 ${LATEST_DRIFT_CHECK.checked_at}`);
     expect(html).toContain("정상");
     expect(html).toContain("경고 0건 · 검사 불가 6건");
-    expect(html).toContain("22 / 22");
-    expect(html).toContain("129 / 129 충족");
-    // 기록 이후 병합된 0022 는 적용 여부를 모른다고 적는다.
-    expect(html).toContain("0022_current_sido_names");
-    expect(html).toContain("현재 정합성은 미확인");
+    expect(html).toContain(`${LATEST_DRIFT_CHECK.migrations_applied} / ${LATEST_DRIFT_CHECK.migrations_expected}`);
+    expect(html).toContain(`${LATEST_DRIFT_CHECK.postconditions_passed} / ${LATEST_DRIFT_CHECK.postconditions_total} 충족`);
     expect(html).toContain("self_check.py");
+  });
+
+  it("기록 이후 병합된 migration 은 적용 여부를 모른다고 적는다", () => {
+    const record: DriftCheckRecord = { ...LATEST_DRIFT_CHECK, unrecorded_migrations: ["0099_example"] };
+    const html = text(renderToStaticMarkup(createElement(DriftCheckCard, { record })));
+    expect(html).toContain("0099_example");
+    expect(html).toContain("현재 정합성은 미확인");
   });
 
   it("건수를 모르면 숫자를 지어내지 않고 '미기록'으로, 불일치는 '불일치'로 보인다", () => {
