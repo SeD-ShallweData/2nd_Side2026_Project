@@ -8,7 +8,7 @@
 - 팀: SeD(Shall we Data?) — 인천대학교 데이터사이언스 연합동아리, 산업경영공학과 7명 · 컴퓨터공학부 3명
 - 서비스: https://moneyworry-demo.tail87a779.ts.net (대회 시연 서버, 기간 한정. 기본 가동 시간 매일 07:00~다음 날 01:00 KST)
 - 3분 시연 영상: https://youtu.be/nF3lwztQjC8 (2026-09-21 제출본)
-- 기준: 최종 운영 배포 `bd438f9`(2026-09-30)
+- 기준: main `e0d3582`(2026-09-30). 운영 서버에 배포된 버전은 배포 원장(`moneyworry-deploy-log`)으로 확인한다.
 
 ## 한눈에 보기
 
@@ -22,7 +22,7 @@
 | 근로계약서 진단 | Upstage Document Parse OCR → Solar 조항 추출 → 파이썬 규칙 12개로 항목 분류. 확인됨·누락 가능·추가 확인 3분류와 회사에 물어볼 질문 |
 | 다국어 | 일반 사용자 화면 6종(한국어·쉬운 한국어·영어·중국어·베트남어·태국어) + 지원 예정 5종. 질문과 답만 번역하고 검증은 한국어 파이프라인으로 하는 한국어 피벗 |
 | 시스템 | Next.js 16.3 · React 19.1 · Node.js 22, PostgreSQL 16(36개 테이블, migration 0000~0023, 기능별 앱 DB 계정 6종), GCP 서울 VM 1대 |
-| 품질 | 최종 main에서 자동 테스트 1,793건 통과(웹 1,408 · 인프라 216 · GCP 62 · DB 45 · RAG 36 · 계약서 26) |
+| 품질 | main(`e0d3582`)에서 자동 테스트 1,802건 통과(웹 1,417 · 인프라 216 · GCP 62 · DB 45 · RAG 36 · 계약서 26) |
 
 ## 설계 원칙: 판정하지 않는 확인
 
@@ -43,7 +43,7 @@
 | --- | --- |
 | 비로그인 | 사업장 검색(부분 문자열, 지역·업종 필터, 지도), 임금·산업재해 두 카드와 입사 전 체크리스트, AI 상담, 계약서 진단, 커뮤니티 열람 |
 | 일반 사용자 | 위에 더해 커뮤니티 글쓰기·신고, 현장 제보(사진 최대 3장, 근로감독관만 열람), 관심 사업장, 상담 기록 30일 보관, 계정 삭제 |
-| 근로감독관 | 위험큐(점수 상위 3,000곳), 모델 원점수("확률 아님" 고정 표기), SHAP 사유(한국어 라벨 39종), 안정 신호 G1~G6, AI 점검 보조(두 모델 비교), ML 대시보드(지역×업종 집계), 현장 제보 열람 |
+| 근로감독관 | 위험큐(점수 상위 3,000곳), 모델 원점수("확률 아님" 고정 표기), SHAP 사유(한국어 라벨 39종), 안정 신호 G1~G6, AI 점검 보조(Upstage 단일 응답. 호출이 실패하면 AI 답변이 아닌 DB 요약으로 대체하고 그렇게 표시), ML 대시보드(지역×업종 집계, 30곳 미만 칸은 비공개), 현장 제보 열람 |
 | 운영 관리자 | 현장 제보 열람을 뺀 감독관 기능, 커뮤니티 신고 심사, 운영 콘솔(서비스 배치 전환, 프롬프트 4종 편집·적용·되돌리기). 운영 콘솔의 변경은 DB 함수가 사유(2~300자)를 확인하고 감사 로그에 남긴다 |
 
 보던 사업장, 관심 사업장, 계약서 진단 요약(원본 제외)을 AI 상담에 이어 줄 수 있다.
@@ -184,11 +184,11 @@ PDF·PNG·JPEG(15MB 이하)를 OCR로 읽고, 조항을 추출한 뒤 규칙 엔
   - 상담 RAG는 `npm run dev:rag`(5051), 계약서 분석은 `npm run dev:contract`(8000)로 각각 다른 터미널에서 띄운다. 웹과 두 서비스는 같은 내부 토큰을 써야 한다. `.env.local`에 `RAG_INTERNAL_TOKEN`과 `CONTRACT_INTERNAL_TOKEN`(서로 다른 임의 값)을 넣고, 각 서비스 터미널에서도 같은 값을 export한다(계약서 터미널에는 `UPSTAGE_API_KEY`도). 토큰이 없거나 다르면 두 서비스가 모든 요청을 401로 거절한다.
   - 가상환경은 서비스별 README를 따른다. RAG는 해시를 고정한 CPU 전용 torch 절차([`product/integrations/rag-api/README.md`](product/integrations/rag-api/README.md)), 계약서 분석은 [`product/integrations/contract-api/README.md`](product/integrations/contract-api/README.md)다.
 
-바꾼 영역의 검사를 CI와 같은 명령으로 통과시킨다. 오른쪽 숫자는 최종 main에서 통과한 테스트 수다.
+바꾼 영역의 검사를 CI와 같은 명령으로 통과시킨다. 오른쪽 숫자는 main(`e0d3582`)에서 통과한 테스트 수다.
 
 | 영역 | 명령 | 통과 |
 | --- | --- | ---: |
-| 웹 | `cd product && npm run check` (테스트·typecheck·lint·빌드) | 1,408 |
+| 웹 | `cd product && npm run check` (테스트·typecheck·lint·빌드) | 1,417 |
 | DB | `cd db && npm ci && npm run test:migration-drift && npm run test:ingest-cli && PATH_B_TEST_PYTHON=<Python 3.12.13 경로> npm run test:path-b-static` | 45 |
 | 인프라 | `python -m unittest discover -s infra/tests -p 'test_*.py'` (저장소 루트) | 216 |
 | GCP 자동화 | `infra/gcp/tests/test-gcp-automation.sh` (가짜 gcloud) | 62 |
