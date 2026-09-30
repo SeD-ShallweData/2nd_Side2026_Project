@@ -489,7 +489,11 @@ export async function sendInspectorChatMessage(value: unknown): Promise<Inspecto
     retrieveLaborLawContext(request.message),
   ]);
   const fallback = fallbackAnswer(detail);
-  const configs = getLlmProviderConfigs();
+  // 점검 보조만 Upstage 단일 호출로 제한한다. 일반 상담의 provider 설정은 유지한다.
+  const config = getLlmProviderConfigs().find((provider) => provider.id === "upstage");
+  if (!config) {
+    throw new ServiceError("INSPECTOR_PROVIDER_UNAVAILABLE", "Upstage 설정을 찾지 못했습니다.", 503, true);
+  }
   const client = new OpenAICompatibleChatClient(fetch, getLlmTimeoutMs());
   const messages = [
     { role: "system" as const, content: buildInspectorSystemPrompt(detail, rag) },
@@ -497,55 +501,51 @@ export async function sendInspectorChatMessage(value: unknown): Promise<Inspecto
     { role: "user" as const, content: request.message },
   ];
 
-  const results = await Promise.all(
-    configs.map(async (config): Promise<InspectorProviderResult> => {
-      try {
-        const completion = await client.complete(config, messages);
-        const guardrailHits = inspectorGuardrailHits(completion.answer, rag.status);
-        const replaced = guardrailHits.length > 0;
-        return {
-          provider: config.id,
-          provider_label: config.label,
-          model: completion.model,
-          status: replaced ? "guardrail_replaced" : "success",
-          answer: replaced ? fallback : completion.answer,
-          limitations: [
-            "AI 답변은 조사·법률 판단·행정처분을 대신하지 않습니다.",
-            rag.status === "matched"
-              ? "표시된 공식 검색 근거와 사업장 원자료를 함께 대조해야 합니다."
-              : "직접 연결된 공식 노동법 검색 근거가 없어 법령 내용은 별도로 확인해야 합니다.",
-            ...(replaced ? [`정책 위반 표현(${guardrailHits.join(", ")})이 감지되어 DB 기반 요약으로 교체했습니다.`] : []),
-          ],
-          metrics: { latency_ms: completion.latencyMs, usage: completion.usage },
-        };
-      } catch (error) {
-        const normalized = error instanceof LlmCallError
-          ? error
-          : new LlmCallError("LLM_UNKNOWN_ERROR", `${config.label} 호출 중 오류가 발생했습니다.`, true, 0);
-        return {
-          provider: config.id,
-          provider_label: config.label,
-          model: config.model,
-          status: "fallback",
-          answer: fallback,
-          limitations: [
-            "해당 모델 API가 실패하여 DB 기반 내부 요약으로 대체했습니다.",
-            "AI 답변은 조사·법률 판단·행정처분을 대신하지 않습니다.",
-          ],
-          metrics: { latency_ms: normalized.latencyMs, usage: EMPTY_USAGE },
-          error: { code: normalized.code, message: normalized.message, retryable: normalized.retryable },
-        };
-      }
-    }),
-  );
+  let result: InspectorProviderResult;
+  try {
+    const completion = await client.complete(config, messages);
+    const guardrailHits = inspectorGuardrailHits(completion.answer, rag.status);
+    const replaced = guardrailHits.length > 0;
+    result = {
+      provider: "upstage",
+      provider_label: config.label,
+      model: completion.model,
+      status: replaced ? "guardrail_replaced" : "success",
+      answer: replaced ? fallback : completion.answer,
+      limitations: [
+        "AI 답변은 조사·법률 판단·행정처분을 대신하지 않습니다.",
+        rag.status === "matched"
+          ? "표시된 공식 검색 근거와 사업장 원자료를 함께 대조해야 합니다."
+          : "직접 연결된 공식 노동법 검색 근거가 없어 법령 내용은 별도로 확인해야 합니다.",
+        ...(replaced ? [`정책 위반 표현(${guardrailHits.join(", ")})이 감지되어 DB 기반 요약으로 교체했습니다.`] : []),
+      ],
+      metrics: { latency_ms: completion.latencyMs, usage: completion.usage },
+    };
+  } catch (error) {
+    const normalized = error instanceof LlmCallError
+      ? error
+      : new LlmCallError("LLM_UNKNOWN_ERROR", `${config.label} 호출 중 오류가 발생했습니다.`, true, 0);
+    result = {
+      provider: "upstage",
+      provider_label: config.label,
+      model: config.model,
+      status: "fallback",
+      answer: fallback,
+      limitations: [
+        "Upstage 호출이 실패하여 저장된 내부 자료의 요약으로 대체했습니다. 이 요약은 AI가 생성한 답변이 아닙니다.",
+        "현장 조사·법률 판단·행정처분은 원자료를 확인해 별도로 진행해야 합니다.",
+      ],
+      metrics: { latency_ms: normalized.latencyMs, usage: EMPTY_USAGE },
+      error: { code: normalized.code, message: normalized.message, retryable: normalized.retryable },
+    };
+  }
 
   return {
-    comparison_id: `ins_${crypto.randomUUID()}`,
+    response_id: `ins_${crypto.randomUUID()}`,
     company_id: detail.company.company_id,
     completed_at: new Date().toISOString(),
-    fair_comparison: { concurrent: true, same_context: true, same_retrieval: true },
     rag_status: rag.status,
     sources: rag.status === "matched" ? rag.documents.map((document) => document.source) : [],
-    results,
+    result,
   };
 }

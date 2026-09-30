@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { DataSourceList } from "@/components/common/DataSourceList";
+import { SafeMarkdown } from "@/components/common/SafeMarkdown";
 import type {
   InspectorChatResponse,
   InspectorCompanyDetail,
@@ -21,7 +22,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  comparison?: InspectorChatResponse;
+  response?: InspectorChatResponse;
 }
 
 export function InspectorChatPanel({ companyId }: { companyId?: string }) {
@@ -43,7 +44,7 @@ export function InspectorChatPanel({ companyId }: { companyId?: string }) {
         const data = await readApiResponse<InspectorCompanyDetail>(response);
         if (!cancelled) {
           setDetail(data);
-          setMessages([{ id: "welcome", role: "assistant", content: `${data.company.company_name}의 내부 위험 데이터가 연결됐습니다. 두 모델은 같은 DB 컨텍스트와 같은 공식 검색 근거를 사용합니다.` }]);
+          setMessages([{ id: "welcome", role: "assistant", content: `${data.company.company_name}의 내부 위험 데이터가 연결됐습니다. Upstage가 필요한 내부 자료와 공식 검색 근거를 받아 점검 보조 답변을 작성합니다.` }]);
         }
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : "사업장 컨텍스트를 불러오지 못했습니다.");
@@ -63,15 +64,11 @@ export function InspectorChatPanel({ companyId }: { companyId?: string }) {
     const message = value.trim();
     if (!message || !detail || loading || !externalContextConsent) return;
     const recentMessages: InspectorRecentMessage[] = messages
-      .filter((item) => item.id !== "welcome")
+      .filter((item) => item.id !== "welcome" && (!item.response || item.response.result.status === "success"))
       .slice(-6)
       .map((item) => ({
         role: item.role,
-        content: item.comparison
-          ? item.comparison.results
-              .map((result) => `${result.provider_label}: ${result.answer.slice(0, 900)}`)
-              .join("\n")
-          : item.content,
+        content: item.response ? item.response.result.answer : item.content,
       }));
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: message }]);
     setDraft("");
@@ -89,7 +86,7 @@ export function InspectorChatPanel({ companyId }: { companyId?: string }) {
         }),
       });
       const data = await readApiResponse<InspectorChatResponse>(response);
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: "두 모델 점검 보조 결과", comparison: data }]);
+      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: data.result.answer, response: data }]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "AI 점검 보조 답변을 불러오지 못했습니다.");
     } finally {
@@ -142,30 +139,31 @@ export function InspectorChatPanel({ companyId }: { companyId?: string }) {
       <section className="inspector-chat-panel">
         <div className="inspector-chat-topbar">
           <div><span className="online-dot" /><strong>감독관 AI 점검 보조</strong></div>
-          <span>동일 조건 · 두 모델 병렬 비교</span>
+          <span>Upstage 단일 응답</span>
         </div>
         <div className="inspector-chat-body" aria-live="polite" aria-busy={loading}>
-          {messages.map((message) => message.comparison ? (
-            <div className="inspector-comparison" key={message.id}>
+          {messages.map((message) => message.response ? (
+            <div className="inspector-response" key={message.id}>
               <header>
-                <div><strong>두 모델의 점검 보조 결과</strong><span>같은 DB 컨텍스트 · 같은 RAG 근거</span></div>
-                <span className={`rag-status rag-status-${message.comparison.rag_status}`}>{message.comparison.rag_status === "matched" ? `공식 근거 ${message.comparison.sources.length}개` : message.comparison.rag_status === "no_match" ? "직접 근거 없음" : "RAG 연결 안 됨"}</span>
+                <div><strong>Upstage 점검 보조 결과</strong><span>사업장 내부 자료 · 공식 검색 근거</span></div>
+                <span className={`rag-status rag-status-${message.response.rag_status}`}>{message.response.rag_status === "matched" ? `공식 근거 ${message.response.sources.length}개` : message.response.rag_status === "no_match" ? "직접 근거 없음" : "RAG 연결 안 됨"}</span>
               </header>
-              <div className="inspector-answer-grid">
-                {message.comparison.results.map((result) => (
-                  <article key={result.provider} className={`inspector-answer inspector-answer-${result.provider}`}>
+              <div className="inspector-answer-single">
+                {(() => {
+                  const result = message.response!.result;
+                  return <article className={`inspector-answer inspector-answer-${result.provider}`}>
                     <div className="inspector-answer-head">
                       <div><span className={`provider-dot provider-dot-${result.provider}`} /><strong>{result.provider_label}</strong><small>{result.model}</small></div>
-                      <span>{result.status === "success" ? "API 응답" : result.status === "guardrail_replaced" ? "정책 교체" : "DB 요약 대체"}</span>
+                      <span>{result.status === "success" ? "Upstage 응답" : result.status === "guardrail_replaced" ? "안전 대체 · DB 요약" : "Upstage 실패 · DB 요약"}</span>
                     </div>
                     {result.error ? <p className="inspector-answer-error">{result.error.message}</p> : null}
-                    <div className="inspector-answer-copy">{result.answer}</div>
+                    <div className="inspector-answer-copy"><SafeMarkdown>{result.answer}</SafeMarkdown></div>
                     <div className="inspector-answer-limit"><strong>해석 한계</strong><ul>{result.limitations.map((item) => <li key={item}>{item}</li>)}</ul></div>
                     <details><summary>응답 상세</summary><dl><div><dt>응답 시간</dt><dd>{result.metrics.latency_ms.toLocaleString("ko-KR")}ms</dd></div><div><dt>전체 토큰</dt><dd>{result.metrics.usage.total_tokens?.toLocaleString("ko-KR") ?? "미제공"}</dd></div></dl></details>
-                  </article>
-                ))}
+                  </article>;
+                })()}
               </div>
-              {message.comparison.sources.length > 0 ? <div className="inspector-chat-sources"><strong>공유된 공식 근거</strong><DataSourceList sources={message.comparison.sources} /></div> : null}
+              {message.response.sources.length > 0 ? <div className="inspector-chat-sources"><strong>검색된 공식 근거</strong><DataSourceList sources={message.response.sources} /></div> : null}
             </div>
           ) : (
             <div className={`inspector-chat-row inspector-chat-row-${message.role}`} key={message.id}>
@@ -175,7 +173,7 @@ export function InspectorChatPanel({ companyId }: { companyId?: string }) {
               <p>{message.content}</p>
             </div>
           ))}
-          {loading ? <div className="inspector-chat-loading"><span className="spinner" /><div><strong>두 모델이 내부 자료를 검토하고 있습니다.</strong><small>공식 근거는 한 번만 검색해 동일하게 전달합니다.</small></div></div> : null}
+          {loading ? <div className="inspector-chat-loading"><span className="spinner" /><div><strong>Upstage 점검 보조 답변을 준비하고 있습니다.</strong><small>사업장 자료와 공식 근거를 확인하고 있습니다.</small></div></div> : null}
           <div ref={bottomRef} />
         </div>
         <div className="inspector-question-chips">
@@ -191,7 +189,7 @@ export function InspectorChatPanel({ companyId }: { companyId?: string }) {
             />
             <span>
               <strong>외부 AI 분석자료 전송 확인</strong>
-              점검 보조에 필요한 사업장·ML·산업안전 자료가 Upstage와 SKT에 전달됩니다.
+              점검 보조에 필요한 사업장·ML·산업안전 자료가 Upstage에 전달됩니다.
             </span>
           </label>
           <details>

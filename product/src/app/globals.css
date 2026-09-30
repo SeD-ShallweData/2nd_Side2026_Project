@@ -2794,6 +2794,28 @@ summary:focus-visible {
   font-size: 0.65rem;
 }
 
+.contract-result-section li .safe-markdown strong {
+  display: inline;
+  font-size: inherit;
+}
+
+.contract-result-section li .safe-markdown li {
+  border: 0;
+  padding: 0;
+}
+
+.contract-item-description {
+  color: var(--muted);
+  font-size: 0.65rem;
+  margin: 2px 0;
+}
+
+.contract-item-description .safe-markdown p,
+.contract-korean-original .safe-markdown p {
+  font-size: inherit;
+  color: inherit;
+}
+
 .contract-result-section li small {
   color: var(--ink-soft);
   font-size: 0.58rem;
@@ -2808,7 +2830,7 @@ summary:focus-visible {
   color: var(--ink-soft);
   font-size: 0.62rem;
   line-height: 1.5;
-  white-space: pre-line;
+  white-space: normal;
 }
 
 .contract-results .contract-korean-original > span {
@@ -4739,18 +4761,18 @@ summary:focus-visible {
 .inspector-chat-row p { background: #f4f5f6; border-radius: 4px 12px 12px 12px; font-size: 0.78rem; margin: 0; max-width: 75%; padding: 11px 13px; }
 .inspector-chat-row-user { justify-content: flex-end; }
 .inspector-chat-row-user p { background: var(--inspector-navy); border-radius: 12px 12px 4px 12px; color: #fff; }
-.inspector-comparison { margin: 18px 0 25px; }
-.inspector-comparison > header { align-items: center; background: #eef2f8; border-left: 3px solid var(--inspector-blue); border-radius: 0 10px 10px 0; display: flex; gap: 15px; justify-content: space-between; margin-bottom: 11px; padding: 11px 13px; }
-.inspector-comparison > header div { display: grid; }
-.inspector-comparison > header div span { color: var(--muted); font-size: 0.63rem; }
-.inspector-comparison .rag-status { border: 1px solid #b9c8db; border-radius: 999px; color: #405d80; flex: 0 0 auto; font-size: 0.62rem; padding: 4px 7px; }
-.inspector-answer-grid { display: grid; gap: 11px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.inspector-response { margin: 18px 0 25px; }
+.inspector-response > header { align-items: center; background: #eef2f8; border-left: 3px solid var(--inspector-blue); border-radius: 0 10px 10px 0; display: flex; gap: 15px; justify-content: space-between; margin-bottom: 11px; padding: 11px 13px; }
+.inspector-response > header div { display: grid; }
+.inspector-response > header div span { color: var(--muted); font-size: 0.63rem; }
+.inspector-response .rag-status { border: 1px solid #b9c8db; border-radius: 999px; color: #405d80; flex: 0 0 auto; font-size: 0.62rem; padding: 4px 7px; }
+.inspector-answer-single { min-width: 0; }
 .inspector-answer { border: 1px solid var(--line); border-radius: 12px; min-width: 0; overflow: hidden; }
 .inspector-answer-head { align-items: center; background: #f2f8fe; border-bottom: 1px solid var(--line); display: flex; gap: 8px; justify-content: space-between; padding: 11px 12px; }
 .inspector-answer-head > div { align-items: center; display: flex; flex-wrap: wrap; gap: 6px; }
 .inspector-answer-head small,
 .inspector-answer-head > span { color: var(--muted); font-size: 0.6rem; }
-.inspector-answer-copy { font-size: 0.76rem; line-height: 1.75; min-height: 230px; padding: 15px; white-space: pre-wrap; }
+.inspector-answer-copy { font-size: 0.76rem; line-height: 1.75; padding: 15px; overflow-wrap: anywhere; }
 .inspector-answer-error { background: var(--danger-bg); color: var(--review); font-size: 0.65rem; margin: 0; padding: 8px 12px; }
 .inspector-answer-limit { background: #f9fcff; border-top: 1px solid var(--line); padding: 12px; }
 .inspector-answer-limit strong { font-size: 0.67rem; }
@@ -4903,8 +4925,6 @@ summary:focus-visible {
   .inspector-detail-grid { grid-template-columns: 1fr; }
   .inspector-batch-strip dl { grid-template-columns: 1fr 1fr; }
   .inspector-detail-actions { align-items: flex-start; flex-direction: column; }
-  .inspector-answer-grid { grid-template-columns: 1fr; }
-  .inspector-answer-copy { min-height: 0; }
   .inspector-chat-body { height: min(620px, 67vh); padding: 14px; }
 }
 
@@ -4925,7 +4945,7 @@ summary:focus-visible {
   .inspector-chat-context dl { grid-template-columns: 1fr; }
   .inspector-chat-topbar { align-items: flex-start; flex-direction: column; gap: 5px; }
   .inspector-chat-row p { max-width: calc(100% - 39px); }
-  .inspector-comparison > header { align-items: flex-start; flex-direction: column; }
+  .inspector-response > header { align-items: flex-start; flex-direction: column; }
   .inspector-queue-pagination { gap: 6px; padding-inline: 8px; }
   .inspector-queue-pagination > button { padding-inline: 8px; }
   .inspector-queue-page { min-width: 82px; }
