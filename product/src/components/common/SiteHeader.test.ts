@@ -62,7 +62,7 @@ describe("공통 사이트 헤더", () => {
 });
 
 describe("이름 메뉴", () => {
-  const props = { name: "김취준", deleting: false, disabled: false, onDeleteAccount: () => {} };
+  const props = { name: "김취준", deleting: false, loggingOut: false, onDeleteAccount: () => {}, onLogout: () => {} };
 
   it("가운데 메뉴에는 즐겨찾기를 두지 않는다", () => {
     pathname = "/companies";
@@ -81,12 +81,14 @@ describe("이름 메뉴", () => {
     expect(html).not.toContain('href="/favorites"');
   });
 
-  it("관리자도 이름 버튼(신고 관리)을 쓰고, 감독관은 이름만 보인다", () => {
+  it("모든 역할이 이름 버튼을 쓰고, 로그아웃도 메뉴 안에 있어 헤더에 드러나지 않는다", () => {
     pathname = "/";
-    expect(renderToStaticMarkup(createElement(AccountMenu, { ...props, role: "admin" }))).toContain("account-menu-toggle");
-    const inspector = renderToStaticMarkup(createElement(AccountMenu, { ...props, role: "inspector" }));
-    expect(inspector).not.toContain("account-menu-toggle");
-    expect(inspector).toContain("김취준님");
+    for (const role of ["user", "admin", "inspector"]) {
+      const html = renderToStaticMarkup(createElement(AccountMenu, { ...props, role }));
+      expect(html).toContain("account-menu-toggle");
+      expect(html).toContain("김취준님");
+      expect(html).not.toContain("로그아웃");
+    }
   });
 });
 

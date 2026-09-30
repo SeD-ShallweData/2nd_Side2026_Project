@@ -5178,10 +5178,10 @@ summary:focus-visible {
 }
 
 
-/* 로그인 버튼 폭을 로고(그림+글자) 폭에 맞춘다. 헤더 양끝이 같은 무게로 선다.
-   실측 152px = 9.5rem, 좁은 화면에서는 로고가 작아지므로 118px = 7.375rem. */
+/* 로그인 버튼 폭. 넓은 화면은 6.5rem(104px)으로 줄여 언어 선택기와 나란히 둔다(10-01).
+   좁은 화면(640px 이하)은 아래 7.375rem(118px)을 그대로 쓴다. */
 .consumer-header-side > .button {
-  width: 9.5rem;
+  width: 6.5rem;
 }
 
 .consumer-header-side,

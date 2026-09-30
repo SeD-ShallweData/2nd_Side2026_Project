@@ -202,17 +202,10 @@ export function SiteHeader() {
                   name={(user.display_name || m.userFallback).trim() || m.userFallback}
                   role={user.role}
                   deleting={deletingAccount}
-                  disabled={deletingAccount || loggingOut}
+                  loggingOut={loggingOut}
                   onDeleteAccount={handleDeleteAccount}
+                  onLogout={handleLogout}
                 />
-                <button
-                  type="button"
-                  className="button button-outline button-small"
-                  disabled={loggingOut}
-                  onClick={handleLogout}
-                >
-                  {loggingOut ? m.loggingOut : m.logout}
-                </button>
               </div>
             ) : (
               <Link href="/login" className="button button-dark button-small">{m.login}</Link>

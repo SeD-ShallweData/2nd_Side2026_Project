@@ -9,22 +9,24 @@ import { useMessages } from "@/i18n/LocaleProvider";
 import { headerMessages } from "@/i18n/messages/header";
 
 /*
- * 헤더 오른쪽의 이름 버튼. 누르면 즐겨찾기·계정 삭제(일반 사용자)와 신고 관리(관리자)가 펼쳐진다.
- * 헤더에 버튼을 늘어놓으면 언어 선택기와 가운데 메뉴가 겹치고, 계정 삭제가 늘 눈앞에 있게 된다.
- * 로그아웃은 자주 쓰므로 메뉴 밖에 그대로 둔다.
+ * 헤더 오른쪽의 이름 버튼. 누르면 즐겨찾기·계정 삭제(일반 사용자), 신고 관리(관리자),
+ * 로그아웃(모든 역할)이 펼쳐진다. 헤더에 버튼을 늘어놓으면 언어 선택기와 가운데 메뉴가 겹치고,
+ * 계정 삭제가 늘 눈앞에 있게 된다.
  */
 export function AccountMenu({
   name,
   role,
   deleting,
-  disabled,
+  loggingOut,
   onDeleteAccount,
+  onLogout,
 }: {
   name: string;
   role: string;
   deleting: boolean;
-  disabled: boolean;
+  loggingOut: boolean;
   onDeleteAccount: () => void;
+  onLogout: () => void;
 }) {
   const m = useMessages(headerMessages);
   const pathname = usePathname();
@@ -34,7 +36,6 @@ export function AccountMenu({
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const label = format(m.userSuffix, { name });
-  const hasItems = role === "user" || role === "admin";
 
   useEffect(() => {
     if (!open) return;
@@ -52,9 +53,6 @@ export function AccountMenu({
       document.removeEventListener("keydown", close);
     };
   }, [open]);
-
-  // 감독관은 펼칠 항목이 없으므로 이름만 보인다.
-  if (!hasItems) return <span className="account-menu-name">{label}</span>;
 
   return (
     <div className="account-menu" ref={rootRef}>
@@ -89,7 +87,7 @@ export function AccountMenu({
             <button
               type="button"
               className="account-menu-danger"
-              disabled={disabled}
+              disabled={deleting || loggingOut}
               onClick={() => {
                 setOpenAt(null);
                 onDeleteAccount();
@@ -98,6 +96,9 @@ export function AccountMenu({
               {deleting ? m.deleting : m.deleteAccount}
             </button>
           ) : null}
+          <button type="button" disabled={deleting || loggingOut} onClick={onLogout}>
+            {loggingOut ? m.loggingOut : m.logout}
+          </button>
         </div>
       ) : null}
     </div>
