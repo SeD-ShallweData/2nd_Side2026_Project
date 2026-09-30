@@ -1,12 +1,12 @@
 export const RAG_MODEL_ID = "BAAI/bge-m3";
 export const RAG_MODEL_REVISION = "5617a9f61b028005a4858fdac845db406aefb181";
-export const RAG_DOCUMENT_COUNT = 583;
+export const RAG_DOCUMENT_COUNT = 806;
 export const RAG_EMBEDDING_DIMENSION = 1024;
 export const RAG_PROBE_DOCUMENT_ID = "kis_a43";
 export const RAG_PROBE_MAX_DISTANCE = 0.0001;
 export const RAG_DISTANCE_THRESHOLD = 0.42;
 export const RAG_STRONG_MATCH_DISTANCE = 0.30;
-export const RAG_ASSET_MANIFEST_SHA256 = "f67ceeb88695eb9f681839bee857ea00e6b8f59853981180a13df547323b30d0";
+export const RAG_ASSET_MANIFEST_SHA256 = "7ac893fba1819472129ac6056ca91a73edcc32e1746ce50de282668a85ead4ea";
 
 export function isRagHealthReady(payload: unknown): boolean {
   if (typeof payload !== "object" || payload === null) return false;

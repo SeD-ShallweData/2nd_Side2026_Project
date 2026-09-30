@@ -14,8 +14,8 @@ const ready = {
   collection: "labor_law",
   embedding_model: "BAAI/bge-m3",
   model_revision: "5617a9f61b028005a4858fdac845db406aefb181",
-  document_count: 583,
-  expected_document_count: 583,
+  document_count: 806,
+  expected_document_count: 806,
   embedding_dimension: 1024,
   expected_embedding_dimension: 1024,
   threshold: 0.42,
@@ -23,17 +23,18 @@ const ready = {
   probe_document_id: "kis_a43",
   probe_distance: 0.000001,
   probe_max_distance: 0.0001,
-  asset_manifest_sha256: "f67ceeb88695eb9f681839bee857ea00e6b8f59853981180a13df547323b30d0",
+  asset_manifest_sha256: "7ac893fba1819472129ac6056ca91a73edcc32e1746ce50de282668a85ead4ea",
 };
 
 describe("RAG health readiness contract", () => {
-  it("accepts only the pinned offline model and verified 583-document query probe", () => {
+  it("accepts only the pinned offline model and verified 806-document query probe", () => {
     expect(isRagHealthReady(ready)).toBe(true);
   });
 
   it.each([
     ["legacy loaded-only payload", { ok: true, database_exists: true, loaded: true }],
     ["wrong count", { ...ready, document_count: 582 }],
+    ["previous 583-document corpus", { ...ready, document_count: 583, expected_document_count: 583 }],
     ["wrong dimension", { ...ready, embedding_dimension: 768 }],
     ["unprobed collection", { ...ready, query_compatible: false }],
     ["wrong semantic document", { ...ready, probe_document_id: "kis_a44" }],

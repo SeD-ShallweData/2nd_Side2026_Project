@@ -26,8 +26,8 @@ const readyRagHealth = {
   collection: "labor_law",
   embedding_model: "BAAI/bge-m3",
   model_revision: "5617a9f61b028005a4858fdac845db406aefb181",
-  document_count: 583,
-  expected_document_count: 583,
+  document_count: 806,
+  expected_document_count: 806,
   embedding_dimension: 1024,
   expected_embedding_dimension: 1024,
   threshold: 0.42,
@@ -35,7 +35,7 @@ const readyRagHealth = {
   probe_document_id: "kis_a43",
   probe_distance: 0.000001,
   probe_max_distance: 0.0001,
-  asset_manifest_sha256: "f67ceeb88695eb9f681839bee857ea00e6b8f59853981180a13df547323b30d0",
+  asset_manifest_sha256: "7ac893fba1819472129ac6056ca91a73edcc32e1746ce50de282668a85ead4ea",
 };
 
 const readyContractHealth = {
@@ -159,7 +159,7 @@ describe("GET /api/health/ready", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("legacy loaded 응답이나 583이 아닌 컬렉션을 ready로 인정하지 않는다", async () => {
+  it("legacy loaded 응답이나 806이 아닌(이전 583건 포함) 컬렉션을 ready로 인정하지 않는다", async () => {
     vi.stubEnv("RAG_API_URL", "http://rag.internal");
     vi.stubEnv("RAG_INTERNAL_TOKEN", "rag-drift-token");
     vi.stubEnv("CONTRACT_ANALYSIS_URL", "http://contract.internal");
@@ -169,7 +169,7 @@ describe("GET /api/health/ready", () => {
       vi.fn(async (input: string | URL | Request) => {
         const isRag = String(input).startsWith("http://rag.internal");
         return new Response(JSON.stringify(isRag
-          ? { ...readyRagHealth, document_count: 582 }
+          ? { ...readyRagHealth, document_count: 583 }
           : readyContractHealth), {
           status: 200,
           headers: { "Content-Type": "application/json" },

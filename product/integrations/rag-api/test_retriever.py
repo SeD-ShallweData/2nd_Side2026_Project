@@ -120,6 +120,67 @@ class RetrievalPolicyTest(unittest.TestCase):
             retriever._out_of_scope_topic("파이썬 코딩을 밤 10시까지 배우고 싶어요", 0.60),
         )
 
+    def test_iaci_is_in_scope_but_industrial_safety_stays_out(self):
+        for query in (
+            "산재 신청은 근로복지공단에 어떻게 하나요?",
+            "산재보험 휴업급여는 얼마인가요?",
+            "근로복지공단에 요양급여를 청구하려면?",
+        ):
+            with self.subTest(query=query):
+                self.assertIsNone(retriever._out_of_scope_topic(query, 0.41))
+        for query in (
+            "중대재해처벌법은 5인 미만 사업장에도 적용되나요?",
+            "산업안전보건법상 안전관리자는 몇 명 이상 사업장에서 선임하나요?",
+            "사업주가 지켜야 할 안전조치 의무는 무엇인가요?",
+        ):
+            with self.subTest(query=query):
+                self.assertEqual("산업안전·중대재해", retriever._out_of_scope_topic(query, 0.41))
+        self.assertEqual("연말정산", retriever._out_of_scope_topic("연말정산 환급금은 언제 들어오나요?", 0.41))
+        self.assertEqual("4대보험", retriever._out_of_scope_topic("외국인 근로자도 국민연금을 내야 하나요?", 0.41))
+        self.assertIsNone(retriever._out_of_scope_topic("외국인 근로자도 건강보험에 가입하나요?", 0.41))
+        self.assertEqual("4대보험", retriever._out_of_scope_topic("건강보험료는 얼마인가요?", 0.41))
+
+    def test_new_law_articles_lead_only_when_the_question_has_that_context(self):
+        candidates = [
+            candidate("산업재해보상보험법", "제52조", "휴업급여", "제3장 보험급여", distance=0.30),
+            candidate("근로기준법", "제46조", "휴업수당", "제3장 임금", distance=0.31),
+        ]
+        picked = retriever._pick(candidates, "회사 사정으로 쉬면 휴업수당을 받나요?", 2)
+        self.assertEqual(["제46조", "제52조"], [item[1]["article_id"] for item in picked])
+        picked = retriever._pick(candidates, "산재로 쉬는 동안 휴업급여를 받나요?", 2)
+        self.assertEqual(["제52조", "제46조"], [item[1]["article_id"] for item in picked])
+
+        foreign = [
+            candidate("외국인근로자의 고용 등에 관한 법률", "제25조", "사업 또는 사업장 변경의 허용", distance=0.30),
+            candidate("근로자퇴직급여 보장법", "제9조", "퇴직금의 지급 등", distance=0.35),
+        ]
+        picked = retriever._pick(foreign, "회사를 옮기면 퇴직금은 어떻게 되나요?", 1)
+        self.assertEqual("제9조", picked[0][1]["article_id"])
+        picked = retriever._pick(foreign, "E-9 비자인데 회사를 옮길 수 있나요?", 1)
+        self.assertEqual("제25조", picked[0][1]["article_id"])
+
+    def test_new_law_expansions_follow_user_wording(self):
+        cases = (
+            ("일하다 다쳤는데 산재 신청은 어떻게 하나요?", "제41조"),
+            ("직장 내 괴롭힘으로 우울증이 생겼는데 산재가 되나요?", "제37조"),
+            ("산재로 장해가 남으면 어떤 보상을 받나요?", "제57조"),
+            ("미등록 외국인도 일하다 다치면 산재보험 적용을 받나요?", "산업재해보상보험법 제6조"),
+            ("직원 3명인 개인 농장에서 다쳤는데 산재보험 되나요?", "시행령 제2조"),
+            ("외국인 근로자의 사업장 변경은 몇 번까지 되나요?", "제25조"),
+            ("E-9 비자인데 회사를 옮기고 싶어요", "제25조"),
+            ("출국만기보험은 언제 받나요?", "제13조"),
+            ("외국인 근로자라는 이유로 임금을 적게 줘도 되나요?", "제22조"),
+        )
+        for query, expected in cases:
+            with self.subTest(query=query):
+                self.assertIn(expected, retriever._expand_query(query))
+        # 산재·외국인 맥락이 없으면 같은 생활어에도 새 법령 조문을 끌어오지 않는다.
+        for query in ("장해보상은 얼마인가요?", "회사를 옮기면 퇴직금은 어떻게 되나요?", "이직하면 연차수당은?"):
+            with self.subTest(query=query):
+                expanded = retriever._expand_query(query)
+                self.assertNotIn("산업재해보상보험법", expanded)
+                self.assertNotIn("외국인근로자의 고용", expanded)
+
     def test_filters_every_vector_candidate_by_the_distance_threshold(self):
         candidates = [
             candidate("근로기준법", "제17조", "근로조건의 명시", distance=0.20),
@@ -202,7 +263,7 @@ class RetrievalReadinessTest(unittest.TestCase):
         model.get_sentence_embedding_dimension.return_value = 1024
         model.encode.return_value = [[0.0] * 1024]
         collection = Mock()
-        collection.count.return_value = 583
+        collection.count.return_value = 806
         collection.query.return_value = {
             "ids": [["kis_a43"]],
             "documents": [["제43조(임금 지급) 임금은 매월 1회 이상 지급하여야 한다."]],
@@ -230,7 +291,7 @@ class RetrievalReadinessTest(unittest.TestCase):
         self.assertTrue(health["ready"])
         self.assertTrue(health["asset_integrity"])
         self.assertTrue(health["query_compatible"])
-        self.assertEqual(583, health["document_count"])
+        self.assertEqual(806, health["document_count"])
         self.assertEqual(1024, health["embedding_dimension"])
         verify_assets.assert_called_once_with(
             retriever.ASSET_MANIFEST,
@@ -250,7 +311,7 @@ class RetrievalReadinessTest(unittest.TestCase):
 
     def test_wrong_document_count_fails_before_query(self):
         model, collection = self._ready_dependencies()
-        collection.count.return_value = 582
+        collection.count.return_value = 583
         with (
             patch.object(
                 retriever,
@@ -260,7 +321,7 @@ class RetrievalReadinessTest(unittest.TestCase):
             patch.object(retriever, "_create_model", return_value=model),
             patch.object(retriever, "_open_collection", return_value=collection),
         ):
-            with self.assertRaisesRegex(retriever.RetrievalUnavailable, "expected 583, got 582"):
+            with self.assertRaisesRegex(retriever.RetrievalUnavailable, "expected 806, got 583"):
                 retriever.warmup()
 
         model.encode.assert_not_called()

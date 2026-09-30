@@ -199,8 +199,11 @@ function supportedResponseSources(answer: string, response: ChatResponse, contex
       (wage && source.category === "wage") || (safety && source.category === "safety"));
   }
   if (context.questionIntent === "labor" && context.ragRetrieval.status === "matched") {
+    const answerKeys = citationKeys(answer);
     return response.sources.filter(source => {
       if ((source.citation && answer.includes(source.citation)) || answer.includes(source.name)) return true;
+      // 약칭(산재보험법·외국인고용법)이나 「」 표기로 인용해도 같은 조문이면 출처를 유지한다.
+      if (source.citation && [...citationKeys(source.citation)].some(key => answerKeys.has(key))) return true;
       const article = source.name.match(/(?:근로기준법|임금채권보장법)(?:\s*시행령)?\s*제\d+조/);
       if (article && answer.includes(article[0])) return true;
       return Boolean(source.url?.startsWith("https://labor.moel.go.kr/")

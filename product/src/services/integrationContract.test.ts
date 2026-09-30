@@ -191,19 +191,19 @@ describe("RAG 내부 계약", () => {
   it("범위 밖 이유와 주제를 보존한다", async () => {
     const fakeFetch = (async () => new Response(JSON.stringify({
       status: "no_match",
-      query: "산재 신청은 어떻게 하나요?",
+      query: "중대재해처벌법은 5인 미만에도 적용되나요?",
       reason: "out_of_scope",
-      topic: "산업재해·산업안전",
+      topic: "산업안전·중대재해",
       threshold: 0.42,
       top1_distance: 0.5,
       items: [],
     }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
 
-    const result = await new HttpRagRetriever("http://rag.test", "rag-internal-token", 1_000, fakeFetch).retrieve("산재 신청은 어떻게 하나요?");
+    const result = await new HttpRagRetriever("http://rag.test", "rag-internal-token", 1_000, fakeFetch).retrieve("중대재해처벌법은 5인 미만에도 적용되나요?");
     expect(result).toMatchObject({
       status: "no_match",
       reason: "out_of_scope",
-      topic: "산업재해·산업안전",
+      topic: "산업안전·중대재해",
     });
   });
 

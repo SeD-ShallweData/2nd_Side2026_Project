@@ -1,0 +1,38 @@
+{
+  "iaci": {
+    "law": "산업재해보상보험법",
+    "mst": "283459",
+    "law_no": "21375",
+    "enforcement_date": "2026-07-01",
+    "file": "mst_283459.xml",
+    "sha256": "9a0328a82a4a183d9280ec1c986c9660206312d5bc201bc9b08310625700860b",
+    "chunks": 159
+  },
+  "iaci_enf": {
+    "law": "산업재해보상보험법 시행령",
+    "mst": "287491",
+    "law_no": "36473",
+    "enforcement_date": "2026-07-01",
+    "file": "mst_287491.xml",
+    "sha256": "70a7c52c75afb5dd41360f63fd1101cd1e33e741650ff3dac3aa32ed0aa97d8a",
+    "chunks": 13
+  },
+  "fem": {
+    "law": "외국인근로자의 고용 등에 관한 법률",
+    "mst": "276857",
+    "law_no": "21065",
+    "enforcement_date": "2025-10-01",
+    "file": "mst_276857.xml",
+    "sha256": "e7e1507b53f1c757e6dfa2a83e2a288f4a16eedae70670d305cb2ba5108eb43c",
+    "chunks": 44
+  },
+  "fem_enf": {
+    "law": "외국인근로자의 고용 등에 관한 법률 시행령",
+    "mst": "244037",
+    "law_no": "32844",
+    "enforcement_date": "2022-08-02",
+    "file": "mst_244037.xml",
+    "sha256": "7edf5e4e24a4b47647db446e5d25a5c3a176dbf35c95bbe281ddab5ed034b1c3",
+    "chunks": 7
+  }
+}

@@ -9,6 +9,7 @@ import type { IntentDecision } from "@/services/chatIntentService";
 import { hasActualUnpaidWageReport, hasUnpaidWageQuestion, reviewedLaborTopics } from "@/services/reviewedLaborGuidance";
 import { asksPublicCompanyComparison, referencedCompanyIds } from "@/services/companyAnswerScope";
 import { asksSplitWageInjuryActions } from "@/services/splitIssueGuidance";
+import { asksNewCorpusLawTopic } from "@/domain/corpusLawTopics";
 
 const DIRECT_LABOR_TERMS = [
   "체불", "근로계약", "근로시간", "퇴근", "수당", "연차", "해고", "휴가", "야근", "노동",
@@ -111,7 +112,9 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
   if (decision.intent === "labor" || laborPortalProcedure || asksSplitWageInjuryActions(request.message)
     || (hasUnpaidWageQuestion(request.message)
       && (decision.intent !== "company" || hasActualUnpaidWageReport(request.message)))
-    || (!outOfScopeTopic && reviewedLaborTopics(request.message).length > 0)) {
+    || (!outOfScopeTopic && reviewedLaborTopics(request.message).length > 0)
+    // 산재보험·외국인고용 절차 질문은 의도 분류가 unclear/company여도 RAG 수록 법령으로 답한다.
+    || (!outOfScopeTopic && asksNewCorpusLawTopic(request.message))) {
     return {
       request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },
       parts: [part("labor", "사용자가 묻는 임금 또는 근로조건 문제", request)],

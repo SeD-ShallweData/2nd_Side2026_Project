@@ -222,7 +222,7 @@ class SystemdPrivilegeBoundaryTests(unittest.TestCase):
             "Environment=RAG_EMBEDDING_MODEL=BAAI/bge-m3",
             "Environment=RAG_MODEL_REVISION=5617a9f61b028005a4858fdac845db406aefb181",
             "Environment=RAG_MODEL_LOCAL_ONLY=1",
-            "Environment=RAG_EXPECTED_DOCUMENT_COUNT=583",
+            "Environment=RAG_EXPECTED_DOCUMENT_COUNT=806",
             "Environment=RAG_EXPECTED_EMBEDDING_DIMENSION=1024",
             "Environment=RAG_DISTANCE_THRESHOLD=0.42",
             "Environment=RAG_STRONG_MATCH_DISTANCE=0.30",
