@@ -6,14 +6,15 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import type { SessionResponse } from "@/app/api/auth/authApiContract";
+import { AccountMenu } from "@/components/common/AccountMenu";
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 import { format } from "@/i18n/defineMessages";
 import { useMessages } from "@/i18n/LocaleProvider";
 import { headerMessages } from "@/i18n/messages/header";
 import { AuthApiError, deleteAccount, getSession, logout } from "@/services/authClient";
 
+// 첫 화면(서비스 소개)은 로고가 같은 곳으로 가므로 가운데 메뉴에 따로 두지 않는다.
 const NAV_ITEMS = [
-  { href: "/", key: "home" },
   { href: "/companies", key: "companies" },
   { href: "/contracts", key: "contracts" },
   { href: "/community", key: "community" },
@@ -191,39 +192,20 @@ export function SiteHeader() {
                 </Link>
               );
             })}
-            {/* 즐겨찾기는 일반 사용자 전용 기능이라 admin/inspector에게는 보이지 않는다.
-                NAV_ITEMS는 로그인 여부와 무관한 공통 메뉴라 여기에 넣지 않는다. */}
-            {user?.role === "user" ? (
-              <Link
-                href="/favorites"
-                className={isCurrentNavPath(pathname, "/favorites") ? "is-current" : undefined}
-                aria-current={isCurrentNavPath(pathname, "/favorites") ? "page" : undefined}
-              >
-                {m.favorites}
-              </Link>
-            ) : null}
+            {/* 즐겨찾기는 일반 사용자 전용이라 오른쪽 이름 메뉴(AccountMenu) 안에 둔다. */}
           </nav>
           <div className="consumer-header-side" style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <LanguageSwitcher />
             {sessionState.status === "loading" ? null : user ? (
               <div className="consumer-header-account" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="muted-text">{format(m.userSuffix, { name: (user.display_name || m.userFallback).trim() || m.userFallback })}</span>
-                {user.role === "admin" ? (
-                  <Link href="/admin" className="button button-outline button-small">{m.moderation}</Link>
-                ) : null}
-                {user.role === "user" ? (
-                  <button type="button" className="button button-outline button-small" disabled={deletingAccount || loggingOut} onClick={handleDeleteAccount}>
-                    {deletingAccount ? m.deleting : m.deleteAccount}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="button button-outline button-small"
-                  disabled={loggingOut}
-                  onClick={handleLogout}
-                >
-                  {loggingOut ? m.loggingOut : m.logout}
-                </button>
+                <AccountMenu
+                  name={(user.display_name || m.userFallback).trim() || m.userFallback}
+                  role={user.role}
+                  deleting={deletingAccount}
+                  loggingOut={loggingOut}
+                  onDeleteAccount={handleDeleteAccount}
+                  onLogout={handleLogout}
+                />
               </div>
             ) : (
               <Link href="/login" className="button button-dark button-small">{m.login}</Link>

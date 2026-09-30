@@ -14,6 +14,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+import { AccountMenu } from "@/components/common/AccountMenu";
 import { SiteHeader, chatHrefForPath, isCurrentNavPath } from "@/components/common/SiteHeader";
 
 describe("공통 사이트 헤더", () => {
@@ -22,7 +23,9 @@ describe("공통 사이트 헤더", () => {
     const html = renderToStaticMarkup(createElement(SiteHeader));
 
     expect(html).toContain("consumer-header");
-    expect(html).toContain("서비스 소개");
+    // 첫 화면은 로고가 담당하므로 가운데 메뉴에 '서비스 소개'를 두지 않는다.
+    expect(html).not.toContain("서비스 소개");
+    expect(html).toContain('href="/" class="brand-link"');
     expect(html).toContain("계약서 진단");
     expect(html).toContain('href="/worksite-tips"');
     expect(html).toContain("현장 신고");
@@ -57,6 +60,37 @@ describe("공통 사이트 헤더", () => {
     expect(html).toContain('href="/community" class="is-current"');
     expect(html).toContain('aria-current="page"');
     expect(html).not.toContain('href="/companies" class="is-current"');
+  });
+});
+
+describe("이름 메뉴", () => {
+  const props = { name: "김취준", deleting: false, loggingOut: false, onDeleteAccount: () => {}, onLogout: () => {} };
+
+  it("가운데 메뉴에는 즐겨찾기를 두지 않는다", () => {
+    pathname = "/companies";
+    const html = renderToStaticMarkup(createElement(SiteHeader));
+    expect(html).not.toContain('href="/favorites"');
+  });
+
+  it("일반 사용자는 이름 버튼으로 펼치고, 처음에는 닫혀 있다", () => {
+    pathname = "/companies";
+    const html = renderToStaticMarkup(createElement(AccountMenu, { ...props, role: "user" }));
+    expect(html).toContain("account-menu-toggle");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("김취준님");
+    // 닫힌 상태에서는 계정 삭제가 헤더에 드러나지 않는다.
+    expect(html).not.toContain("계정 삭제");
+    expect(html).not.toContain('href="/favorites"');
+  });
+
+  it("모든 역할이 이름 버튼을 쓰고, 로그아웃도 메뉴 안에 있어 헤더에 드러나지 않는다", () => {
+    pathname = "/";
+    for (const role of ["user", "admin", "inspector"]) {
+      const html = renderToStaticMarkup(createElement(AccountMenu, { ...props, role }));
+      expect(html).toContain("account-menu-toggle");
+      expect(html).toContain("김취준님");
+      expect(html).not.toContain("로그아웃");
+    }
   });
 });
 
