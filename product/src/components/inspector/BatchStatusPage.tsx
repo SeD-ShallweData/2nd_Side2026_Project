@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { OpsReasonForm } from "@/components/admin/OpsReasonForm";
+import { BatchDomainPanels, DriftCheckCard } from "@/components/inspector/BatchDefinitionPanels";
 import type { BatchStatus, BatchStatusListResponse } from "@/domain/batch";
 import { postJson, readApiResponse } from "@/utils/clientApi";
 
@@ -103,6 +104,8 @@ export function BatchStatusPage({
       </div>
       {loading ? <div className="batch-state-card">배치 목록을 불러오는 중입니다.</div> : null}
       {error ? <div className="batch-state-card batch-state-error" role="alert"><strong>배치 현황을 확인하지 못했습니다.</strong><span>{error}</span></div> : null}
+      {!loading && !error && data?.drift ? <DriftCheckCard record={data.drift} /> : null}
+      {!loading && !error && data?.domains?.length ? <BatchDomainPanels domains={data.domains} /> : null}
       {!loading && !error && batches.length === 0 ? <div className="batch-state-card">적재된 배치가 없습니다.</div> : null}
       {!loading && !error && batches.length > 0 ? (
         <>
