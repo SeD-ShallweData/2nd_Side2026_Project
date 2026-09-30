@@ -9,8 +9,8 @@ import { delay } from "@/utils/delay";
 import { ServiceError } from "@/utils/errors";
 import { getCompanyRepository } from "@/services/providers";
 
-export const PUBLIC_COMPANY_RESULT_LIMIT = 1_000;
-export const PUBLIC_COMPANY_PAGE_LIMIT = 50;
+export const PUBLIC_COMPANY_RESULT_LIMIT = 2_000;
+export const PUBLIC_COMPANY_PAGE_LIMIT = 100;
 
 export function publicCountBand(count: number): { count: number; count_label: string } {
   if (count <= 0) return { count: 0, count_label: "0" };
