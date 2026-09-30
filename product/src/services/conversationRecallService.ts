@@ -112,7 +112,10 @@ export function extractRecallFacts(input: {
       const corrected = sentence.split(/아니라|아니고/).at(-1)!;
       const day = corrected.match(/(?:(?:\d{4}\s*년\s*)?\d{1,2}\s*월\s*|지난달\s*|이번\s*달\s*)?([12]?\d|3[01])\s*일/);
       if (day && !/[?？]$/.test(sentence)) {
-        add("resignation_date", day[0].replace(/\s+/g, " ").trim());
+        const priorMonth = corrected !== sentence && !/(?:년|월|지난달|이번\s*달)/.test(day[0])
+          ? sentence.split(/아니라|아니고/)[0].match(/((?:(?:\d{4}\s*년\s*)?\d{1,2}\s*월|지난달|이번\s*달))\s*(?:[12]?\d|3[01])\s*일/)?.[1]
+          : null;
+        add("resignation_date", `${priorMonth ? `${priorMonth} ` : ""}${day[0]}`.replace(/\s+/g, " ").trim());
       }
     }
     if (WORK_HOURS.test(sentence) || continuation === "work_hours") {
@@ -323,7 +326,7 @@ function numberedRecall(request: ChatRequest): { answer: string; found: boolean 
   const answers = markers.map((marker, index) => {
     const start = marker.index! + marker[0].length;
     const section = request.message.slice(start, markers[index + 1]?.index ?? request.message.length);
-    const scoped = { ...request, message: `앞서 말한 ${section}`,
+    const scoped = { ...request, message: `기억해 주세요. ${section}`,
       ...(request.conversation_recall ? { conversation_recall: { ...request.conversation_recall, active_statement_subject: subject } } : {}) };
     const fact = recallAnswer(scoped);
     const document = documentStatusRecall(scoped);
