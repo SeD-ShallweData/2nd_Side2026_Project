@@ -12,6 +12,7 @@
 | 상담 번역 안내·동의 번역 문장(2단계) | `chat.ts` 의 `translation`·`consent.translation` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | — |
 | 상담 번역 프롬프트(모델 번역 품질) | `product/prompts/translate/system.md` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | — |
 | 화면별 사전 | `chat.ts` `landing.ts` `common.ts` `company.ts` `favorite.ts` `worksite.ts` `contract.ts` `auth.ts` `community.ts` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 |
+| 현장 제보 안내(체류자격·비공개)·증거 자료 목록·번역 전송 고지(`form.guidance*`·`evidence*`·`translationNotice`) | `worksite.ts` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 |
 | 계약서 진단 결과(항목 이름·안내·요약·질문·검토 한계·법률 이름 괄호) | `contractVerdict.ts` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | — |
 | 사업장 확인 카드(상태 문구·해석 안내·근거 항목·긍정 신호·우선순위 구간) | `companyRisk.ts` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | — |
 | 커뮤니티 작성 언어 표시·필터(`postLanguage`) | `community.ts` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | — |
