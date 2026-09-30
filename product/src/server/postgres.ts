@@ -39,13 +39,44 @@ function assertSelectOnly(sql: string): void {
   }
 }
 
-export async function queryReadOnly<T extends QueryResultRow>(sql: string, values: unknown[] = []): Promise<T[]> {
+export interface ReadOnlyQueryOptions {
+  /**
+   * 실패했을 때 서버 로그에 남길 조회 대상 이름(예: "public.v_region_industry_signal").
+   * 화면 문구는 그대로 두고, 어느 관계가 권한·존재 문제로 실패했는지 운영자가 로그로 가른다.
+   */
+  relation?: string;
+}
+
+/** pg 오류에서 원인 분류에 필요한 값만 남긴다. 접속 문자열·비밀번호처럼 보이는 조각은 지운다. */
+export function describeQueryFailure(error: unknown): { code: string | null; message: string } {
+  const candidate = error as { code?: unknown; message?: unknown } | null;
+  const code = typeof candidate?.code === "string" ? candidate.code : null;
+  const raw = typeof candidate?.message === "string" ? candidate.message : "unknown error";
+  const message = raw
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, "[connection-string]")
+    .replace(/password\s*=\s*\S+/gi, "password=[redacted]")
+    .slice(0, 200);
+  return { code, message };
+}
+
+export async function queryReadOnly<T extends QueryResultRow>(
+  sql: string,
+  values: unknown[] = [],
+  options: ReadOnlyQueryOptions = {},
+): Promise<T[]> {
   assertSelectOnly(sql);
   try {
     const result = await getPool().query<T>(sql, values);
     return result.rows;
   } catch (error) {
     if (error instanceof ServiceError) throw error;
+    const failure = describeQueryFailure(error);
+    console.error(JSON.stringify({
+      event: "readonly_query_failed",
+      relation: options.relation ?? "unlabeled",
+      pg_code: failure.code,
+      message: failure.message,
+    }));
     throw new ServiceError(
       "DATABASE_UNAVAILABLE",
       "사업장 데이터베이스를 읽지 못했습니다.",
@@ -80,7 +111,7 @@ export async function isDatabaseReady(): Promise<boolean> {
         AND (SELECT count(*) FROM industrial_safety.v_llm_firm_safety_context) = 515608
         AS ready
       FROM latest
-    `);
+    `, [], { relation: "readiness:batches+scored_active+inspector_queue+safe_recommendation+v_llm_firm_safety_context" });
     return rows.length === 1 && rows[0]?.ready === true;
   } catch {
     return false;
