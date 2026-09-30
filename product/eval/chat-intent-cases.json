@@ -43,5 +43,6 @@
   {"id":"C5","question":"여기 왜 추가 확인이라고 떠요?","expected":["company"],"selected_states":[true]},
   {"id":"C6","question":"이 임금 표시가 무슨 뜻이에요?","expected":["company"],"selected_states":[true]},
   {"id":"C7","question":"이 임금 지급 카드에서 무엇을 확인해야 하나요?","expected":["company"],"selected_states":[true]},
-  {"id":"C8","question":"새봄물류는 월급이 밀린다는 뜻인가요?","expected":["company"],"selected_states":[true]}
+  {"id":"C8","question":"새봄물류는 월급이 밀린다는 뜻인가요?","expected":["company"],"selected_states":[true]},
+  {"id":"O7","question":"회사 컴퓨터에 게임 설치하는 방법 알려줘","expected":["off_topic"],"selected_states":[false],"recent_messages":[{"role":"user","content":"인천 OO건설 임금 카드의 추가 확인 신호는 무슨 뜻인가요?"},{"role":"assistant","content":"OO건설의 임금 지급 카드에서는 최근 가입자 수 감소, 최근 이직 변동 관측 항목이 확인 신호로 제공됐습니다. 일부 변동 신호가 관측되어 추가로 확인하는 것이 좋습니다."}]}
 ]
