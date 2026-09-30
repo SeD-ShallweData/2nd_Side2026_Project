@@ -12,7 +12,13 @@ import type {
 import type { SessionUserDto } from "@/app/api/auth/authApiContract";
 import type { ChatRequest } from "@/domain/chat";
 import type { ChatComparisonResponse } from "@/domain/chatComparison";
-import type { StoredConversationDetail, StoredConversationSummary } from "@/domain/conversation";
+import {
+  koreanPivotDetail,
+  type RecordCompletedConversationTurn,
+  type StoredConversationDetail,
+  type StoredConversationSummary,
+} from "@/domain/conversation";
+import { isImplementedForeignLocale } from "@/i18n/locales";
 import { getConversationRepository } from "@/services/userDataProviders";
 import {
   maybeUpdateConversationSummary,
@@ -113,6 +119,31 @@ function parseGuestImport(value: unknown): ImportGuestConversationRequest {
     };
   });
   return { import_id: record.import_id, turns };
+}
+
+const MAX_STORED_CONTENT_CHARS = 20_000;
+
+function storableKorean(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= MAX_STORED_CONTENT_CHARS
+    ? value
+    : undefined;
+}
+
+/*
+ * 번역 상담이면 사용자가 본 글(content)과 함께 한국어 원문(content_ko)·화면 언어를 저장한다.
+ * 요약·회상·이력 문맥은 이 한국어로 만든다. 한국어 상담은 빈 객체라 저장 모양이 그대로다.
+ */
+function translatedTurnFields(
+  response: ChatComparisonResponse,
+): Pick<RecordCompletedConversationTurn, "user_message_ko" | "assistant_message_ko" | "locale"> {
+  if (!isImplementedForeignLocale(response.locale)) return {};
+  const userMessageKo = storableKorean(response.question_ko);
+  const assistantMessageKo = storableKorean(response.results[0]?.answer_ko);
+  return {
+    locale: response.locale,
+    ...(userMessageKo ? { user_message_ko: userMessageKo } : {}),
+    ...(assistantMessageKo ? { assistant_message_ko: assistantMessageKo } : {}),
+  };
 }
 
 function toSummary(value: StoredConversationSummary): ConversationSummaryDto {
@@ -239,6 +270,7 @@ export async function importGuestConversation(
       answer_type: primary.answer_type,
       guardrail_status: primary.guardrail_status,
       sources: primary.sources,
+      ...translatedTurnFields(turn.response),
       response: { ...turn.response, conversation_id: conversationId, conversation_persistence: "saved" },
       lease_token: claim.lease_token!,
     });
@@ -257,7 +289,8 @@ export async function hydrateConversationRequest(
   user: SessionUserDto,
 ): Promise<ChatRequest> {
   if (!request.conversation_id) return request;
-  const detail = await ownerDetail(request.conversation_id, user);
+  // 번역 상담이면 저장된 한국어 원문으로 이력·회상·요약 문맥을 만든다(한국어 파이프라인 입력).
+  const detail = koreanPivotDetail(await ownerDetail(request.conversation_id, user));
   const summary = await getConversationRepository().findSummary(detail.conversation_id);
   const allMessages = detail.turns.flatMap((turn) => turn.messages);
   const through = summary?.summarized_through_sequence ?? 0;
@@ -355,6 +388,7 @@ export async function completeClaimedConversationRequest(
   const leaseToken = request.conversation_request_lease_token;
   if (!leaseToken) throw new ServiceError("CONVERSATION_REQUEST_LEASE_MISSING", "Conversation request lease is missing.", 409, true);
   if (!request.conversation_id) throw new ServiceError("CONVERSATION_NOT_FOUND", "Conversation request was not claimed.", 404, false);
+  const translated = translatedTurnFields(response);
   response = publicAnswerContext(response);
   const primary = response.results[0];
   if (!primary) throw new ServiceError("CONVERSATION_PERSISTENCE_FAILED", "No displayed chat result to save.", 503, true);
@@ -368,6 +402,7 @@ export async function completeClaimedConversationRequest(
     answer_type: primary.answer_type,
     guardrail_status: primary.guardrail_status,
     sources: primary.sources,
+    ...translated,
     response,
     lease_token: leaseToken,
   });
@@ -402,6 +437,7 @@ export async function persistCompletedChat(
   if (!requestKey || !REQUEST_KEY_PATTERN.test(requestKey)) {
     throw new ServiceError("VALIDATION_ERROR", "대화 요청 식별값을 확인해 주세요.", 400, false);
   }
+  const translated = translatedTurnFields(response);
   response = publicAnswerContext(response);
   const primary = response.results[0];
   if (!primary) {
@@ -420,6 +456,7 @@ export async function persistCompletedChat(
     answer_type: primary.answer_type,
     guardrail_status: primary.guardrail_status,
     sources: primary.sources,
+    ...translated,
   });
   /* 요약 실패는 이미 생성된 사용자 답변을 실패시키지 않는다. 다음 완료 turn에서 재시도한다. */
   try {

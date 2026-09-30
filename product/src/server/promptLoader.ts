@@ -28,8 +28,8 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 
-/** 코드에 고정된 세 가지 프롬프트. 운영 콘솔도 이 이름만 받는다. */
-export const REQUIRED_PROMPTS = ["chat/system", "inspector/system", "rewrite/system"] as const;
+/** 코드에 고정된 네 가지 프롬프트. 운영 콘솔도 이 이름만 받는다. */
+export const REQUIRED_PROMPTS = ["chat/system", "inspector/system", "rewrite/system", "translate/system"] as const;
 export type PromptName = (typeof REQUIRED_PROMPTS)[number];
 
 export function isPromptName(value: string): value is PromptName {

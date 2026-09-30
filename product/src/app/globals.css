@@ -2974,6 +2974,32 @@ summary:focus-visible {
   padding: 18px 16px;
 }
 
+/* 번역 상담: 번역을 쓰지 못했을 때의 고정 안내와 "한국어 원문 보기" 전환 */
+.translation-fallback-notice {
+  background: #f6f4ee;
+  border-bottom: 1px solid var(--line, #e3ded2);
+  color: var(--muted);
+  font-size: 0.76rem;
+  margin: 0;
+  padding: 8px 16px;
+}
+
+.translation-toggle {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.76rem;
+  margin: -8px 16px 12px;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.chat-compare-toggle small.consent-korean-original {
+  display: block;
+  margin-top: 4px;
+}
+
 .safe-markdown p {
   margin: 0 0 1em;
 }

@@ -54,6 +54,8 @@ interface MessageRow {
   turn_id: string;
   role: "user" | "assistant";
   content: string;
+  content_ko: string | null;
+  locale: StoredConversationMessage["locale"] | null;
 }
 
 interface SourceRow {
@@ -202,7 +204,7 @@ export class RealConversationRepository implements ConversationRepository {
     const turnIds = turns.map((turn) => turn.turn_id);
     const messages = turnIds.length === 0 ? [] : await queryWrite<MessageRow>(
       "conversation",
-      `SELECT m.id::text AS message_id, m.turn_id::text, m.role, m.content
+      `SELECT m.id::text AS message_id, m.turn_id::text, m.role, m.content, m.content_ko, m.locale
          FROM conversation_messages m
          JOIN conversation_turns t ON t.id = m.turn_id
         WHERE m.turn_id = ANY($1::uuid[])
@@ -220,7 +222,12 @@ export class RealConversationRepository implements ConversationRepository {
     const messageByTurn = new Map<string, StoredConversationMessage[]>();
     for (const message of messages) {
       const list = messageByTurn.get(message.turn_id) ?? [];
-      list.push({ message_id: message.message_id, role: message.role, content: message.content });
+      list.push({
+        message_id: message.message_id, role: message.role, content: message.content,
+        // 번역 상담(0022)만 한국어 원문과 화면 언어가 있다. 한국어 상담 메시지 모양은 그대로 둔다.
+        ...(message.locale ? { locale: message.locale } : {}),
+        ...(message.content_ko ? { content_ko: message.content_ko } : {}),
+      });
       messageByTurn.set(message.turn_id, list);
     }
     const sourceByTurn = new Map<string, SourceReference[]>();
@@ -435,10 +442,12 @@ export class RealConversationRepository implements ConversationRepository {
       const turnId = inserted[0]?.turn_id;
       if (!turnId) throw new ServiceError("CONVERSATION_WRITE_FAILED", "대화 기록을 저장하지 못했습니다.", 503, true);
 
+      const locale = input.locale ?? null;
       await transaction.query(
-        `INSERT INTO conversation_messages (turn_id, role, message_index, content)
-         VALUES ($1::uuid, 'user', 1, $2), ($1::uuid, 'assistant', 2, $3)`,
-        [turnId, input.user_message, input.assistant_message],
+        `INSERT INTO conversation_messages (turn_id, role, message_index, content, content_ko, locale)
+         VALUES ($1::uuid, 'user', 1, $2, $4, $6), ($1::uuid, 'assistant', 2, $3, $5, $6)`,
+        [turnId, input.user_message, input.assistant_message,
+          locale ? input.user_message_ko ?? null : null, locale ? input.assistant_message_ko ?? null : null, locale],
       );
       for (const [position, source] of input.sources.entries()) {
         await transaction.query(

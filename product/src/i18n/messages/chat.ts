@@ -231,6 +231,14 @@ export const chatMessages = defineMessages({
       title: "이번 질문의 외부 AI 전송에 동의",
       body: "질문, 최근 대화 최대 10개, 30일 요약, 선택한 회사 공개 정보와 현재 공식 근거{contractExtra}가 전송됩니다. 동의는 저장하지 않으며 체크를 해제하면 다음 전송을 막습니다.",
       contractExtra: ", 연결한 계약서 진단 요약(항목 분류·근거 조문)",
+      translation: "화면 언어가 한국어가 아니면 질문과 답변을 번역하기 위해 같은 내용을 같은 AI 공급자(Upstage Solar)에 한 번 더 보냅니다.",
+      koreanOriginalLabel: "한국어 원문",
+    },
+    translation: {
+      showKorean: "한국어 원문 보기",
+      hideKorean: "번역 보기",
+      koreanOriginal: "한국어 원문",
+      fallbackNotice: "번역을 확인하지 못해 한국어 원문을 보여 드립니다.",
     },
     contractLink: {
       aria: "연결된 계약서 진단 결과",
@@ -530,6 +538,14 @@ export const chatMessages = defineMessages({
       title: "I agree to send this question to an external AI",
       body: "Your question, up to 10 recent messages, a 30-day summary, public information on the selected company and the current official sources{contractExtra} will be sent. Your consent is not saved, and unchecking the box blocks the next send.",
       contractExtra: ", and the connected contract check summary (item categories and cited provisions)",
+      translation: "Because your screen language is not Korean, your question and the answer are sent once more to the same AI provider (Upstage Solar) for translation.",
+      koreanOriginalLabel: "Original Korean text",
+    },
+    translation: {
+      showKorean: "Show original Korean",
+      hideKorean: "Show translation",
+      koreanOriginal: "Original Korean",
+      fallbackNotice: "We could not verify the translation, so we are showing the original Korean answer.",
     },
     contractLink: {
       aria: "Connected contract check results",
@@ -781,6 +797,14 @@ export const chatMessages = defineMessages({
       title: "同意将本次问题发送至外部 AI",
       body: "将发送问题、最多 10 条最近对话、30 天摘要、所选公司的公开信息和当前官方依据{contractExtra}。同意不会被保存,取消勾选后将阻止下一次发送。",
       contractExtra: ",以及已连接的合同检查摘要(项目分类·依据条文)",
+      translation: "由于界面语言不是韩语,为了翻译,问题和回答会再发送一次给同一家 AI 服务商(Upstage Solar)。",
+      koreanOriginalLabel: "韩语原文",
+    },
+    translation: {
+      showKorean: "查看韩语原文",
+      hideKorean: "查看译文",
+      koreanOriginal: "韩语原文",
+      fallbackNotice: "未能确认译文,因此显示韩语原文。",
     },
     contractLink: {
       aria: "已连接的合同检查结果",
@@ -1032,6 +1056,14 @@ export const chatMessages = defineMessages({
       title: "Tôi đồng ý gửi câu hỏi này đến AI bên ngoài",
       body: "Câu hỏi, tối đa 10 tin nhắn gần đây, bản tóm tắt 30 ngày, thông tin công khai của công ty đã chọn và căn cứ chính thức hiện tại{contractExtra} sẽ được gửi đi. Sự đồng ý không được lưu lại; nếu bỏ chọn, lần gửi tiếp theo sẽ bị chặn.",
       contractExtra: ", cùng bản tóm tắt kiểm tra hợp đồng đã kết nối (phân loại mục·điều khoản căn cứ)",
+      translation: "Vì ngôn ngữ màn hình không phải tiếng Hàn, câu hỏi và câu trả lời sẽ được gửi thêm một lần nữa đến cùng nhà cung cấp AI (Upstage Solar) để dịch.",
+      koreanOriginalLabel: "Bản gốc tiếng Hàn",
+    },
+    translation: {
+      showKorean: "Xem bản gốc tiếng Hàn",
+      hideKorean: "Xem bản dịch",
+      koreanOriginal: "Bản gốc tiếng Hàn",
+      fallbackNotice: "Không thể xác nhận bản dịch nên chúng tôi hiển thị câu trả lời gốc bằng tiếng Hàn.",
     },
     contractLink: {
       aria: "Kết quả kiểm tra hợp đồng đã kết nối",
@@ -1283,6 +1315,14 @@ export const chatMessages = defineMessages({
       title: "ยินยอมให้ส่งคำถามนี้ไปยัง AI ภายนอก",
       body: "ระบบจะส่งคำถาม การสนทนาล่าสุดไม่เกิน 10 รายการ สรุป 30 วัน ข้อมูลสาธารณะของบริษัทที่เลือก และแหล่งอ้างอิงทางการปัจจุบัน{contractExtra} ความยินยอมจะไม่ถูกบันทึก และหากยกเลิกเครื่องหมาย การส่งครั้งถัดไปจะถูกระงับ",
       contractExtra: " รวมถึงสรุปผลตรวจสัญญาที่เชื่อมต่อไว้ (การจัดหมวดรายการ·มาตราอ้างอิง)",
+      translation: "เนื่องจากภาษาหน้าจอไม่ใช่ภาษาเกาหลี ระบบจะส่งคำถามและคำตอบไปยังผู้ให้บริการ AI รายเดิม (Upstage Solar) อีกหนึ่งครั้งเพื่อแปล",
+      koreanOriginalLabel: "ต้นฉบับภาษาเกาหลี",
+    },
+    translation: {
+      showKorean: "ดูต้นฉบับภาษาเกาหลี",
+      hideKorean: "ดูคำแปล",
+      koreanOriginal: "ต้นฉบับภาษาเกาหลี",
+      fallbackNotice: "ไม่สามารถตรวจสอบคำแปลได้ จึงแสดงคำตอบต้นฉบับภาษาเกาหลี",
     },
     contractLink: {
       aria: "ผลตรวจสัญญาที่เชื่อมต่อไว้",
