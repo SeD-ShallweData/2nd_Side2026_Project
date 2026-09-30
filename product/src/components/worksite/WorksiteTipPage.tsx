@@ -68,25 +68,33 @@ export function WorksiteTipForm() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<WorksiteTipReceiptDto | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   function selectPhotos(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
     setError(null);
-    if (files.length > MAX_PHOTOS) {
+    const additions = files.filter((file) => !photos.some((photo) =>
+      photo.name === file.name && photo.size === file.size && photo.lastModified === file.lastModified));
+    if (photos.length + additions.length > MAX_PHOTOS) {
       setError(m.photoLimit);
-      event.target.value = "";
       return;
     }
-    const invalid = files.find((file) => !PHOTO_TYPES.has(file.type) || file.size > MAX_PHOTO_BYTES);
+    const invalid = additions.find((file) => !PHOTO_TYPES.has(file.type) || file.size > MAX_PHOTO_BYTES);
     if (invalid) {
       setError(m.photoInvalid);
-      event.target.value = "";
       return;
     }
-    setPhotos(files);
+    setPhotos((current) => [...current, ...additions]);
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    setError(null);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -165,8 +173,8 @@ export function WorksiteTipForm() {
       <label>{m.bodyLabel} <span className="field-optional">{m.optional}</span><textarea value={body} onChange={(event) => setBody(event.target.value)} maxLength={5000} rows={8} placeholder={m.bodyPlaceholder} /></label>
       <div className="worksite-upload-field">
         <label htmlFor="worksite-photos">{m.photoLabel} <span className="field-optional">{m.photoOptional}</span></label>
-        <input id="worksite-photos" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={selectPhotos} />
-        {photos.length > 0 ? <ul className="worksite-photo-list">{photos.map((photo) => <li key={`${photo.name}-${photo.size}`}>{photo.name}<span>{Math.ceil(photo.size / 1024)}KB</span></li>)}</ul> : <p className="field-help">{m.photoHelp}</p>}
+        <input ref={photoInputRef} id="worksite-photos" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={selectPhotos} disabled={submitting} />
+        {photos.length > 0 ? <ul className="worksite-photo-list">{photos.map((photo, index) => <li key={`${photo.name}-${photo.size}-${photo.lastModified}`}><span className="worksite-photo-name">{photo.name}</span><span className="worksite-photo-actions"><span>{Math.ceil(photo.size / 1024)}KB</span><button type="button" disabled={submitting} onClick={() => removePhoto(index)} aria-label={format(m.removePhotoAria, { name: photo.name })}>{m.removePhoto}</button></span></li>)}</ul> : <p className="field-help">{m.photoHelp}</p>}
       </div>
       {showTranslationNotice ? <p className="worksite-translation-notice" role="note">{m.translationNotice}</p> : null}
       {error ? <p className="field-error" role="alert">{error}</p> : null}
@@ -225,9 +233,12 @@ function InspectorTipList() {
   const [items, setItems] = useState<WorksiteTipListItemDto[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedTipId, setSelectedTipId] = useState<string | null>(null);
   const [selected, setSelected] = useState<WorksiteTipDto | null>(null);
-  const detailRef = useRef<HTMLDivElement | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const detailRequest = useRef(0);
   const [error, setError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -247,18 +258,38 @@ function InspectorTipList() {
   }, [page]);
 
   async function openTip(tipId: string) {
+    const request = ++detailRequest.current;
+    if (selectedTipId === tipId) {
+      setSelectedTipId(null);
+      setSelected(null);
+      setDetailLoading(false);
+      setDetailError(null);
+      return;
+    }
+    setSelectedTipId(tipId);
+    setSelected(null);
+    setDetailLoading(true);
+    setDetailError(null);
     try {
-      setSelected(await getWorksiteTip(tipId));
+      const detail = await getWorksiteTip(tipId);
+      if (detailRequest.current === request) setSelected(detail);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : m.detailFailed);
+      if (detailRequest.current === request) setDetailError(caught instanceof Error ? caught.message : m.detailFailed);
+    } finally {
+      if (detailRequest.current === request) setDetailLoading(false);
     }
   }
 
   useEffect(() => {
-    if (selected) detailRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [selected]);
+    return () => { detailRequest.current += 1; };
+  }, []);
 
   function changePage(nextPage: number) {
+    detailRequest.current += 1;
+    setSelectedTipId(null);
+    setSelected(null);
+    setDetailLoading(false);
+    setDetailError(null);
     setLoading(true);
     setPage(nextPage);
   }
@@ -266,13 +297,24 @@ function InspectorTipList() {
   return (
     <div className="worksite-inspector-view">
       <div className="worksite-list-toolbar"><div><span className="eyebrow">{m.eyebrow}</span><h2>{m.heading}</h2><p>{m.intro}</p></div><strong>{format(m.total, { count: total.toLocaleString(intlLocale(locale)) })}</strong></div>
-      {/* 목록 아래가 아니라 위에 펼친다. 목록이 길면 아래에 붙은 상세는 화면
-          밖으로 밀려나 열린 줄도 모른다. 열 때 이 자리로 스크롤도 옮긴다. */}
-      {selected ? <div className="worksite-detail-panel" ref={detailRef} tabIndex={-1}><div className="worksite-detail-head"><div><span className="eyebrow">{m.detailEyebrow}</span><h2>{selected.translation_status === "translated" && selected.title_ko ? selected.title_ko : selected.title}</h2><time>{formatDate(selected.submitted_at, locale)}</time></div><button type="button" className="button button-outline" onClick={() => setSelected(null)}>{m.close}</button></div><WorksiteTipDetailBody tip={selected} />{selected.attachments.length > 0 ? <div className="worksite-attachment-grid">{selected.attachments.map((attachment, index) => <a key={attachment.attachment_id} href={attachment.content_url} target="_blank" rel="noreferrer" className="worksite-attachment-thumb" aria-label={format(m.photoAria, { n: index + 1 })}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={attachment.content_url} alt="" loading="lazy" /><span>{format(m.photoCaption, { n: index + 1, size: Math.ceil(attachment.size_bytes / 1024) })}</span></a>)}</div> : <p className="worksite-attachment-empty">{m.noPhotos}</p>}</div> : null}
       {loading ? <div className="worksite-state-card">{m.loading}</div> : null}
       {error ? <p className="field-error" role="alert">{error}</p> : null}
       {!loading && items.length === 0 ? <div className="worksite-state-card"><strong>{m.emptyTitle}</strong><p>{m.emptyBody}</p></div> : null}
-      <div className="worksite-tip-list">{items.map((item) => <article className="worksite-tip-list-item" key={item.tip_id}><div className="worksite-tip-list-meta"><span>{m.tipLabel}</span><time>{formatDate(item.submitted_at, locale)}</time></div><h3>{item.translation_status === "translated" && item.title_ko ? item.title_ko : item.title}{item.translation_status !== "not_needed" ? <span className={`worksite-translation-badge worksite-translation-${item.translation_status}`}>{item.translation_status === "translated" ? m.machineTranslation : m.translationFailed}</span> : null}</h3><p>{(item.translation_status === "translated" ? item.body_preview_ko : null) ?? item.body_preview ?? m.photoTip}</p><div className="worksite-tip-list-foot"><span>{item.company_context ? `${item.company_context.region ?? m.noRegion} · ${item.company_context.industry ?? m.noIndustry}` : m.noCompany}</span><span>{format(m.photoCount, { count: item.attachment_count })}</span><button type="button" className="button button-outline" onClick={() => void openTip(item.tip_id)}>{m.viewDetail}</button></div></article>)}</div>
+      <div className="worksite-tip-list">{items.map((item) => (
+        <article className="worksite-tip-list-item" key={item.tip_id}>
+          <div className="worksite-tip-list-meta"><span>{m.tipLabel}</span><time>{formatDate(item.submitted_at, locale)}</time></div>
+          <h3>{item.translation_status === "translated" && item.title_ko ? item.title_ko : item.title}{item.translation_status !== "not_needed" ? <span className={`worksite-translation-badge worksite-translation-${item.translation_status}`}>{item.translation_status === "translated" ? m.machineTranslation : m.translationFailed}</span> : null}</h3>
+          <p>{(item.translation_status === "translated" ? item.body_preview_ko : null) ?? item.body_preview ?? m.photoTip}</p>
+          <div className="worksite-tip-list-foot"><span>{item.company_context ? `${item.company_context.region ?? m.noRegion} · ${item.company_context.industry ?? m.noIndustry}` : m.noCompany}</span><span>{format(m.photoCount, { count: item.attachment_count })}</span><button type="button" className="button button-outline" aria-expanded={selectedTipId === item.tip_id} aria-controls={selectedTipId === item.tip_id ? `worksite-tip-detail-${item.tip_id}` : undefined} onClick={() => void openTip(item.tip_id)}>{selectedTipId === item.tip_id ? m.close : m.viewDetail}</button></div>
+          {selectedTipId === item.tip_id ? (
+            <div id={`worksite-tip-detail-${item.tip_id}`} className="worksite-detail-panel">
+              {detailLoading ? <p role="status">{m.loading}</p> : selected && selected.tip_id === item.tip_id ? (
+                <><div className="worksite-detail-head"><div><span className="eyebrow">{m.detailEyebrow}</span><h2>{selected.translation_status === "translated" && selected.title_ko ? selected.title_ko : selected.title}</h2><time>{formatDate(selected.submitted_at, locale)}</time></div></div><WorksiteTipDetailBody tip={selected} />{selected.attachments.length > 0 ? <div className="worksite-attachment-grid">{selected.attachments.map((attachment, index) => <a key={attachment.attachment_id} href={attachment.content_url} target="_blank" rel="noreferrer" className="worksite-attachment-thumb" aria-label={format(m.photoAria, { n: index + 1 })}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={attachment.content_url} alt="" loading="lazy" /><span>{format(m.photoCaption, { n: index + 1, size: Math.ceil(attachment.size_bytes / 1024) })}</span></a>)}</div> : <p className="worksite-attachment-empty">{m.noPhotos}</p>}</>
+              ) : detailError ? <p className="field-error" role="alert">{detailError}</p> : null}
+            </div>
+          ) : null}
+        </article>
+      ))}</div>
       {totalPages > 1 ? <nav className="search-pagination" aria-label={m.paginationAria}><button type="button" className="button button-outline" disabled={page <= 1} onClick={() => changePage(page - 1)}>{m.prev}</button><span className="pagination-page">{format(m.pageOf, { page, total: totalPages })}</span><button type="button" className="button button-outline" disabled={page >= totalPages} onClick={() => changePage(page + 1)}>{m.next}</button></nav> : null}
     </div>
   );

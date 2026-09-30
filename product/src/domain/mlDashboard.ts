@@ -14,12 +14,16 @@ export interface MlDashboardDistributionRow {
 
 export interface MlDashboardResponse {
   tab: MlDashboardTab;
-  denominator: number;
+  /** 소규모 셀을 차감해 유추할 수 있으면 공개하지 않는다. */
+  denominator: number | null;
   data_as_of: string | null;
   target_label: string | null;
   stale_notice: string | null;
   basis_notice: string;
   filters: { region: string | null; industry: string | null };
-  options: { regions: string[]; industries: string[] };
+  options: {
+    regions: Array<{ value: string; count: number | null }>;
+    industries: Array<{ value: string; count: number | null }>;
+  };
   rows: MlDashboardDistributionRow[];
 }
