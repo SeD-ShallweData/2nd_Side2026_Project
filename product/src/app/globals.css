@@ -5247,6 +5247,15 @@ html[data-locale="vi"] body { font-family: Pretendard, "Noto Sans", "Segoe UI", 
 html[data-locale="ko-easy"] { font-size: 118.75%; }
 html[data-locale="ko-easy"] body { line-height: 1.75; }
 
+/* 처음 온 사용자에게 화면 언어를 제안하는 띠. 강요하지 않고 닫으면 다시 묻지 않는다. */
+.locale-suggestion { border-bottom: 1px solid var(--line); background: var(--brand-soft); color: var(--ink); }
+.locale-suggestion-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.locale-suggestion-inner p { margin: 0; font-size: .82rem; font-weight: 700; }
+.locale-suggestion-actions { display: flex; flex-shrink: 0; gap: 8px; }
+@media (max-width: 700px) {
+  .locale-suggestion-inner { align-items: stretch; flex-direction: column; }
+  .locale-suggestion-actions > .button { flex: 1; }
+}
 .language-switcher { position: relative; }
 .language-switcher-toggle {
   display: inline-flex; align-items: center; gap: 6px;

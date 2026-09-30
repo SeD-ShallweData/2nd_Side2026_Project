@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteFooter } from "@/components/common/SiteFooter";
+import { LocaleSuggestion } from "@/components/common/LocaleSuggestion";
 import { SiteHeader } from "@/components/common/SiteHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { htmlLang } from "@/i18n/locales";
@@ -29,6 +30,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             {header.skipLink}
           </a>
           <SiteHeader />
+          <LocaleSuggestion />
           <main id="main-content">{children}</main>
           <SiteFooter />
         </LocaleProvider>
