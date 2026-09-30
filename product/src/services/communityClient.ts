@@ -1,5 +1,6 @@
 import type {
   CommunityCategory,
+  CommunityPostLanguage,
   CommunityPostDto,
   CommunityPostListResponse,
   CommunityReportReceiptDto,
@@ -37,6 +38,7 @@ export interface CommunityRequestOptions {
 export interface ListCommunityPostsParams {
   q?: string;
   category?: CommunityCategory | null;
+  language?: CommunityPostLanguage | null;
   page?: number;
   limit?: number;
 }
@@ -115,6 +117,7 @@ function buildListQuery(params: ListCommunityPostsParams): string {
   const query = params.q?.trim();
   if (query) searchParams.set("q", query);
   if (params.category) searchParams.set("category", params.category);
+  if (params.language) searchParams.set("language", params.language);
   if (params.page !== undefined) searchParams.set("page", String(params.page));
   if (params.limit !== undefined) searchParams.set("limit", String(params.limit));
   const serialized = searchParams.toString();

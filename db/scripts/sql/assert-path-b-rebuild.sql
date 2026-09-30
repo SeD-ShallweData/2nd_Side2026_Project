@@ -279,7 +279,9 @@ BEGIN
         'public.v_comments',
         'public.v_reviews',
         'industrial_safety.v_llm_firm_safety_context',
-        'industrial_safety.v_cell_api_label_comparison'
+        'industrial_safety.v_cell_api_label_comparison',
+        -- 0012 이후 DB 에만 있다. 있으면 configure-path-b-release-bot.sql 이 부여한다.
+        'public.v_region_industry_signal'
       )
     ), mismatch AS (
       (SELECT * FROM actual EXCEPT SELECT * FROM expected)
@@ -1140,7 +1142,9 @@ BEGIN
         'public.v_comments',
         'public.v_reviews',
         'industrial_safety.v_llm_firm_safety_context',
-        'industrial_safety.v_cell_api_label_comparison'
+        'industrial_safety.v_cell_api_label_comparison',
+        -- 0012 이후 DB 에만 있다. 있으면 configure-path-b-release-bot.sql 이 부여한다.
+        'public.v_region_industry_signal'
       )
   ) THEN
     RAISE EXCEPTION 'read-only bot role % can SELECT an unapproved relation', bot_name;

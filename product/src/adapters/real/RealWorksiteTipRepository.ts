@@ -13,13 +13,14 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 
-import type {
-  NewWorksiteTip,
-  StoredWorksiteTip,
-  StoredWorksiteTipAttachment,
-  StoredWorksiteTipAttachmentContent,
-  WorksiteTipPage,
-  WorksiteTipRepository,
+import {
+  KOREAN_WORKSITE_TIP_TRANSLATION,
+  type NewWorksiteTip,
+  type StoredWorksiteTip,
+  type StoredWorksiteTipAttachment,
+  type StoredWorksiteTipAttachmentContent,
+  type WorksiteTipPage,
+  type WorksiteTipRepository,
 } from "@/domain/worksiteTip";
 import type {
   WorksiteTipApiSource,
@@ -27,6 +28,7 @@ import type {
   WorksiteTipCompanyContextDto,
   WorksiteTipPhotoMediaType,
   WorksiteTipStatus,
+  WorksiteTipTranslationStatus,
 } from "@/app/api/worksite-tips/worksiteTipApiContract";
 import {
   isWriteDatabaseConfigured,
@@ -48,6 +50,10 @@ interface TipRow {
   sido: string | null;
   industry: string | null;
   submitted_at: Date;
+  source_language: string | null;
+  title_ko: string | null;
+  body_ko: string | null;
+  translation_status: WorksiteTipTranslationStatus;
   attachment_count?: number;
 }
 
@@ -153,6 +159,12 @@ function toTip(row: TipRow, attachments: StoredWorksiteTipAttachment[]): StoredW
       : null,
     submitted_at: new Date(row.submitted_at).toISOString(),
     attachments,
+    translation: {
+      source_language: row.source_language,
+      title_ko: row.title_ko,
+      body_ko: row.body_ko,
+      status: row.translation_status,
+    },
   };
 }
 
@@ -166,7 +178,11 @@ const TIP_SELECT = `
     t.firm_id,
     f.sido,
     f.industry,
-    t.submitted_at
+    t.submitted_at,
+    t.source_language,
+    t.title_ko,
+    t.body_ko,
+    t.translation_status
   FROM worksite_tips t
   LEFT JOIN firms f ON f.firm_id = t.firm_id
 `;
@@ -209,6 +225,13 @@ export class RealWorksiteTipRepository implements WorksiteTipRepository {
                 AND column_name = 'status'
                 AND column_default ~* '''received''::text'
            )
+           -- 0023 번역 컬럼. 없으면 제보 INSERT 가 실패하므로 준비되지 않은 것으로 본다.
+           AND (
+             SELECT count(*) FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = 'worksite_tips'
+                AND column_name IN ('source_language', 'title_ko', 'body_ko', 'translation_status')
+           ) = 4
            AND EXISTS (
              SELECT 1
                FROM pg_catalog.pg_constraint con
@@ -314,6 +337,7 @@ export class RealWorksiteTipRepository implements WorksiteTipRepository {
     const root = storageRoot()!;
     await assertPrivateStorageRoot(root);
 
+    const translation = input.translation ?? KOREAN_WORKSITE_TIP_TRANSLATION;
     const createdFiles: string[] = [];
     try {
       for (const attachment of input.attachments) {
@@ -328,11 +352,13 @@ export class RealWorksiteTipRepository implements WorksiteTipRepository {
       const created = await withWriteTransaction("tip", async (transaction) => {
         const tips = await transaction.query<TipRow>(
           `INSERT INTO worksite_tips (
-             id, reporter_id, category, status, title, body, firm_id, submitted_at
+             id, reporter_id, category, status, title, body, firm_id, submitted_at,
+             source_language, title_ko, body_ko, translation_status
            )
-           VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8::timestamptz)
+           VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8::timestamptz, $9, $10, $11, $12)
            RETURNING id::text AS tip_id, category, status, title, body, firm_id,
-                     NULL::text AS sido, NULL::text AS industry, submitted_at`,
+                     NULL::text AS sido, NULL::text AS industry, submitted_at,
+                     source_language, title_ko, body_ko, translation_status`,
           [
             input.tip_id,
             input.reporter_id,
@@ -342,6 +368,10 @@ export class RealWorksiteTipRepository implements WorksiteTipRepository {
             input.body,
             input.company_context?.company_id ?? null,
             input.submitted_at,
+            translation.source_language,
+            translation.title_ko,
+            translation.body_ko,
+            translation.status,
           ],
         );
         const tip = tips[0];

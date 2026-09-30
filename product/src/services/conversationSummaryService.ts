@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { StoredConversationDetail, StoredConversationMessage } from "@/domain/conversation";
+import { koreanPivotDetail, type StoredConversationDetail, type StoredConversationMessage } from "@/domain/conversation";
 import type {
   ConversationStructuredSummary,
   ConversationSummaryItem,
@@ -190,8 +190,10 @@ function allMessages(detail: StoredConversationDetail): StoredConversationMessag
 
 /** 완료 메시지 10개 경계에서만 원자적으로 누적 요약을 갱신한다. */
 export async function maybeUpdateConversationSummary(
-  detail: StoredConversationDetail,
+  storedDetail: StoredConversationDetail,
 ): Promise<boolean> {
+  // 번역 상담은 한국어 원문(content_ko)으로 요약한다. 화면 표시용 번역문은 요약에 넣지 않는다.
+  const detail = koreanPivotDetail(storedDetail);
   const repository = getConversationRepository();
   const messages = allMessages(detail);
   const target = summaryTargetForMessageCount(messages.length);

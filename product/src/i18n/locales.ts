@@ -15,6 +15,14 @@ export const LOCALE_COOKIE = "donworry_locale";
 export const PENDING_LOCALES = ["uz", "ru", "ne", "id", "km"] as const;
 export type PendingLocale = (typeof PENDING_LOCALES)[number];
 
+/** 모델 번역(상담·현장 제보)을 켜는 외국어. 한국어·쉬운 한국어는 번역하지 않는다. */
+export const IMPLEMENTED_FOREIGN_LOCALES = ["en", "zh", "vi", "th"] as const;
+export type ImplementedForeignLocale = (typeof IMPLEMENTED_FOREIGN_LOCALES)[number];
+
+export function isImplementedForeignLocale(value: unknown): value is ImplementedForeignLocale {
+  return typeof value === "string" && (IMPLEMENTED_FOREIGN_LOCALES as readonly string[]).includes(value);
+}
+
 export function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && (LOCALES as readonly string[]).includes(value);
 }

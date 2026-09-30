@@ -1,6 +1,7 @@
 import type { AnswerType, GuardrailStatus, RecentMessage } from "@/domain/chat";
 import type { ChatComparisonResponse } from "@/domain/chatComparison";
 import type { SourceReference } from "@/domain/risk";
+import type { ImplementedForeignLocale } from "@/i18n/locales";
 
 export type ConversationApiSource = "database" | "mock_memory";
 
@@ -22,7 +23,8 @@ export interface ConversationTurnDto {
   answer_type: AnswerType;
   guardrail_status: GuardrailStatus;
   created_at: string;
-  messages: Array<RecentMessage & { message_id: string }>;
+  /** 번역 상담 메시지에는 한국어 원문(content_ko)과 화면 언어(locale)가 함께 온다. */
+  messages: Array<RecentMessage & { message_id: string; content_ko?: string; locale?: ImplementedForeignLocale }>;
   sources: SourceReference[];
   response: ChatComparisonResponse | null;
 }

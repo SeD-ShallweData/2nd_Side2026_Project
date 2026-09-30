@@ -19,6 +19,7 @@ import type {
   StoredCommunityPost,
   StoredCommunityReport,
 } from "@/domain/community";
+import { detectPostLanguage } from "@/domain/textLanguage";
 import { MOCK_COMPANIES } from "@/mocks/companies";
 import { ServiceError } from "@/utils/errors";
 
@@ -147,6 +148,7 @@ export class MockCommunityRepository implements CommunityRepository {
     const filtered = [...memoryState.posts.values()]
       .filter((post) => post.status === "published")
       .filter((post) => !query.category || post.category === query.category)
+      .filter((post) => !query.language || detectPostLanguage(post.title, post.body) === query.language)
       .filter((post) => {
         if (!normalizedQuery) return true;
         const context = `${post.title} ${post.body} ${post.company_context?.region ?? ""} ${post.company_context?.industry ?? ""}`;

@@ -3,7 +3,8 @@ import { DataSourceList } from "@/components/common/DataSourceList";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { SafetyContextPublic, SourceReference, WageRiskPublic } from "@/domain/risk";
 import { format } from "@/i18n/defineMessages";
-import { useMessages } from "@/i18n/LocaleProvider";
+import { translateRiskText } from "@/i18n/companyRisk";
+import { useLocale, useMessages } from "@/i18n/LocaleProvider";
 import { companyMessages } from "@/i18n/messages/company";
 
 // domain/riskPresentation 의 UNCONNECTED_WAGE_OBSERVATION_LABELS 와 같은 순서다.
@@ -28,6 +29,9 @@ type CardProps =
 
 export function RiskInformationCard(props: CardProps) {
   const m = useMessages(companyMessages).risk;
+  // 서버의 한국어 상태 문구·해석 안내를 고정 사전으로 옮긴다. 한국어 화면에서는 그대로다.
+  const locale = useLocale();
+  const t = (text: string) => translateRiskText(text, locale);
   const isWage = props.kind === "wage";
   const validatedFirmSafety = !isWage && props.data.scope === "validated_firm_context";
   const title = isWage
@@ -58,7 +62,7 @@ export function RiskInformationCard(props: CardProps) {
         <StatusBadge level={props.data.level} verdict={isWage ? props.data.verdict : undefined} kind={props.kind} />
       </div>
 
-      <p className={`risk-summary ${unknown ? "risk-summary-unknown" : ""}`}>{props.data.summary}</p>
+      <p className={`risk-summary ${unknown ? "risk-summary-unknown" : ""}`}>{t(props.data.summary)}</p>
 
       {!isWage ? (
         <div className="scope-strip">
@@ -83,8 +87,8 @@ export function RiskInformationCard(props: CardProps) {
                 <li key={item.code}>
                   <span aria-hidden="true">•</span>
                   <div>
-                    <strong>{item.label}</strong>
-                    <p>{item.description}</p>
+                    <strong>{t(item.label)}</strong>
+                    <p>{t(item.description)}</p>
                   </div>
                 </li>
               ))}
@@ -111,7 +115,7 @@ export function RiskInformationCard(props: CardProps) {
                   {props.data.positive_signals.items.map((item) => (
                     <li key={item.label}>
                       <span aria-hidden="true">{item.status === "confirmed" ? "✓" : "—"}</span>
-                      <div><strong>{item.label}</strong><p>{item.status === "confirmed" ? m.statusConfirmed : m.statusUnconfirmed}</p></div>
+                      <div><strong>{t(item.label)}</strong><p>{item.status === "confirmed" ? m.statusConfirmed : m.statusUnconfirmed}</p></div>
                     </li>
                   ))}
                 </ul>
@@ -163,7 +167,7 @@ export function RiskInformationCard(props: CardProps) {
       ) : null}
 
       {!isWage ? (
-        <p className="scope-disclaimer">{props.data.disclaimer}</p>
+        <p className="scope-disclaimer">{t(props.data.disclaimer)}</p>
       ) : null}
 
       <dl className="risk-meta">

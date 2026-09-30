@@ -18,6 +18,7 @@ import type {
   StoredCommunityPost,
   StoredCommunityReport,
 } from "@/domain/community";
+import { SCRIPT_CLASSES } from "@/domain/textLanguage";
 import {
   isDatabaseError,
   isWriteDatabaseConfigured,
@@ -130,6 +131,40 @@ const POST_SELECT = `
   LEFT JOIN firms f ON f.firm_id = p.firm_id
 `;
 
+/*
+ * 작성 언어 필터(언어 지원 3단계). DB에 언어 열이 없으므로 domain/textLanguage.ts 의
+ * languageFromCounts 와 같은 규칙을 SQL로 계산한다. 글자 범위 문자열도 같은 상수를 쓴다.
+ * 필터를 쓸 때만 붙여, 필터가 없는 목록 쿼리는 그대로 둔다.
+ */
+function scriptCount(chars: string): string {
+  return `char_length(regexp_replace(lt.t, '[^${chars}]', '', 'g'))`;
+}
+
+export const POST_LANGUAGE_JOIN = `
+  CROSS JOIN LATERAL (
+    SELECT
+      ${scriptCount(SCRIPT_CLASSES.hangul)}     AS hangul,
+      ${scriptCount(SCRIPT_CLASSES.thai)}       AS thai,
+      ${scriptCount(SCRIPT_CLASSES.han)}        AS han,
+      ${scriptCount(SCRIPT_CLASSES.kana)}       AS kana,
+      ${scriptCount(SCRIPT_CLASSES.latin)}      AS latin,
+      ${scriptCount(SCRIPT_CLASSES.vietnamese)} AS vietnamese
+    FROM (SELECT p.title || chr(10) || p.body AS t) lt
+  ) lc
+`;
+
+export const POST_LANGUAGE_CASE = `(
+  CASE
+    WHEN lc.hangul + lc.thai + lc.han + lc.kana + lc.latin = 0 THEN 'other'
+    WHEN lc.hangul * 10 >= (lc.hangul + lc.thai + lc.han + lc.kana + lc.latin) * 3 THEN 'ko'
+    WHEN lc.thai >= lc.han AND lc.thai >= lc.kana AND lc.thai >= lc.latin THEN 'th'
+    WHEN lc.han >= lc.kana AND lc.han >= lc.latin THEN 'zh'
+    WHEN lc.kana >= lc.latin THEN 'other'
+    WHEN lc.vietnamese * 20 >= lc.latin THEN 'vi'
+    ELSE 'en'
+  END
+)`;
+
 const REPORT_SELECT = `
   SELECT
     r.id::text          AS report_id,
@@ -214,9 +249,11 @@ export class RealCommunityRepository implements CommunityRepository {
 
   async listPublishedPosts(query: PostListQuery): Promise<CommunityPage<StoredCommunityPost>> {
     const search = query.query.trim();
+    const language = query.language ?? null;
+    const languageJoin = language ? POST_LANGUAGE_JOIN : "";
     const rows = await queryWrite<PostRow>(
       "community",
-      `${POST_SELECT}
+      `${POST_SELECT}${languageJoin}
         WHERE p.status = 'published'
           AND ($1::text IS NULL OR p.category = $1)
           AND (
@@ -226,9 +263,12 @@ export class RealCommunityRepository implements CommunityRepository {
               || COALESCE(f.sido, '') || ' ' || COALESCE(f.industry, '')
             ) ILIKE '%' || $2 || '%' ESCAPE '\\'
           )
+          ${language ? `AND ${POST_LANGUAGE_CASE} = $5` : ""}
         ORDER BY p.created_at DESC, p.id DESC
         LIMIT $3 OFFSET $4`,
-      [query.category, escapeLikePattern(search), query.limit, (query.page - 1) * query.limit],
+      language
+        ? [query.category, escapeLikePattern(search), query.limit, (query.page - 1) * query.limit, language]
+        : [query.category, escapeLikePattern(search), query.limit, (query.page - 1) * query.limit],
     );
 
     /*
@@ -239,7 +279,7 @@ export class RealCommunityRepository implements CommunityRepository {
       "community",
       `SELECT count(*)::text AS total_count
          FROM posts p
-         LEFT JOIN firms f ON f.firm_id = p.firm_id
+         LEFT JOIN firms f ON f.firm_id = p.firm_id${languageJoin}
         WHERE p.status = 'published'
           AND ($1::text IS NULL OR p.category = $1)
           AND (
@@ -248,8 +288,9 @@ export class RealCommunityRepository implements CommunityRepository {
               p.title || ' ' || p.body || ' '
               || COALESCE(f.sido, '') || ' ' || COALESCE(f.industry, '')
             ) ILIKE '%' || $2 || '%' ESCAPE '\\'
-          )`,
-      [query.category, escapeLikePattern(search)],
+          )
+          ${language ? `AND ${POST_LANGUAGE_CASE} = $3` : ""}`,
+      language ? [query.category, escapeLikePattern(search), language] : [query.category, escapeLikePattern(search)],
     );
 
     return { items: rows.map(toPost), total: totalFrom(countRows, rows.length) };

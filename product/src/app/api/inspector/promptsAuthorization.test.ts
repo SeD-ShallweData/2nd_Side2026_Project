@@ -12,7 +12,7 @@ vi.mock("@/services/authService", () => ({
   getOptionalSessionUser: authState.getOptionalSessionUser,
 }));
 vi.mock("@/server/promptLoader", () => ({
-  REQUIRED_PROMPTS: ["chat/system", "inspector/system", "rewrite/system"] as const,
+  REQUIRED_PROMPTS: ["chat/system", "inspector/system", "rewrite/system", "translate/system"] as const,
   loadPromptFile: (name: string) => `# ${name}\n지침 본문`,
   getPromptOverride: () => undefined,
   refreshPromptOverrides: async () => undefined,
@@ -58,9 +58,9 @@ describe("GET /api/inspector/prompts", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.items).toHaveLength(3);
+    expect(body.items).toHaveLength(4);
     expect(body.items.map((item: { name: string }) => item.name)).toEqual([
-      "chat/system", "inspector/system", "rewrite/system",
+      "chat/system", "inspector/system", "rewrite/system", "translate/system",
     ]);
   });
 

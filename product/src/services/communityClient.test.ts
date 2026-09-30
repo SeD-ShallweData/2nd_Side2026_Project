@@ -122,13 +122,14 @@ describe("커뮤니티 목록 조회", () => {
     const fetchImpl = createFetchMock(jsonResponse(POST_LIST));
 
     await listCommunityPosts(
-      { q: "  임금  ", category: "pre_employment", page: 2, limit: 5 },
+      { q: "  임금  ", category: "pre_employment", language: "vi", page: 2, limit: 5 },
       { fetchImpl },
     );
 
     const params = readSearchParams(readCall(fetchImpl).path);
     expect(params.get("q")).toBe("임금");
     expect(params.get("category")).toBe("pre_employment");
+    expect(params.get("language")).toBe("vi");
     expect(params.get("page")).toBe("2");
     expect(params.get("limit")).toBe("5");
   });

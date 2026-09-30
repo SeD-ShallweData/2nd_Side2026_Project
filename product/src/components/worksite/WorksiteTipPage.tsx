@@ -11,8 +11,11 @@ import type {
 import { getSession, getWorksiteTip, listWorksiteTips, submitWorksiteTip } from "@/services/worksiteTipClient";
 import { format } from "@/i18n/defineMessages";
 import { useLocale, useMessages } from "@/i18n/LocaleProvider";
-import { htmlLang, type Locale } from "@/i18n/locales";
+import { htmlLang, isImplementedForeignLocale, type Locale } from "@/i18n/locales";
 import { worksiteMessages } from "@/i18n/messages/worksite";
+import { detectWorksiteTipSubmissionLanguage } from "@/domain/worksiteTipLanguage";
+
+const EVIDENCE_KEYS = ["contract", "payslip", "attendance", "messages", "photos"] as const;
 
 const MAX_PHOTOS = 3;
 const PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -116,6 +119,11 @@ export function WorksiteTipForm() {
     }
   }
 
+  // 번역 안내는 서버가 모델에 보낼 제보에 앞서 반드시 보여야 한다. 서버와 같은 판별 규칙을 쓰고,
+  // 외국어 화면에서는 아직 아무것도 쓰지 않았어도 미리 보여 준다.
+  const showTranslationNotice = isImplementedForeignLocale(locale)
+    || detectWorksiteTipSubmissionLanguage(title, body, locale).kind === "translate";
+
   if (receipt) {
     return (
       <div className="worksite-receipt" role="status">
@@ -136,6 +144,18 @@ export function WorksiteTipForm() {
         <div><span className="eyebrow">{m.eyebrow}</span><h2>{m.heading}</h2></div>
         <p>{m.intro}</p>
       </div>
+      <div className="worksite-guidance">
+        <strong>{m.guidanceTitle}</strong>
+        <ul>
+          <li>{m.guidanceNoStatus}</li>
+          <li>{m.guidanceNotPublic}</li>
+        </ul>
+        <strong>{m.evidenceTitle}</strong>
+        <ul className="worksite-evidence-list">
+          {EVIDENCE_KEYS.map((key) => <li key={key}>{m.evidence[key]}</li>)}
+        </ul>
+        <small>{m.evidenceNote}</small>
+      </div>
       <label>{m.categoryLabel}<select value={category} onChange={(event) => setCategory(event.target.value as WorksiteTipCategory | "")} required>
         <option value="">{m.categoryPlaceholder}</option>
         <option value="wage">{m.categoryWage}</option>
@@ -148,9 +168,53 @@ export function WorksiteTipForm() {
         <input id="worksite-photos" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={selectPhotos} />
         {photos.length > 0 ? <ul className="worksite-photo-list">{photos.map((photo) => <li key={`${photo.name}-${photo.size}`}>{photo.name}<span>{Math.ceil(photo.size / 1024)}KB</span></li>)}</ul> : <p className="field-help">{m.photoHelp}</p>}
       </div>
+      {showTranslationNotice ? <p className="worksite-translation-notice" role="note">{m.translationNotice}</p> : null}
       {error ? <p className="field-error" role="alert">{error}</p> : null}
       <div className="worksite-form-actions"><small>{m.requirement}</small><button className="button button-dark" type="submit" disabled={submitting}>{submitting ? m.submitting : m.submit}</button></div>
     </form>
+  );
+}
+
+function sourceLanguageName(code: string | null, names: Record<string, string>): string {
+  if (!code) return names.und;
+  return names[code] ?? code;
+}
+
+/**
+ * 제보 본문. 한국어 제보는 그대로 보인다.
+ * 외국어 제보는 한국어 기계 번역과 원문을 나란히 두고, 번역이 없으면 원문만 있다고 밝힌다.
+ */
+export function WorksiteTipDetailBody({ tip }: { tip: WorksiteTipDto }) {
+  const m = useMessages(worksiteMessages).inspector;
+  if (tip.translation_status === "not_needed") {
+    return <p className="worksite-detail-body">{tip.body ?? m.photoOnlyBody}</p>;
+  }
+  const language = format(m.sourceLanguage, { language: sourceLanguageName(tip.source_language, m.languageNames) });
+  if (tip.translation_status === "failed" || !tip.title_ko) {
+    return (
+      <div className="worksite-translation-pair">
+        <p className="worksite-translation-status" role="status">{m.translationFailed} · {language}</p>
+        <section lang={tip.source_language ?? undefined}>
+          <span className="worksite-translation-label">{m.original}</span>
+          <h3>{tip.title}</h3>
+          <p className="worksite-detail-body">{tip.body ?? m.photoOnlyBody}</p>
+        </section>
+      </div>
+    );
+  }
+  return (
+    <div className="worksite-translation-pair worksite-translation-columns">
+      <section lang="ko">
+        <span className="worksite-translation-label worksite-translation-machine">{m.machineTranslation}</span>
+        <h3>{tip.title_ko}</h3>
+        <p className="worksite-detail-body">{tip.body_ko ?? tip.body ?? m.photoOnlyBody}</p>
+      </section>
+      <section lang={tip.source_language ?? undefined}>
+        <span className="worksite-translation-label">{m.original} · {language}</span>
+        <h3>{tip.title}</h3>
+        <p className="worksite-detail-body">{tip.body ?? m.photoOnlyBody}</p>
+      </section>
+    </div>
   );
 }
 
@@ -204,11 +268,11 @@ function InspectorTipList() {
       <div className="worksite-list-toolbar"><div><span className="eyebrow">{m.eyebrow}</span><h2>{m.heading}</h2><p>{m.intro}</p></div><strong>{format(m.total, { count: total.toLocaleString(intlLocale(locale)) })}</strong></div>
       {/* 목록 아래가 아니라 위에 펼친다. 목록이 길면 아래에 붙은 상세는 화면
           밖으로 밀려나 열린 줄도 모른다. 열 때 이 자리로 스크롤도 옮긴다. */}
-      {selected ? <div className="worksite-detail-panel" ref={detailRef} tabIndex={-1}><div className="worksite-detail-head"><div><span className="eyebrow">{m.detailEyebrow}</span><h2>{selected.title}</h2><time>{formatDate(selected.submitted_at, locale)}</time></div><button type="button" className="button button-outline" onClick={() => setSelected(null)}>{m.close}</button></div><p className="worksite-detail-body">{selected.body ?? m.photoOnlyBody}</p>{selected.attachments.length > 0 ? <div className="worksite-attachment-grid">{selected.attachments.map((attachment, index) => <a key={attachment.attachment_id} href={attachment.content_url} target="_blank" rel="noreferrer" className="worksite-attachment-thumb" aria-label={format(m.photoAria, { n: index + 1 })}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={attachment.content_url} alt="" loading="lazy" /><span>{format(m.photoCaption, { n: index + 1, size: Math.ceil(attachment.size_bytes / 1024) })}</span></a>)}</div> : <p className="worksite-attachment-empty">{m.noPhotos}</p>}</div> : null}
+      {selected ? <div className="worksite-detail-panel" ref={detailRef} tabIndex={-1}><div className="worksite-detail-head"><div><span className="eyebrow">{m.detailEyebrow}</span><h2>{selected.translation_status === "translated" && selected.title_ko ? selected.title_ko : selected.title}</h2><time>{formatDate(selected.submitted_at, locale)}</time></div><button type="button" className="button button-outline" onClick={() => setSelected(null)}>{m.close}</button></div><WorksiteTipDetailBody tip={selected} />{selected.attachments.length > 0 ? <div className="worksite-attachment-grid">{selected.attachments.map((attachment, index) => <a key={attachment.attachment_id} href={attachment.content_url} target="_blank" rel="noreferrer" className="worksite-attachment-thumb" aria-label={format(m.photoAria, { n: index + 1 })}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={attachment.content_url} alt="" loading="lazy" /><span>{format(m.photoCaption, { n: index + 1, size: Math.ceil(attachment.size_bytes / 1024) })}</span></a>)}</div> : <p className="worksite-attachment-empty">{m.noPhotos}</p>}</div> : null}
       {loading ? <div className="worksite-state-card">{m.loading}</div> : null}
       {error ? <p className="field-error" role="alert">{error}</p> : null}
       {!loading && items.length === 0 ? <div className="worksite-state-card"><strong>{m.emptyTitle}</strong><p>{m.emptyBody}</p></div> : null}
-      <div className="worksite-tip-list">{items.map((item) => <article className="worksite-tip-list-item" key={item.tip_id}><div className="worksite-tip-list-meta"><span>{m.tipLabel}</span><time>{formatDate(item.submitted_at, locale)}</time></div><h3>{item.title}</h3><p>{item.body_preview ?? m.photoTip}</p><div className="worksite-tip-list-foot"><span>{item.company_context ? `${item.company_context.region ?? m.noRegion} · ${item.company_context.industry ?? m.noIndustry}` : m.noCompany}</span><span>{format(m.photoCount, { count: item.attachment_count })}</span><button type="button" className="button button-outline" onClick={() => void openTip(item.tip_id)}>{m.viewDetail}</button></div></article>)}</div>
+      <div className="worksite-tip-list">{items.map((item) => <article className="worksite-tip-list-item" key={item.tip_id}><div className="worksite-tip-list-meta"><span>{m.tipLabel}</span><time>{formatDate(item.submitted_at, locale)}</time></div><h3>{item.translation_status === "translated" && item.title_ko ? item.title_ko : item.title}{item.translation_status !== "not_needed" ? <span className={`worksite-translation-badge worksite-translation-${item.translation_status}`}>{item.translation_status === "translated" ? m.machineTranslation : m.translationFailed}</span> : null}</h3><p>{(item.translation_status === "translated" ? item.body_preview_ko : null) ?? item.body_preview ?? m.photoTip}</p><div className="worksite-tip-list-foot"><span>{item.company_context ? `${item.company_context.region ?? m.noRegion} · ${item.company_context.industry ?? m.noIndustry}` : m.noCompany}</span><span>{format(m.photoCount, { count: item.attachment_count })}</span><button type="button" className="button button-outline" onClick={() => void openTip(item.tip_id)}>{m.viewDetail}</button></div></article>)}</div>
       {totalPages > 1 ? <nav className="search-pagination" aria-label={m.paginationAria}><button type="button" className="button button-outline" disabled={page <= 1} onClick={() => changePage(page - 1)}>{m.prev}</button><span className="pagination-page">{format(m.pageOf, { page, total: totalPages })}</span><button type="button" className="button button-outline" disabled={page >= totalPages} onClick={() => changePage(page + 1)}>{m.next}</button></nav> : null}
     </div>
   );

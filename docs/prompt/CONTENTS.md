@@ -7,13 +7,14 @@
 **왜 이렇게 됐는지**는 [개선 총정리](README.md)를, **파일을 고치는 법**은
 `product/prompts/README.md`를 보세요.
 
-원문은 아래 세 파일입니다. 이 문서는 요약이므로 어긋나면 원문이 맞습니다.
+원문은 아래 네 파일입니다. 이 문서는 요약이므로 어긋나면 원문이 맞습니다.
 
 | 파일 | 줄 수 | 쓰이는 곳 |
 | --- | --- | --- |
 | [`product/prompts/chat/system.md`](../../product/prompts/chat/system.md) | 50 | 사용자 상담 |
 | [`product/prompts/inspector/system.md`](../../product/prompts/inspector/system.md) | 13 | 근로감독관 상담 |
 | [`product/prompts/rewrite/system.md`](../../product/prompts/rewrite/system.md) | 10 | 후속 질문 재작성 |
+| [`product/prompts/translate/system.md`](../../product/prompts/translate/system.md) | 13 | 외국어 상담 질문·답변 번역(2026-09-30 추가) |
 
 ---
 
@@ -62,6 +63,16 @@ retrieved_labor_law(JSON): [ ... ]
 ### 후속 질문 재작성 (`queryRewriteService`)
 
 덧붙이는 값 없이 `rewrite/system.md`만 씁니다. 대화 이력은 사용자 메시지로 갑니다.
+
+### 상담 번역 (`translationService`, 언어 지원 2단계)
+
+화면 언어가 en·zh·vi·th일 때만 씁니다. 번역할 글은 사용자 메시지로 갑니다. 공급자는 기본 Upstage만, temperature 0입니다.
+
+```
+[translate/system.md 전문]
+번역 방향: 베트남어(Tiếng Việt) → 한국어
+용도: 노동 상담 질문 | 검증을 마친 한국어 상담 답변 | 답변 카드 문구 목록 | 현장 제보
+```
 
 ### 도구 실행 흐름 (`responsesChatService`, `CHAT_EXECUTION_MODE=openai_responses`)
 

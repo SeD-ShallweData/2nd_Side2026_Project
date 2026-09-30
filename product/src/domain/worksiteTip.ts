@@ -4,7 +4,27 @@ import type {
   WorksiteTipCompanyContextDto,
   WorksiteTipPhotoMediaType,
   WorksiteTipStatus,
+  WorksiteTipTranslationStatus,
 } from "@/app/api/worksite-tips/worksiteTipApiContract";
+
+/**
+ * 한국어가 아닌 제보의 기계 번역(언어 지원 3단계, migration 0023).
+ * 제보 계정(wg_tip)에는 UPDATE 권한이 없으므로 번역은 저장 전에 끝내고 한 번의 INSERT 로 남긴다.
+ */
+export interface WorksiteTipTranslation {
+  /** null 이면 한국어 제보. */
+  source_language: string | null;
+  title_ko: string | null;
+  body_ko: string | null;
+  status: WorksiteTipTranslationStatus;
+}
+
+export const KOREAN_WORKSITE_TIP_TRANSLATION: WorksiteTipTranslation = Object.freeze({
+  source_language: null,
+  title_ko: null,
+  body_ko: null,
+  status: "not_needed",
+});
 
 export interface StoredWorksiteTipAttachment {
   attachment_id: string;
@@ -23,6 +43,7 @@ export interface StoredWorksiteTip {
   company_context: WorksiteTipCompanyContextDto | null;
   submitted_at: string;
   attachments: StoredWorksiteTipAttachment[];
+  translation: WorksiteTipTranslation;
 }
 
 export interface NewWorksiteTipAttachment extends StoredWorksiteTipAttachment {
@@ -40,6 +61,8 @@ export interface NewWorksiteTip {
   company_context: WorksiteTipCompanyContextDto | null;
   submitted_at: string;
   attachments: NewWorksiteTipAttachment[];
+  /** 없으면 한국어 제보(not_needed)로 저장한다. */
+  translation?: WorksiteTipTranslation;
 }
 
 export interface WorksiteTipPage {
