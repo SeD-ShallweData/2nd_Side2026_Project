@@ -105,7 +105,7 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
     };
   }
 
-  if (indicatorMeaning && !outOfScopeTopic && (/입증|증명|단정|결론/.test(request.message)
+  if (indicatorMeaning && !selectedCompanyCardQuestion && !outOfScopeTopic && (/입증|증명|단정|결론/.test(request.message)
     || (!request.company_id && /뜻|의미/.test(request.message)))) {
     return {
       request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },

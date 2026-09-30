@@ -74,10 +74,10 @@ describe("observed conversation regressions (execution deferred)", () => {
   it("answers each numbered fact requested", () => {
     const input = restored(selected, "1번 급여일, 2번 근무시간, 3번 남은 금액, 4번 퇴사일을 기억해서 정리해 주세요.", "A");
     const answer = recallResponse(input, [{ id: "upstage", label: "Upstage", model: "synthetic" }])!.results[0].answer;
-    expect(answer).toMatch(/1\. .*27일/s);
-    expect(answer).toMatch(/2\. .*7시간/s);
-    expect(answer).toMatch(/3\. .*80만 원/s);
-    expect(answer).toMatch(/4\. .*9월 16일/s);
+    expect(answer).toMatch(/1\. [\s\S]*27일/);
+    expect(answer).toMatch(/2\. [\s\S]*7시간/);
+    expect(answer).toMatch(/3\. [\s\S]*80만 원/);
+    expect(answer).toMatch(/4\. [\s\S]*9월 16일/);
   });
   it("keeps user-named same-name firms local and separates their facts and documents", () => {
     const input = restored([
