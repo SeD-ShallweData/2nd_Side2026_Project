@@ -5,15 +5,28 @@ on:
     paths:
       - "product/**"
       - ".github/workflows/product-ci.yml"
+      # 저장소 루트의 비밀값 검사기·훅·.gitignore 테스트도 product 테스트에 들어 있다.
+      - "scripts/scan-secrets.mjs"
+      - ".githooks/**"
+      - ".gitignore"
   push:
     branches: [main]
     paths:
       - "product/**"
       - ".github/workflows/product-ci.yml"
+      - "scripts/scan-secrets.mjs"
+      - ".githooks/**"
+      - ".gitignore"
+
+permissions:
+  contents: read
 
 jobs:
   web:
     runs-on: ubuntu-latest
+    env:
+      # 빌드 산출물 검사용 가짜 비밀값 표식. 앱 코드는 이 이름을 읽지 않는다.
+      SECRET_CANARY: ci-canary-6d0f1c2a
     defaults:
       run:
         working-directory: product
@@ -28,7 +41,31 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
+      - name: Build (가짜 비밀값 주입)
+        env:
+          # 표식이 든 가짜 값을 넣고 빌드해, 값이 브라우저로 가는 산출물에 섞이는지 아래 단계에서 본다.
+          # NEXT_PUBLIC_ 이름이나 next.config 의 env·compiler.define 으로 새면 여기서 드러난다.
+          UPSTAGE_API_KEY: ${{ env.SECRET_CANARY }}-upstage
+          SKT_API_KEY: ${{ env.SECRET_CANARY }}-skt
+          OPENAI_API_KEY: ${{ env.SECRET_CANARY }}-openai
+          RAG_INTERNAL_TOKEN: ${{ env.SECRET_CANARY }}-rag
+          CONTRACT_INTERNAL_TOKEN: ${{ env.SECRET_CANARY }}-contract
+          PUBLIC_RATE_LIMIT_PROXY_TOKEN: ${{ env.SECRET_CANARY }}-proxy
+          DEMO_BASIC_AUTH_PASSWORD: ${{ env.SECRET_CANARY }}-basic
+          BOT_DATABASE_URL: postgresql://wg_bot:${{ env.SECRET_CANARY }}-bot@127.0.0.1:9/wageguard
+          AUTH_DATABASE_URL: postgresql://wg_auth:${{ env.SECRET_CANARY }}-auth@127.0.0.1:9/wageguard
+          PUBLIC_RATE_LIMIT_REDIS_URL: redis://:${{ env.SECRET_CANARY }}-redis@127.0.0.1:9/0
+          # 혹시 모를 외부 호출은 닿지 않는 주소로 막는다.
+          UPSTAGE_API_URL: http://127.0.0.1:9/
+          SKT_API_URL: http://127.0.0.1:9/
+          OPENAI_RESPONSES_API_URL: http://127.0.0.1:9/
+        run: npm run build
+      - name: 브라우저로 가는 빌드 산출물의 비밀값 검사
+        # 값은 앞부분과 길이만 출력한다. 배포(deploy-from-git.sh)가 npm run build 를 돌리므로
+        # 오탐이 나도 배포가 멈추지 않게 build·postbuild 스크립트가 아닌 CI 에만 둔다.
+        run: |
+          node ../scripts/scan-secrets.mjs --dir .next/static --canary "$SECRET_CANARY"
+          node ../scripts/scan-secrets.mjs --dir .next/server/app --ext html,rsc --canary "$SECRET_CANARY"
 
   rag-quality:
     runs-on: ubuntu-latest

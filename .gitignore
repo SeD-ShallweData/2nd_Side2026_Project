@@ -159,6 +159,35 @@ ENV/
 env.bak/
 venv.bak/
 
+# env 변형과 편집기 백업(.env.production, .env.local.bak, .env~, ..env.swp, web.env.bak, ".env copy")
+# 예시 파일(.env.example, *.env.example, *.example.env)만 추적한다.
+.env.*
+*.env.*
+.env~
+*.env~
+.env[ _-]*
+!.env.example
+!*.env.example
+!*.example.env
+# 공개 호출 한도 게이트웨이의 실제 설정(예시 파일은 추적한다)
+/infra/public-quota/public-gateway.env
+/infra/public-quota/users.acl
+# 키·인증서·자격 증명 파일
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+id_ecdsa*
+*credentials*.json
+service-account*.json
+secrets.json
+.pgpass
+.netrc
+.npmrc
+.git-credentials
+
 # Spyder project settings
 .spyderproject
 .spyproject

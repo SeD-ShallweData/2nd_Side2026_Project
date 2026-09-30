@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { TokenUsage } from "@/domain/chatComparison";
 import type { LlmProviderConfig } from "@/server/llmConfig";
 
