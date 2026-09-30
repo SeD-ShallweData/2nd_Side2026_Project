@@ -76,6 +76,10 @@ function tipRow() {
     sido: null,
     industry: null,
     submitted_at: new Date(SUBMITTED_AT),
+    source_language: null,
+    title_ko: null,
+    body_ko: null,
+    translation_status: "not_needed" as const,
   };
 }
 
@@ -128,9 +132,42 @@ describe("현장 제보 실저장", () => {
       "worksite_tips_status_submitted_idx",
     );
     expect(String(db.queryWrite.mock.calls[0]?.[1])).toContain("worksite_tips_status_ck");
+    // 0023 번역 컬럼이 없으면 INSERT 가 실패하므로 준비 조건에 넣는다.
+    expect(String(db.queryWrite.mock.calls[0]?.[1])).toContain("'translation_status'");
 
     db.queryWrite.mockRejectedValueOnce(new Error("connection unavailable"));
     await expect(new RealWorksiteTipRepository().isReady()).resolves.toBe(false);
+  });
+
+  it("외국어 제보의 한국어 번역본을 같은 INSERT 로 저장하고 다시 읽는다", async () => {
+    const translation = {
+      source_language: "vi",
+      title_ko: "안전모 미지급",
+      body_ko: "현장에 안전모가 부족합니다.",
+      status: "translated" as const,
+    };
+    db.transactionQuery
+      .mockResolvedValueOnce([{ ...tipRow(), title: "Thiếu mũ bảo hộ", body: "Công trường thiếu mũ bảo hộ.",
+        source_language: "vi", title_ko: translation.title_ko, body_ko: translation.body_ko,
+        translation_status: "translated" }])
+      .mockResolvedValueOnce([]);
+
+    const created = await new RealWorksiteTipRepository().insertTip({
+      ...input(),
+      title: "Thiếu mũ bảo hộ",
+      body: "Công trường thiếu mũ bảo hộ.",
+      translation,
+    });
+
+    const sql = String(db.transactionQuery.mock.calls[0]?.[0]);
+    expect(sql).toContain("source_language, title_ko, body_ko, translation_status");
+    expect(db.transactionQuery.mock.calls[0]?.[1]?.slice(-4)).toEqual([
+      "vi",
+      "안전모 미지급",
+      "현장에 안전모가 부족합니다.",
+      "translated",
+    ]);
+    expect(created.translation).toEqual(translation);
   });
 
   it("DB에 파일 메타데이터를 저장하고 원본과 조사관 사본을 분리한다", async () => {
@@ -153,6 +190,10 @@ describe("현장 제보 실저장", () => {
       "현장에 안전모가 부족합니다.",
       "f0000000000000a2",
       SUBMITTED_AT,
+      null,
+      null,
+      null,
+      "not_needed",
     ]);
     expect(db.transactionQuery.mock.calls[1]?.[1]).toEqual([
       ATTACHMENT_ID,

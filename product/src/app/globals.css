@@ -4774,12 +4774,32 @@ summary:focus-visible {
 .worksite-attachment-thumb:hover, .worksite-attachment-thumb:focus-visible { border-color: var(--ink); box-shadow: var(--shadow-sm); }
 .worksite-attachment-grid span { color: var(--muted); font-size: .67rem; font-weight: 600; }
 .worksite-attachment-empty { margin: 12px 0 0; color: var(--muted); font-size: .78rem; }
+/* 접수 전 안내와 증거 자료 목록. 입력 칸보다 조용하게 둔다. */
+.worksite-guidance { display: grid; gap: 6px; margin: 0 0 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 12px 14px; color: var(--ink-soft); font-size: .76rem; line-height: 1.55; }
+.worksite-guidance strong { color: var(--ink); font-size: .76rem; }
+.worksite-guidance ul { margin: 0 0 4px; padding-left: 18px; }
+.worksite-evidence-list { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 0 !important; list-style: none; }
+.worksite-evidence-list li { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--white); padding: 3px 10px; }
+.worksite-guidance small { color: var(--muted); font-size: .7rem; }
+.worksite-translation-notice { margin: 16px 0 0; border-left: 3px solid var(--brand-deep); background: var(--brand-soft); padding: 10px 12px; color: var(--ink); font-size: .76rem; line-height: 1.55; }
+/* 감독관 화면: 한국어 기계 번역과 원문을 나란히 둔다. */
+.worksite-translation-badge { display: inline-block; margin-left: 8px; border-radius: 999px; background: var(--surface); padding: 2px 8px; color: var(--muted); font-size: .66rem; font-weight: 800; vertical-align: middle; }
+.worksite-translation-failed { background: #fff3e0; color: #8a4b00; }
+.worksite-translation-pair { display: grid; gap: 12px; margin: 18px 0; }
+.worksite-translation-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.worksite-translation-pair section { min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--white); padding: 12px 14px; }
+.worksite-translation-pair h3 { margin: 6px 0 0; font-size: .95rem; }
+.worksite-translation-pair .worksite-detail-body { margin: 10px 0 0; }
+.worksite-translation-label { color: var(--muted); font-size: .68rem; font-weight: 850; }
+.worksite-translation-machine { color: var(--brand-deep); }
+.worksite-translation-status { margin: 0; color: #8a4b00; font-size: .76rem; font-weight: 800; }
 
 @media (max-width: 700px) {
   .worksite-privacy-strip, .worksite-form-intro, .worksite-receipt, .worksite-form-actions { align-items: flex-start; flex-direction: column; }
   .worksite-tip-form, .worksite-inspector-view { padding: 16px; }
   .worksite-receipt .button, .worksite-tip-list-foot .button { margin-left: 0; }
   .worksite-attachment-grid { grid-template-columns: 1fr; }
+  .worksite-translation-columns { grid-template-columns: 1fr; }
 }
 .inspector-external-consent { background: #fff8df; border-top: 1px solid #ead791; color: #684f08; padding: 11px 15px; }
 .inspector-external-consent > label { align-items: flex-start; cursor: pointer; display: flex; gap: 9px; }
