@@ -397,6 +397,52 @@ describe("실제 LLM 비교 Provider", () => {
     expect(result.results[0].status).toBe("success");
     expect(result.results[0].sources).toEqual([first.source]);
   });
+  describe("조문 이름 없이 검색 조문을 옮긴 답변 (09-30 운영 사례)", () => {
+    const article25 = {
+      citation: "외국인근로자의 고용 등에 관한 법률 제25조",
+      distance: 0.25,
+      content: "제25조(사업 또는 사업장 변경의 허용) ① 외국인근로자는 다음 각 호의 어느 하나에 해당하는 사유가 발생한 경우에는 고용노동부령으로 정하는 바에 따라 직업안정기관의 장에게 다른 사업 또는 사업장으로의 변경을 신청할 수 있다. 1. 사용자가 정당한 사유로 근로계약기간 중 근로계약을 해지하려고 하거나 근로계약이 만료된 후 갱신을 거절하려는 경우 2. 휴업, 폐업, 고용허가의 취소, 고용의 제한, 기숙사의 제공 위반, 사용자의 근로조건 위반 또는 부당한 처우 등 외국인근로자의 책임이 아닌 사유로 인하여 사회통념상 그 사업 또는 사업장에서 근로를 계속할 수 없게 되었다고 인정하여 고용노동부장관이 고시한 경우 3. 상해 등으로 외국인근로자가 해당 사업 또는 사업장에서 계속 근무하기는 부적합하나 다른 사업 또는 사업장에서 근무하는 것은 가능하다고 인정되는 경우",
+      source: { name: "사업 또는 사업장 변경의 허용", citation: "외국인근로자의 고용 등에 관한 법률 제25조", category: "labor_law" as const },
+    };
+    const unrelated = {
+      citation: "근로기준법 제56조", distance: 0.4,
+      content: "제56조(연장·야간 및 휴일 근로) ① 사용자는 연장근로에 대하여는 통상임금의 100분의 50 이상을 가산하여 근로자에게 지급하여야 한다. ② 휴일근로에 대하여는 8시간 이내의 휴일근로는 통상임금의 100분의 50 이상을 가산하여 지급하여야 한다.",
+      source: { name: "근로기준법 제56조", citation: "근로기준법 제56조", category: "labor_law" as const },
+    };
+    async function run(raw: string) {
+      const fakeFetch = (async () => new Response(JSON.stringify(payload(raw, "test-model")), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+      return new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({
+        ...CONTEXT, questionIntent: "labor", request: { ...CONTEXT.request, message: "외국인 근로자가 사업장을 바꿀 수 있는 사유는?" },
+        policyBaseline: { ...BASELINE, sources: [article25.source, unrelated.source] },
+        ragRetrieval: { query: "사업장 변경 사유", status: "matched", threshold: 0.42, documents: [article25, unrelated] },
+      });
+    }
+
+    it("옮겨 쓴 조문만 출처로 붙인다", async () => {
+      const result = await run("외국인 근로자가 사업장을 바꿀 수 있는 사유는 다음과 같습니다.\n사용자가 정당한 사유로 근로계약기간 중 근로계약을 해지하려고 하거나 근로계약이 만료된 후 갱신을 거절하려는 경우\n휴업, 폐업, 고용허가의 취소, 고용의 제한, 기숙사의 제공 위반, 사용자의 근로조건 위반 또는 부당한 처우 등 외국인근로자의 책임이 아닌 사유로 인하여 사회통념상 그 사업 또는 사업장에서 근로를 계속할 수 없게 되었다고 인정되는 경우\n이러한 사유가 발생하면 고용노동부령에 따라 직업안정기관의 장에게 다른 사업 또는 사업장으로의 변경을 신청할 수 있습니다.");
+      expect(result.results[0].status).toBe("success");
+      expect(result.results[0].sources).toEqual([article25.source]);
+    });
+
+    it("검색 조문과 내용이 겹치지 않으면 출처를 붙이지 않는다", async () => {
+      const result = await run("사업장 변경은 관할 고용센터에 먼저 문의해 필요한 서류를 확인하세요.");
+      expect(result.results[0].sources).toEqual([]);
+    });
+  });
+  it("근로복지공단 번호를 1350 으로 쓴 답변은 1588-0075 로 고친다", async () => {
+    const raw = "휴업급여는 평균임금의 100분의 70을 지급합니다(산업재해보상보험법 제52조).\n근로복지공단 콜센터(1350) 또는 근로복지공단 홈페이지(노동포털)에서 확인할 수 있습니다.";
+    const fakeFetch = (async () => new Response(JSON.stringify(payload(raw, "test-model")), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    const result = await new DualLlmChatProvider([CONFIGS[0]], new OpenAICompatibleChatClient(fakeFetch)).compare({
+      ...CONTEXT, questionIntent: "labor", request: { ...CONTEXT.request, message: "산재 휴업급여는 얼마나 받나요?" },
+      ragRetrieval: { query: "휴업급여", status: "matched", threshold: 0.42, documents: [{
+        citation: "산업재해보상보험법 제52조", distance: 0.2, content: "휴업급여는 평균임금의 100분의 70에 상당하는 금액으로 한다.",
+        source: { name: "휴업급여", citation: "산업재해보상보험법 제52조", category: "labor_law" },
+      }] },
+    });
+    expect(result.results[0].status).toBe("success");
+    expect(result.results[0].answer).toContain("근로복지공단 콜센터(1588-0075)");
+    expect(result.results[0].answer).not.toContain("홈페이지(노동포털)");
+  });
   it("replaces a wage-only raw answer to a split wage and ankle action request", async () => {
     const question = "새봄서비스 임금 문제의 다음 행동과 푸른건설 발목 문제의 우선 행동을 나눠 근거 범위를 알려주세요.";
     const raw = "임금은 급여명세서와 입금액을 대조하세요.";
