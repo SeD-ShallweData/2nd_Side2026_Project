@@ -1248,6 +1248,32 @@ summary:focus-visible {
   box-shadow: var(--shadow-sm);
 }
 
+.favorite-search-form { margin-bottom: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--white); }
+.favorite-card { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 16px; border: 1px solid var(--line); border-radius: 18px; padding: 16px 20px; background: var(--white); }
+.favorite-card.is-dragging { opacity: .55; }
+.favorite-card.is-drag-over { border-color: var(--brand-deep); box-shadow: 0 0 0 2px var(--brand-soft); }
+.favorite-drag-handle { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid #dfc83e; border-radius: 14px; background: var(--brand-soft); color: var(--ink); cursor: grab; }
+.favorite-drag-handle:active { cursor: grabbing; }
+.favorite-drag-handle:disabled { cursor: default; }
+.favorite-drag-handle:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.favorite-handle-icon { grid-area: 1 / 1; font-size: 1.15rem; }
+.favorite-handle-arrows { grid-area: 1 / 1; opacity: 0; font-size: .75rem; font-weight: 950; line-height: .85; text-align: center; }
+.favorite-drag-handle:hover .favorite-handle-icon,
+.favorite-drag-handle:focus-visible .favorite-handle-icon,
+.is-dragging .favorite-handle-icon { opacity: 0; }
+.favorite-drag-handle:hover .favorite-handle-arrows,
+.favorite-drag-handle:focus-visible .favorite-handle-arrows,
+.is-dragging .favorite-handle-arrows { opacity: 1; }
+.favorite-card-main { min-width: 0; }
+.favorite-card-main h3 { margin: 0 0 7px; overflow-wrap: anywhere; font-size: 1.06rem; }
+.favorite-card-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.favorite-card-actions .button { white-space: nowrap; }
+
+@media (max-width: 700px) {
+  .favorite-card { grid-template-columns: 48px minmax(0, 1fr); align-items: start; }
+  .favorite-card-actions { grid-column: 2; flex-wrap: wrap; justify-content: flex-end; }
+}
+
 .company-result-actions {
   display: flex;
   flex-shrink: 0;
@@ -1439,6 +1465,9 @@ summary:focus-visible {
   align-items: center;
   gap: 20px;
 }
+
+.detail-favorite-status { display: grid; gap: 6px; max-width: 16rem; color: var(--muted); font-size: .78rem; }
+.detail-favorite-status .field-error { margin: 0; }
 
 .company-avatar-large {
   width: 72px;
