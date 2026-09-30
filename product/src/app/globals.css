@@ -4830,6 +4830,15 @@ summary:focus-visible {
 .field-optional { color: var(--muted); font-size: .7rem; font-weight: 600; }
 .worksite-upload-field { margin-top: 16px; border: 1px dashed var(--line-strong); border-radius: 10px; background: var(--surface); padding: 13px; }
 .worksite-upload-field input[type="file"] { display: block; width: 100%; margin-top: 9px; color: var(--muted); font-size: .75rem; }
+/* 브라우저 기본 '파일 선택' 버튼(회색 #EFEFEF)을 사이트의 외곽선 작은 버튼 모양으로 맞춘다. */
+.worksite-upload-field input[type="file"]::file-selector-button {
+  margin: 0 10px 0 0; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--white);
+  color: var(--ink); cursor: pointer; font: inherit; font-size: .8rem; font-weight: 800; padding: 8px 14px;
+  transition: border-color .15s, background-color .15s;
+}
+.worksite-upload-field input[type="file"]:hover:not(:disabled)::file-selector-button { border-color: var(--ink); background: var(--surface); }
+.worksite-upload-field input[type="file"]:focus-visible { outline: 3px solid rgb(255 214 0 / 35%); outline-offset: 2px; border-radius: 10px; }
+.worksite-upload-field input[type="file"]:disabled::file-selector-button { cursor: default; opacity: .55; }
 .worksite-photo-list { display: grid; gap: 5px; margin: 10px 0 0; padding: 0; list-style: none; color: var(--ink-soft); font-size: .75rem; }
 .worksite-photo-list li { display: flex; justify-content: space-between; gap: 12px; border-radius: 7px; background: var(--white); padding: 7px 9px; }
 .worksite-photo-list span { color: var(--muted); }
