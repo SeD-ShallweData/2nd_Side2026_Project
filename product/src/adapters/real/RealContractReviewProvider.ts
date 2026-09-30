@@ -6,7 +6,7 @@ import type {
   ContractReviewResult,
 } from "@/domain/contract";
 import { normalizeContractLegalBasis } from "@/domain/contractLaw";
-import { markErrorLogged, ServiceError } from "@/utils/errors";
+import { markErrorLogged, ServiceError, takeApiErrorLogSlot } from "@/utils/errors";
 import { redactErrorText } from "@/utils/redactErrorText";
 
 interface CshFinding {
@@ -109,8 +109,12 @@ function upstreamReason(payload: CshReviewResponse): string | null {
   return typeof payload.reason === "string" ? payload.reason.slice(0, 40) : null;
 }
 
-/* 상류 원문은 여기서만 남긴다. 응답 본문과 화면에는 싣지 않는다. */
-function logUpstreamFailure(httpStatus: number, payload: CshReviewResponse): void {
+/*
+ * 상류 원문은 여기서만 남긴다. 응답 본문과 화면에는 싣지 않는다. 남겼으면 true 를 돌려준다.
+ * 장애 때는 요청마다 같은 줄이 쌓이므로 5xx 기록과 같은 속도 상한(utils/errors.ts)을 거친다.
+ */
+function logUpstreamFailure(httpStatus: number, payload: CshReviewResponse): boolean {
+  if (!takeApiErrorLogSlot()) return false;
   const text = upstreamText(payload);
   console.error(JSON.stringify({
     event: "contract_upstream_failed",
@@ -118,6 +122,7 @@ function logUpstreamFailure(httpStatus: number, payload: CshReviewResponse): voi
     reason: upstreamReason(payload),
     upstream: text ? redactErrorText(text) : null,
   }));
+  return true;
 }
 
 function publicContractFailure(httpStatus: number, payload: CshReviewResponse): ServiceError {
@@ -126,28 +131,32 @@ function publicContractFailure(httpStatus: number, payload: CshReviewResponse): 
     return new ServiceError("NOT_A_CONTRACT", NOT_A_CONTRACT_MESSAGE, 422, true);
   }
 
-  logUpstreamFailure(httpStatus, payload);
   const text = upstreamText(payload);
   const known = httpStatus === 400 && text
     ? KNOWN_UPSTREAM_INPUT_ERRORS.find((entry) => text.startsWith(entry.prefix))
     : undefined;
-  const error = known
-    ? new ServiceError(known.code, known.message, known.status, false)
-    : httpStatus === 503
-      ? new ServiceError(
-          "CONTRACT_PROVIDER_UNAVAILABLE",
-          "계약서 분석 서비스를 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
-          503,
-          true,
-        )
-      : new ServiceError(
-          "CONTRACT_ANALYSIS_FAILED",
-          "계약서를 분석하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-          502,
-          true,
-        );
-  // 원문은 바로 위에서 남겼다. errorPayload 가 같은 실패를 한 줄 더 남기지 않게 표시한다.
-  return markErrorLogged(error);
+  if (known) {
+    // 빈 파일·형식·크기·글자 없음은 사용자 입력 문제라 장애 기록을 남기지 않는다(다른 4xx 와 같다).
+    // 로그인 사용자는 계약서 분석 공개 한도에서 빠지므로, 남기면 같은 파일을 되풀이해 올려 로그를
+    // 불릴 수 있다.
+    return new ServiceError(known.code, known.message, known.status, false);
+  }
+
+  const error = httpStatus === 503
+    ? new ServiceError(
+        "CONTRACT_PROVIDER_UNAVAILABLE",
+        "계약서 분석 서비스를 지금 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+        503,
+        true,
+      )
+    : new ServiceError(
+        "CONTRACT_ANALYSIS_FAILED",
+        "계약서를 분석하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        502,
+        true,
+      );
+  // 원문을 남겼으면 표시해 둔다. errorPayload 는 원문 없이 request_id·코드만 한 줄 남긴다.
+  return logUpstreamFailure(httpStatus, payload) ? markErrorLogged(error) : error;
 }
 
 function invalidUpstreamResponse(): ServiceError {

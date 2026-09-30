@@ -10,6 +10,7 @@ import { GET as getSession } from "@/app/api/auth/session/route";
 import { GET as getCurrentUser } from "@/app/api/users/me/route";
 import { resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 import { resetLoginAttemptsForTests } from "@/server/auth/loginAttemptTracker";
+import { silenceServerErrorLogs } from "@/testing/silenceServerErrorLogs";
 
 const MOCK_PASSWORDS = {
   user: "local-user-password",
@@ -41,6 +42,9 @@ async function loginAs(
     body: await response.json() as Record<string, unknown>,
   };
 }
+
+// 일부러 5xx 를 내는 경우가 있어 서버 오류 기록 줄(JSON)만 테스트 출력에서 뺀다.
+silenceServerErrorLogs();
 
 beforeEach(() => {
   vi.stubEnv("AUTH_DATA_MODE", "mock");

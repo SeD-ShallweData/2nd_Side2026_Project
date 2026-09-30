@@ -16,6 +16,10 @@ vi.mock("pg", () => ({
 
 import { isDatabaseReady } from "@/server/postgres";
 import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
+import { silenceServerErrorLogs } from "@/testing/silenceServerErrorLogs";
+
+// 조회 실패를 일부러 내므로 서버 오류 기록 줄(JSON)만 테스트 출력에서 뺀다.
+silenceServerErrorLogs();
 
 afterEach(() => {
   database.query.mockReset();

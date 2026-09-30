@@ -52,4 +52,20 @@ describe("서버 로그용 오류 문구 정리", () => {
     expect(text).not.toContain("\n");
     expect(text).toHaveLength(200);
   });
+
+  it("긴 입력을 자른 자리에 걸린 키 조각은 남기지 않는다", () => {
+    // 2,000자에서 잘리면 'up_abcdefg' 만 남아 키 규칙(8자 이상)에 걸리지 않고,
+    // 앞의 공백이 합쳐지면서 200자 안으로 들어온다.
+    expect(redactErrorText(`${" ".repeat(1_990)}up_abcdefghijk`)).not.toContain("up_abc");
+    expect(redactErrorText(`fail ${" ".repeat(1_985)}sk-abcdefghijklmnop`)).toBe("fail");
+    // 앞의 긴 값이 지워져 조각이 앞으로 당겨지는 경우도 같다.
+    const pulledForward = redactErrorText(`token ${"a1".repeat(991)}  up_abcdefghijk`);
+    expect(pulledForward).toBe("token [redacted-token]");
+  });
+
+  it("자른 자리 바로 뒤가 공백이면 마지막 낱말은 온전하므로 그대로 둔다", () => {
+    const text = redactErrorText(`${" ".repeat(1_991)}relation1 ${"x".repeat(50)}`);
+
+    expect(text).toBe("relation1");
+  });
 });

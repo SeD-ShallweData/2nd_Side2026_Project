@@ -5,7 +5,7 @@ import { toWageRiskPublic } from "@/adapters/real/MlRiskProvider";
 import { getCompanyDataMode, getContractDataMode } from "@/config/dataMode";
 import { buildBotDatabaseUrl, getDatabaseConnectionString } from "@/server/databaseConfig";
 import { queryReadOnly } from "@/server/postgres";
-import { errorPayload, resetApiErrorLogForTests } from "@/utils/errors";
+import { errorPayload, resetApiErrorLogForTests, takeApiErrorLogSlot } from "@/utils/errors";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -357,6 +357,7 @@ describe("계약서 분석 내부 계약", () => {
     });
     afterEach(() => {
       errorSpy.mockRestore();
+      resetApiErrorLogForTests();
     });
 
     it("공급자 HTTP 오류 본문과 키 조각은 응답에 싣지 않고 정리해서 로그에만 남긴다", async () => {
@@ -364,18 +365,35 @@ describe("계약서 분석 내부 계약", () => {
       const error = await reviewFailure(upstream(502, { error: raw }));
 
       expect(error).toMatchObject({ code: "CONTRACT_ANALYSIS_FAILED", status: 502, retryable: true });
-      const body = JSON.stringify(errorPayload(error).body);
+      const payload = errorPayload(error);
+      const body = JSON.stringify(payload.body);
       expect(body).toContain("계약서를 분석하지 못했습니다. 잠시 후 다시 시도해 주세요.");
       expect(body).not.toContain("HTTP 401");
       expect(body).not.toContain("upstage");
       expect(body).not.toContain("up_live");
 
       const events = loggedEvents(errorSpy);
-      // errorPayload 는 같은 실패를 다시 남기지 않는다(한 줄만).
-      expect(events).toHaveLength(1);
+      expect(events).toHaveLength(2);
       expect(events[0]).toMatchObject({ event: "contract_upstream_failed", http_status: 502 });
       expect(String(events[0].upstream)).toContain("upstage HTTP 401");
       expect(String(events[0].upstream)).not.toContain("up_live_0123456789abcdef");
+      // errorPayload 는 원문을 되풀이하지 않고 request_id 로 찾을 수 있는 짧은 줄만 남긴다.
+      expect(events[1]).toEqual({
+        event: "api_error",
+        request_id: payload.body.error.request_id,
+        status: 502,
+        code: "CONTRACT_ANALYSIS_FAILED",
+        cause_logged: true,
+      });
+    });
+
+    it("장애 기록 상한에 닿으면 상류 원문 줄도 더 남기지 않는다", async () => {
+      for (let index = 0; index < 30; index += 1) takeApiErrorLogSlot();
+
+      const error = await reviewFailure(upstream(502, { error: "skt HTTP 500: upstream exploded" }));
+
+      expect(error).toMatchObject({ code: "CONTRACT_ANALYSIS_FAILED", status: 502 });
+      expect(errorSpy).not.toHaveBeenCalled();
     });
 
     it("파일 경로가 든 OSError 문구도 응답에 싣지 않는다", async () => {
@@ -416,10 +434,13 @@ describe("계약서 분석 내부 계약", () => {
       ["빈 파일입니다.", "CONTRACT_FILE_EMPTY", 400, "빈 파일은 분석할 수 없습니다. 계약서 파일을 다시 선택해 주세요."],
       ["계약서 파일이 없습니다.", "CONTRACT_FILE_REQUIRED", 400, "계약서 파일을 받지 못했습니다. 파일을 다시 선택해 주세요."],
       ["파일이 너무 큽니다 (21.3MB). 20MB 이하로 올려 주세요.", "FILE_TOO_LARGE", 413, "파일은 15MB 이하만 업로드할 수 있습니다."],
-    ])("알려진 입력 오류 '%s'는 제품의 고정 안내로 바꾼다", async (raw, code, status, message) => {
+    ])("알려진 입력 오류 '%s'는 제품의 고정 안내로 바꾸고 장애 기록은 남기지 않는다", async (raw, code, status, message) => {
       const error = await reviewFailure(upstream(400, { error: raw }));
 
       expect(error).toMatchObject({ code, status, retryable: false, message });
+      // 사용자 입력 문제(4xx)라 되풀이해 올려도 서버 로그가 늘지 않는다.
+      errorPayload(error);
+      expect(errorSpy).not.toHaveBeenCalled();
     });
 
     it("JSON 이 아닌 빈 응답도 일반 안내로 바꾸고 원문 없음으로 기록한다", async () => {

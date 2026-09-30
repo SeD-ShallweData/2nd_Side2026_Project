@@ -1,7 +1,7 @@
 import { Pool, type QueryResultRow } from "pg";
 import { getDatabaseConnectionString } from "@/server/databaseConfig";
 import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
-import { markErrorLogged, ServiceError } from "@/utils/errors";
+import { markErrorLogged, ServiceError, takeApiErrorLogSlot } from "@/utils/errors";
 import { redactErrorText } from "@/utils/redactErrorText";
 
 let pool: Pool | undefined;
@@ -67,20 +67,25 @@ export async function queryReadOnly<T extends QueryResultRow>(
     return result.rows;
   } catch (error) {
     if (error instanceof ServiceError) throw error;
-    const failure = describeQueryFailure(error);
-    console.error(JSON.stringify({
-      event: "readonly_query_failed",
-      relation: options.relation ?? "unlabeled",
-      pg_code: failure.code,
-      message: failure.message,
-    }));
-    // 원인은 바로 위에서 남겼다. errorPayload 가 같은 장애를 한 줄 더 남기지 않게 표시한다.
-    throw markErrorLogged(new ServiceError(
+    const unavailable = new ServiceError(
       "DATABASE_UNAVAILABLE",
       "사업장 데이터베이스를 읽지 못했습니다.",
       503,
       true,
-    ));
+    );
+    // DB 장애 때는 요청마다 같은 줄이 쌓이므로 5xx 기록과 같은 속도 상한(utils/errors.ts)을 거친다.
+    if (takeApiErrorLogSlot()) {
+      const failure = describeQueryFailure(error);
+      console.error(JSON.stringify({
+        event: "readonly_query_failed",
+        relation: options.relation ?? "unlabeled",
+        pg_code: failure.code,
+        message: failure.message,
+      }));
+      // 원인은 바로 위에서 남겼다. errorPayload 는 원인 문구 없이 request_id·코드만 남긴다.
+      markErrorLogged(unavailable);
+    }
+    throw unavailable;
   }
 }
 

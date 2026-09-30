@@ -10,6 +10,7 @@ import { POST as createReport } from "@/app/api/community/posts/[postId]/reports
 import { GET as listPosts, POST as createPost } from "@/app/api/community/posts/route";
 import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 import { resetMockCommunityState } from "@/adapters/mock/MockCommunityRepository";
+import { silenceServerErrorLogs } from "@/testing/silenceServerErrorLogs";
 
 const USER: SessionUserDto = {
   user_id: "10000000-0000-4000-8000-000000000001",
@@ -63,6 +64,9 @@ function contextFor<Key extends "postId" | "reportId">(
 ): { params: Promise<Record<Key, string>> } {
   return { params: Promise.resolve({ [key]: value } as Record<Key, string>) };
 }
+
+// 일부러 5xx 를 내는 경우가 있어 서버 오류 기록 줄(JSON)만 테스트 출력에서 뺀다.
+silenceServerErrorLogs();
 
 beforeEach(() => {
   vi.stubEnv("COMMUNITY_DATA_MODE", "mock");

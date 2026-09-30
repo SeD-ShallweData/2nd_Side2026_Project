@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { errorPayload, markErrorLogged, resetApiErrorLogForTests, ServiceError } from "@/utils/errors";
+import {
+  errorPayload,
+  markErrorLogged,
+  resetApiErrorLogForTests,
+  ServiceError,
+  takeApiErrorLogSlot,
+} from "@/utils/errors";
 
 let errorSpy: ReturnType<typeof vi.spyOn>;
 
@@ -83,14 +89,21 @@ describe("5xx 서버 기록", () => {
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
-  it("발생한 자리에서 이미 남긴 오류는 다시 남기지 않는다(postgres.ts 와 두 줄이 되지 않게)", () => {
+  it("발생한 자리에서 원인을 남긴 오류는 원인 문구 없이 request_id·상태·코드만 남긴다", () => {
     const payload = errorPayload(markErrorLogged(
       new ServiceError("DATABASE_UNAVAILABLE", "사업장 데이터베이스를 읽지 못했습니다.", 503, true),
     ));
 
     expect(payload.status).toBe(503);
     expect(payload.body.error.request_id).toMatch(/^req_/);
-    expect(errorSpy).not.toHaveBeenCalled();
+    // 사용자가 알려 준 req_… 로 찾을 수 있어야 하므로 건너뛰지 않는다.
+    expect(loggedEvents()).toEqual([{
+      event: "api_error",
+      request_id: payload.body.error.request_id,
+      status: 503,
+      code: "DATABASE_UNAVAILABLE",
+      cause_logged: true,
+    }]);
   });
 
   it("Error 가 아닌 값을 던져도 기록하고 응답은 고정 문구다", () => {
@@ -124,5 +137,50 @@ describe("5xx 서버 기록", () => {
     expect(events).toHaveLength(32);
     expect(events[30]).toEqual({ event: "api_error_log_suppressed", suppressed: 5, window_ms: 60_000 });
     expect(events[31]).toMatchObject({ event: "api_error", message: "after window" });
+  });
+
+  it("폭주 뒤 조용해져도 창이 끝나는 시각에 건너뛴 개수를 한 번 알린다", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(2_000_000);
+      for (let index = 0; index < 33; index += 1) errorPayload(new Error(`boom ${index}`));
+      expect(errorSpy).toHaveBeenCalledTimes(30);
+
+      vi.advanceTimersByTime(59_999);
+      expect(errorSpy).toHaveBeenCalledTimes(30);
+
+      vi.advanceTimersByTime(1);
+      expect(loggedEvents()[30]).toEqual({ event: "api_error_log_suppressed", suppressed: 3, window_ms: 60_000 });
+
+      // 이미 알린 개수는 다음 창에서 다시 알리지 않는다.
+      errorPayload(new Error("after window"));
+      const events = loggedEvents();
+      expect(events).toHaveLength(32);
+      expect(events[31]).toMatchObject({ event: "api_error", message: "after window" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("원인을 발생한 자리에서 남기는 곳도 같은 상한을 쓴다", () => {
+    vi.spyOn(Date, "now").mockReturnValue(3_000_000);
+    for (let index = 0; index < 30; index += 1) expect(takeApiErrorLogSlot()).toBe(true);
+
+    expect(takeApiErrorLogSlot()).toBe(false);
+    errorPayload(new Error("over the limit"));
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("상한 확인은 기록이 실패해도 예외를 던지지 않는다", () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(4_000_000);
+    for (let index = 0; index < 31; index += 1) takeApiErrorLogSlot();
+    errorSpy.mockImplementation(() => {
+      throw new Error("journald unavailable");
+    });
+
+    now.mockReturnValue(4_000_000 + 60_000);
+
+    expect(() => takeApiErrorLogSlot()).not.toThrow();
+    expect(takeApiErrorLogSlot()).toBe(true);
   });
 });

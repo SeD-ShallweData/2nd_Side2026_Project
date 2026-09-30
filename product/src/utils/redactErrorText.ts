@@ -25,8 +25,19 @@ const REDACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}/g, "[redacted-token]"],
 ];
 
+/*
+ * 긴 입력의 앞부분만 남긴다. 자른 자리가 낱말 한가운데면 그 조각은 버린다.
+ * 키가 앞 몇 글자만 남으면 아래 규칙(8자·32자 이상)에 걸리지 않는데, 앞쪽 공백이 합쳐지거나
+ * 앞의 긴 값이 지워지면 그 조각이 200자 안으로 들어와 그대로 남을 수 있기 때문이다.
+ */
+function truncateInput(raw: string): string {
+  if (raw.length <= MAX_INPUT_LENGTH) return raw;
+  const head = raw.slice(0, MAX_INPUT_LENGTH);
+  return /\s/.test(raw.charAt(MAX_INPUT_LENGTH)) ? head : head.replace(/\S+$/, "");
+}
+
 export function redactErrorText(raw: string, maxLength = DEFAULT_MAX_LENGTH): string {
-  let text = raw.slice(0, MAX_INPUT_LENGTH);
+  let text = truncateInput(raw);
   for (const [pattern, replacement] of REDACTIONS) {
     text = text.replace(pattern, replacement);
   }

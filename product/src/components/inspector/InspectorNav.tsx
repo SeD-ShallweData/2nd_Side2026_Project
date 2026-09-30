@@ -1,14 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { cookies } from "next/headers";
 
 import { canOperatePlatform } from "@/server/auth/inspectorAccess";
-import { SESSION_COOKIE_NAME } from "@/server/auth/sessionCookie";
-import { getOptionalSessionUser } from "@/services/authService";
+import { getPageSessionUser } from "@/server/auth/pageGuards";
 
 export async function InspectorNav({ current }: { current: "dashboard" | "chat" | "batches" | "ml-dashboard" | "prompts" }) {
-  const cookieStore = await cookies();
-  const user = await getOptionalSessionUser(cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null);
+  // 페이지 가드가 같은 요청에서 이미 조회한 세션을 다시 쓴다(pageGuards.ts 의 cache).
+  const user = await getPageSessionUser();
   const isOperator = canOperatePlatform(user?.role);
 
   return (

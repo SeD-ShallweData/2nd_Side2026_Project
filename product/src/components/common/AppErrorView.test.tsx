@@ -76,6 +76,23 @@ describe("화면 오류 경계", () => {
     expect(errorReferenceCode(undefined)).toBeNull();
     expect(errorReferenceCode(42)).toBeNull();
   });
+
+  it("Next 내부 오류의 '<해시>@E<번호>' digest 는 해시만 문의 코드로 쓴다", () => {
+    expect(errorReferenceCode("2156946829@E394")).toBe("2156946829");
+    expect(errorReferenceCode("2156946829123456@E394")).toBe("215694682912");
+    expect(errorReferenceCode("@E394")).toBeNull();
+    expect(errorReferenceCode("<script>@E394")).toBeNull();
+  });
+
+  it("오류 번호가 붙은 digest 도 화면에 문의 코드 줄을 그린다", () => {
+    const error = internalError();
+    error.digest = "2156946829@E394";
+
+    const html = renderToStaticMarkup(createElement(AppError, { error, retry: () => undefined }));
+
+    expect(html).toContain("문의 코드 2156946829");
+    expect(html).not.toContain("@E394");
+  });
 });
 
 describe("403 화면", () => {
@@ -83,7 +100,15 @@ describe("403 화면", () => {
     const html = renderToStaticMarkup(createElement(ForbiddenPage));
 
     expect(html).toContain("접근 권한이 없습니다");
+    expect(html).toContain("이 화면을 볼 권한이 있는 계정으로 로그인해 주세요.");
     expect(html).toContain('href="/login"');
     expect(html).toContain('href="/"');
+  });
+
+  it("역할 이름을 적지 않는다(운영 관리자 전용 화면에 들어온 근로감독관에게도 맞는 안내)", () => {
+    const html = renderToStaticMarkup(createElement(ForbiddenPage));
+
+    expect(html).not.toContain("근로감독관");
+    expect(html).not.toContain("관리자");
   });
 });

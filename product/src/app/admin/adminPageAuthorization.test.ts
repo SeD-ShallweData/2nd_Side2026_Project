@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const pageState = vi.hoisted(() => ({
   token: null as string | null,
+  // 설정하면 token 대신 이 Cookie 헤더를 그대로 보낸다.
+  rawCookie: null as string | null,
   usersByToken: new Map<string, {
     user_id: string;
     email: string;
@@ -18,14 +20,12 @@ const pageState = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// 화면 가드는 API 와 같은 규칙으로 Cookie 헤더를 직접 읽는다(sessionCookie.ts 의 parseSessionToken).
 vi.mock("next/headers", () => ({
-  cookies: async () => ({
-    get: (name: string) => (
-      name === "donworry_session" && pageState.token
-        ? { name, value: pageState.token }
-        : undefined
-    ),
-  }),
+  headers: async () => {
+    if (pageState.rawCookie !== null) return new Headers({ cookie: pageState.rawCookie });
+    return new Headers(pageState.token ? { cookie: `theme=dark; donworry_session=${pageState.token}` } : {});
+  },
 }));
 vi.mock("next/navigation", () => ({
   forbidden: pageState.forbidden,
@@ -36,10 +36,12 @@ vi.mock("@/services/authService", () => ({
 
 import AdminPage from "@/app/admin/page";
 import AdminBatchesPage from "@/app/admin/batches/page";
+import { getSessionTokenFromRequest } from "@/server/auth/sessionCookie";
 
 beforeEach(() => {
   vi.clearAllMocks();
   pageState.token = null;
+  pageState.rawCookie = null;
   pageState.usersByToken.clear();
   pageState.usersByToken.set("user-token", {
     user_id: "10000000-0000-4000-8000-000000000001",
@@ -88,5 +90,28 @@ describe.each([
     expect(isValidElement(element)).toBe(true);
     expect(pageState.forbidden).not.toHaveBeenCalled();
     expect(pageState.getOptionalSessionUser).toHaveBeenCalledWith("admin-token");
+  });
+});
+
+/*
+ * Path 가 다른 donworry_session 이 둘 오면 화면 가드와 API 가 같은 세션을 봐야 한다.
+ * API(getSessionTokenFromRequest)는 첫 값을 쓰므로 화면 가드도 첫 값을 쓴다.
+ */
+describe("이름이 같은 세션 쿠키가 여럿일 때", () => {
+  it.each([
+    ["donworry_session=user-token; donworry_session=admin-token", "user-token", false],
+    ["donworry_session=admin-token; donworry_session=user-token", "admin-token", true],
+  ])("%s 는 API 와 같은 첫 값(%s)으로 판정한다", async (cookie, expectedToken, allowed) => {
+    pageState.rawCookie = cookie;
+    const apiToken = getSessionTokenFromRequest(new Request("http://localhost/api/admin/batches", { headers: { cookie } }));
+
+    if (allowed) {
+      expect(isValidElement(await AdminPage())).toBe(true);
+    } else {
+      await expect(AdminPage()).rejects.toThrow("NEXT_FORBIDDEN");
+    }
+
+    expect(apiToken).toBe(expectedToken);
+    expect(pageState.getOptionalSessionUser).toHaveBeenCalledWith(expectedToken);
   });
 });

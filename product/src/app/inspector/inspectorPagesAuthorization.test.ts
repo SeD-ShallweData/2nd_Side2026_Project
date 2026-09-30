@@ -18,14 +18,11 @@ const pageState = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// 화면 가드는 API 와 같은 규칙으로 Cookie 헤더를 직접 읽는다(sessionCookie.ts 의 parseSessionToken).
 vi.mock("next/headers", () => ({
-  cookies: async () => ({
-    get: (name: string) => (
-      name === "donworry_session" && pageState.token
-        ? { name, value: pageState.token }
-        : undefined
-    ),
-  }),
+  headers: async () => new Headers(
+    pageState.token ? { cookie: `theme=dark; donworry_session=${pageState.token}` } : {},
+  ),
 }));
 vi.mock("next/navigation", () => ({
   forbidden: pageState.forbidden,
