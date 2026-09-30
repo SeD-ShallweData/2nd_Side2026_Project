@@ -23,7 +23,9 @@ describe("공통 사이트 헤더", () => {
     const html = renderToStaticMarkup(createElement(SiteHeader));
 
     expect(html).toContain("consumer-header");
-    expect(html).toContain("서비스 소개");
+    // 첫 화면은 로고가 담당하므로 가운데 메뉴에 '서비스 소개'를 두지 않는다.
+    expect(html).not.toContain("서비스 소개");
+    expect(html).toContain('href="/" class="brand-link"');
     expect(html).toContain("계약서 진단");
     expect(html).toContain('href="/worksite-tips"');
     expect(html).toContain("현장 신고");

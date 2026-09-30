@@ -3912,7 +3912,7 @@ summary:focus-visible {
    화면 정중앙에 오게 한다. 항목 사이 간격은 건드리지 않는다. */
 .consumer-header-inner { display: grid; min-height: 76px; align-items: center; grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr); column-gap: 16px; }
 .consumer-header-inner > :last-child { justify-self: end; }
-.consumer-main-nav { --nav-shift: 0.9375rem;   /* 실측 15px. '서비스 소개·사업장 확인' 이 '커뮤니티·현장 신고' 보다 넓어 생기는 차이다. */ display: flex; align-items: center; gap: 7px; transform: translateX(calc(-1 * var(--nav-shift))); }
+.consumer-main-nav { --nav-shift: 0;   /* '서비스 소개'를 뺀 뒤(10-01) 메뉴 4개를 그대로 가운데에 둔다. 이전 값 15px 는 5개일 때 가운데 항목을 맞추던 보정이다. */ display: flex; align-items: center; gap: 7px; transform: translateX(calc(-1 * var(--nav-shift))); }
 .consumer-main-nav a { border-radius: 999px; color: var(--muted); font-size: .9rem; font-weight: 800; padding: 11px 15px; }
 .consumer-main-nav a:hover { background: var(--surface); color: var(--ink); }
 .consumer-main-nav a.is-current { background: var(--surface); color: var(--ink); }

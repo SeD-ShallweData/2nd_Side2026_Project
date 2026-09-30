@@ -13,8 +13,8 @@ import { useMessages } from "@/i18n/LocaleProvider";
 import { headerMessages } from "@/i18n/messages/header";
 import { AuthApiError, deleteAccount, getSession, logout } from "@/services/authClient";
 
+// 첫 화면(서비스 소개)은 로고가 같은 곳으로 가므로 가운데 메뉴에 따로 두지 않는다.
 const NAV_ITEMS = [
-  { href: "/", key: "home" },
   { href: "/companies", key: "companies" },
   { href: "/contracts", key: "contracts" },
   { href: "/community", key: "community" },
