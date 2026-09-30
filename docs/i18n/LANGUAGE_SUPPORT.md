@@ -41,3 +41,31 @@
 - 화면 문구는 저장소의 고정 사전(`product/src/i18n/messages`)으로만 그린다. 상담 모델을 부르지 않는다.
 - 외국어 긴급 안내는 고정 문구(`product/src/domain/multilingualEmergency.ts`)이며 모델을 부르지 않는다.
 - 상담 답변 번역(2단계)부터 상담 모델을 쓴다. 범위는 질문·답변·현장 제보 번역으로 한정한다.
+
+## 상담 번역 피벗 (2단계, 2026-09-30)
+
+화면 언어가 `en` `zh` `vi` `th`일 때만 켜진다. `ko`·`ko-easy`(와 알 수 없는 값)는 번역 경로를 통과만 하며
+응답 객체가 이전과 같다. 적용 위치는 일반 상담 입구 `chatExecutionService`라서 `dual_api`·`openai_responses`
+두 실행 모드에 똑같이 걸린다. 근로감독관 점검 보조(`inspectorService`)는 번역하지 않는다.
+
+| 순서 | 단계 | 구현 | 실패 시 |
+| --- | --- | --- | --- |
+| 1 | 긴급 선처리 | `detectMultilingualEmergency` → 고정 외국어 긴급 문구(`fixed_copy`). 번역기 호출 0회 | — |
+| 2 | 입구 번역 | 질문 → 한국어(`chat_question`). 한글이 절반을 넘는 질문은 건너뜀 | 원문 질문 그대로 한국어 파이프라인에 넣는다(사용자를 막지 않음). `question_ko` 없음 |
+| 3 | 한국어 파이프라인 | 의도·회사 문맥·RAG·근거 게이트·생성·출력 가드레일·인용 검증 — 변경 없음 | — |
+| 4 | 출구 번역 | 검증한 한국어 답변 → 화면 언어(`chat_answer`). 같은 답변은 한 번만 | 한국어 답변 + 고정 안내(`korean_fallback`) |
+| 4 | 카드 문구 번역 | 한계 문구·다음 행동 이름·설명을 모든 결과에서 모아 번호 목록 한 번(`chat_labels`), 답변 번역과 동시 실행 | 해당 항목만 한국어로 둔다 |
+
+- 번역기: `product/src/services/translationService.ts`. 기본 Upstage 공급자에만 보낸다(동의 문구의 "같은 공급자").
+  키가 없으면 모델을 부르지 않고 `unconfigured` → 한국어 대체(모의·시연에서 결과가 늘 같다).
+  시간 상한은 입구 12초, 출구 20초(`LLM_TIMEOUT_MS`보다 짧은 쪽). 잘린 번역(`finish_reason=length`)은 버린다.
+- 보존 검사: `product/src/domain/translationGuardrail.ts`. 숫자·전화번호·금액 단위·조문명(「…」 제N조)·기관명이
+  그대로인지, 원문에 없던 판정·단정 표현(위법·illegal·safe·dangerous·definitely 등)이 생기지 않았는지 본다.
+- 화면: 번역 답변마다 "한국어 원문 보기" 전환과 고정 사전 문장 `chat.translation.verifyNotice`
+  ("공식 창구에서 다시 확인하세요")를 붙인다. 모델이 만든 문장이 아니다.
+- 동의: 외국어 화면에는 "번역을 위해 같은 공급자에게 한 번 더 전송" 문장(`chat.consent.translation`)을 더하고,
+  법적 의미가 있으므로 한국어 원문 동의문을 함께 보여 준다.
+- 저장: 로그인 대화는 `conversation_messages.content`(사용자가 본 글)와 `content_ko`(한국어 파이프라인이 읽은 글)·`locale`을
+  함께 저장한다(0023 마이그레이션, CHECK: locale ∈ en/zh/vi/th, content_ko 1..20000자). 이력 복원·회상·30일 요약은
+  `content_ko`를 쓴다. 익명 상담은 화면이 `question_ko`·`answer_ko`를 최근 대화 문맥으로 보낸다.
+- 운영 콘솔: `translate/system`이 네 번째 편집 프롬프트다. 필수 정책 문장은 `product/src/server/promptPolicy.ts`.

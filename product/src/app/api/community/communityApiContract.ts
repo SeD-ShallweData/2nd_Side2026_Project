@@ -5,6 +5,10 @@ export const COMMUNITY_CATEGORIES = [
   "wage",
 ] as const;
 
+/** 글 작성 언어(글자 체계로 추정). 자동 번역은 하지 않는다. domain/textLanguage 와 같은 값이다. */
+export const COMMUNITY_POST_LANGUAGES = ["ko", "en", "zh", "vi", "th", "other"] as const;
+export type CommunityPostLanguage = (typeof COMMUNITY_POST_LANGUAGES)[number];
+
 export const COMMUNITY_CATEGORY_LABELS = {
   pre_employment: "입사 전 확인",
   employment_contract: "근로계약서",
@@ -40,6 +44,8 @@ export interface CommunityPostDto {
   category_label: string;
   title: string;
   body: string;
+  /** 제목·본문의 글자 체계로 추정한 작성 언어. 표시·필터용이며 번역하지 않는다. */
+  language: CommunityPostLanguage;
   company_context: CommunityCompanyContextDto | null;
   anonymous: boolean;
   author_label: string | null;
@@ -60,6 +66,8 @@ export interface CommunityPostListResponse {
   capabilities: CommunityApiCapabilities;
   query: string;
   category: CommunityCategory | null;
+  /** 작성 언어 필터. null 이면 모든 언어. */
+  language: CommunityPostLanguage | null;
   items: CommunityPostDto[];
   total: number;
   has_more: boolean;

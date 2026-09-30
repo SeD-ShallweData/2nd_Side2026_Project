@@ -21,7 +21,7 @@ import type {
 import { executionModeCopy, providerRunStatusLabel } from "@/components/chat/runLabels";
 import { format } from "@/i18n/defineMessages";
 import { useLocale, useMessages } from "@/i18n/LocaleProvider";
-import type { Locale } from "@/i18n/locales";
+import { isImplementedForeignLocale, type Locale } from "@/i18n/locales";
 import { chatMessages, type ChatMessages } from "@/i18n/messages/chat";
 import { languageMessages } from "@/i18n/messages/language";
 import type { FavoriteCompanyDto } from "@/app/api/users/me/favorites/favoriteApiContract";
@@ -63,6 +63,8 @@ interface UiMessage {
   requestId?: string;
   role: "user" | "assistant";
   content: string;
+  /** 번역 상담의 한국어 질문. 다음 질문의 최근 대화 문맥은 한국어로 보낸다. */
+  contentKo?: string;
   comparison?: ChatComparisonResponse;
   sources?: import("@/domain/risk").SourceReference[];
   companyId?: string | null;
@@ -109,7 +111,8 @@ function comparisonHistoryContent(
     ? comparison.results.filter((result) => result.provider === selection)
     : comparison.results;
   return selected
-    .map((result) => publicAnswerText(result.answer).slice(0, 900))
+    // 번역 상담이면 한국어 상담 파이프라인이 읽을 한국어 원문을 문맥으로 보낸다.
+    .map((result) => publicAnswerText(result.answer_ko ?? result.answer).slice(0, 900))
     .join("\n");
 }
 
@@ -124,6 +127,9 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
   const locale = useLocale();
   const t = m.trace;
   const statusLabel = providerRunStatusLabel(result.status, result.trace.guardrail_hits, result.trace.recall_mode, m.run);
+  const [showKorean, setShowKorean] = useState(false);
+  // 번역했거나 고정 사전 문구로 바꾼 답변만 한국어 원문을 따로 보여 줄 수 있다.
+  const koreanOriginal = result.answer_ko && result.translation_status !== "korean_fallback" ? result.answer_ko : null;
 
   return (
     <article className={`provider-answer provider-answer-${result.provider}`}>
@@ -143,7 +149,29 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
         </div>
       ) : null}
 
-      <div className="provider-answer-copy"><SafeMarkdown>{publicAnswerText(result.answer)}</SafeMarkdown></div>
+      {result.translation_status === "korean_fallback" ? (
+        <p className="translation-fallback-notice" role="status">{m.translation.fallbackNotice}</p>
+      ) : null}
+      <div
+        className="provider-answer-copy"
+        lang={(showKorean && koreanOriginal) || result.translation_status === "korean_fallback" ? "ko" : undefined}
+      >
+        <SafeMarkdown>{publicAnswerText(showKorean && koreanOriginal ? koreanOriginal : result.answer)}</SafeMarkdown>
+      </div>
+      {koreanOriginal ? (
+        <button
+          type="button"
+          className="translation-toggle"
+          aria-pressed={showKorean}
+          onClick={() => setShowKorean((current) => !current)}
+        >
+          {showKorean ? m.translation.hideKorean : m.translation.showKorean}
+        </button>
+      ) : null}
+      {result.translation_status === "translated" || result.translation_status === "korean_fallback" ? (
+        // 모델 번역을 거친 답변에는 고정 사전 문장으로 공식 창구 재확인을 붙인다(모델이 만들지 않는다).
+        <p className="translation-verify-notice">{m.translation.verifyNotice}</p>
+      ) : null}
 
       <section className="provider-evidence" aria-label={format(m.card.evidenceAria, { provider: result.provider_label })}>
         <div>
@@ -422,10 +450,11 @@ export function ChatPanel({
         role: item.role,
         content: item.comparison
           ? comparisonHistoryContent(item.comparison, feedback[item.comparison.comparison_id])
-          : item.content,
+          : item.contentKo ?? item.content,
       }));
+    const userMessageId = crypto.randomUUID();
     setMessages((current) => [...current, {
-      id: crypto.randomUUID(), requestId, role: "user", content: message, companyId: activeCompanyId ?? null, companyName: activeCompanyName ?? null,
+      id: userMessageId, requestId, role: "user", content: message, companyId: activeCompanyId ?? null, companyName: activeCompanyName ?? null,
     }]);
     setDraft("");
     setError(null);
@@ -494,7 +523,7 @@ export function ChatPanel({
         }
       }
       setMessages((current) => [
-        ...current,
+        ...current.map((item) => item.id === userMessageId && data.question_ko ? { ...item, contentKo: data.question_ko } : item),
         { id: crypto.randomUUID(), role: "assistant", content: "상담 결과", comparison: data },
       ]);
     } catch (caught) {
@@ -554,6 +583,7 @@ export function ChatPanel({
               id: `${turn.turn_id}-${message.role}`,
               role: message.role,
               content: message.content,
+              ...(message.content_ko ? { contentKo: message.content_ko } : {}),
               companyId: turn.company_id,
               companyName: turn.company_name,
               ...(message.role === "assistant" ? { sources: turn.sources } : {}),
@@ -799,6 +829,17 @@ export function ChatPanel({
         <span>
           <strong>{m.consent.title}</strong>
           <small>{format(m.consent.body, { contractExtra: contractReview ? m.consent.contractExtra : "" })}</small>
+          {isImplementedForeignLocale(locale) ? (
+            <>
+              <small>{m.consent.translation}</small>
+              {/* 동의는 법적 의미가 있어 외국어 화면에서도 한국어 원문을 함께 보여 준다. */}
+              <small className="consent-korean-original" lang="ko">
+                {m.consent.koreanOriginalLabel}: {chatMessages.ko.consent.title}.{" "}
+                {format(chatMessages.ko.consent.body, { contractExtra: contractReview ? chatMessages.ko.consent.contractExtra : "" })}{" "}
+                {chatMessages.ko.consent.translation}
+              </small>
+            </>
+          ) : null}
         </span>
       </label>
 

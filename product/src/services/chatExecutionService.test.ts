@@ -4,6 +4,8 @@ vi.mock("server-only", () => ({}));
 
 import type { ChatRequest } from "@/domain/chat";
 import type { ChatComparisonResponse } from "@/domain/chatComparison";
+import type { ProviderComparisonResult } from "@/domain/chatComparison";
+import type { TranslationRequest, TranslationResult } from "@/domain/translation";
 import { createConfiguredChatSender } from "@/services/chatExecutionService";
 
 const REQUEST: ChatRequest = {
@@ -62,5 +64,60 @@ describe("chat execution feature flag", () => {
     expect(result.execution_mode).toBe("openai_responses");
     expect(sendResponses).toHaveBeenCalledWith(REQUEST, { signal });
     expect(sendDual).not.toHaveBeenCalled();
+  });
+
+  it("한국어 요청은 번역기를 부르지 않고 같은 요청·같은 응답 객체를 그대로 쓴다", async () => {
+    for (const ui_locale of [undefined, "ko", "ko-easy"]) {
+      const expected = response("dual_api");
+      const sendDual = vi.fn().mockResolvedValue(expected);
+      const translator = vi.fn();
+      const input = { ...REQUEST, ...(ui_locale ? { ui_locale } : {}) };
+      const send = createConfiguredChatSender({ getMode: () => "dual_api", sendDual, sendResponses: vi.fn(), translator });
+      expect(await send(input)).toBe(expected);
+      expect(sendDual.mock.calls[0][0]).toBe(input);
+      expect(translator).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe("상담 번역 피벗은 실행 모드와 관계없이 적용된다", () => {
+  function translatedResult(answer: string, provider: ProviderComparisonResult["provider"]): ProviderComparisonResult {
+    return {
+      provider, provider_label: provider, model: "test", status: "success", answer, answer_type: "general_guidance",
+      sources: [], suggested_actions: [], limitations: [], guardrail_status: "passed",
+      metrics: { latency_ms: 1, time_to_first_token_ms: null, streaming: false, finish_reason: "stop", answer_chars: answer.length, usage: { prompt_tokens: null, completion_tokens: null, total_tokens: null, cached_tokens: null, reasoning_tokens: null } },
+      trace: { prompt_policy_version: "test", query_transform: "none", context_mode: "general", company_context_attached: false, recent_message_count: 0, guardrail_action: "passed", guardrail_hits: [], upstream_request_id: null, rag_status: "matched", rag_reason: null, rag_topic: null, retrieved_document_count: 0 },
+    };
+  }
+  const translator = vi.fn(async (input: TranslationRequest): Promise<TranslationResult> => (
+    input.to === "ko" ? { ok: true, text: "월급을 못 받았어요." } : { ok: true, text: `EN: ${input.text}` }
+  ));
+
+  it.each(["dual_api", "openai_responses"] as const)("%s: 한국어 질문으로 실행하고 답변을 옮긴다", async (mode) => {
+    translator.mockClear();
+    const korean = { ...response(mode), results: [translatedResult("고용노동부 1350에 문의해 보세요.", mode === "dual_api" ? "upstage" : "openai")] };
+    const sendDual = vi.fn().mockResolvedValue(korean);
+    const sendResponses = vi.fn().mockResolvedValue(korean);
+    const send = createConfiguredChatSender({ getMode: () => mode, sendDual, sendResponses, translator });
+    const signal = AbortSignal.timeout(1_000);
+
+    const result = await send({ ...REQUEST, message: "I did not get paid.", ui_locale: "en" }, { signal });
+
+    const called = mode === "dual_api" ? sendDual : sendResponses;
+    expect(called.mock.calls[0][0]).toMatchObject({ message: "월급을 못 받았어요.", ui_locale: "en" });
+    if (mode === "openai_responses") expect(sendResponses.mock.calls[0][1]).toEqual({ signal });
+    expect((mode === "dual_api" ? sendResponses : sendDual)).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ locale: "en", question_ko: "월급을 못 받았어요." });
+    expect(result.results[0]).toMatchObject({ answer: "EN: 고용노동부 1350에 문의해 보세요.", translation_status: "translated" });
+  });
+});
+
+describe("근로감독관 점검 보조는 번역하지 않는다", () => {
+  it("inspectorService 와 점검 보조 route 는 번역 피벗·일반 상담 입구를 거치지 않는다", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const file of ["src/services/inspectorService.ts", "src/app/api/inspector/chat/route.ts"]) {
+      const source = readFileSync(file, "utf8");
+      expect(source, file).not.toMatch(/chatTranslationPipeline|translationService|chatExecutionService/);
+    }
   });
 });

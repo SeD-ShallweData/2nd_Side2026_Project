@@ -31,6 +31,14 @@ export const communityMessages = defineMessages({
       description: "분류와 내용을 다시 확인하고 저장하세요. 바꾼 항목만 반영됩니다.",
     },
     categoryAll: "전체",
+    // 커뮤니티 글은 자동 번역하지 않는다. 작성 언어만 표시하고 거를 수 있게 한다(언어 지원 3단계).
+    postLanguage: {
+      filterLabel: "작성 언어",
+      filterAria: "작성 언어로 거르기",
+      all: "모든 언어",
+      writtenIn: "작성 언어: {language}",
+      names: { ko: "한국어", en: "English", zh: "中文", vi: "Tiếng Việt", th: "ไทย", other: "기타 언어" },
+    },
     categories: {
       pre_employment: "입사 전 확인",
       employment_contract: "근로계약서",
@@ -236,6 +244,14 @@ export const communityMessages = defineMessages({
       description: "Review the category and content, then save. Only the fields you change are updated.",
     },
     categoryAll: "All",
+    // 커뮤니티 글은 자동 번역하지 않는다. 작성 언어만 표시하고 거를 수 있게 한다(언어 지원 3단계).
+    postLanguage: {
+      filterLabel: "Written in",
+      filterAria: "Filter by the language posts are written in",
+      all: "All languages",
+      writtenIn: "Written in: {language}",
+      names: { ko: "한국어", en: "English", zh: "中文", vi: "Tiếng Việt", th: "ไทย", other: "Other languages" },
+    },
     categories: {
       pre_employment: "Before starting a job",
       employment_contract: "Employment contract",
@@ -380,6 +396,14 @@ export const communityMessages = defineMessages({
       description: "请重新确认分类和内容后保存。只会更新您修改的项目。",
     },
     categoryAll: "全部",
+    // 커뮤니티 글은 자동 번역하지 않는다. 작성 언어만 표시하고 거를 수 있게 한다(언어 지원 3단계).
+    postLanguage: {
+      filterLabel: "发帖语言",
+      filterAria: "按发帖语言筛选",
+      all: "所有语言",
+      writtenIn: "发帖语言：{language}",
+      names: { ko: "한국어", en: "English", zh: "中文", vi: "Tiếng Việt", th: "ไทย", other: "其他语言" },
+    },
     categories: {
       pre_employment: "入职前确认",
       employment_contract: "劳动合同",
@@ -524,6 +548,14 @@ export const communityMessages = defineMessages({
       description: "Hãy kiểm tra lại chuyên mục và nội dung rồi lưu. Chỉ những mục bạn thay đổi mới được cập nhật.",
     },
     categoryAll: "Tất cả",
+    // 커뮤니티 글은 자동 번역하지 않는다. 작성 언어만 표시하고 거를 수 있게 한다(언어 지원 3단계).
+    postLanguage: {
+      filterLabel: "Ngôn ngữ viết",
+      filterAria: "Lọc theo ngôn ngữ bài viết",
+      all: "Tất cả ngôn ngữ",
+      writtenIn: "Viết bằng: {language}",
+      names: { ko: "한국어", en: "English", zh: "中文", vi: "Tiếng Việt", th: "ไทย", other: "Ngôn ngữ khác" },
+    },
     categories: {
       pre_employment: "Kiểm tra trước khi vào làm",
       employment_contract: "Hợp đồng lao động",
@@ -668,6 +700,14 @@ export const communityMessages = defineMessages({
       description: "ตรวจสอบหมวดหมู่และเนื้อหาอีกครั้งแล้วบันทึก ระบบจะอัปเดตเฉพาะรายการที่เปลี่ยน",
     },
     categoryAll: "ทั้งหมด",
+    // 커뮤니티 글은 자동 번역하지 않는다. 작성 언어만 표시하고 거를 수 있게 한다(언어 지원 3단계).
+    postLanguage: {
+      filterLabel: "ภาษาที่เขียน",
+      filterAria: "กรองตามภาษาที่เขียนโพสต์",
+      all: "ทุกภาษา",
+      writtenIn: "เขียนเป็นภาษา: {language}",
+      names: { ko: "한국어", en: "English", zh: "中文", vi: "Tiếng Việt", th: "ไทย", other: "ภาษาอื่น" },
+    },
     categories: {
       pre_employment: "ตรวจสอบก่อนเริ่มงาน",
       employment_contract: "สัญญาจ้างงาน",

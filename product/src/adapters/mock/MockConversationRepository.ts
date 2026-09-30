@@ -86,6 +86,11 @@ function cloneDetail(thread: StoredThread): StoredConversationDetail {
   return { ...cloneSummary(thread), turns: thread.turns.map(cloneTurn) };
 }
 
+/** 번역 상담 메시지에만 한국어 원문과 화면 언어를 붙인다. 한국어 상담 메시지 모양은 그대로다. */
+function translatedMessageFields(locale: RecordCompletedConversationTurn["locale"], contentKo: string | undefined) {
+  return locale ? { locale, ...(contentKo ? { content_ko: contentKo } : {}) } : {};
+}
+
 function titleFor(message: string): string {
   const compact = message.replace(/\s+/g, " ").trim();
   return compact.length <= 120 ? compact : `${compact.slice(0, 117)}...`;
@@ -241,8 +246,10 @@ export class MockConversationRepository implements ConversationRepository {
       guardrail_status: input.guardrail_status,
       created_at: now.toISOString(),
       messages: [
-        { message_id: randomUUID(), role: "user", content: input.user_message },
-        { message_id: randomUUID(), role: "assistant", content: input.assistant_message },
+        { message_id: randomUUID(), role: "user", content: input.user_message,
+          ...translatedMessageFields(input.locale, input.user_message_ko) },
+        { message_id: randomUUID(), role: "assistant", content: input.assistant_message,
+          ...translatedMessageFields(input.locale, input.assistant_message_ko) },
       ],
       sources: input.sources.map((source) => ({ ...source })),
       response: null,

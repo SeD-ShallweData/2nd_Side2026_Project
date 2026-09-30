@@ -4,6 +4,7 @@ import { defineMessages } from "@/i18n/defineMessages";
  * 근로계약서 확인 화면 문구.
  * 결과 제목은 판정하지 않는 말로 둔다: 확인됨 / 누락 가능 / 추가 확인.
  * 항목 이름·설명·근거 조문·질문 예시·검토 한계는 서버가 보내는 값이라 여기 두지 않는다.
+ * 외국어 화면에서 그 값을 옮기는 고정 사전은 contractVerdict.ts 에 있다.
  */
 export const contractMessages = defineMessages({
   ko: {

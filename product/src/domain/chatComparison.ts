@@ -9,12 +9,19 @@ import type { AnswerPlan } from "@/domain/answerPlan";
 import type { CompanyRiskResult, SourceReference } from "@/domain/risk";
 import type { RagRetrievalResult } from "@/domain/rag";
 import type { ConversationMemoryDiagnostics } from "@/domain/conversationRecall";
+import type { ImplementedForeignLocale } from "@/i18n/locales";
 
 export type LlmProviderId = "upstage" | "skt";
 export type ChatResultProviderId = LlmProviderId | "openai";
 export type ConfiguredChatExecutionMode = "dual_api" | "openai_responses";
 export type ChatExecutionMode = ConfiguredChatExecutionMode | "single_api" | "policy_short_circuit";
 export type ProviderRunStatus = "success" | "guardrail_replaced" | "fallback" | "policy_short_circuit";
+/**
+ * 외국어 화면에서 답변을 어떻게 보여 줬는지.
+ * translated: 검증한 한국어 답변을 번역해 보여 줌, fixed_copy: 고정 사전 문구(긴급 안내),
+ * korean_fallback: 번역을 쓰지 못해 한국어 원문과 고정 안내 문구를 보여 줌.
+ */
+export type AnswerTranslationStatus = "translated" | "fixed_copy" | "korean_fallback";
 
 export interface TokenUsage {
   prompt_tokens: number | null;
@@ -71,6 +78,9 @@ export interface ProviderComparisonResult {
   guardrail_status: GuardrailStatus;
   metrics: ProviderMetrics;
   trace: SafeExecutionTrace;
+  /** 번역한 답변일 때만. 검증을 마친 한국어 원문이며 "한국어 원문 보기"와 저장(content_ko)에 쓴다. */
+  answer_ko?: string;
+  translation_status?: AnswerTranslationStatus;
   error?: {
     code: string;
     message: string;
@@ -93,6 +103,10 @@ export interface ChatComparisonResponse {
   };
   /* 로그인 원문 저장 결과. guest는 현재 탭 history만 유지한다. */
   conversation_persistence?: "saved" | "unavailable" | "guest";
+  /** 한국어를 거쳐 번역한 상담일 때만(화면 언어가 구현 외국어). */
+  locale?: ImplementedForeignLocale;
+  /** 한국어 상담 파이프라인이 실제로 읽은 질문. 입구 번역에 실패하면 없다. */
+  question_ko?: string;
   results: ProviderComparisonResult[];
 }
 

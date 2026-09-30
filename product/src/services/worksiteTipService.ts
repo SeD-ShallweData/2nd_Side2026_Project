@@ -20,16 +20,22 @@ import {
   type WorksiteTipCategory,
 } from "@/app/api/worksite-tips/worksiteTipApiContract";
 import { WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER } from "@/adapters/mock/MockWorksiteTipRepository";
-import type {
-  NewWorksiteTipAttachment,
-  StoredWorksiteTip,
+import type { Translator } from "@/domain/translation";
+import {
+  KOREAN_WORKSITE_TIP_TRANSLATION,
+  type NewWorksiteTipAttachment,
+  type StoredWorksiteTip,
+  type WorksiteTipTranslation,
 } from "@/domain/worksiteTip";
+import { detectWorksiteTipSubmissionLanguage } from "@/domain/worksiteTipLanguage";
+import { LOCALE_COOKIE, resolveLocale, type ImplementedForeignLocale, type Locale } from "@/i18n/locales";
 import { WORKSITE_TIP_REVIEW_ROLES } from "@/server/auth/inspectorAccess";
 import { requireUserRole } from "@/server/auth/permissions";
 import {
   getWorksiteTipRepository,
   resetMockWorksiteTipsForTests as resetRepositoryForTests,
 } from "@/services/userDataProviders";
+import { translate } from "@/services/translationService";
 import { ServiceError } from "@/utils/errors";
 
 interface WorksiteTipListOptions {
@@ -48,7 +54,18 @@ const MAX_IMAGE_DIMENSION = 10_000;
 const MAX_IMAGE_PIXELS = 25_000_000;
 const MAX_TOTAL_IMAGE_PIXELS = 40_000_000;
 const MAX_INSPECTOR_PHOTO_BYTES = 10 * 1024 * 1024;
+/**
+ * 제목·본문 번역을 함께 기다리는 상한. 번역이 늦어도 접수는 이 시간 안에 원문만으로 끝난다.
+ * 번역 서비스 자체의 시간 제한과 별개로 여기서 한 번 더 묶는다.
+ */
+export const WORKSITE_TIP_TRANSLATION_TIMEOUT_MS = 8_000;
 export { WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER };
+
+export interface WorksiteTipSubmitDependencies {
+  /** 테스트에서 번역기를 바꿔 끼운다. 기본값은 services/translationService 의 translate. */
+  translator?: Translator;
+  translationTimeoutMs?: number;
+}
 
 function requireSubmitter(user: SessionUserDto): void {
   requireUserRole(user, ["user"]);
@@ -572,16 +589,22 @@ function toInspectorDto(
     company_context: tip.company_context ? { ...tip.company_context } : null,
     submitted_at: tip.submitted_at,
     attachments: tip.attachments.map((attachment) => attachmentMetadata(tip.tip_id, attachment)),
+    source_language: tip.translation.source_language,
+    translation_status: tip.translation.status,
+    title_ko: tip.translation.title_ko,
+    body_ko: tip.translation.body_ko,
   };
+}
+
+function previewOf(body: string | null): string | null {
+  return body && body.length > 160 ? `${body.slice(0, 157)}...` : body;
 }
 
 function toInspectorListItem(
   tip: StoredWorksiteTip,
   source: WorksiteTipListItemDto["source"],
 ): WorksiteTipListItemDto {
-  const bodyPreview = tip.body && tip.body.length > 160
-    ? `${tip.body.slice(0, 157)}...`
-    : tip.body;
+  const bodyPreview = previewOf(tip.body);
   return {
     source,
     tip_id: tip.tip_id,
@@ -592,12 +615,94 @@ function toInspectorListItem(
     company_context: tip.company_context ? { ...tip.company_context } : null,
     submitted_at: tip.submitted_at,
     attachment_count: tip.attachments.length,
+    source_language: tip.translation.source_language,
+    translation_status: tip.translation.status,
+    title_ko: tip.translation.title_ko,
+    body_preview_ko: previewOf(tip.translation.body_ko),
   };
+}
+
+/** 제보자의 화면 언어. 쿠키가 없거나 알 수 없는 값이면 한국어다. */
+function reporterLocale(request: Request): Locale {
+  const header = request.headers.get("cookie");
+  if (!header) return "ko";
+  for (const part of header.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0 || part.slice(0, separator).trim() !== LOCALE_COOKIE) continue;
+    try {
+      return resolveLocale(decodeURIComponent(part.slice(separator + 1).trim()));
+    } catch {
+      return "ko";
+    }
+  }
+  return "ko";
+}
+
+async function translateToKorean(
+  text: string,
+  from: ImplementedForeignLocale,
+  translator: Translator,
+): Promise<string | null> {
+  try {
+    const result = await translator({ text, from, to: "ko", purpose: "worksite_tip" });
+    const translated = result.ok ? result.text.trim() : "";
+    return translated ? translated : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 한국어가 아닌 제보를 한국어로 옮긴다. 근로감독관 화면은 한국어라 번역본을 원문과 나란히 보여 준다.
+ *
+ * 번역은 어떤 경우에도 접수를 막지 않는다. 모델 미설정·시간 초과·오류는 전부
+ * translation_status 'failed' 로 남기고 원문만 저장한다. 제목과 본문 중 하나라도 실패하면
+ * 반쪽 번역을 남기지 않고 실패로 둔다.
+ */
+async function translateSubmission(
+  title: string,
+  body: string | null,
+  locale: Locale,
+  dependencies: WorksiteTipSubmitDependencies,
+): Promise<WorksiteTipTranslation> {
+  const language = detectWorksiteTipSubmissionLanguage(title, body, locale);
+  if (language.kind === "korean") return { ...KOREAN_WORKSITE_TIP_TRANSLATION };
+  const failed: WorksiteTipTranslation = {
+    source_language: language.language,
+    title_ko: null,
+    body_ko: null,
+    status: "failed",
+  };
+  // 번역 경로가 없는 언어는 모델에 보내지 않는다. 폼도 이 경우 전송 안내를 띄우지 않는다.
+  if (language.kind === "unsupported") return failed;
+
+  const translator = dependencies.translator ?? translate;
+  const timeoutMs = dependencies.translationTimeoutMs ?? WORKSITE_TIP_TRANSLATION_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), timeoutMs);
+  });
+  try {
+    const translated = await Promise.race([
+      Promise.all([
+        translateToKorean(title, language.language, translator),
+        body ? translateToKorean(body, language.language, translator) : Promise.resolve(null),
+      ]),
+      deadline,
+    ]);
+    if (!translated) return failed;
+    const [titleKo, bodyKo] = translated;
+    if (!titleKo || (body && !bodyKo)) return failed;
+    return { source_language: language.language, title_ko: titleKo, body_ko: bodyKo, status: "translated" };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export async function createWorksiteTip(
   request: Request,
   user: SessionUserDto,
+  dependencies: WorksiteTipSubmitDependencies = {},
 ): Promise<WorksiteTipReceiptDto> {
   requireSubmitter(user);
   const repository = getWorksiteTipRepository();
@@ -613,6 +718,14 @@ export async function createWorksiteTip(
     throw new ServiceError("COMPANY_NOT_FOUND", "선택한 사업장을 찾을 수 없습니다.", 404, false);
   }
 
+  // 저장 전에 번역한다. 제보 계정에는 UPDATE 권한이 없어 나중에 번역본을 덧붙일 수 없다.
+  const translation = await translateSubmission(
+    submission.title,
+    submission.body,
+    reporterLocale(request),
+    dependencies,
+  );
+
   const tip = await repository.insertTip({
     tip_id: tipId,
     reporter_id: user.user_id,
@@ -623,6 +736,7 @@ export async function createWorksiteTip(
     company_context: companyContext,
     submitted_at: submittedAt,
     attachments: submission.attachments,
+    translation,
   });
   return {
     source: repository.source,

@@ -4,8 +4,13 @@ import Link from "next/link";
 import { ChangeEvent, FormEvent, useId, useRef, useState } from "react";
 import type { DataMode } from "@/config/dataMode";
 import { format } from "@/i18n/defineMessages";
-import { useMessages } from "@/i18n/LocaleProvider";
+import { useLocale, useMessages } from "@/i18n/LocaleProvider";
 import { contractMessages } from "@/i18n/messages/contract";
+import {
+  localizeContractReview,
+  type LocalizedContractItem,
+  type LocalizedText,
+} from "@/i18n/contractVerdict";
 import type { ContractItem, ContractReviewResult } from "@/domain/contract";
 import {
   CONTRACT_REVIEW_CONTEXT_STORAGE_KEY,
@@ -73,8 +78,67 @@ function ReviewSection({
   );
 }
 
+/*
+ * 외국어 화면의 결과 구역. 항목 이름·안내는 고정 사전 문장이고, 숫자가 든 설명은
+ * 한국어 원문으로 함께 둔다(회사·지원센터에 그대로 보여 줄 수 있게).
+ */
+function LocalizedReviewSection({
+  title,
+  items,
+  tone,
+  koreanLabel,
+}: {
+  title: string;
+  items: LocalizedContractItem[];
+  tone: "detected" | "missing" | "review";
+  koreanLabel: string;
+}) {
+  const m = useMessages(contractMessages).panel;
+  return (
+    <section className={`contract-result-section contract-${tone}`}>
+      <div className="contract-result-title">
+        <span aria-hidden="true">{tone === "detected" ? "✓" : tone === "missing" ? "!" : "?"}</span>
+        <h3>{title}</h3>
+        <small>{format(m.itemCount, { count: items.length })}</small>
+      </div>
+      {items.length === 0 ? (
+        <p className="muted-text">{m.empty}</p>
+      ) : (
+        <ul>
+          {items.map((item) => (
+            <li key={item.code}>
+              <strong>{item.label}</strong>
+              {item.about ? <p>{item.about}</p> : null}
+              <p className="contract-korean-original" lang="ko">
+                {item.translated ? <span>{koreanLabel} · {item.korean_label}</span> : null}
+                {item.korean_description}
+              </p>
+              {item.legal_basis ? <small>{item.legal_basis}</small> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function LocalizedLine({ line, koreanLabel }: { line: LocalizedText; koreanLabel: string }) {
+  return (
+    <li>
+      {line.text}
+      {line.korean ? (
+        <span className="contract-korean-original" lang="ko">
+          <span>{koreanLabel}</span>
+          {line.korean}
+        </span>
+      ) : null}
+    </li>
+  );
+}
+
 export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
   const m = useMessages(contractMessages).panel;
+  const locale = useLocale();
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -82,6 +146,9 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [chatLinkReady, setChatLinkReady] = useState(false);
+
+  // 한국어·쉬운 한국어 화면에서는 null 이라 서버의 한국어 결과를 그대로 그린다.
+  const localized = result ? localizeContractReview(result, locale) : null;
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const next = event.target.files?.[0] ?? null;
@@ -223,12 +290,40 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
               {m.otherFile}
             </button>
           </div>
-          <div className="contract-result-grid">
-            <ReviewSection title={m.sectionDetected} items={result.detected_items} tone="detected" />
-            <ReviewSection title={m.sectionMissing} items={result.missing_items} tone="missing" />
-            <ReviewSection title={m.sectionReview} items={result.review_items} tone="review" />
-          </div>
-          {result.suggested_questions.length > 0 ? (
+          {localized ? (
+            <div className="contract-result-grid">
+              <LocalizedReviewSection title={m.sectionDetected} items={localized.detected_items} tone="detected" koreanLabel={localized.korean_original_label} />
+              <LocalizedReviewSection title={m.sectionMissing} items={localized.missing_items} tone="missing" koreanLabel={localized.korean_original_label} />
+              <LocalizedReviewSection title={m.sectionReview} items={localized.review_items} tone="review" koreanLabel={localized.korean_original_label} />
+            </div>
+          ) : (
+            <div className="contract-result-grid">
+              <ReviewSection title={m.sectionDetected} items={result.detected_items} tone="detected" />
+              <ReviewSection title={m.sectionMissing} items={result.missing_items} tone="missing" />
+              <ReviewSection title={m.sectionReview} items={result.review_items} tone="review" />
+            </div>
+          )}
+          {localized && localized.suggested_questions.length > 0 ? (
+            <div className="contract-questions">
+              <h3>{m.questionsHeading}</h3>
+              <ul>
+                {localized.suggested_questions.map((line, index) => (
+                  <LocalizedLine key={`${index}-${line.text}`} line={line} koreanLabel={localized.korean_original_label} />
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {localized && localized.notices.length > 0 ? (
+            <div className="contract-warning">
+              <strong>{m.limitsHeading}</strong>
+              <ul>
+                {localized.notices.map((line, index) => (
+                  <LocalizedLine key={`${index}-${line.text}`} line={line} koreanLabel={localized.korean_original_label} />
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {!localized && result.suggested_questions.length > 0 ? (
             <div className="contract-questions">
               <h3>{m.questionsHeading}</h3>
               <ul>
@@ -238,7 +333,7 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
               </ul>
             </div>
           ) : null}
-          {[...result.warnings, ...result.limitations].length > 0 ? (
+          {!localized && [...result.warnings, ...result.limitations].length > 0 ? (
             <div className="contract-warning">
               <strong>{m.limitsHeading}</strong>
               <ul>

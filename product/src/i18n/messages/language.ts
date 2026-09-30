@@ -26,6 +26,11 @@ export const languageMessages = defineMessages({
     voiceRead: "읽어 주기",
     voicePending: "지원 예정(추후 도입 기능)",
     voicePendingReason: "글을 읽고 쓰기 어려운 분도 쓸 수 있도록 음성으로 묻고 듣는 기능을 준비하고 있습니다.",
+    // 처음 온 사용자에게 브라우저 언어로 화면 언어를 제안한다(강요하지 않음). 문구는 제안하는 언어로 보인다.
+    suggestTitle: "처음 오셨나요? 이 서비스를 {language}(으)로 볼 수 있습니다.",
+    suggestAccept: "{language}(으)로 보기",
+    suggestDismiss: "한국어로 계속 보기",
+    suggestAria: "화면 언어 제안",
   },
   "ko-easy": {
     pendingCommon: "지금은 영어로 쓸 수 있어요.",
@@ -53,6 +58,11 @@ export const languageMessages = defineMessages({
     voiceRead: "Read aloud",
     voicePending: "Coming soon",
     voicePendingReason: "We are preparing voice questions and spoken answers for people who find reading or writing difficult.",
+    // 처음 온 사용자에게 브라우저 언어로 화면 언어를 제안한다(강요하지 않음). 문구는 제안하는 언어로 보인다.
+    suggestTitle: "First time here? You can use this service in English.",
+    suggestAccept: "Switch to English",
+    suggestDismiss: "Keep Korean",
+    suggestAria: "Display language suggestion",
   },
   zh: {
     selectorLabel: "语言",
@@ -74,6 +84,11 @@ export const languageMessages = defineMessages({
     voiceRead: "朗读",
     voicePending: "即将支持(后续上线)",
     voicePendingReason: "我们正在准备语音提问和语音回答功能,方便读写有困难的人使用。",
+    // 처음 온 사용자에게 브라우저 언어로 화면 언어를 제안한다(강요하지 않음). 문구는 제안하는 언어로 보인다.
+    suggestTitle: "第一次来吗？本服务可以用中文（简体）浏览。",
+    suggestAccept: "切换为中文",
+    suggestDismiss: "继续使用韩语",
+    suggestAria: "页面语言建议",
   },
   vi: {
     selectorLabel: "Ngôn ngữ",
@@ -95,6 +110,11 @@ export const languageMessages = defineMessages({
     voiceRead: "Đọc to",
     voicePending: "Sắp ra mắt",
     voicePendingReason: "Chúng tôi đang chuẩn bị chức năng hỏi và nghe trả lời bằng giọng nói cho người gặp khó khăn khi đọc, viết.",
+    // 처음 온 사용자에게 브라우저 언어로 화면 언어를 제안한다(강요하지 않음). 문구는 제안하는 언어로 보인다.
+    suggestTitle: "Lần đầu đến đây? Bạn có thể dùng dịch vụ này bằng tiếng Việt.",
+    suggestAccept: "Chuyển sang tiếng Việt",
+    suggestDismiss: "Tiếp tục dùng tiếng Hàn",
+    suggestAria: "Gợi ý ngôn ngữ hiển thị",
   },
   th: {
     selectorLabel: "ภาษา",
@@ -116,5 +136,10 @@ export const languageMessages = defineMessages({
     voiceRead: "อ่านออกเสียง",
     voicePending: "เร็ว ๆ นี้",
     voicePendingReason: "เรากำลังเตรียมฟังก์ชันถามด้วยเสียงและฟังคำตอบ สำหรับผู้ที่อ่านเขียนได้ยาก",
+    // 처음 온 사용자에게 브라우저 언어로 화면 언어를 제안한다(강요하지 않음). 문구는 제안하는 언어로 보인다.
+    suggestTitle: "มาครั้งแรกใช่ไหม ใช้บริการนี้เป็นภาษาไทยได้",
+    suggestAccept: "เปลี่ยนเป็นภาษาไทย",
+    suggestDismiss: "ใช้ภาษาเกาหลีต่อ",
+    suggestAria: "คำแนะนำภาษาที่แสดง",
   },
 });

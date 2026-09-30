@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { CommunityPostDto } from "@/app/api/community/communityApiContract";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
-import { companyContextLabel, relativeTimeLabel } from "@/components/community/communityFormat";
+import { companyContextLabel, postLanguageLabel, relativeTimeLabel } from "@/components/community/communityFormat";
 import { CommunityPostDeleteButton } from "@/components/community/CommunityPostDeleteButton";
 import { CommunityReportForm } from "@/components/community/CommunityReportForm";
 import { format } from "@/i18n/defineMessages";
@@ -66,13 +66,13 @@ export function CommunityPostDetail({ postId }: { postId: string }) {
             <div>
               <span>{m.categories[post.category] ?? post.category_label}</span>
               <small>
-                {[companyContextLabel(post.company_context, m.format), post.author_label ?? m.post.anonymous, relativeTimeLabel(post.created_at, m.format)]
+                {[companyContextLabel(post.company_context, m.format), post.author_label ?? m.post.anonymous, relativeTimeLabel(post.created_at, m.format), postLanguageLabel(post.language, m.postLanguage)]
                   .filter((part): part is string => Boolean(part))
                   .join(" · ")}
                 {post.updated_at === post.created_at ? "" : ` · ${format(m.post.edited, { time: relativeTimeLabel(post.updated_at, m.format) })}`}
               </small>
             </div>
-            <h2>{post.title}</h2><p className="community-post-body">{post.body}</p>
+            <h2 lang={post.language === "other" ? undefined : post.language}>{post.title}</h2><p className="community-post-body" lang={post.language === "other" ? undefined : post.language}>{post.body}</p>
             <strong>{post.like_count === null ? null : `${format(m.post.likes, { count: post.like_count })}　`}{format(m.post.comments, { count: post.comment_count })}</strong>
           </article>
           <p className="field-help">{m.detail.countsNote}</p>

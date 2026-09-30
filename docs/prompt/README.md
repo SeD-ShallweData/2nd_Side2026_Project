@@ -73,6 +73,7 @@ main 이 259개 파일만큼 움직여 그대로 병합할 수 없었고, 최신
 | `product/prompts/chat/system.md` | 사용자 상담 — `DualLlmChatProvider` |
 | `product/prompts/inspector/system.md` | 근로감독관 상담 — `inspectorService` |
 | `product/prompts/rewrite/system.md` | 후속 질문 재작성 — `queryRewriteService` |
+| `product/prompts/translate/system.md` | 외국어 상담 질문·답변 번역(언어 지원 2단계) — `translationService` |
 | `product/prompts/README.md` | 프롬프트 작성 규칙 |
 | `product/src/server/promptLoader.ts` | 프롬프트 로더 |
 | `product/src/server/guardrails.ts` | 출력 가드레일 공용 엔진 |

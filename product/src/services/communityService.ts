@@ -24,6 +24,7 @@ import type {
   StoredCommunityPost,
   StoredCommunityReport,
 } from "@/domain/community";
+import { detectPostLanguage, isTextLanguage, type TextLanguage } from "@/domain/textLanguage";
 import { requireResourceOwner, requireUserRole } from "@/server/auth/permissions";
 import { getCommunityRepository } from "@/services/userDataProviders";
 import { ServiceError } from "@/utils/errors";
@@ -43,6 +44,7 @@ import { ServiceError } from "@/utils/errors";
 interface ListOptions {
   query?: string;
   category?: string | null;
+  language?: string | null;
   page?: number;
   limit?: number;
 }
@@ -93,6 +95,17 @@ function parseCategory(value: unknown): CommunityCategory {
     );
   }
   return value as CommunityCategory;
+}
+
+function parseLanguage(value: unknown): TextLanguage {
+  if (isTextLanguage(value)) return value;
+  throw new ServiceError(
+    "VALIDATION_ERROR",
+    "작성 언어를 확인해 주세요.",
+    400,
+    false,
+    [{ field: "language", reason: "지원하는 작성 언어가 아닙니다." }],
+  );
 }
 
 function parseOptionalCompanyId(value: unknown): string | null {
@@ -205,6 +218,7 @@ function toPostDto(
     category_label: COMMUNITY_CATEGORY_LABELS[post.category],
     title: post.title,
     body: post.body,
+    language: detectPostLanguage(post.title, post.body),
     company_context: post.company_context ? { ...post.company_context } : null,
     anonymous: post.anonymous,
     /*
@@ -285,9 +299,10 @@ export async function listCommunityPosts(
     throw new ServiceError("VALIDATION_ERROR", "검색어는 100자 이하여야 합니다.", 400, false);
   }
   const category = options.category ? parseCategory(options.category) : null;
+  const language = options.language ? parseLanguage(options.language) : null;
   const { limit, page } = parsePage(options.limit, options.page);
 
-  const { items, total } = await repository.listPublishedPosts({ query, category, limit, page });
+  const { items, total } = await repository.listPublishedPosts({ query, category, language, limit, page });
   const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
   return {
@@ -295,6 +310,7 @@ export async function listCommunityPosts(
     capabilities: capabilitiesFor(viewer),
     query,
     category,
+    language,
     items: items.map((post) => toPostDto(repository, post, viewer)),
     total,
     has_more: page < totalPages,

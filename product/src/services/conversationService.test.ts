@@ -401,3 +401,110 @@ describe("로그인 대화 원문 저장", () => {
       .rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });
+
+describe("번역 상담 저장(언어 지원 2단계)", () => {
+  function translatedResponse(answer: string, answerKo: string, questionKo?: string): ChatComparisonResponse {
+    const base = response(answer);
+    return {
+      ...base,
+      locale: "vi",
+      ...(questionKo ? { question_ko: questionKo } : {}),
+      results: [{ ...base.results[0], answer_ko: answerKo, translation_status: "translated" }],
+    };
+  }
+
+  it("사용자가 본 글(content)과 한국어 원문(content_ko)·화면 언어를 함께 저장하고, 모델 문맥은 한국어로 복원한다", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    const conversationId = await persistCompletedChat(
+      { message: "Công ty chưa trả lương 2 tháng.", request_id: REQUEST_ID, chat_mode: "wage", recent_messages: [], ui_locale: "vi" },
+      translatedResponse("Hãy liên hệ 고용노동부 1350.", "고용노동부 1350에 문의해 보세요.", "회사가 2개월째 임금을 주지 않았습니다."),
+      USER,
+    );
+    const detail = await getUserConversation(conversationId, USER);
+    expect(detail.turns[0]?.messages.map(({ role, content, content_ko, locale }) => ({ role, content, content_ko, locale }))).toEqual([
+      { role: "user", content: "Công ty chưa trả lương 2 tháng.", content_ko: "회사가 2개월째 임금을 주지 않았습니다.", locale: "vi" },
+      { role: "assistant", content: "Hãy liên hệ 고용노동부 1350.", content_ko: "고용노동부 1350에 문의해 보세요.", locale: "vi" },
+    ]);
+    const hydrated = await hydrateConversationRequest(
+      { message: "그다음은요?", conversation_id: conversationId, request_id: "request_0000000000000002", chat_mode: "wage", recent_messages: [] },
+      USER,
+    );
+    expect(hydrated.recent_messages).toEqual([
+      { role: "user", content: "회사가 2개월째 임금을 주지 않았습니다." },
+      { role: "assistant", content: "고용노동부 1350에 문의해 보세요." },
+    ]);
+  });
+
+  it("입구 번역에 실패한 질문은 locale 만 남기고 content_ko 를 비운다", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    const conversationId = await persistCompletedChat(
+      { message: "I was not paid.", request_id: REQUEST_ID, chat_mode: "wage", recent_messages: [] },
+      { ...translatedResponse("Contact 1350.", "1350에 문의해 보세요."), locale: "en" },
+      USER,
+    );
+    const [user, assistant] = (await getUserConversation(conversationId, USER)).turns[0]!.messages;
+    expect(user).toMatchObject({ content: "I was not paid.", locale: "en" });
+    expect(user).not.toHaveProperty("content_ko");
+    expect(assistant).toMatchObject({ content: "Contact 1350.", content_ko: "1350에 문의해 보세요.", locale: "en" });
+  });
+
+  it("한국어 상담은 content_ko·locale 없이 기존 모양 그대로 저장한다", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    const conversationId = await persistCompletedChat({ message: "임금이 밀렸어요", request_id: REQUEST_ID, chat_mode: "wage", recent_messages: [] }, response(), USER);
+    for (const message of (await getUserConversation(conversationId, USER)).turns[0]!.messages) {
+      expect(Object.keys(message).sort()).toEqual(["content", "message_id", "role"]);
+    }
+  });
+
+  it("알 수 없는 locale 이나 한도를 넘는 한국어 원문은 저장하지 않는다(DB CHECK 와 같은 기준)", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    const unknown = await persistCompletedChat(
+      { message: "질문", request_id: REQUEST_ID, chat_mode: "wage", recent_messages: [] },
+      { ...translatedResponse("답변", "한국어 답변", "한국어 질문"), locale: "uz" as never },
+      USER,
+    );
+    for (const message of (await getUserConversation(unknown, USER)).turns[0]!.messages) {
+      expect(message).not.toHaveProperty("locale");
+      expect(message).not.toHaveProperty("content_ko");
+    }
+    const tooLong = await persistCompletedChat(
+      { message: "질문", request_id: "request_0000000000000003", chat_mode: "wage", recent_messages: [] },
+      translatedResponse("answer", "가".repeat(20_001), "한국어 질문"),
+      USER,
+    );
+    const [, assistant] = (await getUserConversation(tooLong, USER)).turns[0]!.messages;
+    expect(assistant).toMatchObject({ locale: "vi" });
+    expect(assistant).not.toHaveProperty("content_ko");
+  });
+
+  it("익명 번역 상담을 가져올 때도 한국어 원문을 함께 저장한다", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    const imported = await importGuestConversation({
+      import_id: "guest_import_000000000077",
+      turns: [{ user_message: "ไม่ได้รับค่าจ้าง", company_id: null, response: translatedResponse("โปรดติดต่อ 1350", "1350에 문의해 보세요.", "임금을 받지 못했습니다.") }],
+    }, USER);
+    const [user, assistant] = (await getUserConversation(imported.conversation_id, USER)).turns[0]!.messages;
+    expect(user).toMatchObject({ content: "ไม่ได้รับค่าจ้าง", content_ko: "임금을 받지 못했습니다.", locale: "vi" });
+    expect(assistant).toMatchObject({ content: "โปรดติดต่อ 1350", content_ko: "1350에 문의해 보세요." });
+  });
+
+  it("누적 요약은 번역문이 아니라 한국어 원문으로 만든다", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    let conversationId = "";
+    for (let index = 0; index < 5; index += 1) {
+      conversationId = await persistCompletedChat({
+        message: `Wage question number ${index}`,
+        request_id: `translated_summary_${String(index).padStart(4, "0")}`,
+        chat_mode: "wage",
+        recent_messages: [],
+        conversation_id: conversationId || undefined,
+      }, translatedResponse(`Guidance ${index}`, `안내 ${index}`, `임금 문의 ${index}번째`), USER);
+    }
+    const summary = await getConversationRepository().findSummary(conversationId);
+    expect(summary).toMatchObject({ status: "ready", summarized_through_sequence: 10 });
+    const text = JSON.stringify(summary?.summary);
+    expect(text).toContain("임금 문의");
+    expect(text).not.toMatch(/Wage question|Guidance/);
+  });
+});
+
