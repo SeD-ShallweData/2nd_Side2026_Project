@@ -72,12 +72,15 @@ export function FavoritesView() {
           return;
         }
         const result = await getFavorites({ signal: controller.signal });
-        if (!ignore && session.authenticated) setView({
-          status: "ready",
-          userId: session.user.user_id,
-          items: result.items,
-          orderedIds: reconcileFavoriteOrder(result.items, readFavoriteOrder(session.user.user_id)),
-        });
+        if (!ignore && session.authenticated) {
+          const orderedIds = reconcileFavoriteOrder(result.items, readFavoriteOrder(session.user.user_id));
+          setOrderSaveError(!saveFavoriteOrder(session.user.user_id, orderedIds));
+          const regions = new Set(optionsFor(result.items, "region").map(([value]) => value));
+          const industries = new Set(optionsFor(result.items, "industry").map(([value]) => value));
+          setRegion((current) => regions.has(current) ? current : "");
+          setIndustry((current) => industries.has(current) ? current : "");
+          setView({ status: "ready", userId: session.user.user_id, items: result.items, orderedIds });
+        }
       } catch (caught) {
         if (ignore || (caught instanceof DOMException && caught.name === "AbortError")) return;
         setView({ status: "error", message: describeFavoriteError(caught, m.errors) });
@@ -105,15 +108,6 @@ export function FavoritesView() {
     return () => window.removeEventListener("pageshow", refreshAfterRestore);
   }, []);
 
-  useEffect(() => {
-    if (view.status !== "ready") return;
-    setOrderSaveError(!saveFavoriteOrder(view.userId, view.orderedIds));
-    const regions = new Set(optionsFor(view.items, "region").map(([value]) => value));
-    const industries = new Set(optionsFor(view.items, "industry").map(([value]) => value));
-    setRegion((current) => regions.has(current) ? current : "");
-    setIndustry((current) => industries.has(current) ? current : "");
-  }, [view]);
-
   async function handleRemove(companyId: string) {
     if (removingId || view.status !== "ready") return;
     const ownerId = view.userId;
@@ -121,10 +115,14 @@ export function FavoritesView() {
     setRemovingId(companyId);
     try {
       await removeFavorite(companyId);
+      const items = view.items.filter((item) => item.company_id !== companyId);
+      const orderedIds = reconcileFavoriteOrder(items, view.orderedIds);
+      setOrderSaveError(!saveFavoriteOrder(ownerId, orderedIds));
+      if (region && !optionsFor(items, "region").some(([value]) => value === region)) setRegion("");
+      if (industry && !optionsFor(items, "industry").some(([value]) => value === industry)) setIndustry("");
       setView((current) => {
         if (current.status !== "ready" || current.userId !== ownerId) return current;
-        const items = current.items.filter((item) => item.company_id !== companyId);
-        return { ...current, items, orderedIds: reconcileFavoriteOrder(items, current.orderedIds) };
+        return { ...current, items, orderedIds };
       });
     } catch (caught) {
       setRemoveError(describeFavoriteError(caught, m.errors));
@@ -174,11 +172,14 @@ export function FavoritesView() {
     && (!region || item.region === region)
     && (!industry || item.industry === industry));
   const visibleIds = visibleItems.map((item) => item.company_id);
+  const ownerId = view.userId;
+  const currentOrderedIds = view.orderedIds;
 
   function move(sourceId: string, targetId: string) {
-    const ownerId = view.userId;
+    const orderedIds = reorderVisibleFavorites(currentOrderedIds, visibleIds, sourceId, targetId);
+    setOrderSaveError(!saveFavoriteOrder(ownerId, orderedIds));
     setView((current) => current.status === "ready" && current.userId === ownerId
-      ? { ...current, orderedIds: reorderVisibleFavorites(current.orderedIds, visibleIds, sourceId, targetId) }
+      ? { ...current, orderedIds: reconcileFavoriteOrder(current.items, orderedIds) }
       : current);
   }
 

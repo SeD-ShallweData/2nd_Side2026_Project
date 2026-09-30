@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import { SafeMarkdown } from "@/components/common/SafeMarkdown";
 
 describe("SafeMarkdown", () => {
+  it("계약서 고정 서술의 교부 강조를 실제 굵은 글씨로 표시한다", () => {
+    const html = renderToStaticMarkup(<SafeMarkdown>{"근로계약서는 작성만으로 부족하고 근로자에게 **교부**해야 합니다."}</SafeMarkdown>);
+    expect(html).toContain("<strong>교부</strong>");
+    expect(html).toContain("근로자에게 ");
+    expect(html).toContain("해야 합니다.");
+    expect(html).not.toContain("**교부**");
+  });
+
   it("굵은 표시와 문단을 HTML 삽입 없이 렌더링한다", () => {
     const html = renderToStaticMarkup(<SafeMarkdown>{"먼저 **계약서**를 확인하세요.\n\n<script>alert(1)</script>"}</SafeMarkdown>);
     expect(html).toContain("<strong>계약서</strong>");
