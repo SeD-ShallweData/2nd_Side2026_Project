@@ -8,7 +8,7 @@ import { ServiceError } from "@/utils/errors";
 type PublicRateScope = "company_search" | "anonymous_chat" | "anonymous_contract_review";
 type Window = { name: string; limit: number; ms: number };
 type Bucket = { count: number; resetAt: number };
-const CONTRACT_DEMO_EXEMPT_UNTIL = Date.parse("2026-10-01T15:00:00.000Z"); // 2026-10-02 00:00 KST
+const DEMO_EXEMPT_UNTIL = Date.parse("2026-10-01T15:00:00.000Z"); // 2026-10-02 00:00 KST
 
 const buckets = new Map<string, Bucket>();
 let sharedClient: ReturnType<typeof createClient> | null = null;
@@ -69,7 +69,7 @@ function windows(scope: PublicRateScope): Window[] {
     return [{ name: "minute", limit: configuredLimit("PUBLIC_COMPANY_SEARCH_PER_MINUTE", 30), ms: 60_000 }];
   }
   const prefix = scope === "anonymous_chat" ? "ANONYMOUS_CHAT" : "ANONYMOUS_CONTRACT_REVIEW";
-  const defaults = scope === "anonymous_chat" ? [10, 30, 1_000] : [5, 15, 300];
+  const defaults = scope === "anonymous_chat" ? [30, 100, 1_000] : [10, 50, 500];
   return [
     { name: "hour", limit: configuredLimit(`${prefix}_PER_HOUR`, defaults[0]), ms: 3_600_000 },
     { name: "day", limit: configuredLimit(`${prefix}_PER_DAY`, defaults[1]), ms: 86_400_000 },
@@ -171,34 +171,21 @@ async function sharedLimit(scope: PublicRateScope, address: string, marker: stri
 
 /** Shared mode requires a canonical, authenticated proxy address. */
 export async function assertPublicRateLimit(request: Request, scope: PublicRateScope, now = Date.now()): Promise<void> {
+  // The demo lasts through October 1 KST. Keep the quota implementation for later use.
+  if (now < DEMO_EXEMPT_UNTIL) return;
   const address = trustedAddress(request);
   if (process.env.PUBLIC_RATE_LIMIT_STORE === "redis") {
     if (!address) unavailable();
-    if (scope === "anonymous_contract_review" && now < CONTRACT_DEMO_EXEMPT_UNTIL) {
-      try {
-        const date = new Date(now).toISOString().slice(0, 10).replaceAll("-", "");
-        const minute = new Date(now).toISOString().slice(0, 16).replaceAll(/[-:T]/g, "");
-        const dailyKey = `mw:quota:metrics:v1:${date}:${scope}:allowed`;
-        const minuteKey = `mw:quota:metrics:v1:${minute}:${scope}:minute-allowed`;
-        await (await redisClient()).multi()
-          .incr(dailyKey).pExpire(dailyKey, 172800000)
-          .incr(minuteKey).pExpire(minuteKey, 120000).exec();
-      } catch {
-        console.warn(JSON.stringify({ event: "public_rate_limit_store_unavailable", scope }));
-      }
-      return;
-    }
     try {
       await sharedLimit(scope, address, clientMarker(request));
     } catch (error) {
       if (!(error instanceof ServiceError) || error.code !== "PUBLIC_RATE_LIMIT_UNAVAILABLE" ||
-          (scope !== "company_search" && now >= CONTRACT_DEMO_EXEMPT_UNTIL)) throw error;
+          scope !== "company_search") throw error;
       console.warn(JSON.stringify({ event: "public_rate_limit_local_fallback", scope }));
       localLimit(scope, address, clientMarker(request), now);
     }
     return;
   }
-  if (scope === "anonymous_contract_review" && now < CONTRACT_DEMO_EXEMPT_UNTIL) return;
   localLimit(scope, address ?? "unknown", clientMarker(request), now);
 }
 
