@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useId, useState } from "react";
 import {
   COMMUNITY_CATEGORIES,
-  COMMUNITY_CATEGORY_LABELS,
   type CommunityCategory,
   type CommunityPostDto,
   type UpdateCommunityPostRequest,
 } from "@/app/api/community/communityApiContract";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/AsyncStates";
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { communityMessages } from "@/i18n/messages/community";
 import { CommunityApiError, getCommunityPost, updateCommunityPost } from "@/services/communityClient";
 import type { ErrorDetail } from "@/utils/errors";
 
@@ -38,6 +40,9 @@ interface SubmitError {
 }
 
 export function CommunityPostEditForm({ postId }: { postId: string }) {
+  const m = useMessages(communityMessages);
+  const n = (value: number) => value.toLocaleString(m.numberLocale);
+  const loadFailedMessage = m.detail.loadFailed;
   const router = useRouter();
   const fieldId = useId();
   const [reloadToken, setReloadToken] = useState(0);
@@ -69,11 +74,11 @@ export function CommunityPostEditForm({ postId }: { postId: string }) {
           key: requestKey,
           post: null,
           notFound,
-          error: notFound ? null : caught instanceof Error ? caught.message : "게시글을 불러오지 못했습니다.",
+          error: notFound ? null : caught instanceof Error ? caught.message : loadFailedMessage,
         });
       });
     return () => controller.abort();
-  }, [requestKey, postId]);
+  }, [requestKey, postId, loadFailedMessage]);
 
   const post = loading ? null : loaded?.post ?? null;
 
@@ -81,11 +86,11 @@ export function CommunityPostEditForm({ postId }: { postId: string }) {
     const errors: FieldErrors = {};
     const trimmedTitle = current.title.trim();
     if (trimmedTitle.length < TITLE_MIN || trimmedTitle.length > TITLE_MAX) {
-      errors.title = `제목은 ${TITLE_MIN}자 이상 ${TITLE_MAX}자 이하여야 합니다.`;
+      errors.title = format(m.form.titleLength, { min: TITLE_MIN, max: TITLE_MAX });
     }
     const trimmedBody = current.body.trim();
     if (trimmedBody.length < BODY_MIN || trimmedBody.length > BODY_MAX) {
-      errors.body = `내용은 ${BODY_MIN}자 이상 ${BODY_MAX.toLocaleString("ko-KR")}자 이하여야 합니다.`;
+      errors.body = format(m.form.bodyLength, { min: BODY_MIN, max: n(BODY_MAX) });
     }
     return errors;
   }
@@ -121,19 +126,19 @@ export function CommunityPostEditForm({ postId }: { postId: string }) {
       }
       setSubmitError({
         code: "NETWORK_ERROR",
-        message: "네트워크 문제로 게시글을 수정하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        message: m.edit.networkError,
       });
     }
   }
 
-  if (loading) return <LoadingSkeleton label="게시글을 불러오고 있습니다." />;
+  if (loading) return <LoadingSkeleton label={m.detail.loading} />;
 
   if (loaded?.notFound) {
     return (
       <EmptyState
-        title="게시글을 찾을 수 없습니다"
-        description="삭제되었거나 공개되지 않은 게시글입니다. 커뮤니티 목록에서 다시 확인해 주세요."
-        action={<Link href="/community" className="button button-dark">커뮤니티 목록으로</Link>}
+        title={m.detail.notFoundTitle}
+        description={m.detail.notFoundDescription}
+        action={<Link href="/community" className="button button-dark">{m.detail.backToList}</Link>}
       />
     );
   }
@@ -148,16 +153,16 @@ export function CommunityPostEditForm({ postId }: { postId: string }) {
   if (!post.viewer_permissions.can_edit) {
     return (
       <EmptyState
-        title="게시글을 수정할 수 없습니다"
-        description="본인이 작성한 공개 상태의 게시글만 수정할 수 있습니다."
-        action={<Link href={`/community/${encodeURIComponent(post.post_id)}`} className="button button-dark">게시글로 돌아가기</Link>}
+        title={m.edit.cannotEditTitle}
+        description={m.edit.cannotEditDescription}
+        action={<Link href={`/community/${encodeURIComponent(post.post_id)}`} className="button button-dark">{m.edit.backToPost}</Link>}
       />
     );
   }
 
   return (
     <form className="search-form" onSubmit={handleSubmit} noValidate>
-      <label htmlFor={`${fieldId}-category`}>분류</label>
+      <label htmlFor={`${fieldId}-category`}>{m.form.category}</label>
       <select
         id={`${fieldId}-category`}
         value={draft.category}
@@ -165,11 +170,11 @@ export function CommunityPostEditForm({ postId }: { postId: string }) {
         onChange={(event) => setDraft({ ...draft, category: event.target.value as CommunityCategory })}
       >
         {COMMUNITY_CATEGORIES.map((item) => (
-          <option key={item} value={item}>{COMMUNITY_CATEGORY_LABELS[item]}</option>
+          <option key={item} value={item}>{m.categories[item]}</option>
         ))}
       </select>
 
-      <label htmlFor={`${fieldId}-title`}>제목</label>
+      <label htmlFor={`${fieldId}-title`}>{m.form.title}</label>
       <input
         id={`${fieldId}-title`}
         value={draft.title}
@@ -182,9 +187,9 @@ export function CommunityPostEditForm({ postId }: { postId: string }) {
       />
       {fieldErrors.title
         ? <p className="field-error" id={`${fieldId}-title-error`} role="alert">{fieldErrors.title}</p>
-        : <p className="field-help" id={`${fieldId}-title-help`}>{TITLE_MIN}~{TITLE_MAX}자 · 현재 {draft.title.trim().length}자</p>}
+        : <p className="field-help" id={`${fieldId}-title-help`}>{format(m.form.lengthHelp, { min: TITLE_MIN, max: TITLE_MAX, count: draft.title.trim().length })}</p>}
 
-      <label htmlFor={`${fieldId}-body`}>내용</label>
+      <label htmlFor={`${fieldId}-body`}>{m.form.body}</label>
       <textarea
         id={`${fieldId}-body`}
         value={draft.body}
@@ -197,9 +202,9 @@ export function CommunityPostEditForm({ postId }: { postId: string }) {
       />
       {fieldErrors.body
         ? <p className="field-error" id={`${fieldId}-body-error`} role="alert">{fieldErrors.body}</p>
-        : <p className="field-help" id={`${fieldId}-body-help`}>{BODY_MIN}~{BODY_MAX.toLocaleString("ko-KR")}자 · 현재 {draft.body.trim().length.toLocaleString("ko-KR")}자</p>}
+        : <p className="field-help" id={`${fieldId}-body-help`}>{format(m.form.lengthHelp, { min: BODY_MIN, max: n(BODY_MAX), count: n(draft.body.trim().length) })}</p>}
 
-      <label htmlFor={`${fieldId}-anonymous`}>익명 설정</label>
+      <label htmlFor={`${fieldId}-anonymous`}>{m.form.anonymousLabel}</label>
       <p className="field-help">
         <input
           id={`${fieldId}-anonymous`}
@@ -208,18 +213,18 @@ export function CommunityPostEditForm({ postId }: { postId: string }) {
           disabled={submitting}
           onChange={(event) => setDraft({ ...draft, anonymous: event.target.checked })}
         />
-        {" "}익명으로 표시합니다. 해제하면 목록과 상세에 표시 이름이 노출됩니다.
+        {" "}{m.edit.anonymousEdit}
       </p>
 
       <div className="contract-actions">
         <button type="submit" className="button button-dark" disabled={submitting}>
-          {submitting ? "저장 중" : "수정 저장"}
+          {submitting ? m.edit.saving : m.edit.save}
         </button>
-        <Link href={`/community/${encodeURIComponent(post.post_id)}`} className="button button-outline">취소</Link>
+        <Link href={`/community/${encodeURIComponent(post.post_id)}`} className="button button-outline">{m.form.cancel}</Link>
       </div>
 
       {submitError?.code === "AUTHENTICATION_REQUIRED" ? (
-        <p className="field-error" role="alert">로그인이 필요합니다. 로그인한 뒤 다시 시도해 주세요.</p>
+        <p className="field-error" role="alert">{m.form.loginRequired}</p>
       ) : null}
       {submitError && submitError.code !== "AUTHENTICATION_REQUIRED" ? (
         <>

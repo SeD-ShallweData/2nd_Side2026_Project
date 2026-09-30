@@ -19,6 +19,11 @@ import type {
   ProviderComparisonResult,
 } from "@/domain/chatComparison";
 import { executionModeCopy, providerRunStatusLabel } from "@/components/chat/runLabels";
+import { format } from "@/i18n/defineMessages";
+import { useLocale, useMessages } from "@/i18n/LocaleProvider";
+import type { Locale } from "@/i18n/locales";
+import { chatMessages, type ChatMessages } from "@/i18n/messages/chat";
+import { languageMessages } from "@/i18n/messages/language";
 import type { FavoriteCompanyDto } from "@/app/api/users/me/favorites/favoriteApiContract";
 import {
   CONTRACT_REVIEW_CONTEXT_STORAGE_KEY,
@@ -38,37 +43,16 @@ import {
   readGuestConversation,
 } from "@/services/guestConversationClient";
 
-const COMPANY_QUESTIONS = [
-  "왜 추가 확인이 필요한가요?",
-  "입사 전에 무엇을 확인해야 하나요?",
-  "임금이 밀리면 어떻게 해야 하나요?",
-  "산재 신청은 어떻게 하나요?",
-  "이 회사는 안전한가요?",
-] as const;
+// 추천 질문과 가이드 문구는 사전(chatMessages)에 있다. 여기서는 순서만 정한다.
+type QuestionKey = keyof ChatMessages["questions"];
 
-const GENERAL_QUESTIONS = [
-  "임금이 밀리면 어떻게 해야 하나요?",
-  "산재 신청은 어떻게 하나요?",
-  "근로계약서에서 무엇을 확인해야 하나요?",
-  "이 회사는 안전한가요?",
-] as const;
+const COMPANY_QUESTIONS: readonly QuestionKey[] = ["whyReview", "beforeJoining", "unpaidWage", "injuryClaim", "isSafe"];
+
+const GENERAL_QUESTIONS: readonly QuestionKey[] = ["unpaidWage", "injuryClaim", "contractCheck", "isSafe"];
 
 const GUIDE_GROUPS = [
-  {
-    title: "입사 전 확인",
-    items: [
-      ["임금 지급 조건", "입사 전에 임금 지급일과 급여 구성에서 무엇을 확인해야 하나요?"],
-      ["계약서 필수 항목", "근로계약서에서 꼭 확인해야 하는 항목을 알려주세요."],
-    ],
-  },
-  {
-    title: "문제가 생겼을 때",
-    items: [
-      ["임금이 밀렸을 때", "임금이 밀렸을 때 어떤 자료부터 준비해야 하나요?"],
-      ["해고 통보 확인", "갑자기 나오지 말라는 말을 들었을 때 무엇을 확인해야 하나요?"],
-      ["연차 확인", "연차 유급휴가를 사용하지 못했을 때 무엇을 확인해야 하나요?"],
-    ],
-  },
+  { key: "beforeJoining", items: ["wageTerms", "contractItems"] },
+  { key: "trouble", items: ["unpaidWage", "dismissal", "annualLeave"] },
 ] as const;
 
 const CONTRACT_FILE_TYPES = ["application/pdf", "image/png", "image/jpeg"];
@@ -83,21 +67,38 @@ interface UiMessage {
   sources?: import("@/domain/risk").SourceReference[];
   companyId?: string | null;
   companyName?: string | null;
+  /** 환영 메시지는 화면 언어로 그때그때 그린다. */
+  welcome?: { company?: string };
 }
 
-function welcomeContent(company: string | undefined, executionMode: ConfiguredChatExecutionMode): string {
+function welcomeContent(
+  company: string | undefined,
+  executionMode: ConfiguredChatExecutionMode,
+  m: ChatMessages,
+): string {
   if (company) {
-    return executionMode === "dual_api"
-      ? `${company}의 공개 컨텍스트와 공식 근거를 Upstage Solar에 전달해 답변합니다. 필요할 때만 SKT A.X 비교를 켤 수 있습니다. 안전·위법 여부나 입사 결정을 대신하지는 않습니다.`
-      : `${company}을 선택했습니다. 필요한 경우 허용된 사업장·위험·법령 조회 도구를 사용해 답변합니다.`;
+    return format(executionMode === "dual_api" ? m.welcome.companyDual : m.welcome.companyTools, { company });
   }
-  return executionMode === "dual_api"
-    ? "기본적으로 Upstage Solar 하나에 질문을 보내고, 비교를 켠 질문에만 SKT A.X 답변을 함께 표시합니다."
-    : "OpenAI Responses가 질문에 필요한 공식 정보 도구만 선택적으로 호출해 노동 상담 답변을 만듭니다.";
+  return executionMode === "dual_api" ? m.welcome.generalDual : m.welcome.generalTools;
 }
 
-function metric(value: number | null, suffix = ""): string {
-  return value === null ? "미제공" : `${value.toLocaleString("ko-KR")}${suffix}`;
+function welcomeMessage(company: string | undefined): UiMessage {
+  return { id: "welcome", role: "assistant", content: "", welcome: { company } };
+}
+
+/** 숫자·시간 표기용 BCP 47 태그. 쉬운 한국어도 한국어 표기를 쓴다. */
+function intlLocale(locale: Locale): string {
+  switch (locale) {
+    case "en": return "en-US";
+    case "zh": return "zh-CN";
+    case "vi": return "vi-VN";
+    case "th": return "th-TH";
+    default: return "ko-KR";
+  }
+}
+
+function metric(value: number | null, m: ChatMessages, locale: Locale, suffix = ""): string {
+  return value === null ? m.trace.notProvided : `${value.toLocaleString(intlLocale(locale))}${suffix}`;
 }
 
 function comparisonHistoryContent(
@@ -119,7 +120,10 @@ function isLegacyProvider(
 }
 
 function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
-  const statusLabel = providerRunStatusLabel(result.status, result.trace.guardrail_hits, result.trace.recall_mode);
+  const m = useMessages(chatMessages);
+  const locale = useLocale();
+  const t = m.trace;
+  const statusLabel = providerRunStatusLabel(result.status, result.trace.guardrail_hits, result.trace.recall_mode, m.run);
 
   return (
     <article className={`provider-answer provider-answer-${result.provider}`}>
@@ -141,57 +145,57 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
 
       <div className="provider-answer-copy"><SafeMarkdown>{publicAnswerText(result.answer)}</SafeMarkdown></div>
 
-      <section className="provider-evidence" aria-label={`${result.provider_label} 답변 근거와 한계`}>
+      <section className="provider-evidence" aria-label={format(m.card.evidenceAria, { provider: result.provider_label })}>
         <div>
-          <strong>공식 근거</strong>
+          <strong>{m.card.officialSources}</strong>
           <DataSourceList sources={result.sources} />
         </div>
         <div>
-          <strong>답변 한계</strong>
+          <strong>{m.card.limitations}</strong>
           {result.limitations.length > 0 ? (
             <ul>{result.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
-          ) : <p className="muted-text">별도로 표시된 한계가 없습니다.</p>}
+          ) : <p className="muted-text">{m.card.noLimitations}</p>}
         </div>
       </section>
 
       <details className="provider-trace">
-        <summary>응답 상세 · 속도, 토큰, 생성 과정</summary>
+        <summary>{t.summary}</summary>
         <dl>
-          <div><dt>전체 응답시간</dt><dd>{metric(result.metrics.latency_ms, "ms")}</dd></div>
-          <div><dt>전체 토큰</dt><dd>{metric(result.metrics.usage.total_tokens)}</dd></div>
-          <div><dt>답변 길이</dt><dd>{metric(result.metrics.answer_chars, "자")}</dd></div>
-          <div><dt>실행 상태</dt><dd>{statusLabel}</dd></div>
-          <div><dt>컨텍스트</dt><dd>{result.trace.context_mode === "company" ? "선택 사업장 연결" : "일반 상담"}</dd></div>
-          <div><dt>질의 재작성</dt><dd>{result.trace.query_transform === "none" ? "사용 안 함" : "후속 질문 독립형 재작성"}</dd></div>
-          <div><dt>최근 대화</dt><dd>{result.trace.recent_message_count}개 전달</dd></div>
-          <div><dt>공식 근거 검색</dt><dd>{result.trace.rag_status}</dd></div>
-          <div><dt>검색 판단</dt><dd>{result.trace.rag_reason ?? "근거 연결"}</dd></div>
-          <div><dt>범위 밖 주제</dt><dd>{result.trace.rag_topic ?? "해당 없음"}</dd></div>
-          <div><dt>공유 근거</dt><dd>{result.trace.retrieved_document_count}개</dd></div>
-          {result.trace.tool_round_count !== undefined ? <div><dt>도구 라운드</dt><dd>{result.trace.tool_round_count}회</dd></div> : null}
-          {result.trace.tool_call_count !== undefined ? <div><dt>도구 호출</dt><dd>{result.trace.tool_call_count}회</dd></div> : null}
-          {result.trace.tool_names ? <div><dt>사용 도구</dt><dd>{result.trace.tool_names.join(", ") || "사용 안 함"}</dd></div> : null}
-          <div><dt>정책 버전</dt><dd>{result.trace.prompt_policy_version}</dd></div>
-          <div><dt>가드레일</dt><dd>{result.trace.guardrail_action}</dd></div>
-          <div><dt>가드레일 규칙</dt><dd>{result.trace.guardrail_hits.join(", ") || "탐지 없음"}</dd></div>
-          <div><dt>종료 사유</dt><dd>{result.metrics.finish_reason || "미제공"}</dd></div>
-          <div><dt>입력 토큰</dt><dd>{metric(result.metrics.usage.prompt_tokens)}</dd></div>
-          <div><dt>출력 토큰</dt><dd>{metric(result.metrics.usage.completion_tokens)}</dd></div>
-          <div><dt>캐시 토큰</dt><dd>{metric(result.metrics.usage.cached_tokens)}</dd></div>
-          <div><dt>추론 토큰</dt><dd>{metric(result.metrics.usage.reasoning_tokens)}</dd></div>
-          <div><dt>첫 토큰 시간</dt><dd>비스트리밍 호출로 미측정</dd></div>
-          <div><dt>요청 추적 ID</dt><dd>{result.trace.upstream_request_id || "미제공"}</dd></div>
+          <div><dt>{t.latency}</dt><dd>{metric(result.metrics.latency_ms, m, locale, "ms")}</dd></div>
+          <div><dt>{t.totalTokens}</dt><dd>{metric(result.metrics.usage.total_tokens, m, locale)}</dd></div>
+          <div><dt>{t.answerLength}</dt><dd>{metric(result.metrics.answer_chars, m, locale, t.charsSuffix)}</dd></div>
+          <div><dt>{t.runStatus}</dt><dd>{statusLabel}</dd></div>
+          <div><dt>{t.context}</dt><dd>{result.trace.context_mode === "company" ? t.contextCompany : t.contextGeneral}</dd></div>
+          <div><dt>{t.queryRewrite}</dt><dd>{result.trace.query_transform === "none" ? t.notUsed : t.queryRewriteStandalone}</dd></div>
+          <div><dt>{t.recentMessages}</dt><dd>{format(t.recentMessagesValue, { count: result.trace.recent_message_count })}</dd></div>
+          <div><dt>{t.ragSearch}</dt><dd>{result.trace.rag_status}</dd></div>
+          <div><dt>{t.ragReason}</dt><dd>{result.trace.rag_reason ?? t.ragReasonDefault}</dd></div>
+          <div><dt>{t.ragTopic}</dt><dd>{result.trace.rag_topic ?? t.ragTopicNone}</dd></div>
+          <div><dt>{t.sharedSources}</dt><dd>{format(t.countValue, { count: result.trace.retrieved_document_count })}</dd></div>
+          {result.trace.tool_round_count !== undefined ? <div><dt>{t.toolRounds}</dt><dd>{format(t.timesValue, { count: result.trace.tool_round_count })}</dd></div> : null}
+          {result.trace.tool_call_count !== undefined ? <div><dt>{t.toolCalls}</dt><dd>{format(t.timesValue, { count: result.trace.tool_call_count })}</dd></div> : null}
+          {result.trace.tool_names ? <div><dt>{t.toolNames}</dt><dd>{result.trace.tool_names.join(", ") || t.notUsed}</dd></div> : null}
+          <div><dt>{t.policyVersion}</dt><dd>{result.trace.prompt_policy_version}</dd></div>
+          <div><dt>{t.guardrail}</dt><dd>{result.trace.guardrail_action}</dd></div>
+          <div><dt>{t.guardrailRules}</dt><dd>{result.trace.guardrail_hits.join(", ") || t.guardrailNone}</dd></div>
+          <div><dt>{t.finishReason}</dt><dd>{result.metrics.finish_reason || t.notProvided}</dd></div>
+          <div><dt>{t.promptTokens}</dt><dd>{metric(result.metrics.usage.prompt_tokens, m, locale)}</dd></div>
+          <div><dt>{t.completionTokens}</dt><dd>{metric(result.metrics.usage.completion_tokens, m, locale)}</dd></div>
+          <div><dt>{t.cachedTokens}</dt><dd>{metric(result.metrics.usage.cached_tokens, m, locale)}</dd></div>
+          <div><dt>{t.reasoningTokens}</dt><dd>{metric(result.metrics.usage.reasoning_tokens, m, locale)}</dd></div>
+          <div><dt>{t.firstToken}</dt><dd>{t.firstTokenValue}</dd></div>
+          <div><dt>{t.upstreamRequestId}</dt><dd>{result.trace.upstream_request_id || t.notProvided}</dd></div>
         </dl>
-        <p className="trace-security-note">API 키와 숨은 시스템 프롬프트는 보안을 위해 표시하지 않습니다.</p>
+        <p className="trace-security-note">{t.securityNote}</p>
       </details>
 
       {result.suggested_actions.length > 0 ? (
         <div className="provider-actions">
-          <strong>다음 행동</strong>
+          <strong>{m.card.nextActions}</strong>
           <ul>
             {result.suggested_actions.map((action) => (
               <li key={action.code}>
-                <span>{action.priority === "now" ? "지금" : action.priority === "next" ? "다음" : "선택"}</span>
+                <span>{action.priority === "now" ? m.card.priorityNow : action.priority === "next" ? m.card.priorityNext : m.card.priorityOptional}</span>
                 <div><strong>{action.label}</strong>{action.description ? <p>{action.description}</p> : null}</div>
               </li>
             ))}
@@ -212,24 +216,27 @@ function ComparisonBlock({
   selected?: LlmProviderId | "tie";
   onSelect: (selection: LlmProviderId | "tie") => void;
 }) {
+  const m = useMessages(chatMessages);
+  const locale = useLocale();
+  const c = m.comparison;
   const retrieval = comparison.results[0]?.trace;
   const ragToolCalled = retrieval?.tool_names?.includes("retrieve_labor_law") ?? false;
   const ragLabel = !retrieval
-    ? "공식 근거 상태 미확인"
+    ? c.ragUnknown
     : comparison.execution_mode === "policy_short_circuit" && retrieval.recall_mode
-      ? "사용자 진술 기반 · 법령 검색 미사용"
+      ? c.ragRecall
     : comparison.execution_mode === "openai_responses" && !ragToolCalled
-      ? "이번 답변에서 공식 법령 검색 미사용"
+      ? c.ragToolUnused
     : retrieval.rag_status === "matched"
-      ? `공식 근거 ${retrieval.retrieved_document_count}개 연결`
+      ? format(c.ragMatched, { count: retrieval.retrieved_document_count })
       : retrieval.rag_status === "no_match"
         ? retrieval.rag_reason === "out_of_scope" && retrieval.rag_topic
-          ? `현재 수록 범위 밖 · ${retrieval.rag_topic}`
-          : "직접 관련 공식 근거 없음"
+          ? format(c.ragOutOfScope, { topic: retrieval.rag_topic })
+          : c.ragNoMatch
         : comparison.execution_mode === "policy_short_circuit"
-          ? "긴급 안내 우선"
-          : "공식 근거 검색 연결 안 됨";
-  const modeCopy = executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits, retrieval?.recall_mode);
+          ? c.ragEmergency
+          : c.ragDisconnected;
+  const modeCopy = executionModeCopy(comparison.execution_mode, retrieval?.guardrail_hits, retrieval?.recall_mode, m.run);
   const feedbackResults = comparison.execution_mode === "dual_api"
     ? comparison.results.filter(isLegacyProvider)
     : [];
@@ -243,15 +250,15 @@ function ComparisonBlock({
           <strong>{modeCopy.summary}</strong>
           <span className={`rag-status rag-status-${retrieval?.rag_status ?? "unavailable"}`}>{ragLabel}</span>
         </div>
-        <span>{new Date(comparison.completed_at).toLocaleTimeString("ko-KR")}</span>
+        <span>{new Date(comparison.completed_at).toLocaleTimeString(intlLocale(locale))}</span>
       </div>
       <div className={`provider-answer-grid${comparison.results.length === 1 ? " provider-answer-grid-single" : ""}`}>
         {comparison.results.map((result) => <ProviderAnswerCard key={result.provider} result={result} />)}
       </div>
       {showFeedback ? <div className="comparison-feedback">
         <div>
-          <strong>어느 답변이 더 유용했나요?</strong>
-          <span>질문과 답변 원문 없이 선택과 성능 지표만 로컬 평가 로그에 저장됩니다.</span>
+          <strong>{c.feedbackQuestion}</strong>
+          <span>{c.feedbackNote}</span>
         </div>
         <div className="feedback-buttons">
           {feedbackResults.map((result) => (
@@ -261,14 +268,14 @@ function ComparisonBlock({
               className={selected === result.provider ? "selected" : ""}
               onClick={() => onSelect(result.provider)}
             >
-              {result.provider_label}가 더 유용
+              {format(c.feedbackPrefer, { provider: result.provider_label })}
             </button>
           ))}
           <button type="button" className={selected === "tie" ? "selected" : ""} onClick={() => onSelect("tie")}>
-            비슷함
+            {c.feedbackTie}
           </button>
         </div>
-        {selected ? <p role="status">평가가 저장되었습니다.</p> : null}
+        {selected ? <p role="status">{c.feedbackSaved}</p> : null}
       </div> : null}
     </div>
   );
@@ -290,18 +297,18 @@ export function ChatPanel({
   /** 계약서 진단 화면의 "AI 상담으로 이어가기"로 들어온 경우 true. */
   contractReviewRequested?: boolean;
 }) {
+  const m = useMessages(chatMessages);
+  const lm = useMessages(languageMessages);
+  const locale = useLocale();
+  const n = m.notice;
   const inputId = useId();
+  const voiceInputTipId = useId();
+  const voiceReadTipId = useId();
   const contractFileInputId = useId();
   const contractFileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(suggestedPrompt ?? "");
-  const [messages, setMessages] = useState<UiMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: welcomeContent(companyName, executionMode),
-    },
-  ]);
+  const [messages, setMessages] = useState<UiMessage[]>([welcomeMessage(companyName)]);
   const [conversationId, setConversationId] = useState<string>();
   const [conversationTitle, setConversationTitle] = useState<string>();
   const [activeCompanyId, setActiveCompanyId] = useState(companyId);
@@ -327,11 +334,11 @@ export function ChatPanel({
       setConversationHistory([]);
       return;
     }
-    if (!response.ok) throw new Error("대화 기록을 불러오지 못했습니다.");
+    if (!response.ok) throw new Error(n.historyLoadFailed);
     const data = await readApiResponse<ConversationListResponse>(response);
     setHistoryAvailable(true);
     setConversationHistory(data.items);
-  }, []);
+  }, [n.historyLoadFailed]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -401,7 +408,7 @@ export function ChatPanel({
     const message = value.trim();
     if (!message || loading) return;
     if (!externalProcessingConsent) {
-      setError("외부 AI 전송 안내를 확인하고 이번 질문 전송에 동의해 주세요.");
+      setError(n.consentRequired);
       return;
     }
     const submittedContractFile = contractFile;
@@ -436,6 +443,7 @@ export function ChatPanel({
         form.append("message", message);
         form.append("request_id", requestId);
         form.append("chat_mode", chatMode);
+        form.append("ui_locale", locale);
         form.append("recent_messages", JSON.stringify(recentMessages));
         form.append("external_processing_consent", "true");
         if (conversationId) form.append("conversation_id", conversationId);
@@ -452,6 +460,7 @@ export function ChatPanel({
           external_processing_consent: true,
           external_compare_consent: requestedComparison,
           chat_mode: chatMode,
+          ui_locale: locale,
           recent_messages: recentMessages,
           ...(chatMode === "contract" && contractReview ? { contract_review: contractReview } : {}),
         });
@@ -460,16 +469,16 @@ export function ChatPanel({
       const data = await readApiResponse<ChatComparisonResponse>(response);
       if (data.conversation_persistence !== "guest") setConversationId(data.conversation_id);
       if (data.conversation_persistence === "saved") {
-        setPersistenceNotice("상담과 표시된 답변이 저장되었습니다.");
+        setPersistenceNotice(n.saved);
         void refreshConversationHistory().catch(() => setHistoryAvailable(false));
       } else if (data.conversation_persistence === "unavailable") {
         setHistoryAvailable(false);
-        setError("답변은 표시했지만 대화 기록 저장소에 연결하지 못했습니다.");
-        setPersistenceNotice("저장에 실패했습니다. 같은 질문의 재전송 버튼으로 저장을 다시 시도할 수 있습니다.");
+        setError(n.storageUnavailable);
+        setPersistenceNotice(n.saveFailedRetry);
       } else if (data.conversation_persistence === "guest") {
         appendGuestConversationTurn(message, activeCompanyId ?? null, data);
         setGuestImportAvailable(true);
-        setPersistenceNotice("이 익명 상담은 현재 탭에만 임시 보관됩니다.");
+        setPersistenceNotice(n.guestTemporary);
       }
       const completedContractReview = data.results.some(
         (result) =>
@@ -489,7 +498,7 @@ export function ChatPanel({
         { id: crypto.randomUUID(), role: "assistant", content: "상담 결과", comparison: data },
       ]);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "상담 답변을 불러오지 못했습니다.");
+      setError(caught instanceof Error ? caught.message : n.answerLoadFailed);
     } finally {
       if (requestedComparison) setCompare(false);
       setLoading(false);
@@ -517,7 +526,7 @@ export function ChatPanel({
       });
       if (!response.ok) throw new Error("feedback save failed");
     } catch {
-      setError("비교 평가는 화면에 반영됐지만 로그 저장에는 실패했습니다.");
+      setError(n.feedbackLogFailed);
     }
   }
 
@@ -538,10 +547,7 @@ export function ChatPanel({
         : detail.active_company_name ?? undefined;
       setActiveCompanyName(restoredCompanyName);
       setMessages([
-        { id: "welcome", role: "assistant", content: welcomeContent(
-          restoredCompanyName,
-          executionMode,
-        ) },
+        welcomeMessage(restoredCompanyName),
         ...detail.turns.flatMap((turn) => turn.messages.map((message) => message.role === "assistant" && turn.response
           ? { id: `${turn.turn_id}-assistant`, role: "assistant" as const, content: "상담 결과", comparison: turn.response }
           : {
@@ -553,9 +559,9 @@ export function ChatPanel({
               ...(message.role === "assistant" ? { sources: turn.sources } : {}),
             })),
       ]);
-      setPersistenceNotice("저장된 상담을 복원했습니다. 현재 사업장 문맥도 함께 적용되었습니다.");
+      setPersistenceNotice(n.restored);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "대화 기록을 불러오지 못했습니다.");
+      setError(caught instanceof Error ? caught.message : n.historyLoadFailed);
     } finally {
       setHistoryLoading(false);
     }
@@ -578,9 +584,9 @@ export function ChatPanel({
         setMessages((current) => current.slice(0, 1));
       }
       await refreshConversationHistory();
-      setPersistenceNotice("저장된 상담을 삭제했습니다. 늦게 끝난 응답도 다시 저장되지 않습니다.");
+      setPersistenceNotice(n.deleted);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "대화 기록을 삭제하지 못했습니다.");
+      setError(caught instanceof Error ? caught.message : n.historyDeleteFailed);
     } finally {
       setHistoryLoading(false);
     }
@@ -601,12 +607,12 @@ export function ChatPanel({
       setActiveCompanyId(updated.active_company_id ?? undefined);
       setActiveCompanyName(updated.active_company_id === companyId ? companyName : undefined);
       setMessages((current) => current.map((message) => message.id === "welcome"
-        ? { ...message, content: welcomeContent(updated.active_company_id === companyId ? companyName : updated.active_company_id ?? undefined, executionMode) }
+        ? welcomeMessage(updated.active_company_id === companyId ? companyName : updated.active_company_id ?? undefined)
         : message));
       await refreshConversationHistory();
-      setPersistenceNotice(patch.title !== undefined ? "상담 제목을 수정했습니다." : updated.active_company_id ? "사업장 문맥을 변경했습니다." : "사업장 문맥을 해제했습니다.");
+      setPersistenceNotice(patch.title !== undefined ? n.titleUpdated : updated.active_company_id ? n.companyChanged : n.companyCleared);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "상담 정보를 수정하지 못했습니다.");
+      setError(caught instanceof Error ? caught.message : n.metadataUpdateFailed);
     } finally {
       setHistoryLoading(false);
     }
@@ -614,7 +620,7 @@ export function ChatPanel({
 
   function editConversationTitle() {
     if (!conversationId) return;
-    const title = window.prompt("새 상담 제목을 입력해 주세요.", conversationTitle ?? "");
+    const title = window.prompt(n.titlePrompt, conversationTitle ?? "");
     if (title !== null && title.trim()) void updateConversationMetadata({ title });
   }
 
@@ -634,9 +640,9 @@ export function ChatPanel({
       setGuestImportAvailable(false);
       await refreshConversationHistory();
       await restoreConversation(imported.conversation_id);
-      setPersistenceNotice(imported.reused ? "이미 가져온 익명 상담을 복원했습니다." : "동의한 현재 익명 상담 하나를 계정으로 가져왔습니다.");
+      setPersistenceNotice(imported.reused ? n.guestReimported : n.guestImported);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "익명 상담을 가져오지 못했습니다.");
+      setError(caught instanceof Error ? caught.message : n.guestImportFailed);
     } finally {
       setHistoryLoading(false);
     }
@@ -656,28 +662,29 @@ export function ChatPanel({
     }
     if (!CONTRACT_FILE_TYPES.includes(next.type)) {
       setContractFile(null);
-      setError("계약서는 PDF, PNG, JPG 파일만 선택할 수 있습니다.");
+      setError(n.fileTypeInvalid);
       event.target.value = "";
       return;
     }
     if (next.size > MAX_CONTRACT_FILE_SIZE) {
       setContractFile(null);
-      setError("계약서 파일은 10MB 이하여야 합니다.");
+      setError(n.fileTooLarge);
       event.target.value = "";
       return;
     }
     setContractFile(next);
   }
 
-  const questions = activeCompanyId ? COMPANY_QUESTIONS : GENERAL_QUESTIONS;
-  const activeCompanyLabel = activeCompanyName ?? (activeCompanyId ? "선택 사업장" : undefined);
+  const questions = (activeCompanyId ? COMPANY_QUESTIONS : GENERAL_QUESTIONS).map((key) => m.questions[key]);
+  const activeCompanyLabel = activeCompanyName ?? (activeCompanyId ? m.topbar.selectedCompanyFallback : undefined);
+  const reviewCounts = contractReview ? contractReviewCounts(contractReview) : null;
 
   return (
     <div className="chat-experience-layout">
       <div className="chat-panel comparison-chat-panel">
       <div className="chat-topbar">
-        <div><span className="online-dot" aria-hidden="true" /><strong>{executionMode === "dual_api" ? compare ? "Upstage·SKT 답변 비교" : "Upstage Solar 단일 상담" : "OpenAI 도구 연결 상담"}</strong></div>
-        <span>{activeCompanyLabel ? `${activeCompanyLabel} 컨텍스트 연결됨` : chatMode === "contract" ? contractReview ? "계약서 진단 결과 연결됨" : "계약서 후속 상담" : "일반 노동 상담"}</span>
+        <div><span className="online-dot" aria-hidden="true" /><strong>{executionMode === "dual_api" ? compare ? m.topbar.dualCompare : m.topbar.dualSingle : m.topbar.tools}</strong></div>
+        <span>{activeCompanyLabel ? format(m.topbar.companyConnected, { company: activeCompanyLabel }) : chatMode === "contract" ? contractReview ? m.topbar.contractLinked : m.topbar.contractFollowup : m.topbar.general}</span>
       </div>
 
       <div className="chat-body comparison-chat-body" aria-live="polite" aria-busy={loading}>
@@ -694,76 +701,76 @@ export function ChatPanel({
               {message.role === "assistant" ? <Image className="chat-avatar" src="/brand/donworry-avatar.png" alt="" width={192} height={192} /> : null}
               {message.role === "user" ? (
                 <div className="user-message-wrap">
-                  <button type="button" className="message-retry" onClick={() => void sendMessage(message.content, message.requestId)} disabled={loading} aria-label={`질문 다시 보내기: ${message.content}`}>
-                    <span aria-hidden="true">↻</span> 재전송
+                  <button type="button" className="message-retry" onClick={() => void sendMessage(message.content, message.requestId)} disabled={loading} aria-label={format(m.thread.retryAria, { question: message.content })}>
+                    <span aria-hidden="true">↻</span> {m.thread.retry}
                   </button>
                   <div className="chat-message chat-message-user"><p>{message.content}</p></div>
-                  {message.companyId ? <small className="turn-company-label">당시 사업장: {message.companyName ?? "연결된 사업장"}</small> : null}
+                  {message.companyId ? <small className="turn-company-label">{format(m.thread.turnCompany, { company: message.companyName ?? m.thread.turnCompanyFallback })}</small> : null}
                 </div>
-              ) : <div className="chat-message chat-message-assistant"><p>{message.content}</p>{message.sources?.length ? <DataSourceList sources={message.sources} /> : null}</div>}
+              ) : <div className="chat-message chat-message-assistant"><p>{message.welcome ? welcomeContent(message.welcome.company, executionMode, m) : message.content}</p>{message.sources?.length ? <DataSourceList sources={message.sources} /> : null}</div>}
             </div>
           )
         ))}
         {loading ? executionMode === "dual_api" && compare ? (
           <div className="dual-loading" role="status">
-            <strong>두 모델에 같은 요청을 동시에 보냈습니다</strong>
+            <strong>{m.loading.dualCompareTitle}</strong>
             <div>
-              <span><i className="provider-dot provider-dot-upstage" />Upstage Solar 응답 대기</span>
-              <span><i className="provider-dot provider-dot-skt" />SKT A.X 응답 대기</span>
+              <span><i className="provider-dot provider-dot-upstage" />{m.loading.upstageWaiting}</span>
+              <span><i className="provider-dot provider-dot-skt" />{m.loading.sktWaiting}</span>
             </div>
-            <small>한쪽이 실패해도 다른 모델의 결과는 유지합니다. 최대 45초까지 기다릴 수 있습니다.</small>
+            <small>{m.loading.dualCompareNote}</small>
           </div>
         ) : executionMode === "dual_api" ? (
           <div className="dual-loading" role="status">
-            <strong>Upstage Solar에 공식 근거와 함께 질문을 보냈습니다</strong>
+            <strong>{m.loading.dualSingleTitle}</strong>
             <div>
-              <span><i className="provider-dot provider-dot-upstage" />Upstage Solar 응답 대기</span>
+              <span><i className="provider-dot provider-dot-upstage" />{m.loading.upstageWaiting}</span>
             </div>
-            <small>기본 단일 모델 호출이며, SKT A.X는 비교를 켠 질문에서만 호출합니다.</small>
+            <small>{m.loading.dualSingleNote}</small>
           </div>
         ) : (
           <div className="dual-loading" role="status">
-            <strong>질문을 분석하고 필요한 공식 정보 도구를 확인하고 있습니다</strong>
+            <strong>{m.loading.toolsTitle}</strong>
             <div>
-              <span><i className="provider-dot provider-dot-openai" />OpenAI Responses 응답 대기</span>
+              <span><i className="provider-dot provider-dot-openai" />{m.loading.openaiWaiting}</span>
             </div>
-            <small>도구가 필요하면 허용된 검색·위험·법령 조회만 실행합니다. 여러 단계면 응답에 시간이 걸릴 수 있습니다.</small>
+            <small>{m.loading.toolsNote}</small>
           </div>
         ) : null}
         <div ref={bottomRef} />
       </div>
 
-      <div className="question-chips" aria-label="추천 질문">
+      <div className="question-chips" aria-label={m.chipsAria}>
         {questions.map((question) => (
           <button key={question} type="button" onClick={() => void sendMessage(question)} disabled={loading}>{question}</button>
         ))}
       </div>
 
       {historyAvailable ? (
-        <section className="chat-history" aria-label="저장된 대화">
-          <div><strong>저장된 대화</strong><small>마지막 활동 후 30일이 지나면 원문과 표시 근거가 삭제됩니다.</small></div>
+        <section className="chat-history" aria-label={m.history.title}>
+          <div><strong>{m.history.title}</strong><small>{m.history.retention}</small></div>
           {conversationHistory.length ? <ul>
             {conversationHistory.map((conversation) => <li key={conversation.conversation_id}>
               <button type="button" disabled={historyLoading || loading} onClick={() => void restoreConversation(conversation.conversation_id)}>
                 {conversation.title}
               </button>
-              <button type="button" disabled={historyLoading || loading} onClick={() => void deleteConversation(conversation)} aria-label={`${conversation.title} 삭제`}>삭제</button>
+              <button type="button" disabled={historyLoading || loading} onClick={() => void deleteConversation(conversation)} aria-label={format(m.history.deleteAria, { title: conversation.title })}>{m.history.delete}</button>
             </li>)}
-          </ul> : <p className="muted-text">아직 저장된 대화가 없습니다.</p>}
+          </ul> : <p className="muted-text">{m.history.empty}</p>}
           {conversationId ? <div className="conversation-controls">
-            <button type="button" disabled={historyLoading || loading} onClick={editConversationTitle}>제목 수정</button>
-            {companyId && companyId !== activeCompanyId ? <button type="button" disabled={historyLoading || loading} onClick={() => void updateConversationMetadata({ active_company_id: companyId })}>현재 화면 사업장으로 변경</button> : null}
-            {activeCompanyId ? <button type="button" disabled={historyLoading || loading} onClick={() => void updateConversationMetadata({ active_company_id: null })}>사업장 연결 해제</button> : null}
+            <button type="button" disabled={historyLoading || loading} onClick={editConversationTitle}>{m.history.editTitle}</button>
+            {companyId && companyId !== activeCompanyId ? <button type="button" disabled={historyLoading || loading} onClick={() => void updateConversationMetadata({ active_company_id: companyId })}>{m.history.useCurrentCompany}</button> : null}
+            {activeCompanyId ? <button type="button" disabled={historyLoading || loading} onClick={() => void updateConversationMetadata({ active_company_id: null })}>{m.history.detachCompany}</button> : null}
           </div> : null}
         </section>
       ) : null}
 
-      {historyAvailable && guestImportAvailable ? <section className="guest-import-consent" aria-label="익명 상담 가져오기">
-        <strong>로그인 전에 진행한 현재 익명 상담이 있습니다.</strong>
-        <p>동의하면 이 상담 하나만 계정의 30일 대화 기록으로 가져옵니다.</p>
+      {historyAvailable && guestImportAvailable ? <section className="guest-import-consent" aria-label={m.guestImport.aria}>
+        <strong>{m.guestImport.title}</strong>
+        <p>{m.guestImport.body}</p>
         <div>
-          <button type="button" disabled={historyLoading || loading} onClick={() => void importCurrentGuestConversation()}>동의하고 가져오기</button>
-          <button type="button" disabled={historyLoading || loading} onClick={() => { clearGuestConversation(); setGuestImportAvailable(false); setPersistenceNotice("익명 상담 임시 기록을 삭제했습니다."); }}>가져오지 않고 삭제</button>
+          <button type="button" disabled={historyLoading || loading} onClick={() => void importCurrentGuestConversation()}>{m.guestImport.accept}</button>
+          <button type="button" disabled={historyLoading || loading} onClick={() => { clearGuestConversation(); setGuestImportAvailable(false); setPersistenceNotice(n.guestDeleted); }}>{m.guestImport.discard}</button>
         </div>
       </section> : null}
 
@@ -776,8 +783,8 @@ export function ChatPanel({
             disabled={loading}
           />
           <span>
-            <strong>SKT A.X 답변도 함께 비교</strong>
-            <small>선택 시 다음 질문에 두 모델의 답변을 함께 제공합니다.</small>
+            <strong>{m.compareToggle.title}</strong>
+            <small>{m.compareToggle.note}</small>
           </span>
         </label>
       ) : null}
@@ -790,21 +797,21 @@ export function ChatPanel({
           disabled={loading}
         />
         <span>
-          <strong>이번 질문의 외부 AI 전송에 동의</strong>
-          <small>질문, 최근 대화 최대 10개, 30일 요약, 선택한 회사 공개 정보와 현재 공식 근거{contractReview ? ", 연결한 계약서 진단 요약(항목 분류·근거 조문)" : ""}가 전송됩니다. 동의는 저장하지 않으며 체크를 해제하면 다음 전송을 막습니다.</small>
+          <strong>{m.consent.title}</strong>
+          <small>{format(m.consent.body, { contractExtra: contractReview ? m.consent.contractExtra : "" })}</small>
         </span>
       </label>
 
-      {contractReview ? (
-        <section className="chat-contract-review-link" aria-label="연결된 계약서 진단 결과">
+      {contractReview && reviewCounts ? (
+        <section className="chat-contract-review-link" aria-label={m.contractLink.aria}>
           <div>
-            <strong>계약서 진단 결과 연결됨</strong>
+            <strong>{m.contractLink.title}</strong>
             <span>
-              확인됨 {contractReviewCounts(contractReview).detected} · 누락 가능 {contractReviewCounts(contractReview).missing} · 추가 확인 {contractReviewCounts(contractReview).review}
+              {format(m.contractLink.counts, { detected: reviewCounts.detected, missing: reviewCounts.missing, review: reviewCounts.review })}
             </span>
-            <small>항목 분류와 근거 조문 요약만 연결됩니다. 계약서 원본·원문은 보내지 않고 대화 기록에도 남기지 않습니다.</small>
+            <small>{m.contractLink.note}</small>
           </div>
-          <button type="button" disabled={loading} onClick={detachContractReview}>연결 해제</button>
+          <button type="button" disabled={loading} onClick={detachContractReview}>{m.contractLink.detach}</button>
         </section>
       ) : null}
 
@@ -815,7 +822,7 @@ export function ChatPanel({
         {executionMode === "openai_responses" && chatMode === "contract" ? (
           <div className="chat-contract-upload">
             <label className="button button-outline" htmlFor={contractFileInputId}>
-              상담에 계약서 첨부
+              {m.upload.attach}
             </label>
             <input
               ref={contractFileInputRef}
@@ -826,15 +833,15 @@ export function ChatPanel({
               onChange={handleContractFile}
               disabled={loading}
             />
-            <span>{contractFile ? `${contractFile.name} · 전송 후 선택 해제` : "선택 사항 · 최대 10MB"}</span>
+            <span>{contractFile ? format(m.upload.selected, { file: contractFile.name }) : m.upload.hint}</span>
           </div>
         ) : null}
-        <label className="sr-only" htmlFor={inputId}>상담 질문</label>
+        <label className="sr-only" htmlFor={inputId}>{m.input.label}</label>
         <textarea
           id={inputId}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder={activeCompanyId ? `${activeCompanyLabel ?? "선택 사업장"}에 관해 궁금한 점을 입력하세요` : "노동 관련 질문을 입력하세요"}
+          placeholder={activeCompanyId ? format(m.input.placeholderCompany, { company: activeCompanyLabel ?? m.topbar.selectedCompanyFallback }) : m.input.placeholderGeneral}
           rows={2}
           maxLength={2_000}
           onKeyDown={(event) => {
@@ -844,16 +851,45 @@ export function ChatPanel({
             }
           }}
         />
-        <button type="submit" className="chat-send" disabled={loading || !draft.trim() || !externalProcessingConsent} aria-label="질문 보내기"><span aria-hidden="true">↑</span></button>
+        {/* 음성 입력·읽어 주기는 아직 준비 중이다. 비활성 표시만 두고 누르면 아무 일도 하지 않는다. */}
+        <span className="voice-pending">
+          <button
+            type="button"
+            className="voice-pending-button"
+            aria-disabled="true"
+            aria-describedby={voiceInputTipId}
+            onClick={(event) => event.preventDefault()}
+          >
+            {lm.voiceInput}
+          </button>
+          <span className="voice-pending-tip" role="tooltip" id={voiceInputTipId}>
+            {lm.voicePending} · {lm.voicePendingReason}
+          </span>
+        </span>
+        <span className="voice-pending">
+          <button
+            type="button"
+            className="voice-pending-button"
+            aria-disabled="true"
+            aria-describedby={voiceReadTipId}
+            onClick={(event) => event.preventDefault()}
+          >
+            {lm.voiceRead}
+          </button>
+          <span className="voice-pending-tip" role="tooltip" id={voiceReadTipId}>
+            {lm.voicePending} · {lm.voicePendingReason}
+          </span>
+        </span>
+        <button type="submit" className="chat-send" disabled={loading || !draft.trim() || !externalProcessingConsent} aria-label={m.input.sendAria}><span aria-hidden="true">↑</span></button>
       </form>
       {!activeCompanyId ? (
         <p className="chat-company-help">
-          특정 회사에 관해 질문하려면 <Link href="/companies">사업장을 먼저 검색해 선택</Link>하세요.
+          {m.companyHelp.before}<Link href="/companies">{m.companyHelp.link}</Link>{m.companyHelp.after}
         </p>
       ) : null}
       {favoriteCompanies.some((company) => company.company_id !== activeCompanyId) ? (
-        <nav className="chat-favorite-companies" aria-label="관심 사업장으로 상담">
-          <span>관심 사업장으로 상담</span>
+        <nav className="chat-favorite-companies" aria-label={m.favoritesLabel}>
+          <span>{m.favoritesLabel}</span>
           {favoriteCompanies
             .filter((company) => company.company_id !== activeCompanyId)
             .slice(0, 6)
@@ -869,7 +905,7 @@ export function ChatPanel({
         </nav>
       ) : null}
       </div>
-      <aside className="question-guide" aria-label="AI 질문 가이드">
+      <aside className="question-guide" aria-label={m.guide.aria}>
         <div className="guide-title">
           <Image
             className="guide-avatar"
@@ -878,20 +914,24 @@ export function ChatPanel({
             width={192}
             height={192}
           />
-          <div><strong>AI 질문 가이드</strong><small>무엇부터 물을지 막막하다면</small></div>
+          <div><strong>{m.guide.title}</strong><small>{m.guide.subtitle}</small></div>
         </div>
         {activeCompanyLabel ? (
-          <div className="guide-context"><strong>{activeCompanyLabel}</strong><span>사업장 공개 컨텍스트 연결</span></div>
+          <div className="guide-context"><strong>{activeCompanyLabel}</strong><span>{m.guide.contextNote}</span></div>
         ) : null}
-        {GUIDE_GROUPS.map((group) => (
-          <div className="guide-group" key={group.title}>
-            <strong>{group.title}</strong>
-            {group.items.map(([label, prompt]) => (
-              <button type="button" key={label} disabled={loading} onClick={() => void sendMessage(prompt)}>{label}</button>
-            ))}
-          </div>
-        ))}
-        <p className="guide-scope-note">현재 공식 근거 검색 범위에 맞춘 질문입니다.<br />수록 범위 밖 주제는 해당 이유와 공식 확인 창구를 안내합니다.</p>
+        {GUIDE_GROUPS.map((group) => {
+          const groupCopy = m.guide[group.key] as ChatMessages["guide"][typeof group.key] & Record<string, { label: string; prompt: string }>;
+          return (
+            <div className="guide-group" key={group.key}>
+              <strong>{groupCopy.title}</strong>
+              {group.items.map((itemKey) => {
+                const item = groupCopy[itemKey];
+                return <button type="button" key={itemKey} disabled={loading} onClick={() => void sendMessage(item.prompt)}>{item.label}</button>;
+              })}
+            </div>
+          );
+        })}
+        <p className="guide-scope-note">{m.guide.scopeNote1}<br />{m.guide.scopeNote2}</p>
       </aside>
     </div>
   );

@@ -43,6 +43,8 @@ export interface ChatRequest {
    * 브라우저가 보낸 값이라 parseContractReviewContext 로 다시 검사한 것만 붙는다. 저장하지 않는다.
    */
   contract_review?: ContractReviewContext;
+  /** 화면 언어(src/i18n/locales.ts). 지금은 외국어 긴급 안내의 답 언어를 고르는 데만 쓴다. */
+  ui_locale?: string;
   /** 서버 소유 대화방의 ready 요약만 붙는다. 클라이언트 입력은 신뢰하지 않는다. */
   conversation_memory?: ConversationMemoryContext;
   /** Server-only, owner-checked provenance. Raw request parsing drops this field. */

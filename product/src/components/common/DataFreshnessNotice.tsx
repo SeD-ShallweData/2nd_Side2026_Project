@@ -1,3 +1,9 @@
+"use client";
+
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { commonMessages } from "@/i18n/messages/common";
+
 export function DataFreshnessNotice({
   dataAsOf,
   targetMonth,
@@ -5,11 +11,12 @@ export function DataFreshnessNotice({
   dataAsOf: string | null;
   targetMonth?: string | null;
 }) {
-  const dataLabel = dataAsOf ? `데이터 기준 ${dataAsOf}` : "데이터 기준월 미확정";
+  const m = useMessages(commonMessages).freshness;
+  const dataLabel = dataAsOf ? format(m.dataAsOf, { date: dataAsOf }) : m.dataUnknown;
   return (
     <div className="freshness" role="status">
-      <strong>분석 기준</strong>
-      <span>{[dataLabel, targetMonth && `예측 대상 ${targetMonth}`].filter(Boolean).join(" · ")}</span>
+      <strong>{m.title}</strong>
+      <span>{[dataLabel, targetMonth && format(m.target, { month: targetMonth })].filter(Boolean).join(" · ")}</span>
     </div>
   );
 }

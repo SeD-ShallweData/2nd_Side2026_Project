@@ -1,6 +1,10 @@
 import type { SessionResponse } from "@/app/api/auth/authApiContract";
 import { getSession } from "@/services/authClient";
 import { addFavorite, removeFavorite } from "@/services/favoriteClient";
+import { favoriteMessages } from "@/i18n/messages/favorite";
+
+// 판정 결과는 한국어 원문으로 들고 있다. 화면은 localizeFavoriteReason 으로 현재 언어 문구를 찾는다.
+const REASON = favoriteMessages.ko.errors;
 
 export interface FavoriteIneligibleReason {
   message: string;
@@ -21,26 +25,26 @@ export function getFavoriteEligibility(session: SessionResponse | "loading"): Fa
   if (session === "loading") {
     return {
       eligible: false,
-      reason: { message: "세션을 확인하는 중입니다. 잠시 후 다시 시도해 주세요.", requiresLogin: false },
+      reason: { message: REASON.sessionLoading, requiresLogin: false },
     };
   }
   if (!session.authenticated) {
     return {
       eligible: false,
-      reason: { message: "로그인이 필요한 기능입니다.", requiresLogin: true },
+      reason: { message: REASON.loginRequired, requiresLogin: true },
     };
   }
   if (session.user.role !== "user") {
     return {
       eligible: false,
-      reason: { message: "일반 사용자 전용 기능입니다.", requiresLogin: false },
+      reason: { message: REASON.userOnly, requiresLogin: false },
     };
   }
   return { eligible: true };
 }
 
 const SESSION_RECHECK_FAILED_REASON: FavoriteIneligibleReason = {
-  message: "세션을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  message: REASON.sessionRecheckFailed,
   requiresLogin: false,
 };
 

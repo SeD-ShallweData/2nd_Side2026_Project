@@ -1,54 +1,72 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  CONNECTED_WAGE_LISTING_LABEL,
-  UNCONNECTED_WAGE_OBSERVATION_LABELS,
-} from "@/domain/riskPresentation";
+import { format } from "@/i18n/defineMessages";
+import { landingMessages, type LandingMessages } from "@/i18n/messages/landing";
 
-const WAGE_PREVIEW_ITEMS = [
-  [CONNECTED_WAGE_LISTING_LABEL, "연계 데이터 내 일치 결과 없음"],
-  [UNCONNECTED_WAGE_OBSERVATION_LABELS[0], "18%"],
-  [UNCONNECTED_WAGE_OBSERVATION_LABELS[1], "완만한 증가"],
-  [UNCONNECTED_WAGE_OBSERVATION_LABELS[2], "높음 · 12/12개월"],
+/*
+ * 랜딩 부품은 서버 컴포넌트다. 페이지가 현재 언어 사전을 넘기고,
+ * 넘기지 않으면(테스트 등) 한국어로 그린다.
+ */
+type Props = { m?: LandingMessages };
+
+const STEP_KEYS = [
+  { number: "01", icon: "⌕", key: "company" },
+  { number: "02", icon: "?", key: "questions" },
+  { number: "03", icon: "✓", key: "contract" },
 ] as const;
 
-const STEPS = [
-  { number: "01", icon: "⌕", title: "사업장 확인", body: "회사명과 지역·업종으로 정확한 사업장을 선택합니다.", tag: "공개 데이터" },
-  { number: "02", icon: "?", title: "확인 질문 정리", body: "임금과 산업안전 신호를 섞지 않고 확인할 질문을 봅니다.", tag: "두 가지 위험카드" },
-  { number: "03", icon: "✓", title: "계약서 진단", body: "계약서에서 확인된 항목과 다시 물어볼 내용을 정리합니다.", tag: "원문 대조" },
-] as const;
+const COMMUNITY_KEYS = ["pay", "breaks", "firstDay"] as const;
 
-export function FeatureSection() {
+/**
+ * 상담 예시 질문을 쿼리 값으로 넣는다. 쿼리 구분에 쓰이는 문자만 인코딩해
+ * 기존 한국어 링크(`임금이%20밀릴...%3F`)와 같은 모양을 유지한다.
+ */
+function chatPromptHref(prompt: string): string {
+  return `/chat?prompt=${prompt.replace(/[%&#+?= ]/g, (char) => encodeURIComponent(char))}`;
+}
+
+export function FeatureSection({ m = landingMessages.ko }: Props) {
+  const f = m.flow;
   return (
     <section className="section refresh-flow" aria-labelledby="flow-title">
       <div className="shell">
-        <div className="section-heading"><span className="eyebrow">Co끼리 이용 흐름</span><h2 id="flow-title">확인하고, 질문하고, 대비하세요</h2><p>입사 전부터 문제가 생긴 뒤까지 필요한 확인을 순서대로 연결합니다.</p></div>
+        <div className="section-heading"><span className="eyebrow">{f.eyebrow}</span><h2 id="flow-title">{f.title}</h2><p>{f.desc}</p></div>
         <div className="refresh-step-grid">
-          {STEPS.map((step) => <article key={step.number}><i>{step.icon}</i><span>STEP {step.number}</span><h3>{step.title}</h3><p>{step.body}</p><b>{step.tag}</b></article>)}
+          {STEP_KEYS.map((step) => {
+            const copy = f.steps[step.key];
+            return <article key={step.number}><i>{step.icon}</i><span>{format(f.stepLabel, { number: step.number })}</span><h3>{copy.title}</h3><p>{copy.body}</p><b>{copy.tag}</b></article>;
+          })}
         </div>
       </div>
     </section>
   );
 }
 
-export function RiskPreviewSection() {
+export function RiskPreviewSection({ m = landingMessages.ko }: Props) {
+  const r = m.risk;
+  const wageItems = [
+    [r.wageItems.listing, r.wageItems.listingValue],
+    [r.wageItems.turnover, "18%"],
+    [r.wageItems.trend, r.wageItems.trendValue],
+    [r.wageItems.completeness, r.wageItems.completenessValue],
+  ] as const;
   return (
     <section className="section refresh-risk-showcase" aria-labelledby="risk-preview-title">
       <div className="shell">
-        <div className="refresh-section-row"><div><span className="eyebrow">사업장 확인</span><h2 id="risk-preview-title">두 가지 위험카드로 나눠 확인하세요</h2><p>사업장 단위 임금 정보와 지역·업종 단위 산업안전 정보를 섞지 않습니다.</p></div><Link href="/companies" className="button button-outline">사업장 검색하기 →</Link></div>
-        <div className="refresh-risk-preview" aria-label="위험카드 화면 예시">
+        <div className="refresh-section-row"><div><span className="eyebrow">{r.eyebrow}</span><h2 id="risk-preview-title">{r.title}</h2><p>{r.desc}</p></div><Link href="/companies" className="button button-outline">{r.searchCta} →</Link></div>
+        <div className="refresh-risk-preview" aria-label={r.previewAria}>
           <article className="refresh-risk-card is-watch">
-            <header><div><small>사업장 단위 확인 정보</small><h3>임금 지급 관련 정보</h3></div><strong>안전 신호 미확인</strong></header>
-            <p className="refresh-status-copy"><strong>공식 명단 1개 확인 예시</strong><span>추가 공개 지표 3개 분석 예시</span></p>
-            <dl>{WAGE_PREVIEW_ITEMS.map(([item, value]) => <div key={item}><dt>{item}</dt><dd>{value}</dd></div>)}</dl>
-            <small className="refresh-preview-note">DEMO 예시 · 실제 결과는 선택한 사업장 데이터로 표시됩니다.</small>
+            <header><div><small>{r.wage.scope}</small><h3>{r.wage.title}</h3></div><strong>{r.wage.status}</strong></header>
+            <p className="refresh-status-copy"><strong>{r.wage.listedExample}</strong><span>{r.wage.extraExample}</span></p>
+            <dl>{wageItems.map(([item, value]) => <div key={item}><dt>{item}</dt><dd>{value}</dd></div>)}</dl>
+            <small className="refresh-preview-note">{r.wage.note}</small>
           </article>
           <article className="refresh-risk-card is-review">
-            <header><div><small>개별 사업장 판정 아님</small><h3>지역·업종 산업재해 신호</h3></div><strong>우선 확인 필요</strong></header>
-            <p className="refresh-status-copy">이 신호는 해당 회사의 사고확률이 아닙니다. 현장별 안전조치를 직접 확인하세요.</p>
-            <div className="refresh-context-box"><b>분석 범위</b><span>지역·업종 맥락 · 인천광역시 · 건설업</span></div>
-            <ul><li>입사 전 안전교육 일정 확인</li><li>업무별 보호구 지급 여부 확인</li><li>위험 작업과 작업중지 절차 질문</li></ul>
-            <small className="refresh-preview-note">화면 예시 · 실제 결과는 선택한 사업장 데이터로 표시됩니다.</small>
+            <header><div><small>{r.safety.scope}</small><h3>{r.safety.title}</h3></div><strong>{r.safety.status}</strong></header>
+            <p className="refresh-status-copy">{r.safety.body}</p>
+            <div className="refresh-context-box"><b>{r.safety.rangeLabel}</b><span>{r.safety.rangeValue}</span></div>
+            <ul><li>{r.safety.check1}</li><li>{r.safety.check2}</li><li>{r.safety.check3}</li></ul>
+            <small className="refresh-preview-note">{r.safety.note}</small>
           </article>
         </div>
       </div>
@@ -56,41 +74,41 @@ export function RiskPreviewSection() {
   );
 }
 
-export function ContractPreviewSection() {
+export function ContractPreviewSection({ m = landingMessages.ko }: Props) {
+  const c = m.contract;
   return (
     <section className="section refresh-contract-preview" aria-labelledby="contract-preview-title"><div className="shell refresh-split-section">
-      <div><span className="eyebrow">계약서 진단</span><h2 id="contract-preview-title">서명 전에 놓친 항목을 확인하세요</h2><p>계약서 원문에서 임금 지급일, 근로시간, 휴게시간과 수당 기준을 찾아 다시 확인할 질문으로 정리합니다.</p><Link href="/contracts" className="button button-dark">계약서 진단하기 →</Link></div>
-      <div className="refresh-contract-card"><span>▤</span><div><small>진단 결과 화면 예시</small><h3>근로계약서 기본 항목</h3><ul><li><b>✓</b><span>문서에서 확인됨</span><strong>3개</strong></li><li><b>!</b><span>누락 가능</span><strong>1개</strong></li><li><b>?</b><span>추가 확인</span><strong>2개</strong></li></ul></div></div>
+      <div><span className="eyebrow">{c.eyebrow}</span><h2 id="contract-preview-title">{c.title}</h2><p>{c.desc}</p><Link href="/contracts" className="button button-dark">{c.cta} →</Link></div>
+      <div className="refresh-contract-card"><span>▤</span><div><small>{c.cardSmall}</small><h3>{c.cardTitle}</h3><ul><li><b>✓</b><span>{c.found}</span><strong>{format(c.count, { count: 3 })}</strong></li><li><b>!</b><span>{c.missing}</span><strong>{format(c.count, { count: 1 })}</strong></li><li><b>?</b><span>{c.extra}</span><strong>{format(c.count, { count: 2 })}</strong></li></ul></div></div>
     </div></section>
   );
 }
 
-const COMMUNITY_PREVIEW = [
-  ["인천 · 건설업", "급여", "급여일이 자꾸 밀리는데 다들 어떻게 확인하셨나요?", "입사할 때 들었던 날짜와 실제 지급일이 달라서 계약서를 다시 보고 있어요."],
-  ["경기 · 제조업", "계약서", "휴게시간이 계약서와 다를 때 어떻게 기록하나요?", "근무표와 실제 쉬는 시간을 따로 기록해 보신 분의 경험이 궁금합니다."],
-  ["서울 · 서비스업", "입사 전", "첫 출근 전에 꼭 물어봐야 할 질문을 모아봐요", "급여 구성과 근무시간 외에 미리 확인하면 좋은 항목을 나눠주세요."],
-] as const;
-
-export function CommunityPreview() {
+export function CommunityPreview({ m = landingMessages.ko }: Props) {
+  const c = m.community;
   return (
     <section className="section refresh-community-preview" aria-labelledby="community-preview-title"><div className="shell">
-      <div className="refresh-section-row"><div><span className="eyebrow">커뮤니티</span><h2 id="community-preview-title">같은 현장, 같은 고민</h2><p>사용자 경험은 공식 데이터와 구분해 표시합니다.</p></div><Link href="/community" className="button button-outline">커뮤니티 보기 →</Link></div>
-      <div className="refresh-post-grid">{COMMUNITY_PREVIEW.map(([place, tag, title, body]) => <article key={title}><div><b>{place}</b><em>{tag}</em></div><h3>{title}</h3><p>{body}</p></article>)}</div>
+      <div className="refresh-section-row"><div><span className="eyebrow">{c.eyebrow}</span><h2 id="community-preview-title">{c.title}</h2><p>{c.desc}</p></div><Link href="/community" className="button button-outline">{c.cta} →</Link></div>
+      <div className="refresh-post-grid">{COMMUNITY_KEYS.map((key) => {
+        const post = c.posts[key];
+        return <article key={key}><div><b>{post.place}</b><em>{post.tag}</em></div><h3>{post.title}</h3><p>{post.body}</p></article>;
+      })}</div>
     </div></section>
   );
 }
 
-export function ConsultPreviewSection() {
+export function ConsultPreviewSection({ m = landingMessages.ko }: Props) {
+  const c = m.consult;
   return (
     <section className="section refresh-consult-preview" aria-labelledby="consult-preview-title"><div className="shell refresh-split-section">
-      <div><span className="eyebrow">AI 노동 상담</span><h2 id="consult-preview-title">막막할 때<br />AI가 먼저 답합니다</h2><p>공식 문서를 기반으로 답변을 생성하고 다음 행동을 제안합니다.</p><div className="refresh-prompt-list"><Link href="/chat?prompt=임금이%20밀릴%20때%20어떤%20자료부터%20준비해야%20하나요%3F">“급여가 밀릴 때 뭘 준비하나요?” <span>→</span></Link><Link href="/chat?prompt=근로계약서에서%20꼭%20확인할%20항목을%20알려주세요.">“계약서에서 꼭 볼 것은?” <span>→</span></Link></div></div>
-      <div className="refresh-answer-preview"><header><span>두 모델 답변 비교</span><small>같은 질문 · 같은 공식 근거</small></header><div><article><b>Upstage Solar</b><h3>지금 확인할 순서</h3><ol><li>계약서와 임금명세서 확보</li><li>입금 내역과 근무기록 정리</li><li>회사에 지급일 서면 확인</li></ol><small>공식 근거 · 답변 한계 표시</small></article><article><b>SKT A.X</b><h3>핵심 확인 사항</h3><p>사실관계를 기록하고 공식 상담 창구와 구제 절차를 함께 확인하세요.</p><small>응답 상세 · 기술 정보 토글</small></article></div></div>
+      <div><span className="eyebrow">{c.eyebrow}</span><h2 id="consult-preview-title">{c.titleLine1}<br />{c.titleLine2}</h2><p>{c.desc}</p><div className="refresh-prompt-list"><Link href={chatPromptHref(c.prompt1)}>{c.prompt1Label} <span>→</span></Link><Link href={chatPromptHref(c.prompt2)}>{c.prompt2Label} <span>→</span></Link></div></div>
+      <div className="refresh-answer-preview"><header><span>{c.compareTitle}</span><small>{c.compareNote}</small></header><div><article><b>Upstage Solar</b><h3>{c.solar.title}</h3><ol><li>{c.solar.step1}</li><li>{c.solar.step2}</li><li>{c.solar.step3}</li></ol><small>{c.solar.foot}</small></article><article><b>SKT A.X</b><h3>{c.ax.title}</h3><p>{c.ax.body}</p><small>{c.ax.foot}</small></article></div></div>
     </div></section>
   );
 }
 
-export function FinalCta() {
+export function FinalCta({ m = landingMessages.ko }: Props) {
   return (
-    <section className="refresh-final-cta"><div className="shell"><span className="eyebrow">지금 시작하세요</span><h2>일하기 전에도, 일하는 중에도<br />미리 대비하는 Co끼리</h2><div className="refresh-button-row"><Link href="/chat" className="button button-outline button-large consult-cta"><Image src="/brand/donworry-mascot.png" alt="" width={192} height={192} />돈워리 AI에게 상담하기 <span aria-hidden="true">→</span></Link><Link href="/companies" className="button button-dark button-large">궁금한 사업장의 위험요소 보러가기 →</Link></div></div></section>
+    <section className="refresh-final-cta"><div className="shell"><span className="eyebrow">{m.final.eyebrow}</span><h2>{m.hero.titleLine1}<br />{format(m.final.titleLine2, { brand: m.brand })}</h2><div className="refresh-button-row"><Link href="/chat" className="button button-outline button-large consult-cta"><Image src="/brand/donworry-mascot.png" alt="" width={192} height={192} />{m.hero.ctaChat} <span aria-hidden="true">→</span></Link><Link href="/companies" className="button button-dark button-large">{m.hero.ctaCompanies} →</Link></div></div></section>
   );
 }

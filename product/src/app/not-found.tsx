@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { commonMessages } from "@/i18n/messages/common";
+import { getMessages } from "@/i18n/server";
 
-export default function NotFoundPage() {
+export default async function NotFoundPage() {
+  const m = (await getMessages(commonMessages)).notFound;
   return (
     <div className="page-section">
       <div className="shell narrow-shell">
@@ -8,10 +11,10 @@ export default function NotFoundPage() {
           <span className="state-icon" aria-hidden="true">
             ?
           </span>
-          <h1>요청한 사업장을 찾을 수 없습니다</h1>
-          <p>사업장 검색에서 이름, 지역, 업종을 다시 확인해 주세요.</p>
+          <h1>{m.title}</h1>
+          <p>{m.desc}</p>
           <Link href="/companies" className="button button-dark">
-            사업장 다시 검색
+            {m.action}
           </Link>
         </div>
       </div>

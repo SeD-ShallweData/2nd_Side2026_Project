@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useId, useRef, useState } from "react";
 import type { DataMode } from "@/config/dataMode";
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { contractMessages } from "@/i18n/messages/contract";
 import type { ContractItem, ContractReviewResult } from "@/domain/contract";
 import {
   CONTRACT_REVIEW_CONTEXT_STORAGE_KEY,
@@ -31,6 +34,11 @@ function rememberReviewForChat(result: ContractReviewResult): boolean {
 }
 const MAX_SIZE = 10 * 1024 * 1024;
 
+/** 상담 입력창에 미리 채울 질문. 공백은 +로 둔다. */
+function chatPromptQuery(prompt: string): string {
+  return encodeURIComponent(prompt).replace(/%20/g, "+");
+}
+
 function ReviewSection({
   title,
   items,
@@ -40,15 +48,16 @@ function ReviewSection({
   items: ContractItem[];
   tone: "detected" | "missing" | "review";
 }) {
+  const m = useMessages(contractMessages).panel;
   return (
     <section className={`contract-result-section contract-${tone}`}>
       <div className="contract-result-title">
         <span aria-hidden="true">{tone === "detected" ? "✓" : tone === "missing" ? "!" : "?"}</span>
         <h3>{title}</h3>
-        <small>{items.length}개</small>
+        <small>{format(m.itemCount, { count: items.length })}</small>
       </div>
       {items.length === 0 ? (
-        <p className="muted-text">해당하는 항목이 없습니다.</p>
+        <p className="muted-text">{m.empty}</p>
       ) : (
         <ul>
           {items.map((item) => (
@@ -65,6 +74,7 @@ function ReviewSection({
 }
 
 export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
+  const m = useMessages(contractMessages).panel;
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -83,13 +93,13 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
     }
     if (!ALLOWED_TYPES.includes(next.type)) {
       setFile(null);
-      setError("PDF, PNG, JPG 파일만 선택할 수 있습니다.");
+      setError(m.typeError);
       event.target.value = "";
       return;
     }
     if (next.size > MAX_SIZE) {
       setFile(null);
-      setError("파일은 10MB 이하만 선택할 수 있습니다.");
+      setError(m.sizeError);
       event.target.value = "";
       return;
     }
@@ -98,7 +108,7 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
 
   async function review(useDemo = false) {
     if (!file && !useDemo) {
-      setError("검토할 계약서 파일을 먼저 선택해 주세요.");
+      setError(m.noFile);
       return;
     }
     setLoading(true);
@@ -118,7 +128,7 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
       setResult(reviewed);
       setChatLinkReady(rememberReviewForChat(reviewed));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "계약서 검토 결과를 불러오지 못했습니다.");
+      setError(caught instanceof Error ? caught.message : m.reviewFailed);
     } finally {
       setLoading(false);
     }
@@ -144,8 +154,8 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
             ↑
           </span>
           <div>
-            <h3>근로계약서 파일 선택</h3>
-            <p>PDF, PNG, JPG · 최대 10MB</p>
+            <h3>{m.uploadTitle}</h3>
+            <p>{m.uploadHint}</p>
           </div>
         </div>
         <input
@@ -161,9 +171,9 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
             <span aria-hidden="true">▤</span>
             <div>
               <strong>{file.name}</strong>
-              <small>{(file.size / 1024).toFixed(1)}KB · 영구 저장하지 않음</small>
+              <small>{format(m.fileMeta, { size: (file.size / 1024).toFixed(1) })}</small>
             </div>
-            <button type="button" onClick={reset} aria-label="선택한 파일 제거">
+            <button type="button" onClick={reset} aria-label={m.removeFileAria}>
               ×
             </button>
           </div>
@@ -172,14 +182,14 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
           {/* 고르기와 검토하기는 한 줄에 나란히 선다. 둘 중 하나를 누르면 되는
               자리라 위아래로 쌓으면 순서가 있는 것처럼 읽힌다. */}
           <label className="button button-dark" htmlFor={inputId}>
-            파일 찾아보기
+            {m.browse}
           </label>
           <button type="submit" className="button button-outline" disabled={loading || !file}>
-            {loading ? "검토 중" : "선택한 파일 검토"}
+            {loading ? m.reviewing : m.reviewSelected}
           </button>
           {dataMode === "mock" ? (
             <button type="button" className="button button-ghost" onClick={() => void review(true)} disabled={loading}>
-              파일 없이 데모 결과 보기
+              {m.demo}
             </button>
           ) : null}
         </div>
@@ -194,8 +204,8 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
         <div className="contract-loading" role="status">
           <span className="spinner" aria-hidden="true" />
           <div>
-            <strong>계약서 검토 결과를 준비하고 있습니다</strong>
-            <p>{dataMode === "real" ? "문서 인식과 조항별 규칙 검토를 순서대로 진행합니다." : "명시된 데모 시나리오 결과를 준비합니다."}</p>
+            <strong>{m.loadingTitle}</strong>
+            <p>{dataMode === "real" ? m.loadingReal : m.loadingMock}</p>
           </div>
         </div>
       ) : null}
@@ -205,22 +215,22 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
           <div className="contract-results-head">
             <div>
               <span className="demo-pill">
-                {result.analysis_status === "mocked" ? "MOCK 결과" : result.analysis_status === "partial" ? "부분 분석" : "실제 분석"}
+                {result.analysis_status === "mocked" ? m.statusMocked : result.analysis_status === "partial" ? m.statusPartial : m.statusReal}
               </span>
-              <h2>기본 항목 확인 결과</h2>
+              <h2>{m.resultsHeading}</h2>
             </div>
             <button type="button" className="text-button" onClick={reset}>
-              다른 파일 확인
+              {m.otherFile}
             </button>
           </div>
           <div className="contract-result-grid">
-            <ReviewSection title="확인됨" items={result.detected_items} tone="detected" />
-            <ReviewSection title="누락 가능" items={result.missing_items} tone="missing" />
-            <ReviewSection title="추가 확인" items={result.review_items} tone="review" />
+            <ReviewSection title={m.sectionDetected} items={result.detected_items} tone="detected" />
+            <ReviewSection title={m.sectionMissing} items={result.missing_items} tone="missing" />
+            <ReviewSection title={m.sectionReview} items={result.review_items} tone="review" />
           </div>
           {result.suggested_questions.length > 0 ? (
             <div className="contract-questions">
-              <h3>회사에 이렇게 물어보세요</h3>
+              <h3>{m.questionsHeading}</h3>
               <ul>
                 {result.suggested_questions.map((question) => (
                   <li key={question}>{question}</li>
@@ -230,7 +240,7 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
           ) : null}
           {[...result.warnings, ...result.limitations].length > 0 ? (
             <div className="contract-warning">
-              <strong>검토 한계</strong>
+              <strong>{m.limitsHeading}</strong>
               <ul>
                 {[...result.warnings, ...result.limitations].map((item) => (
                   <li key={item}>{item}</li>
@@ -240,19 +250,19 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
           ) : null}
           <div className="contract-followup">
             <div>
-              <strong>결과를 이해하기 어려운가요?</strong>
+              <strong>{m.followupTitle}</strong>
               <p>
-                검토 결과를 법률 확정판정으로 보지 말고, 궁금한 항목을 공식 근거 기반 AI 상담에서 이어서 물어보세요.
-                {chatLinkReady ? " 이어가면 항목 분류와 근거 조문 요약만 상담에 연결됩니다(원본 파일·원문은 보내지 않음)." : ""}
+                {m.followupBody}
+                {chatLinkReady ? m.followupLinked : ""}
               </p>
             </div>
             <Link
               href={chatLinkReady
-                ? "/chat?mode=contract&contract_review=1&prompt=%EC%A7%84%EB%8B%A8+%EA%B2%B0%EA%B3%BC%EC%97%90%EC%84%9C+%ED%99%95%EC%9D%B8%EC%9D%B4+%ED%95%84%EC%9A%94%ED%95%9C+%ED%95%AD%EB%AA%A9%EC%9D%84+%ED%9A%8C%EC%82%AC%EC%97%90+%EC%96%B4%EB%96%BB%EA%B2%8C+%EB%AC%BC%EC%96%B4%EB%B3%B4%EB%A9%B4+%EB%90%98%EB%82%98%EC%9A%94%3F"
-                : "/chat?mode=contract&prompt=근로계약서+검토+결과에서+확인+필요+항목을+어떻게+질문해야+하나요%3F"}
+                ? `/chat?mode=contract&contract_review=1&prompt=${chatPromptQuery(m.chatPromptWithReview)}`
+                : `/chat?mode=contract&prompt=${chatPromptQuery(m.chatPromptGeneric)}`}
               className="button button-outline"
             >
-              AI 상담으로 이어가기
+              {m.followupCta}
             </Link>
           </div>
         </div>

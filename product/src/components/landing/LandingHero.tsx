@@ -1,44 +1,47 @@
 import Image from "next/image";
 import Link from "next/link";
+import { landingMessages, type LandingMessages } from "@/i18n/messages/landing";
 
-export function LandingHero() {
+/** 사전을 넘기지 않으면(테스트 등) 한국어로 그린다. */
+export function LandingHero({ m = landingMessages.ko }: { m?: LandingMessages }) {
+  const h = m.hero;
   return (
     <section className="refresh-hero" aria-labelledby="home-title">
       <div className="shell refresh-hero-grid">
         <div className="refresh-hero-copy">
-          <span className="eyebrow">구직자와 근로자를 위한 AI 노동 정보</span>
+          <span className="eyebrow">{h.eyebrow}</span>
           <h1 id="home-title">
-            <span>일하기 전에도, 일하는 중에도</span>
-            <mark>미리 대비하는 <span className="refresh-brand-word">Co끼리</span></mark>
+            <span>{h.titleLine1}</span>
+            <mark>{h.titleMarkBefore}<span className="refresh-brand-word">{m.brand}</span>{h.titleMarkAfter || null}</mark>
           </h1>
-          <p>사업장의 공개 정보부터 계약서, 노동 상담까지.<br />막막했던 확인을 한곳에서 시작하세요.</p>
+          <p>{h.leadLine1}<br />{h.leadLine2}</p>
           <div className="refresh-button-row">
             <Link href="/chat" className="button button-ai button-large consult-cta">
               <Image src="/brand/donworry-mascot.png" alt="" width={192} height={192} />
-              돈워리 AI에게 상담하기 <span aria-hidden="true">→</span>
+              {h.ctaChat} <span aria-hidden="true">→</span>
             </Link>
-            <Link href="/companies" className="button button-dark button-large">궁금한 사업장의 위험요소 보러가기 <span aria-hidden="true">→</span></Link>
+            <Link href="/companies" className="button button-dark button-large">{h.ctaCompanies} <span aria-hidden="true">→</span></Link>
           </div>
           <dl className="refresh-hero-facts">
-            <div><dt>위험 정보</dt><dd>두 카드로 분리</dd></div>
-            <div><dt>공식 근거</dt><dd>출처와 기준일 표시</dd></div>
-            <div><dt>결론 대신</dt><dd>확인할 행동 안내</dd></div>
+            <div><dt>{h.facts.riskTerm}</dt><dd>{h.facts.riskDesc}</dd></div>
+            <div><dt>{h.facts.sourceTerm}</dt><dd>{h.facts.sourceDesc}</dd></div>
+            <div><dt>{h.facts.actionTerm}</dt><dd>{h.facts.actionDesc}</dd></div>
           </dl>
         </div>
 
-        <div className="refresh-hero-visual" aria-label="Co끼리 위험카드 화면 예시">
+        <div className="refresh-hero-visual" aria-label={h.visualAria}>
           <div className="refresh-demo-window">
-            <div className="refresh-demo-bar"><i /><i /><i /><span>Co끼리 · 사업장 확인</span></div>
+            <div className="refresh-demo-bar"><i /><i /><i /><span>{h.demoBar}</span></div>
             <div className="refresh-demo-company">
-              <b>OO</b><div><strong>OO건설</strong><span>인천광역시 · 건설업</span></div>
+              <b>OO</b><div><strong>{h.demoCompany}</strong><span>{h.demoRegion}</span></div>
             </div>
             <div className="refresh-demo-cards">
-              <article className="is-watch"><small>사업장 단위</small><strong>임금 지급 관련 정보</strong><em>안전 신호 미확인</em><p>공개된 항목과 확인 질문을 살펴보세요.</p></article>
-              <article className="is-review"><small>지역·업종 맥락</small><strong>산업재해 확인 신호</strong><em>우선 확인 필요</em><p>현장 안전조치와 교육 여부를 물어보세요.</p></article>
+              <article className="is-watch"><small>{h.wageCard.scope}</small><strong>{h.wageCard.title}</strong><em>{h.wageCard.status}</em><p>{h.wageCard.body}</p></article>
+              <article className="is-review"><small>{h.safetyCard.scope}</small><strong>{h.safetyCard.title}</strong><em>{h.safetyCard.status}</em><p>{h.safetyCard.body}</p></article>
             </div>
           </div>
-          <span className="refresh-float-chip refresh-chip-top">공개 데이터 기준일 표시</span>
-          <span className="refresh-float-chip refresh-chip-bottom">공식 근거 기반 다음 행동</span>
+          <span className="refresh-float-chip refresh-chip-top">{h.chipTop}</span>
+          <span className="refresh-float-chip refresh-chip-bottom">{h.chipBottom}</span>
         </div>
       </div>
     </section>

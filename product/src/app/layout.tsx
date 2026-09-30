@@ -2,27 +2,36 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteFooter } from "@/components/common/SiteFooter";
 import { SiteHeader } from "@/components/common/SiteHeader";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { htmlLang } from "@/i18n/locales";
+import { headerMessages } from "@/i18n/messages/header";
+import { siteMessages } from "@/i18n/messages/site";
+import { getMessages, getRequestLocale } from "@/i18n/server";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: {
-    default: "Co끼리 — 일하기 전, 일하는 중에도",
-    template: "%s | Co끼리",
-  },
-  description:
-    "공공데이터 기반 고용 신호와 공식 노동 정보를 연결해 입사 전과 재직 중 확인할 정보를 안내합니다.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const m = await getMessages(siteMessages);
+  return {
+    title: { default: m.title, template: m.titleTemplate },
+    description: m.description,
+  };
+}
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+  // 화면 언어는 쿠키로만 정한다. 화면 문구는 고정 사전이며 상담 모델을 부르지 않는다.
+  const locale = await getRequestLocale();
+  const header = await getMessages(headerMessages);
   return (
-    <html lang="ko">
+    <html lang={htmlLang(locale)} data-locale={locale}>
       <body>
-        <a className="skip-link" href="#main-content">
-          본문으로 바로가기
-        </a>
-        <SiteHeader />
-        <main id="main-content">{children}</main>
-        <SiteFooter />
+        <LocaleProvider locale={locale}>
+          <a className="skip-link" href="#main-content">
+            {header.skipLink}
+          </a>
+          <SiteHeader />
+          <main id="main-content">{children}</main>
+          <SiteFooter />
+        </LocaleProvider>
       </body>
     </html>
   );
