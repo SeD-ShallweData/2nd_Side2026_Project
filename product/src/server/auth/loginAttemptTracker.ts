@@ -12,15 +12,23 @@ interface LoginAttemptRecord {
 
 interface LoginAttemptMemory {
   key_salt: Buffer;
+  /* 마지막 실패 순서를 유지한다. 기록을 고칠 때마다 지웠다가 다시 넣어 맨 뒤로 보낸다. */
   attempts: Map<string, LoginAttemptRecord>;
   queues: Map<string, Promise<void>>;
-  next_capacity_check_ms: number;
 }
 
 const MAX_FAILURES = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1_000;
 const FAILURE_RECORD_IDLE_MS = 15 * 60 * 1_000;
-const MAX_TRACKED_IDENTIFIERS = 10_000;
+/*
+ * 추적표 상한. 로그인 실패는 모두 비밀번호 해시(동시 2개, passwordHash.ts)를 거쳐야 기록되므로
+ * 초당 수십 건이 한계다(이 Mac 실측 약 43건). 그 속도로는 10만 개를 채우는 데 약 39분이 걸려
+ * 기록 유지 시간(15분) 안에 표를 가득 채울 수 없다. 키를 16바이트로 줄여 가득 차도 약 14MB 다.
+ */
+export const MAX_TRACKED_LOGIN_IDENTIFIERS = 100_000;
+
+/* 테스트가 작은 표로 포화 동작을 확인할 때만 바꾼다. resetLoginAttemptsForTests 가 되돌린다. */
+let trackedIdentifierCapacity = MAX_TRACKED_LOGIN_IDENTIFIERS;
 
 /*
  * 현재 운영은 단일 Next.js 프로세스다. 로그인 잠금도 같은 프로세스 메모리에
@@ -35,29 +43,35 @@ const memory = loginAttemptGlobal.__donworryLoginAttemptMemory ?? {
   key_salt: randomBytes(32),
   attempts: new Map<string, LoginAttemptRecord>(),
   queues: new Map<string, Promise<void>>(),
-  next_capacity_check_ms: 0,
 };
 /* 개발 HMR 중 이전 형태의 객체가 남아 있어도 안전하게 보강한다. */
 memory.queues ??= new Map<string, Promise<void>>();
-memory.next_capacity_check_ms ??= 0;
 loginAttemptGlobal.__donworryLoginAttemptMemory = memory;
 
-/* 원문 이메일을 메모리 키로 남기지 않는다. 입력은 서비스에서 이미 정규화된다. */
+/*
+ * 원문 이메일을 메모리 키로 남기지 않는다. 입력은 서비스에서 이미 정규화된다.
+ * 키는 HMAC 앞 16바이트(128비트)만 쓴다. 10만 개 사이에서 겹칠 확률은 무시할 만하고 메모리는 줄어든다.
+ */
 function identifierKey(email: string): string {
   return createHmac("sha256", memory.key_salt)
     .update(email.trim().toLocaleLowerCase("en-US"), "utf8")
-    .digest("hex");
+    .digest()
+    .subarray(0, 16)
+    .toString("base64url");
 }
 
 function retryAfterSeconds(lockedUntilMs: number, nowMs: number): number {
   return Math.max(1, Math.ceil((lockedUntilMs - nowMs) / 1_000));
 }
 
+function recordExpiresAtMs(record: LoginAttemptRecord): number {
+  return record.locked_until_ms ?? record.last_failure_ms + FAILURE_RECORD_IDLE_MS;
+}
+
 function activeRecord(key: string, nowMs: number): LoginAttemptRecord | null {
   const record = memory.attempts.get(key);
   if (!record) return null;
-  const expiresAtMs = record.locked_until_ms ?? record.last_failure_ms + FAILURE_RECORD_IDLE_MS;
-  if (expiresAtMs <= nowMs) {
+  if (recordExpiresAtMs(record) <= nowMs) {
     memory.attempts.delete(key);
     return null;
   }
@@ -65,37 +79,48 @@ function activeRecord(key: string, nowMs: number): LoginAttemptRecord | null {
 }
 
 /*
- * 임의 이메일로 Map 을 무한히 키우는 공격을 막는다. 상한에 닿으면 만료된 기록만
- * 지운다. 활성 실패 기록을 밀어내면 공격자가 5회 잠금을 우회할 수 있으므로,
- * 여전히 가득 찼다면 가장 먼저 비는 시각까지 신규 식별자의 로그인을 닫는다.
+ * 임의 이메일로 Map 을 무한히 키우는 공격을 막는다. 상한에 닿으면 새 기록 하나가 들어갈
+ * 자리를 만든다. 처음 보는 이메일의 로그인은 막지 않는다 — 전에는 표가 가득 차면 새 이메일을
+ * 모두 막았는데, 그러면 약 1만 건의 요청만으로 실패 기록이 없는 정상 사용자(관리자·감독관 포함)
+ * 전원의 로그인을 15분씩 되풀이해 막을 수 있었다.
+ *
+ * 비우는 순서는 이렇다.
+ *   1. 만료된 기록. 기록은 마지막 실패 순서로 놓여 있고 잠금 시간과 실패 기록 유지 시간이 같아
+ *      만료된 기록은 앞쪽에 모여 있다. 앞에서부터 만료되지 않은 기록을 만날 때까지만 본다.
+ *   2. 잠기지 않은 기록 가운데 실패 횟수가 가장 적은 것, 같으면 가장 오래된 것.
+ *      가장 오래된 것부터 비우면, 피해자 이메일로 4번 틀린 뒤 실패 1번짜리 이메일을 쏟아부어
+ *      그 기록을 밀어내고 5회 잠금 없이 계속 대입할 수 있다. 실패가 적은 기록부터 비우면 쏟아부은
+ *      기록끼리만 밀려난다. 실패 1번은 가장 적은 값이라 처음 만나는 즉시 비운다.
+ *   3. 가장 오래된 잠긴 기록. 잠긴 기록을 먼저 밀어내면 새 이메일을 쏟아부어 잠금을 일찍 풀 수
+ *      있으므로, 표 전체가 잠긴 기록일 때만 밀어낸다.
+ * 표 끝까지 훑는 것은 실패 1번짜리가 없을 때뿐이다(10만 개에 약 4ms). 새 기록은 비밀번호 해시를
+ * 거쳐야 생기므로 이 검사도 초당 수십 번을 넘지 않는다.
  */
 function ensureRoomForNewIdentifier(nowMs: number): void {
-  if (memory.attempts.size < MAX_TRACKED_IDENTIFIERS) {
-    memory.next_capacity_check_ms = 0;
-    return;
-  }
-  if (memory.next_capacity_check_ms > nowMs) {
-    throw new LoginTemporarilyLockedError(
-      retryAfterSeconds(memory.next_capacity_check_ms, nowMs),
-    );
-  }
+  if (memory.attempts.size < trackedIdentifierCapacity) return;
 
-  let earliestExpiryMs = Number.POSITIVE_INFINITY;
   for (const [key, record] of memory.attempts) {
-    const expiresAtMs = record.locked_until_ms ?? record.last_failure_ms + FAILURE_RECORD_IDLE_MS;
-    if (expiresAtMs <= nowMs) {
-      memory.attempts.delete(key);
-    } else {
-      earliestExpiryMs = Math.min(earliestExpiryMs, expiresAtMs);
-    }
+    if (recordExpiresAtMs(record) > nowMs) break;
+    memory.attempts.delete(key);
   }
-  if (memory.attempts.size < MAX_TRACKED_IDENTIFIERS) {
-    memory.next_capacity_check_ms = 0;
-    return;
-  }
+  if (memory.attempts.size < trackedIdentifierCapacity) return;
 
-  memory.next_capacity_check_ms = earliestExpiryMs;
-  throw new LoginTemporarilyLockedError(retryAfterSeconds(earliestExpiryMs, nowMs));
+  let evictKey: string | undefined;
+  let evictFailures = Number.POSITIVE_INFINITY;
+  for (const [key, record] of memory.attempts) {
+    if (record.locked_until_ms !== null || record.failures >= evictFailures) continue;
+    evictKey = key;
+    evictFailures = record.failures;
+    if (evictFailures <= 1) break;
+  }
+  evictKey ??= memory.attempts.keys().next().value;
+  if (evictKey !== undefined) memory.attempts.delete(evictKey);
+}
+
+/* 고친 기록을 맨 뒤로 보내 Map 순서가 마지막 실패 순서가 되게 한다. */
+function saveRecord(key: string, record: LoginAttemptRecord): void {
+  memory.attempts.delete(key);
+  memory.attempts.set(key, record);
 }
 
 export class LoginTemporarilyLockedError extends ServiceError {
@@ -116,7 +141,6 @@ export function assertLoginAttemptAllowed(email: string, nowMs = Date.now()): vo
   if (record && record.locked_until_ms !== null) {
     throw new LoginTemporarilyLockedError(retryAfterSeconds(record.locked_until_ms, nowMs));
   }
-  if (!record) ensureRoomForNewIdentifier(nowMs);
 }
 
 export function recordLoginFailure(email: string, nowMs = Date.now()): void {
@@ -133,7 +157,7 @@ export function recordLoginFailure(email: string, nowMs = Date.now()): void {
   const failures = (record?.failures ?? 0) + 1;
   if (failures >= MAX_FAILURES) {
     const lockedUntilMs = nowMs + LOCK_DURATION_MS;
-    memory.attempts.set(key, {
+    saveRecord(key, {
       failures: MAX_FAILURES,
       locked_until_ms: lockedUntilMs,
       last_failure_ms: nowMs,
@@ -141,12 +165,15 @@ export function recordLoginFailure(email: string, nowMs = Date.now()): void {
     throw new LoginTemporarilyLockedError(retryAfterSeconds(lockedUntilMs, nowMs));
   }
 
-  memory.attempts.set(key, { failures, locked_until_ms: null, last_failure_ms: nowMs });
+  saveRecord(key, { failures, locked_until_ms: null, last_failure_ms: nowMs });
 }
 
 export function clearLoginFailures(email: string): void {
   memory.attempts.delete(identifierKey(email));
-  if (memory.attempts.size < MAX_TRACKED_IDENTIFIERS) memory.next_capacity_check_ms = 0;
+}
+
+export function trackedLoginIdentifierCountForTests(): number {
+  return memory.attempts.size;
 }
 
 /*
@@ -172,8 +199,12 @@ export async function withLoginAttemptLock<T>(email: string, action: () => Promi
   }
 }
 
+export function setLoginAttemptCapacityForTests(capacity: number): void {
+  trackedIdentifierCapacity = capacity;
+}
+
 export function resetLoginAttemptsForTests(): void {
   memory.attempts.clear();
   memory.queues.clear();
-  memory.next_capacity_check_ms = 0;
+  trackedIdentifierCapacity = MAX_TRACKED_LOGIN_IDENTIFIERS;
 }

@@ -2,6 +2,7 @@ import type { NextResponse } from "next/server";
 
 import { getOptionalSessionUser } from "@/services/authService";
 import { addFavoriteCompany, deleteFavoriteCompany } from "@/services/favoriteService";
+import { assertAccountRateLimit } from "@/server/accountRateLimit";
 import { assertSameOriginRequest, noStoreError, noStoreJson } from "@/server/auth/http";
 import { requireAuthenticatedUser } from "@/server/auth/permissions";
 import { getSessionTokenFromRequest } from "@/server/auth/sessionCookie";
@@ -23,6 +24,8 @@ export async function PUT(
   try {
     assertSameOriginRequest(request);
     const user = await authenticatedUser(request);
+    // 즐겨찾기 수에는 상한이 없고 목록은 항목마다 사업장을 조회하므로, 추가하는 속도를 묶는다.
+    assertAccountRateLimit("favorite_add", user.user_id);
     const { companyId } = await params;
     const response = await addFavoriteCompany(companyId, user);
     return noStoreJson(response, response.created ? 201 : 200);

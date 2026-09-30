@@ -19,6 +19,7 @@ vi.mock("@/services/contractService", () => ({
 }));
 
 import { POST } from "@/app/api/contracts/review/route";
+import { ACCOUNT_RATE_LIMITS, resetAccountRateLimitsForTests } from "@/server/accountRateLimit";
 import { resetPublicRateLimitsForTests } from "@/server/publicRateLimit";
 
 const BROWSER_A = "00000000-0000-4000-8000-00000000000a";
@@ -50,6 +51,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetPublicRateLimitsForTests();
+  resetAccountRateLimitsForTests();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
   state.usersByToken.clear();
@@ -105,5 +107,26 @@ describe("계약서 진단 호출 한도", () => {
       expect((await POST(request({ clientId: BROWSER_A, token: "user-token" }))).status).toBe(200);
     }
     expect(state.reviewCalls).toBe(3);
+  });
+
+  it("로그인 사용자는 계정 단위로 세고, 넘으면 파일을 읽기 전에 429 로 막는다", async () => {
+    const hourly = ACCOUNT_RATE_LIMITS.contract_review.perAccount.find((window) => window.name === "hour")!.limit;
+    for (let i = 0; i < hourly; i += 1) {
+      expect((await POST(request({ clientId: BROWSER_A, token: "user-token" }))).status).toBe(200);
+    }
+
+    // 본문을 읽었다면 415 가 났을 요청이다. 한도가 먼저 걸리는지 본다.
+    const limited = await POST(new Request("http://localhost/api/contracts/review", {
+      method: "POST",
+      headers: { "content-type": "text/plain", cookie: "donworry_session=user-token" },
+      body: "not a contract",
+    }));
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("3600");
+    expect(await limited.json()).toMatchObject({
+      error: { code: "ACCOUNT_RATE_LIMITED", message: "계약서 분석 요청이 너무 많습니다. 1시간 뒤에 다시 시도해 주세요." },
+    });
+    expect(state.reviewCalls).toBe(hourly);
   });
 });

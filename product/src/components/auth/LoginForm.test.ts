@@ -37,6 +37,17 @@ describe("submitErrorMessage", () => {
     const error = new AuthApiError(503, "DATABASE_UNAVAILABLE", "서버 오류", true, "req_test");
     expect(submitErrorMessage(error)).toBe("인증 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.");
   });
+
+  it("비밀번호 해시 대기 초과(503 AUTH_BUSY)는 서버가 바쁘다는 문구를 그대로 쓴다", () => {
+    const error = new AuthApiError(
+      503,
+      "AUTH_BUSY",
+      "지금은 로그인·가입 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      true,
+      "req_test",
+    );
+    expect(submitErrorMessage(error)).toBe("지금은 로그인·가입 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  });
 });
 
 describe("resolveSafeNextPath — open redirect 방지", () => {

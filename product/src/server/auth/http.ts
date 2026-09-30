@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
-import { errorPayload, ServiceError } from "@/utils/errors";
+import { errorPayload, retryAfterHeaders, ServiceError } from "@/utils/errors";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 const MAX_JSON_BODY_BYTES = 64 * 1024;
@@ -21,11 +21,12 @@ export function noStoreJson(body: unknown, status = 200): NextResponse {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
+/* 한도 초과(429)는 남은 시간을 Retry-After 헤더로도 알려 준다. */
 export function noStoreError(error: unknown): NextResponse {
   const payload = errorPayload(error);
   return NextResponse.json(payload.body, {
     status: payload.status,
-    headers: NO_STORE_HEADERS,
+    headers: { ...NO_STORE_HEADERS, ...retryAfterHeaders(error) },
   });
 }
 

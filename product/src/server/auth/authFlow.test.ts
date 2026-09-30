@@ -8,9 +8,10 @@ import { POST as signup } from "@/app/api/auth/signup/route";
 import { DELETE as deleteAccount } from "@/app/api/auth/account/route";
 import { GET as getSession } from "@/app/api/auth/session/route";
 import { GET as getCurrentUser } from "@/app/api/users/me/route";
-import { resetMockSessions } from "@/adapters/mock/MockAuthRepository";
+import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 import { resetLoginAttemptsForTests } from "@/server/auth/loginAttemptTracker";
 import { silenceServerErrorLogs } from "@/testing/silenceServerErrorLogs";
+import { ServiceError } from "@/utils/errors";
 
 const MOCK_PASSWORDS = {
   user: "local-user-password",
@@ -237,6 +238,23 @@ describe("Mock 사용자 인증 API", () => {
       "user@mock.donworry.local",
       MOCK_PASSWORDS.user,
     )).response.status).toBe(429);
+  });
+
+  /*
+   * 비밀번호 해시 동시 실행 상한(passwordHash.ts)에 걸린 503 은 서버가 바빠서 난 오류다.
+   * 자격 증명 실패로 세면 요청이 몰리는 동안 정상 사용자가 잠길 수 있다.
+   */
+  it("해시 계산이 밀려 503 AUTH_BUSY 가 나도 로그인 실패 횟수에 넣지 않는다", async () => {
+    const busy = new ServiceError("AUTH_BUSY", "지금은 로그인·가입 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.", 503, true);
+    const authenticate = vi.spyOn(MockAuthRepository.prototype, "authenticate").mockRejectedValue(busy);
+    for (let attempt = 1; attempt <= 6; attempt += 1) {
+      const response = await loginAs("user@mock.donworry.local", MOCK_PASSWORDS.user);
+      expect(response.response.status).toBe(503);
+      expect(response.body).toMatchObject({ error: { code: "AUTH_BUSY", retryable: true } });
+    }
+    authenticate.mockRestore();
+
+    expect((await loginAs("user@mock.donworry.local", MOCK_PASSWORDS.user)).response.status).toBe(200);
   });
 
   it("짧거나 서로 같은 Mock 비밀번호 설정을 거부한다", async () => {

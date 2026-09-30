@@ -30,6 +30,15 @@ export interface LogoutResponse {
 export interface DeleteAccountResponse { deleted: true }
 
 /*
+ * 가입 화면의 숨은 입력칸(허니팟) 이름.
+ *
+ * 화면에는 보이지 않고 탭 이동·보조기기로도 닿지 않아 사람은 채울 수 없다. 칸을 모두 채우는
+ * 봇만 값을 넣는다. 서버는 값이 있으면 이유를 밝히지 않고 거절한다. 자동완성이 알아보지 못하게
+ * 뜻 없는 이름을 쓴다. 칸을 보내지 않는 요청(검증 스크립트 등)은 빈 값과 같게 본다.
+ */
+export const SIGNUP_HONEYPOT_FIELD = "mw_hp";
+
+/*
  * 가입에서 받는 값은 이 셋뿐이다.
  *
  * 직업 구분(구직자·사업주 등 5종)과 사업장 연결은 받지 않는다. 역할을
@@ -43,6 +52,8 @@ export interface SignupRequest {
   email: string;
   password: string;
   name: string;
+  /** 숨은 칸(허니팟) 값. 위 SIGNUP_HONEYPOT_FIELD 설명 참고. 사람이 쓰는 화면에서는 늘 빈 값이다. */
+  [SIGNUP_HONEYPOT_FIELD]?: string;
 }
 
 /*

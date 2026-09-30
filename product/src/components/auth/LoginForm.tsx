@@ -129,6 +129,8 @@ export function submitErrorMessage(error: AuthApiError, m: AuthErrorMessages = a
     case "INVALID_CREDENTIALS":
     case "AUTH_ROLE_UNSUPPORTED":
     case "CROSS_SITE_REQUEST_REJECTED":
+    // 비밀번호 해시 대기 초과. 계정이 없을 때의 대조도 같은 줄을 서므로 계정 존재 여부와 무관하다.
+    case "AUTH_BUSY":
       return error.message;
     case "LOGIN_TEMPORARILY_LOCKED": {
       // "잠시 후"는 몇 분인지 알 수 없어 재시도 타이밍을 못 잡는다.

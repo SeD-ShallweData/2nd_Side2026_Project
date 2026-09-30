@@ -11,7 +11,7 @@ import { format } from "@/i18n/defineMessages";
 import { useMessages } from "@/i18n/LocaleProvider";
 import { communityMessages } from "@/i18n/messages/community";
 import { CommunityApiError, createCommunityPost } from "@/services/communityClient";
-import type { ErrorDetail } from "@/utils/errors";
+import { displayableErrorDetails, type ErrorDetail } from "@/utils/errors";
 
 const TITLE_MIN = 2;
 const TITLE_MAX = 120;
@@ -80,7 +80,7 @@ export function CommunityPostForm() {
     } catch (caught) {
       setSubmitting(false);
       if (caught instanceof CommunityApiError) {
-        setSubmitError({ code: caught.code, message: caught.message, details: caught.details });
+        setSubmitError({ code: caught.code, message: caught.message, details: displayableErrorDetails(caught.details) });
         return;
       }
       setSubmitError({
