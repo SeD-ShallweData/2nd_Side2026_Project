@@ -10,16 +10,24 @@
 
 ## 1. 화면이 실제로 읽는 것
 
-`mlDashboardService.ts` 가 읽는 관계는 다섯이다. 하나라도 없거나 권한이 없으면
-전체가 `503` 이 된다 — `queryReadOnly` 가 모든 실패를 한 문구로 뭉뚱그리기 때문이다.
+> **2026-09-30 갱신** — 산업재해 탭이 `wg_bot` 에 권한이 없는 `public.v_current_scored` 를
+> 읽어 항상 503 이던 문제를 앱에서 고쳤다. 이제 두 탭 모두 `wg_bot` 기본 권한
+> (`db/scripts/sql/configure-path-b-release-bot.sql`) 안의 관계만으로 동작한다.
+> 조회가 실패하면 서버 로그에 `{"event":"readonly_query_failed","relation":"…","pg_code":"…"}`
+> 한 줄이 남는다 — 화면 문구는 그대로지만 어느 관계가 실패했는지는 로그로 바로 갈린다.
 
-| 탭 | 읽는 관계 | 만드는 곳 |
-| --- | --- | --- |
-| 임금체불 | `public.v_region_industry_signal` | `db/migrations/0012_v_region_industry_signal.sql` |
-| 임금체불 | `public.batches` | `0004` 이후 · `ingest.sh` 가 행을 넣는다 |
-| 산업재해 | `industrial_safety.v_llm_firm_safety_context` | `db/migrations/0004_industrial_safety.sql` |
-| 산업재해 | `public.v_current_scored` | `db/migrations/0007_current_batch_views.sql` |
-| 공통 | `public.firms` | `0004`·`0005` |
+| 탭 | 읽는 관계 | 만드는 곳 | wg_bot 권한 |
+| --- | --- | --- | --- |
+| 공통 | `public.batches` (서비스 배치 1건 — 0021 고정 규칙) | `0004` 이후 · `ingest.sh` | 기본 |
+| 임금체불 | `public.v_region_industry_signal` (먼저 시도) | `0012_v_region_industry_signal.sql` | 0012 의 GRANT → 봇 스크립트에도 추가(아래) |
+| 임금체불 | 위 뷰를 못 읽으면 `scored_active` + `safe_recommendation` + `firms` 로 같은 정의를 계산 | `0000`·`0007` | 기본 |
+| 산업재해 | `industrial_safety.v_llm_firm_safety_context` | `0005_existing_firms_projection.sql` | 기본 |
+| 산업재해 | `public.scored_active` (업종 — 서비스 배치 행만) | `0000` | 기본 |
+
+`create-bot-role.sh`(= `configure-path-b-release-bot.sql`)는 먼저 `REVOKE ALL` 을 하므로
+다시 돌리면 0012 가 준 `v_region_industry_signal` 권한이 지워진다. 2026-09-30 부터 이 스크립트가
+뷰가 있을 때만 다시 부여한다. 스크립트를 다시 돌리지 않아도 임금 탭은 원본 테이블 대체 계산으로 뜬다.
+집계 셀은 서비스 배치 ID 를 키로 5분 동안 메모리에 캐시한다(필터 변경마다 55만 행을 다시 세지 않는다).
 
 읽는 계정은 **`BOT_DATABASE_URL`(= `wg_bot`, 읽기 전용 롤)** 이다.
 `getDatabaseConnectionString()` 이 `BOT_DATABASE_URL` → `DATABASE_URL` 순으로 고른다.

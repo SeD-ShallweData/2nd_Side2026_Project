@@ -68,6 +68,34 @@ describe("관리자 배치 현황 API", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(state.listBatchStatuses).toHaveBeenCalledOnce();
+    expect(state.listBatchStatuses).toHaveBeenCalledWith({ includeDomains: true });
     expect(await response.json()).toMatchObject({ selection_mode: "auto", batches: [] });
+  });
+
+  it("정의서 도메인 현황과 드리프트 기록을 그대로 전달한다", async () => {
+    state.listBatchStatuses.mockResolvedValueOnce({
+      selection_mode: "auto",
+      current: null,
+      batches: [],
+      domains: [{ domain: "wage", grades: { status: "unavailable", reason: "현재 읽기 권한으로 이 집계를 읽지 못했습니다." } }],
+      drift: { source: "manual", checked_at: "2026-09-29", result: "aligned", warning_count: 0, unverifiable_count: 6 },
+      generated_at: "2026-09-30T00:00:00.000Z",
+    });
+    const response = await GET(request("admin"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      domains: [{ domain: "wage", grades: { status: "unavailable" } }],
+      drift: { source: "manual", checked_at: "2026-09-29", result: "aligned", warning_count: 0, unverifiable_count: 6 },
+      manageable: expect.any(Boolean),
+    });
+  });
+
+  it("?fields=batches 는 등급 집계 없이 전환 목록만 요청한다", async () => {
+    const response = await GET(new Request("http://localhost/api/admin/batches?fields=batches", {
+      headers: new Headers({ cookie: "donworry_session=admin" }),
+    }));
+    expect(response.status).toBe(200);
+    expect(state.listBatchStatuses).toHaveBeenCalledWith({ includeDomains: false });
   });
 });

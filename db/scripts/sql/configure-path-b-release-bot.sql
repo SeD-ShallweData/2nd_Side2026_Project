@@ -73,4 +73,10 @@ GRANT SELECT ON
   industrial_safety.v_cell_api_label_comparison
 TO :"bot_user";
 
+-- migration 0012 의 지역·업종 집계 뷰(ML 대시보드 임금 탭). 위의 REVOKE ALL 이 0012 가 준
+-- GRANT 까지 지우므로 이 스크립트를 다시 돌려도 권한이 남도록 여기서 다시 준다.
+-- Path B 재구성(0000~0008)에는 이 뷰가 아직 없으므로, 있을 때만 부여한다.
+SELECT format('GRANT SELECT ON public.v_region_industry_signal TO %I', :'bot_user')
+WHERE to_regclass('public.v_region_industry_signal') IS NOT NULL \gexec
+
 COMMIT;
