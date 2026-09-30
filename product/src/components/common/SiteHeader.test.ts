@@ -14,6 +14,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+import { AccountMenu } from "@/components/common/AccountMenu";
 import { SiteHeader, chatHrefForPath, isCurrentNavPath } from "@/components/common/SiteHeader";
 
 describe("공통 사이트 헤더", () => {
@@ -57,6 +58,35 @@ describe("공통 사이트 헤더", () => {
     expect(html).toContain('href="/community" class="is-current"');
     expect(html).toContain('aria-current="page"');
     expect(html).not.toContain('href="/companies" class="is-current"');
+  });
+});
+
+describe("이름 메뉴", () => {
+  const props = { name: "김취준", deleting: false, disabled: false, onDeleteAccount: () => {} };
+
+  it("가운데 메뉴에는 즐겨찾기를 두지 않는다", () => {
+    pathname = "/companies";
+    const html = renderToStaticMarkup(createElement(SiteHeader));
+    expect(html).not.toContain('href="/favorites"');
+  });
+
+  it("일반 사용자는 이름 버튼으로 펼치고, 처음에는 닫혀 있다", () => {
+    pathname = "/companies";
+    const html = renderToStaticMarkup(createElement(AccountMenu, { ...props, role: "user" }));
+    expect(html).toContain("account-menu-toggle");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("김취준님");
+    // 닫힌 상태에서는 계정 삭제가 헤더에 드러나지 않는다.
+    expect(html).not.toContain("계정 삭제");
+    expect(html).not.toContain('href="/favorites"');
+  });
+
+  it("관리자도 이름 버튼(신고 관리)을 쓰고, 감독관은 이름만 보인다", () => {
+    pathname = "/";
+    expect(renderToStaticMarkup(createElement(AccountMenu, { ...props, role: "admin" }))).toContain("account-menu-toggle");
+    const inspector = renderToStaticMarkup(createElement(AccountMenu, { ...props, role: "inspector" }));
+    expect(inspector).not.toContain("account-menu-toggle");
+    expect(inspector).toContain("김취준님");
   });
 });
 
