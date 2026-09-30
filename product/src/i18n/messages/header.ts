@@ -61,7 +61,7 @@ export const headerMessages = defineMessages({
     logoutFailed: "Could not log out. Please try again shortly.",
     logoutNetworkFailed: "Could not log out because of a network problem. Please try again shortly.",
     login: "Log in",
-    floatingChat: "Ask Donwori AI",
+    floatingChat: "Ask MoneyWorry AI",
     skipLink: "Skip to main content",
   },
   zh: {
@@ -89,7 +89,7 @@ export const headerMessages = defineMessages({
     logoutFailed: "未能退出登录,请稍后再试。",
     logoutNetworkFailed: "网络问题导致未能退出登录,请稍后再试。",
     login: "登录",
-    floatingChat: "向 Donwori AI 咨询",
+    floatingChat: "向 MoneyWorry AI 咨询",
     skipLink: "跳到正文",
   },
   vi: {
@@ -117,7 +117,7 @@ export const headerMessages = defineMessages({
     logoutFailed: "Không thể đăng xuất. Vui lòng thử lại sau.",
     logoutNetworkFailed: "Không thể đăng xuất do lỗi mạng. Vui lòng thử lại sau.",
     login: "Đăng nhập",
-    floatingChat: "Hỏi Donwori AI",
+    floatingChat: "Hỏi MoneyWorry AI",
     skipLink: "Chuyển đến nội dung chính",
   },
   th: {
@@ -145,7 +145,7 @@ export const headerMessages = defineMessages({
     logoutFailed: "ออกจากระบบไม่สำเร็จ โปรดลองอีกครั้งภายหลัง",
     logoutNetworkFailed: "ออกจากระบบไม่สำเร็จเพราะปัญหาเครือข่าย โปรดลองอีกครั้งภายหลัง",
     login: "เข้าสู่ระบบ",
-    floatingChat: "ปรึกษา Donwori AI",
+    floatingChat: "ปรึกษา MoneyWorry AI",
     skipLink: "ข้ามไปยังเนื้อหาหลัก",
   },
 });

@@ -878,6 +878,8 @@ export function ChatPanel({
           </div>
         ) : null}
         <label className="sr-only" htmlFor={inputId}>{m.input.label}</label>
+        {/* 보내기 버튼은 입력창 오른쪽 아래 안쪽에 겹쳐 둔다. 아래 음성 버튼 줄과 분리하려고 둘을 한 묶음으로 감싼다. */}
+        <div className="chat-input-wrap">
         <textarea
           id={inputId}
           value={draft}
@@ -892,7 +894,10 @@ export function ChatPanel({
             }
           }}
         />
+          <button type="submit" className="chat-send" disabled={loading || !draft.trim() || !externalProcessingConsent} aria-label={m.input.sendAria}><span aria-hidden="true">↑</span></button>
+        </div>
         {/* 음성 입력·읽어 주기는 아직 준비 중이다. 비활성 표시만 두고 누르면 아무 일도 하지 않는다. */}
+        <div className="chat-voice-row">
         <span className="voice-pending">
           <button
             type="button"
@@ -921,7 +926,7 @@ export function ChatPanel({
             {lm.voicePending} · {lm.voicePendingReason}
           </span>
         </span>
-        <button type="submit" className="chat-send" disabled={loading || !draft.trim() || !externalProcessingConsent} aria-label={m.input.sendAria}><span aria-hidden="true">↑</span></button>
+        </div>
       </form>
       {!activeCompanyId ? (
         <p className="chat-company-help">
