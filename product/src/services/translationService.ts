@@ -28,11 +28,16 @@ const LANGUAGE_NAMES: Record<TranslationRequest["from"], string> = {
 const PURPOSE_LABELS: Record<TranslationPurpose, string> = {
   chat_question: "노동 상담 질문. 한국어 상담 파이프라인이 읽을 수 있게 옮긴다.",
   chat_answer: "검증을 마친 한국어 상담 답변. 사용자 화면 언어로 옮긴다.",
+  chat_labels: "상담 답변 카드에 보이는 짧은 안내 문구 목록. 번호와 줄 수를 그대로 두고 한 줄에 하나씩 옮긴다.",
   worksite_tip: "현장 제보(제목·본문). 한국어 검토자가 읽을 수 있게 옮긴다.",
 };
 
-/** 번역은 본 답변보다 짧게 기다린다. 늦으면 한국어 원문을 보여 주는 편이 낫다. */
+/**
+ * 번역은 본 답변보다 짧게 기다린다. 늦으면 한국어 원문을 보여 주는 편이 낫다.
+ * 입구(질문)는 짧은 글이고 뒤에 본 답변 생성이 남아 있어 더 짧게 끊는다.
+ */
 const TRANSLATION_TIMEOUT_CAP_MS = 20_000;
+const QUESTION_TIMEOUT_CAP_MS = 12_000;
 const MAX_TRANSLATION_INPUT_CHARS = 8_000;
 
 export interface TranslatorDependencies {
@@ -42,7 +47,7 @@ export interface TranslatorDependencies {
 
 function validDirection(request: TranslationRequest): boolean {
   if (request.from === request.to) return false;
-  if (request.purpose === "chat_answer") return request.from === "ko" && isImplementedForeignLocale(request.to);
+  if (request.purpose === "chat_answer" || request.purpose === "chat_labels") return request.from === "ko" && isImplementedForeignLocale(request.to);
   return request.to === "ko" && isImplementedForeignLocale(request.from);
 }
 
@@ -66,8 +71,8 @@ export function createTranslator(dependencies: TranslatorDependencies = {}): Tra
     // 동의 문구가 약속한 대로 기본 상담 공급자(Upstage)에만 보낸다.
     const config = configs.find((candidate) => candidate.id === "upstage" && Boolean(candidate.apiKey));
     if (!config) return { ok: false, reason: "unconfigured" };
-    const client = dependencies.client
-      ?? new OpenAICompatibleChatClient(fetch, Math.min(getLlmTimeoutMs(), TRANSLATION_TIMEOUT_CAP_MS));
+    const cap = request.purpose === "chat_question" ? QUESTION_TIMEOUT_CAP_MS : TRANSLATION_TIMEOUT_CAP_MS;
+    const client = dependencies.client ?? new OpenAICompatibleChatClient(fetch, Math.min(getLlmTimeoutMs(), cap));
 
     let answer: string;
     let finishReason: string | null;

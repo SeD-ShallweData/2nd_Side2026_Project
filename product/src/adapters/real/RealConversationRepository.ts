@@ -224,7 +224,7 @@ export class RealConversationRepository implements ConversationRepository {
       const list = messageByTurn.get(message.turn_id) ?? [];
       list.push({
         message_id: message.message_id, role: message.role, content: message.content,
-        // 번역 상담(0022)만 한국어 원문과 화면 언어가 있다. 한국어 상담 메시지 모양은 그대로 둔다.
+        // 번역 상담(0023)만 한국어 원문과 화면 언어가 있다. 한국어 상담 메시지 모양은 그대로 둔다.
         ...(message.locale ? { locale: message.locale } : {}),
         ...(message.content_ko ? { content_ko: message.content_ko } : {}),
       });

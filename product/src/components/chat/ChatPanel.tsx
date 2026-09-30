@@ -152,7 +152,10 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
       {result.translation_status === "korean_fallback" ? (
         <p className="translation-fallback-notice" role="status">{m.translation.fallbackNotice}</p>
       ) : null}
-      <div className="provider-answer-copy" lang={showKorean && koreanOriginal ? "ko" : undefined}>
+      <div
+        className="provider-answer-copy"
+        lang={(showKorean && koreanOriginal) || result.translation_status === "korean_fallback" ? "ko" : undefined}
+      >
         <SafeMarkdown>{publicAnswerText(showKorean && koreanOriginal ? koreanOriginal : result.answer)}</SafeMarkdown>
       </div>
       {koreanOriginal ? (
@@ -164,6 +167,10 @@ function ProviderAnswerCard({ result }: { result: ProviderComparisonResult }) {
         >
           {showKorean ? m.translation.hideKorean : m.translation.showKorean}
         </button>
+      ) : null}
+      {result.translation_status === "translated" || result.translation_status === "korean_fallback" ? (
+        // 모델 번역을 거친 답변에는 고정 사전 문장으로 공식 창구 재확인을 붙인다(모델이 만들지 않는다).
+        <p className="translation-verify-notice">{m.translation.verifyNotice}</p>
       ) : null}
 
       <section className="provider-evidence" aria-label={format(m.card.evidenceAria, { provider: result.provider_label })}>

@@ -21,9 +21,6 @@ import { finalizeConversationResponse, recallResponse } from "@/services/convers
 import { referencedCompanyIds } from "@/services/companyAnswerScope";
 import { companySignalForAnswer } from "@/services/publicAnswerContext";
 import { asksSplitWageInjuryActions, splitWageInjuryGuidance } from "@/services/splitIssueGuidance";
-import { runWithTranslation } from "@/services/chatTranslationPipeline";
-import { translate } from "@/services/translationService";
-import type { Translator } from "@/domain/translation";
 import {
   getLlmProviderConfigs,
   getLlmTimeoutMs,
@@ -213,20 +210,11 @@ export async function sendComparedChatMessage(value: unknown): Promise<ChatCompa
   return sendParsedComparedChatRequest(parseChatRequest(value));
 }
 
-/**
- * Server-internal entry point for an already parsed and hydrated request.
- * 화면 언어가 구현 외국어면 한국어 파이프라인 앞뒤로 번역한다(chatTranslationPipeline).
- * 한국어·쉬운 한국어는 번역 없이 같은 요청으로 한 번 실행한다.
- */
+/** Server-internal entry point for an already parsed and hydrated request. */
 export async function sendParsedComparedChatRequest(
   parsedRequest: ChatRequest,
-  translator: Translator = translate,
 ): Promise<ChatComparisonResponse> {
-  return runWithTranslation(
-    parsedRequest,
-    async (request) => finalizeConversationResponse(request, await sendParsedComparedChatRequestInternal(request)),
-    translator,
-  );
+  return finalizeConversationResponse(parsedRequest, await sendParsedComparedChatRequestInternal(parsedRequest));
 }
 
 async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest): Promise<ChatComparisonResponse> {

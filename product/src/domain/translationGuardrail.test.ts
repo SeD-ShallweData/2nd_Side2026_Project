@@ -149,4 +149,15 @@ describe("번역 보존 검사 — 입구(외국어 → 한국어)", () => {
     });
     expect(result.failures).toContain("VERDICT_ADDED");
   });
+
+  it.each([
+    ["vi", "Công ty chưa trả lương 2 tháng, tôi phải làm gì?", "회사가 2개월째 임금을 주지 않았습니다. 어떻게 해야 하나요?"],
+    ["zh", "公司已经两个月没发工资了,我该怎么办?", "회사가 2개월 동안 임금을 주지 않았습니다. 어떻게 해야 하나요?"],
+    ["th", "นายจ้างไม่จ่ายค่าจ้าง 2 เดือนแล้ว ควรทำอย่างไร", "고용주가 2개월째 임금을 주지 않았습니다. 어떻게 해야 하나요?"],
+    ["en", "My employer has not paid me for 2 months. What should I do?", "고용주가 2개월 동안 임금을 주지 않았습니다. 어떻게 해야 하나요?"],
+  ] as const)("시연 질문(%s)의 자연스러운 한국어 번역은 통과한다", (from, source, translation) => {
+    const result = checkTranslationPreservation({ source, translation, from, to: "ko" });
+    expect(result.failures, result.details.join(", ")).toEqual([]);
+  });
 });
+

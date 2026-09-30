@@ -239,6 +239,7 @@ export const chatMessages = defineMessages({
       hideKorean: "번역 보기",
       koreanOriginal: "한국어 원문",
       fallbackNotice: "번역을 확인하지 못해 한국어 원문을 보여 드립니다.",
+      verifyNotice: "번역은 참고용입니다. 공식 창구(고용노동부 1350 등)에서 다시 확인하세요.",
     },
     contractLink: {
       aria: "연결된 계약서 진단 결과",
@@ -546,6 +547,7 @@ export const chatMessages = defineMessages({
       hideKorean: "Show translation",
       koreanOriginal: "Original Korean",
       fallbackNotice: "We could not verify the translation, so we are showing the original Korean answer.",
+      verifyNotice: "This translation is for reference only. Please check again with an official office (such as the Ministry of Employment and Labor, 1350).",
     },
     contractLink: {
       aria: "Connected contract check results",
@@ -805,6 +807,7 @@ export const chatMessages = defineMessages({
       hideKorean: "查看译文",
       koreanOriginal: "韩语原文",
       fallbackNotice: "未能确认译文,因此显示韩语原文。",
+      verifyNotice: "译文仅供参考。请向官方窗口(如雇佣劳动部1350)再次确认。",
     },
     contractLink: {
       aria: "已连接的合同检查结果",
@@ -1064,6 +1067,7 @@ export const chatMessages = defineMessages({
       hideKorean: "Xem bản dịch",
       koreanOriginal: "Bản gốc tiếng Hàn",
       fallbackNotice: "Không thể xác nhận bản dịch nên chúng tôi hiển thị câu trả lời gốc bằng tiếng Hàn.",
+      verifyNotice: "Bản dịch chỉ để tham khảo. Hãy kiểm tra lại với cơ quan chính thức (như Bộ Việc làm và Lao động, 1350).",
     },
     contractLink: {
       aria: "Kết quả kiểm tra hợp đồng đã kết nối",
@@ -1323,6 +1327,7 @@ export const chatMessages = defineMessages({
       hideKorean: "ดูคำแปล",
       koreanOriginal: "ต้นฉบับภาษาเกาหลี",
       fallbackNotice: "ไม่สามารถตรวจสอบคำแปลได้ จึงแสดงคำตอบต้นฉบับภาษาเกาหลี",
+      verifyNotice: "คำแปลนี้ใช้เพื่ออ้างอิงเท่านั้น โปรดตรวจสอบอีกครั้งกับหน่วยงานทางการ (เช่น กระทรวงการจ้างงานและแรงงาน 1350)",
     },
     contractLink: {
       aria: "ผลตรวจสัญญาที่เชื่อมต่อไว้",

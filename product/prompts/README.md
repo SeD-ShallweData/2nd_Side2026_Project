@@ -8,6 +8,7 @@ TypeScript를 건드리지 않아도 되고, 프롬프트 변경 이력이 코�
 | `chat/system.md` | 사용자 상담 — `DualLlmChatProvider` |
 | `inspector/system.md` | 근로감독관 상담 — `inspectorService` |
 | `rewrite/system.md` | 후속 질문 재작성 — `queryRewriteService` |
+| `translate/system.md` | 외국어 상담 질문·답변 번역(한국어 경유) — `translationService` |
 
 ## 고치는 법
 

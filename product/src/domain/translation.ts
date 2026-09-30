@@ -8,7 +8,12 @@
 
 import type { ImplementedForeignLocale } from "@/i18n/locales";
 
-export type TranslationPurpose = "chat_question" | "chat_answer" | "worksite_tip";
+/**
+ * chat_question: 상담 질문(외국어 → 한국어), chat_answer: 검증한 상담 답변(한국어 → 외국어),
+ * chat_labels: 답변 카드의 한계 문구·다음 행동 이름(한국어 → 외국어, 번호 목록 한 번에),
+ * worksite_tip: 현장 제보(외국어 → 한국어).
+ */
+export type TranslationPurpose = "chat_question" | "chat_answer" | "chat_labels" | "worksite_tip";
 
 export interface TranslationRequest {
   text: string;

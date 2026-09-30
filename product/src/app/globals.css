@@ -2995,6 +2995,12 @@ summary:focus-visible {
   text-decoration: underline;
 }
 
+.translation-verify-notice {
+  color: var(--muted);
+  font-size: 0.76rem;
+  margin: 0 16px 12px;
+}
+
 .chat-compare-toggle small.consent-korean-original {
   display: block;
   margin-top: 4px;
