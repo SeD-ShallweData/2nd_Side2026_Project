@@ -5,8 +5,10 @@ vi.mock("server-only", () => ({}));
 import { POST as login } from "@/app/api/auth/login/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
 import { GET as getCurrentUser } from "@/app/api/users/me/route";
+import { SIGNUP_HONEYPOT_FIELD } from "@/app/api/auth/authApiContract";
 import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 import { resetLoginAttemptsForTests } from "@/server/auth/loginAttemptTracker";
+import { resetSignupGuardForTests, SIGNUP_RATE_LIMITS } from "@/server/auth/signupGuard";
 import { loginUser, registerUser } from "@/services/authService";
 
 const VALID = {
@@ -40,11 +42,13 @@ beforeEach(() => {
   vi.stubEnv("MOCK_AUTH_INSPECTOR_PASSWORD", "local-inspector-password");
   resetMockSessions();
   resetLoginAttemptsForTests();
+  resetSignupGuardForTests();
 });
 
 afterEach(() => {
   resetMockSessions();
   resetLoginAttemptsForTests();
+  resetSignupGuardForTests();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
 });
@@ -311,5 +315,68 @@ describe("가입 입력값 검증", () => {
       jsonRequest("http://localhost/api/auth/signup", VALID, { origin: "http://evil.example" }),
     );
     expect(response.status).toBe(403);
+  });
+});
+
+describe("가입 보호", () => {
+  const CLIENT_A = "00000000-0000-4000-8000-0000000000a1";
+  const CLIENT_B = "00000000-0000-4000-8000-0000000000b1";
+
+  function signupFrom(clientId: string, body: unknown) {
+    return signup(jsonRequest("http://localhost/api/auth/signup", body, { "x-moneyworry-client-id": clientId }));
+  }
+
+  it("숨은 칸을 비워 보낸 화면 가입은 그대로 성공한다", async () => {
+    const { response } = await post({ ...VALID, [SIGNUP_HONEYPOT_FIELD]: "" });
+    expect(response.status).toBe(201);
+  });
+
+  it("숨은 칸에 값이 있으면 이유를 밝히지 않고 400 으로 거절하며 계정을 만들지 않는다", async () => {
+    const { response, body } = await post({ ...VALID, [SIGNUP_HONEYPOT_FIELD]: "https://spam.example" });
+
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({ error: { code: "SIGNUP_REJECTED", retryable: false } });
+    expect(JSON.stringify(body)).not.toContain(SIGNUP_HONEYPOT_FIELD);
+    expect(response.headers.get("set-cookie")).toBeNull();
+
+    const signedIn = await login(jsonRequest("http://localhost/api/auth/login", {
+      email: VALID.email,
+      password: VALID.password,
+    }));
+    expect(signedIn.status).toBe(401);
+  });
+
+  describe("가입 시도 상한", () => {
+    beforeEach(() => {
+      // 상한 실제 값으로 확인한다. 운영 모드의 Mock 인증은 시연 외곽 인증 설정을 요구한다.
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("DEMO_BASIC_AUTH_USER", "demo-user");
+      vi.stubEnv("DEMO_BASIC_AUTH_PASSWORD", "demo-password");
+    });
+
+    it("같은 탭의 시도가 상한을 넘으면 비밀번호 해시 전에 429 와 Retry-After 로 막고 다른 탭은 막지 않는다", async () => {
+      const perClient = SIGNUP_RATE_LIMITS.perClient.find((window) => window.name === "hour")!.limit;
+      // 입력이 틀린 시도도 센다. 이메일 가입 여부를 대량으로 떠보는 요청도 같은 상한에 걸린다.
+      for (let index = 0; index < perClient; index += 1) {
+        const invalid = await signupFrom(CLIENT_A, { ...VALID, email: `probe-${index}@example.com`, password: "short" });
+        expect(invalid.status).toBe(400);
+      }
+
+      const limited = await signupFrom(CLIENT_A, VALID);
+      expect(limited.status).toBe(429);
+      expect(limited.headers.get("retry-after")).toMatch(/^[1-9]\d*$/);
+      expect(limited.headers.get("set-cookie")).toBeNull();
+      expect(await limited.json()).toMatchObject({
+        error: {
+          code: "SIGNUP_RATE_LIMITED",
+          retryable: true,
+          message: expect.stringContaining("가입 시도가 너무 많습니다."),
+          details: [{ field: "retry_after_seconds" }],
+        },
+      });
+
+      const otherTab = await signupFrom(CLIENT_B, VALID);
+      expect(otherTab.status).toBe(201);
+    });
   });
 });

@@ -15,7 +15,8 @@ import {
 } from "@/services/conversationService";
 import { assertSameOriginRequest } from "@/server/auth/http";
 import { getSessionTokenFromRequest } from "@/server/auth/sessionCookie";
-import { errorPayload, ServiceError } from "@/utils/errors";
+import { errorPayload, retryAfterHeaders, ServiceError } from "@/utils/errors";
+import { assertAccountRateLimit } from "@/server/accountRateLimit";
 import { assertPublicRateLimit } from "@/server/publicRateLimit";
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -37,6 +38,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!user) await assertPublicRateLimit(request, "anonymous_chat");
     let chatRequest = parseChatRequest(parsed.body);
     assertExternalProcessingConsent(chatRequest);
+    /*
+     * 로그인 사용자는 계정으로 센다. 같은 request_id 로 다시 보낸 요청은 새 상담으로 세지 않는다.
+     * 대화방 claim 보다 먼저 확인해야 한도 초과가 claim 을 실패 상태로 남겨 같은 질문의
+     * 다시 보내기를 막는 일이 없다.
+     *
+     * request_id 가 본문에 있어 다른 쓰기 경로와 달리 본문을 읽은 뒤에 센다. 그래서 한도를 넘은
+     * 계정도 본문 읽기까지는 시킬 수 있다. 앱 차원의 본문 크기 상한은 후속 작업으로 둔다
+     * (rateLimitCoverage.test.ts 의 LIMIT_AFTER_BODY).
+     */
+    if (user) assertAccountRateLimit("chat", user.user_id, { requestId: chatRequest.request_id });
     let persistence: "unavailable" | "guest" | undefined = user ? undefined : "guest";
     if (user) {
       try {
@@ -125,6 +136,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
     const payload = errorPayload(error);
-    return NextResponse.json(payload.body, { status: payload.status });
+    return NextResponse.json(payload.body, { status: payload.status, headers: retryAfterHeaders(error) });
   }
 }

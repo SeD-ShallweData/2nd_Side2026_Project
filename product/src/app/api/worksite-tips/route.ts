@@ -2,6 +2,7 @@ import type { NextResponse } from "next/server";
 
 import { getOptionalSessionUser } from "@/services/authService";
 import { createWorksiteTip, listWorksiteTips } from "@/services/worksiteTipService";
+import { assertAccountRateLimit } from "@/server/accountRateLimit";
 import { assertSameOriginRequest, noStoreError, noStoreJson } from "@/server/auth/http";
 import { requireWorksiteTipReviewerRequest } from "@/server/auth/inspectorAccess";
 import { requireAuthenticatedUser } from "@/server/auth/permissions";
@@ -30,6 +31,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     const user = requireAuthenticatedUser(
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
+    // 최대 12MB 본문 읽기, 사진 재인코딩, 파일 저장보다 먼저 센다.
+    assertAccountRateLimit("worksite_tip", user.user_id);
     return noStoreJson(await createWorksiteTip(request, user), 201);
   } catch (error) {
     return noStoreError(error);

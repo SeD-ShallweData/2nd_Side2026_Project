@@ -137,6 +137,49 @@ describe("회원가입", () => {
     });
   });
 
+  /* 서버는 가입 시도를 브라우저 탭 표시값별로도 센다(server/auth/signupGuard.ts). */
+  it("브라우저에서는 탭 표시값 헤더를 함께 보낸다", async () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", {
+      sessionStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+      },
+    });
+    try {
+      const fetchImpl = createFetchMock(jsonResponse(SIGNUP_RESPONSE, 201));
+      await signup({ email: "worker@example.com", password: "Pw9!zx_-{}", name: "새 사용자" }, { fetchImpl });
+
+      const { init } = readCall(fetchImpl);
+      expect(init.headers).toEqual({
+        "Content-Type": "application/json",
+        "X-MoneyWorry-Client-Id": expect.stringMatching(/^[0-9a-f-]{36}$/),
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("저장소를 막은 브라우저에서도 표시값 없이 가입 요청을 보낸다", async () => {
+    vi.stubGlobal("window", {
+      sessionStorage: {
+        getItem: () => {
+          throw new Error("SecurityError");
+        },
+        setItem: () => undefined,
+      },
+    });
+    try {
+      const fetchImpl = createFetchMock(jsonResponse(SIGNUP_RESPONSE, 201));
+      await expect(signup({ email: "worker@example.com", password: "Pw9!zx_-{}", name: "새 사용자" }, { fetchImpl }))
+        .resolves.toEqual(SIGNUP_RESPONSE);
+
+      expect(readCall(fetchImpl).init.headers).toEqual({ "Content-Type": "application/json" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("VALIDATION_ERROR는 field 상세를 담아 던진다", async () => {
     const fetchImpl = createFetchMock(
       errorResponse(400, "VALIDATION_ERROR", "가입 정보를 확인해 주세요.", {

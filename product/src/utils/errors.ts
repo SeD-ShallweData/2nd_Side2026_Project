@@ -16,6 +16,22 @@ export class ServiceError extends Error {
   }
 }
 
+/** 화면에 보여 줄 오류 상세. 재시도까지 남은 초(retry_after_seconds)는 안내 문장에 이미 있어 뺀다. */
+export function displayableErrorDetails(details: ErrorDetail[] | undefined): ErrorDetail[] | undefined {
+  const visible = details?.filter((detail) => detail.field !== "retry_after_seconds");
+  return visible?.length ? visible : undefined;
+}
+
+/**
+ * 한도 초과(429) 오류가 details.retry_after_seconds 로 알려 준 재시도 초를 Retry-After 헤더로 옮긴다.
+ * 해당 값이 없는 오류에는 빈 객체를 돌려주므로 응답 헤더에 그대로 펼쳐 넣으면 된다.
+ */
+export function retryAfterHeaders(error: unknown): Record<string, string> {
+  if (!(error instanceof ServiceError) || error.status !== 429) return {};
+  const seconds = error.details?.find((detail) => detail.field === "retry_after_seconds")?.reason;
+  return seconds && /^[1-9]\d{0,9}$/.test(seconds) ? { "Retry-After": seconds } : {};
+}
+
 export function errorPayload(error: unknown): {
   body: {
     error: {

@@ -16,6 +16,7 @@ import type { CompanyRiskResult } from "@/domain/risk";
 import { getSession } from "@/services/authClient";
 import { getFavorites } from "@/services/favoriteClient";
 import { readApiResponse } from "@/utils/clientApi";
+import { publicClientHeaders } from "@/utils/publicClientId";
 import { useMessages } from "@/i18n/LocaleProvider";
 import { companyMessages } from "@/i18n/messages/company";
 import { favoriteMessages } from "@/i18n/messages/favorite";
@@ -84,7 +85,10 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/companies/${encodeURIComponent(company.company_id)}/risk`, { signal });
+      const response = await fetch(`/api/companies/${encodeURIComponent(company.company_id)}/risk`, {
+        signal,
+        headers: publicClientHeaders(),
+      });
       setRisk(await readApiResponse<CompanyRiskResult>(response));
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") return;
@@ -96,7 +100,11 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/companies/${encodeURIComponent(company.company_id)}/risk`, { signal: controller.signal })
+    // 회사 조회 한도를 탭 표시값별로 세므로 검색 화면과 같은 표시값을 보낸다(server/publicRateLimit.ts).
+    fetch(`/api/companies/${encodeURIComponent(company.company_id)}/risk`, {
+      signal: controller.signal,
+      headers: publicClientHeaders(),
+    })
       .then((response) => readApiResponse<CompanyRiskResult>(response))
       .then((data) => setRisk(data))
       .catch((caught: unknown) => {

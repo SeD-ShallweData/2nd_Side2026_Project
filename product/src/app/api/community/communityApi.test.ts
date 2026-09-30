@@ -10,6 +10,7 @@ import { POST as createReport } from "@/app/api/community/posts/[postId]/reports
 import { GET as listPosts, POST as createPost } from "@/app/api/community/posts/route";
 import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 import { resetMockCommunityState } from "@/adapters/mock/MockCommunityRepository";
+import { ACCOUNT_RATE_LIMITS, resetAccountRateLimitsForTests } from "@/server/accountRateLimit";
 
 const USER: SessionUserDto = {
   user_id: "10000000-0000-4000-8000-000000000001",
@@ -74,8 +75,13 @@ beforeEach(() => {
 afterEach(() => {
   resetMockSessions();
   resetMockCommunityState();
+  resetAccountRateLimitsForTests();
   vi.unstubAllEnvs();
 });
+
+function hourlyLimit(action: "community_post" | "community_post_edit" | "community_report"): number {
+  return ACCOUNT_RATE_LIMITS[action].perAccount.find((window) => window.name === "hour")!.limit;
+}
 
 describe("커뮤니티 공개 조회 계약", () => {
   it("현재 UI의 네 개 Mock 게시물과 기능 상태를 익명 조회에 제공한다", async () => {
@@ -425,5 +431,115 @@ describe("신고와 관리자 검토 권한", () => {
     expect(await hiddenReport.json()).toMatchObject({
       error: { code: "COMMUNITY_POST_NOT_REPORTABLE" },
     });
+  });
+});
+
+describe("게시글·신고 계정 한도", () => {
+  beforeEach(() => {
+    // 한도 실제 값으로 확인한다. 운영 모드의 Mock 인증은 시연 외곽 인증 설정을 요구한다.
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DEMO_BASIC_AUTH_USER", "demo-user");
+    vi.stubEnv("DEMO_BASIC_AUTH_PASSWORD", "demo-password");
+  });
+
+  it("계정 한도를 넘은 글쓰기는 본문을 읽기 전에 429 로 막고 저장하지 않는다", async () => {
+    const cookie = await cookieFor(USER);
+    for (let index = 0; index < hourlyLimit("community_post"); index += 1) {
+      const created = await createPost(jsonMutation(
+        "http://localhost/api/community/posts",
+        "POST",
+        { category: "wage", title: `한도 확인 글 ${index + 1}`, body: "계정 단위 글쓰기 한도를 확인하는 글입니다." },
+        cookie,
+      ));
+      expect(created.status).toBe(201);
+    }
+    const before = await (await listPosts(new Request("http://localhost/api/community/posts"))).json() as { total: number };
+
+    // 본문을 읽었다면 415 가 났을 요청이다. 한도가 먼저 걸리는지 본다.
+    const limited = await createPost(new Request("http://localhost/api/community/posts", {
+      method: "POST",
+      headers: { "content-type": "text/plain", origin: "http://localhost", cookie },
+      body: "not json",
+    }));
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toMatch(/^[1-9]\d*$/);
+    expect(limited.headers.get("cache-control")).toBe("no-store");
+    expect(await limited.json()).toMatchObject({
+      error: { code: "ACCOUNT_RATE_LIMITED", retryable: true, details: [{ field: "retry_after_seconds" }] },
+    });
+    const after = await (await listPosts(new Request("http://localhost/api/community/posts"))).json() as { total: number };
+    expect(after.total).toBe(before.total);
+
+    // 다른 계정은 영향을 받지 않는다.
+    const other = await createPost(jsonMutation(
+      "http://localhost/api/community/posts",
+      "POST",
+      { category: "wage", title: "다른 계정의 글", body: "다른 계정은 따로 셉니다." },
+      await cookieFor(INSPECTOR),
+    ));
+    expect(other.status).toBe(201);
+  });
+
+  it("신고도 계정 단위로 세며, 중복 신고처럼 실패한 시도도 센다", async () => {
+    const cookie = await cookieFor(INSPECTOR);
+    const reportUrl = "http://localhost/api/community/posts/post_mock_001/reports";
+    const statuses: number[] = [];
+    for (let index = 0; index < hourlyLimit("community_report"); index += 1) {
+      const response = await createReport(
+        jsonMutation(reportUrl, "POST", { reason: "spam" }, cookie),
+        contextFor("postId", "post_mock_001"),
+      );
+      statuses.push(response.status);
+    }
+    expect(statuses[0]).toBe(201);
+    expect(statuses.slice(1).every((status) => status === 409)).toBe(true);
+
+    const limited = await createReport(
+      jsonMutation(reportUrl, "POST", { reason: "spam" }, cookie),
+      contextFor("postId", "post_mock_001"),
+    );
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toMatchObject({
+      error: { code: "ACCOUNT_RATE_LIMITED", message: expect.stringContaining("게시글 신고가 너무 많습니다.") },
+    });
+  });
+
+  it("글 수정·삭제는 합산해 계정 단위로 세고, 넘으면 본문을 읽기 전에 429 로 막는다", async () => {
+    const cookie = await cookieFor(USER);
+    const created = await createPost(jsonMutation(
+      "http://localhost/api/community/posts",
+      "POST",
+      { category: "wage", title: "수정 한도 확인 글", body: "글 수정·삭제 한도를 확인하는 글입니다." },
+      cookie,
+    ));
+    const { post_id: postId } = await created.json() as { post_id: string };
+    const postUrl = `http://localhost/api/community/posts/${postId}`;
+    for (let index = 0; index < hourlyLimit("community_post_edit"); index += 1) {
+      const updated = await updatePost(
+        jsonMutation(postUrl, "PATCH", { title: `수정 ${index + 1}` }, cookie),
+        contextFor("postId", postId),
+      );
+      expect(updated.status).toBe(200);
+    }
+
+    // 본문을 읽었다면 415 가 났을 요청이다. 한도가 먼저 걸리는지 본다.
+    const limited = await updatePost(new Request(postUrl, {
+      method: "PATCH",
+      headers: { "content-type": "text/plain", origin: "http://localhost", cookie },
+      body: "not json",
+    }), contextFor("postId", postId));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toMatch(/^[1-9]\d*$/);
+    expect(await limited.json()).toMatchObject({
+      error: { code: "ACCOUNT_RATE_LIMITED", message: expect.stringContaining("게시글 수정·삭제가 너무 많습니다.") },
+    });
+
+    // 삭제도 같은 한도를 쓴다. 막힌 삭제는 글을 지우지 않는다.
+    const deleted = await deletePost(jsonMutation(postUrl, "DELETE", undefined, cookie), contextFor("postId", postId));
+    expect(deleted.status).toBe(429);
+    const stillThere = await getPost(new Request(postUrl, { headers: { cookie } }), contextFor("postId", postId));
+    expect(stillThere.status).toBe(200);
+    expect(await stillThere.json()).toMatchObject({ title: `수정 ${hourlyLimit("community_post_edit")}` });
   });
 });
