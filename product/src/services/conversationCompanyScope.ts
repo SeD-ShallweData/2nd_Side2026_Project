@@ -1,3 +1,5 @@
+import type { ChatRequest } from "@/domain/chat";
+
 export interface RecallCompany {
   company_id: string;
   company_name: string;
@@ -45,14 +47,17 @@ export function statementCompany(
   const named = mentionedCompanies(text, companies);
   const ids = new Set(named.map((company) => company.company_id));
   if (ids.size > 1) return { company_id: null, ambiguous: true };
+  if (!named.length && /^(?:다른|새로운)\s*(?:회사|사업장)(?:의|는|은|에서)/.test(text.trim())) {
+    return { company_id: null, ambiguous: true };
+  }
   // Unknown explicit subject, e.g. "새로운업체에서는 ...", is not selected-company evidence.
   // Do not resolve free text by searching public companies or create a new identity.
   const subject = text.trim().match(/^([^.!?。？\n]{1,60}?)(?:에서는|에서|은|는|의)\s/);
   if (subject) {
     const value = subject[1].trim();
-    const contextual = /^(?:이\s*회사|그\s*회사|해당\s*회사|회사|여기|이곳|사장|사업주|대표|저|저희|우리|이번|이번에|이번\s*회사)$/.test(value)
+    const contextual = /^(?:이\s*회사|그\s*회사|해당\s*회사|회사|여기|이곳|사장|사업주|대표|저|저희|우리|이번|이번에|이번\s*회사|이\s*(?:가상\s*)?(?:상담|사례)|선택한\s*회사에\s*대한\s*실제\s*사실)$/.test(value)
       || /급여일|월급날|지급일|지급\s*약속|입금\s*약속|임금|월급/.test(value)
-      || /^(?:제\s*)?(?:근로계약서|계약서|급여명세서|통장|출퇴근\s*기록)(?:\s*(?:원본|사본))?$/.test(value);
+      || /^(?:제\s*)?(?:근로계약서|계약서|(?:급여|임금)\s*명세서|통장|출퇴근\s*기록|퇴사일|퇴직일|(?:퇴사한|퇴직한|그만둔)\s*날|근무\s*시간|근로\s*시간|사고\s*장소)(?:\s*(?:원본|사본))?$/.test(value);
     const joinedDocumentSubject = /^하루\s*\d{1,2}\s*시간\s*(?:일하며|일하고|근무하며|근무하고)\s*(?:급여명세서|임금명세서|(?:근로)?계약서|통장\s*사본)$/.test(value);
     const subjectMatches = companies.filter((company) => company.company_name === value);
     const locationMatchesNamed = named.length === 1 && hasCompanyLocationQualifier(value, named[0]);
@@ -66,4 +71,37 @@ export function statementCompany(
     if (subjectMatches.length === 1) return { company_id: subjectMatches[0].company_id, ambiguous: false };
   }
   return { company_id: named[0]?.company_id ?? selected, ambiguous: false };
+}
+
+/** For recall only. Callers of public company lookup must keep using .companies. */
+export function statementCompanies(request: ChatRequest): RecallCompany[] {
+  return [...(request.conversation_recall?.companies ?? request.conversation_recall?.company_history ?? []),
+    ...(request.conversation_recall?.statement_subjects ?? [])];
+}
+
+export function defaultStatementSubject(request: ChatRequest): string | null {
+  return request.conversation_recall && "active_statement_subject" in request.conversation_recall
+    ? request.conversation_recall.active_statement_subject ?? null : request.company_id ?? null;
+}
+
+/** Discover bounded, location-qualified labels only from user assertions.
+ * These keys are rebuilt locally and must never enter public company lookup/storage IDs. */
+export function userStatementSubjects(messages: string[], publicCompanies: RecallCompany[]): RecallCompany[] {
+  const subjects = new Map<string, RecallCompany>();
+  const region = "서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주";
+  const pattern = new RegExp(`(?:^|[.!?。\\n]\\s*)(${region})(?:특별자치시|특별자치도|특별시|광역시|도|시)?(?:의|에(?:도|는)?|에서)?\\s*(?:(?:이름이\\s*)?(?:똑같은|같은)\\s*)?([가-힣A-Za-z0-9㈜()·_-]{2,50})(?:에서|의\\s|은\\s|는\\s|이\\s|가\\s)`, "g");
+  for (const content of messages) {
+    if (/만약|가정하면|예를\s*들어/.test(content) || !/일하|일했던|근무|급여일|월급날|퇴사|계약서|명세서|통장|같은.{0,30}있어요/.test(content)) continue;
+    for (const match of content.trim().matchAll(pattern)) {
+      const sentence = content.trim().slice(match.index).split(/[.!。\n]/)[0];
+      if (/[?？]|기억|회상|말한|말했던/.test(sentence)) continue;
+      const name = match[2];
+      if (/^(?:회사|사업장|제가|급여일|월급날|이름)$/.test(name)) continue;
+      const candidate = { company_id: `statement:${encodeURIComponent(match[1])}:${encodeURIComponent(name)}`,
+        company_name: name, region: match[1] };
+      if (publicCompanies.some(company => company.company_name === name && hasCompanyLocationQualifier(match[1], company))) continue;
+      subjects.set(candidate.company_id, candidate);
+    }
+  }
+  return [...subjects.values()].slice(-16);
 }

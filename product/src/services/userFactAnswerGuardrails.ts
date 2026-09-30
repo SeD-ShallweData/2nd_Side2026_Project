@@ -3,7 +3,7 @@ import { referencedCompanyIds } from "@/services/companyAnswerScope";
 import { documentStatusesForRequest } from "@/services/conversationDocumentStatus";
 import { extractRecallFacts } from "@/services/conversationRecallService";
 import { asksUserDocumentStatus, asksWageDocumentUse } from "@/services/chatQuestionPurpose";
-import { mentionedCompanies, statementCompany } from "@/services/conversationCompanyScope";
+import { defaultStatementSubject, mentionedCompanies, statementCompanies, statementCompany } from "@/services/conversationCompanyScope";
 import { companySection as locatedCompanySection } from "@/services/companyAnswerGuardrails";
 
 function companySection(answer: string, name: string, others: string[]): string {
@@ -16,11 +16,10 @@ function companySection(answer: string, name: string, others: string[]): string 
 
 function documentContradiction(answer: string, request: ChatRequest): boolean {
   if (!asksUserDocumentStatus(request.message) && !asksWageDocumentUse(request.message)) return false;
-  // A new direct user correction in this turn supersedes retained history.
-  if (!/[?？]/.test(request.message) && /(?:계약서|명세서|통장\s*사본).{0,22}(?:갖고|보유|분실|잃|못\s*받|없)/.test(request.message)) return false;
+  // documentStatusesForRequest already applies current assertions after stored ones.
   const rows = documentStatusesForRequest(request);
   const names = [...new Set(rows.map(row => row.company_name))];
-  const companies = request.conversation_recall?.companies ?? [];
+  const companies = statementCompanies(request);
   const patterns = {
     contract: /(?:근로)?계약서(?!\s*(?:원본|사본))|계약\s*문서/,
     contract_original: /(?:근로)?계약서\s*원본/,
@@ -57,22 +56,23 @@ function documentContradiction(answer: string, request: ChatRequest): boolean {
 
 function paymentContradiction(answer: string, request: ChatRequest): boolean {
   if (!/미지급|입금|잔액|남은\s*금액/.test(request.message)) return false;
-  const companies = request.conversation_recall?.companies ?? [];
+  const companies = statementCompanies(request);
+  const defaultSubject = defaultStatementSubject(request);
   if (!mentionedCompanies(request.message, companies).length
-    && statementCompany(request.message, request.company_id ?? null, companies).ambiguous) return false;
-  const ids = referencedCompanyIds(request.message, companies, request.company_id);
+    && statementCompany(request.message, defaultSubject, companies).ambiguous) return false;
+  const ids = referencedCompanyIds(request.message, companies, defaultSubject ?? undefined);
   if (ids.length > 1) return false;
   const current = extractRecallFacts({ content: request.message, source_message_id: "current_request", sequence: Number.MAX_SAFE_INTEGER,
-    company_id: request.company_id ?? null, companies });
+    company_id: defaultSubject, companies, previous_facts: request.conversation_recall?.facts });
   const facts = [...(request.conversation_recall?.facts ?? []), ...current]
     .filter(fact => fact.kind === "wage_balance" && (ids.length === 0 ? fact.company_id === null : ids.includes(fact.company_id ?? "")));
   const latest = facts.at(-1);
-  const relation = latest?.value?.match(/^(\d+)만 원 중 (\d+)만 원 입금, 남은 금액 (\d+)만 원$/);
+  const relation = latest?.value?.match(/^([\d.]+)만 원 중 ([\d.]+)만 원 입금, 남은 금액 ([\d.]+)만 원$/);
   if (!relation) return false;
   const paid = Number(relation[2]);
   const balance = Number(relation[3]);
-  const balanceClaim = answer.match(/(?:잔액|남은\s*금액|미지급(?:된)?\s*(?:금액)?)[^\d\n]{0,12}(\d+)\s*만\s*원?/);
-  const paidClaim = answer.match(/(?:입금(?:된)?\s*금액|받은\s*금액)[^\d\n]{0,12}(\d+)\s*만\s*원?/);
+  const balanceClaim = answer.match(/(?:잔액|남은\s*금액|미지급(?:된)?\s*(?:금액)?)[^\d\n]{0,12}([\d.]+)\s*만\s*원?/);
+  const paidClaim = answer.match(/(?:입금(?:된)?\s*금액|받은\s*금액)[^\d\n]{0,12}([\d.]+)\s*만\s*원?/);
   return Boolean(balanceClaim && Number(balanceClaim[1]) !== balance
     || paidClaim && Number(paidClaim[1]) !== paid);
 }
