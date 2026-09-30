@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { RagDocument, RagRetrievalResult, RagRetriever } from "@/domain/rag";
 
 interface UpstreamItem {

@@ -1,0 +1,2 @@
+# 훅은 sh 가 실행하므로 Windows 체크아웃에서도 LF 를 유지한다.
+* text eol=lf

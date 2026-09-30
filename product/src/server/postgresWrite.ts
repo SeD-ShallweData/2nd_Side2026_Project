@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import {
   getAuthDatabaseConnectionString,

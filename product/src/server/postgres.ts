@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Pool, type QueryResultRow } from "pg";
 import { getDatabaseConnectionString } from "@/server/databaseConfig";
 import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";

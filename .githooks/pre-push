@@ -1,0 +1,46 @@
+#!/bin/sh
+# push 하기 전에 나가는 커밋에 비밀값이 섞였는지 scripts/scan-secrets.mjs 로 검사한다.
+# 공개 저장소는 push 하는 순간 공개되므로, 노출 전에 막을 수 있는 곳은 여기뿐이다.
+#
+# 켜기: git config core.hooksPath .githooks   (저장소 루트에서 한 번)
+# 끄기: git config --unset core.hooksPath
+# 오탐으로 급할 때 한 번만 건너뛰기: git push --no-verify (CI 의 Secret scan 이 다시 본다)
+
+remote="${1:-origin}"
+root=$(git rev-parse --show-toplevel) || exit 1
+scanner="$root/scripts/scan-secrets.mjs"
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "[pre-push] node 를 찾지 못해 비밀값 검사를 할 수 없습니다. PATH 에 Node 22 를 추가하거나 훅을 끕니다." >&2
+  exit 1
+fi
+
+# 브랜치 삭제는 SHA 가 전부 0 이다. SHA-1·SHA-256 저장소 모두에 맞게 길이를 맞춘다.
+zero=$(git hash-object --stdin </dev/null | tr '0-9a-f' '0')
+status=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  base=""
+  if [ "$remote_sha" != "$zero" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+    base="$remote_sha"
+  else
+    # 새 브랜치는 원격 기본 브랜치에서 갈라진 지점부터 본다. 추적 ref 가 없는 새 원격(포크·미러)이나
+    # URL 로 push 할 때는 origin 을 기준으로 삼는다.
+    for candidate in "refs/remotes/$remote/HEAD" "refs/remotes/$remote/main" refs/remotes/origin/HEAD refs/remotes/origin/main; do
+      base=$(git merge-base "$local_sha" "$candidate" 2>/dev/null) && break
+    done
+  fi
+  if [ -n "$base" ]; then
+    node "$scanner" --diff "$base" --head "$local_sha" || status=1
+  else
+    # 작업 트리가 아니라 push 되는 이력을 본다. 넣었다가 지운 값도 이력에는 남는다.
+    echo "[pre-push] $local_ref: 비교할 원격 기준이 없어 원격 추적 ref 에 없는 커밋을 모두 검사합니다."
+    node "$scanner" --outgoing "$local_sha" || status=1
+  fi
+done
+
+if [ "$status" -ne 0 ]; then
+  echo "[pre-push] 비밀값 검사를 통과하지 못해 push 를 멈췄습니다." >&2
+fi
+exit "$status"

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { HttpRagRetriever } from "@/adapters/real/HttpRagRetriever";
 import type { RagRetrievalResult } from "@/domain/rag";
 import { reviewedLaborRetrieval } from "@/services/reviewedLaborGuidance";
