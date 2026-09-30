@@ -14,12 +14,17 @@ import {
  * 그래서 로그인이 필요한 쓰기와 로그인 사용자의 AI 호출은 계정(user_id)으로 센다. 계정은 세션이
  * 보증하므로 IP 나 proxy 설정 없이 지금 운영 구조 그대로 동작한다.
  *
- * 계정을 여러 개 만들어 나눠 쓰는 경우를 위해 게시글과 현장 제보에는 사이트 전체 하루 상한도 둔다.
+ * 계정은 가입 상한(시간당 200·하루 1,000개, signupGuard) 안에서 얼마든지 새로 만들 수 있다. 그래서
+ * 계정을 바꿔 가며 쓰는 경우를 위해 상담·계약서 분석(LLM 비용), 현장 제보(디스크), 게시글·신고에는
+ * 사이트 전체 상한도 둔다. 시간당 상한은 하루치를 한꺼번에 써 버리지 못하게 한다. 공격자가 전체 상한을
+ * 다 쓰면 정상 사용자도 창이 끝날 때까지 막히는데, 방문자 IP 를 모르는 지금 구조에서는 피할 수 없는
+ * 절충이다.
  *
  * 저장은 프로세스 메모리다. 운영은 Next.js 프로세스 하나라 정확하고, 재시작하면 초기화된다.
  * 한도 값은 코드 상수다. 운영 web.env 검증기가 모르는 키를 거부하므로 환경변수로 받지 않는다.
- * 시연과 평가 스크립트(상담 최대 약 70회)의 정상 사용량보다 넉넉하게 잡았다. 목적은 봇 계정 하나가
- * 밤새 쓸 수 있는 양을 묶는 것이다.
+ * 계정별 한도는 봇 계정 하나가 밤새 쓸 수 있는 양을 묶고, 사이트 전체 상한은 비용·저장 공간의 최대치를
+ * 정한다. 둘 다 시연(계정 하나를 여럿이 함께 쓰는 경우 포함)과 평가 스크립트(상담 최대 약 70회)의
+ * 정상 사용량보다 넉넉하게 잡았다.
  *
  * 요청은 본문을 읽거나 저장·AI 호출을 하기 전에 센다. 입력 검증에 실패한 요청도 세므로 한도는
  * 정상 사용보다 크게 둔다.
@@ -30,8 +35,10 @@ export type AccountRateAction =
   | "contract_review"
   | "worksite_tip"
   | "community_post"
+  | "community_post_edit"
   | "community_report"
-  | "conversation_import";
+  | "conversation_import"
+  | "favorite_add";
 
 export interface AccountRateWindow {
   name: "hour" | "day";
@@ -62,28 +69,41 @@ export const ACCOUNT_RATE_LIMITS: Readonly<Record<AccountRateAction, AccountRate
   chat: {
     accountMessage: "상담 요청이 너무 많습니다.",
     perAccount: [perHour(100), perDay(500)],
+    // 상담 한 번이 공급자 호출 2번(dual_api)이다. 익명 상담의 하루 상한(1,000회)과 따로 센다.
+    siteWide: { message: "사이트 전체의 상담 요청 한도에 도달했습니다.", windows: [perHour(500), perDay(3_000)] },
   },
   contract_review: {
     accountMessage: "계약서 분석 요청이 너무 많습니다.",
     perAccount: [perHour(30), perDay(150)],
+    siteWide: { message: "사이트 전체의 계약서 분석 한도에 도달했습니다.", windows: [perHour(100), perDay(600)] },
   },
   worksite_tip: {
     accountMessage: "현장 제보가 너무 많습니다.",
-    perAccount: [perHour(10), perDay(30)],
+    // 시연 계정 하나를 여럿이 함께 쓰고 사진 올리기에 실패한 요청도 세므로 넉넉히 둔다. 디스크는 전체 상한이 묶는다.
+    perAccount: [perHour(30), perDay(60)],
     siteWide: { message: "사이트 전체의 현장 제보 접수 한도에 도달했습니다.", windows: [perDay(300)] },
   },
   community_post: {
     accountMessage: "게시글 작성이 너무 많습니다.",
     perAccount: [perHour(20), perDay(60)],
-    siteWide: { message: "사이트 전체의 게시글 작성 한도에 도달했습니다.", windows: [perDay(1_000)] },
+    siteWide: { message: "사이트 전체의 게시글 작성 한도에 도달했습니다.", windows: [perHour(150), perDay(1_000)] },
+  },
+  community_post_edit: {
+    accountMessage: "게시글 수정·삭제가 너무 많습니다.",
+    perAccount: [perHour(60)],
   },
   community_report: {
     accountMessage: "게시글 신고가 너무 많습니다.",
     perAccount: [perHour(30), perDay(100)],
+    siteWide: { message: "사이트 전체의 게시글 신고 접수 한도에 도달했습니다.", windows: [perHour(300), perDay(2_000)] },
   },
   conversation_import: {
     accountMessage: "대화 가져오기 요청이 너무 많습니다.",
     perAccount: [perHour(20), perDay(60)],
+  },
+  favorite_add: {
+    accountMessage: "즐겨찾기 추가가 너무 많습니다.",
+    perAccount: [perHour(120)],
   },
 };
 

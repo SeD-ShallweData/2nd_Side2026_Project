@@ -30,11 +30,21 @@ const PASSWORD_MAX = 30;
 // 서버(authService.ts)의 PASSWORD_ALLOWED_PATTERN과 동일하다 — 공백 없는 ASCII 출력 문자만 허용한다.
 const PASSWORD_ALLOWED_PATTERN = /^[A-Za-z0-9!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]+$/;
 
-function submitErrorMessage(error: AuthApiError, m: MessageShape<typeof authMessages.ko>["errors"]): string {
+/*
+ * 서버 문구(error.message)는 받은 그대로 두고, 화면이 만드는 문구만 현재 언어 사전에서 고른다.
+ * 가입 시도 상한(SIGNUP_RATE_LIMITED)과 해시 대기 초과(AUTH_BUSY)는 서버 문구에 남은 시간·이유가
+ * 있으므로 그대로 보여 준다. 일반 '인증 서비스를 사용할 수 없습니다'로 바꾸면 고장처럼 읽힌다.
+ */
+export function submitErrorMessage(
+  error: AuthApiError,
+  m: MessageShape<typeof authMessages.ko>["errors"] = authMessages.ko.errors,
+): string {
   switch (error.code) {
     case "VALIDATION_ERROR":
     case "EMAIL_ALREADY_REGISTERED":
     case "CROSS_SITE_REQUEST_REJECTED":
+    case "SIGNUP_RATE_LIMITED":
+    case "AUTH_BUSY":
       return error.message;
     default:
       return error.retryable

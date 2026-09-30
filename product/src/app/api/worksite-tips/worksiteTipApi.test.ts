@@ -14,7 +14,11 @@ import { GET as listTips, POST as createTip } from "@/app/api/worksite-tips/rout
 import { GET as listCommunityPosts } from "@/app/api/community/posts/route";
 import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 import { resetMockCommunityState } from "@/adapters/mock/MockCommunityRepository";
-import { ACCOUNT_RATE_LIMITS, resetAccountRateLimitsForTests } from "@/server/accountRateLimit";
+import {
+  ACCOUNT_RATE_LIMITS,
+  assertAccountRateLimit,
+  resetAccountRateLimitsForTests,
+} from "@/server/accountRateLimit";
 import {
   resetMockWorksiteTipsForTests,
   WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER,
@@ -766,14 +770,18 @@ describe("현장 제보 계정 한도", () => {
   it("계정 한도를 넘은 제보는 multipart 본문을 읽기 전에 429 로 막고 저장하지 않는다", async () => {
     const hourly = ACCOUNT_RATE_LIMITS.worksite_tip.perAccount.find((window) => window.name === "hour")!.limit;
     const cookie = await cookieFor(USER);
-    for (let index = 0; index < hourly; index += 1) {
-      const created = await createTip(submissionRequest({
-        cookie,
-        title: `계정 한도 확인 제보 ${index + 1}`,
-        body: "계정 단위 제보 한도를 확인합니다.",
-      }));
-      expect(created.status).toBe(201);
+    // Mock 저장소는 제보자당 25건까지만 받아 시간당 계정 한도보다 먼저 찬다. 한도는 미리 채우고
+    // 마지막 한 건만 실제로 제출한다.
+    expect(hourly).toBeGreaterThan(WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER);
+    for (let index = 0; index < hourly - 1; index += 1) {
+      assertAccountRateLimit("worksite_tip", USER.user_id);
     }
+    const created = await createTip(submissionRequest({
+      cookie,
+      title: "계정 한도 확인 제보",
+      body: "계정 단위 제보 한도를 확인합니다.",
+    }));
+    expect(created.status).toBe(201);
 
     // 본문을 읽었다면 multipart 가 아니라서 거절됐을 요청이다. 한도가 먼저 걸리는지 본다.
     const limited = await createTip(new Request("http://localhost/api/worksite-tips", {
@@ -790,6 +798,6 @@ describe("현장 제보 계정 한도", () => {
     const list = await listTips(new Request("http://localhost/api/worksite-tips", {
       headers: { cookie: await cookieFor(INSPECTOR) },
     }));
-    expect(await list.json()).toMatchObject({ total: hourly });
+    expect(await list.json()).toMatchObject({ total: 1 });
   });
 });

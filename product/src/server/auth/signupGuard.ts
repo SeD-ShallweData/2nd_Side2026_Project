@@ -1,7 +1,7 @@
 import "server-only";
 
 import { SIGNUP_HONEYPOT_FIELD } from "@/app/api/auth/authApiContract";
-import { publicClientMarker } from "@/server/publicClientMarker";
+import { publicClientMarker, UNMARKED_CLIENT } from "@/server/publicClientMarker";
 import {
   FixedWindowCounter,
   rateLimitError,
@@ -39,6 +39,11 @@ export const SIGNUP_RATE_LIMITS = {
     { name: "hour", limit: 20, ms: HOUR_MS },
     { name: "day", limit: 50, ms: DAY_MS },
   ],
+  /*
+   * 탭 표시값이 없는 요청은 모두 한 묶음으로 센다. 저장소를 막은 브라우저, 배포 직후 예전 화면,
+   * 표시값을 보내지 않는 봇이 함께 쓰므로, 봇 하나가 금방 나머지까지 막지 못하게 탭 한도의 5배를 준다.
+   */
+  unmarkedClientMultiplier: 5,
 } as const;
 
 const counter = new FixedWindowCounter();
@@ -66,11 +71,12 @@ export function assertSignupAllowed(request: Request, body: unknown, now = Date.
 
   const scale = testLimitScale();
   const marker = publicClientMarker(request);
+  const clientScale = marker === UNMARKED_CLIENT ? SIGNUP_RATE_LIMITS.unmarkedClientMultiplier : 1;
   const siteWindows: CounterWindow[] = SIGNUP_RATE_LIMITS.siteWide.map((window) => ({
     key: `signup:site-${window.name}`, limit: window.limit * scale, ms: window.ms,
   }));
   const clientWindows: CounterWindow[] = SIGNUP_RATE_LIMITS.perClient.map((window) => ({
-    key: `signup:client-${window.name}:${marker}`, limit: window.limit * scale, ms: window.ms,
+    key: `signup:client-${window.name}:${marker}`, limit: window.limit * clientScale * scale, ms: window.ms,
   }));
   const rejection = counter.consume([...clientWindows, ...siteWindows], now);
   if (!rejection) return;

@@ -7,6 +7,7 @@ import { DELETE, PUT } from "@/app/api/users/me/favorites/[companyId]/route";
 import { GET } from "@/app/api/users/me/favorites/route";
 import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 import { resetMockFavoritesForTests } from "@/services/userDataProviders";
+import { ACCOUNT_RATE_LIMITS, resetAccountRateLimitsForTests } from "@/server/accountRateLimit";
 
 const USER: SessionUserDto = {
   user_id: "10000000-0000-4000-8000-000000000001",
@@ -74,6 +75,7 @@ beforeEach(() => {
 afterEach(() => {
   resetMockSessions();
   resetMockFavoritesForTests();
+  resetAccountRateLimitsForTests();
   vi.unstubAllEnvs();
 });
 
@@ -213,5 +215,39 @@ describe("즐겨찾기 목록·추가·해제 계약", () => {
     expect(await response.json()).toMatchObject({
       error: { code: "FAVORITE_DATABASE_NOT_CONFIGURED", retryable: true },
     });
+  });
+});
+
+describe("즐겨찾기 추가 계정 한도", () => {
+  beforeEach(() => {
+    // 한도 실제 값으로 확인한다. 운영 모드의 Mock 인증은 시연 외곽 인증 설정을 요구한다.
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DEMO_BASIC_AUTH_USER", "demo-user");
+    vi.stubEnv("DEMO_BASIC_AUTH_PASSWORD", "demo-password");
+  });
+
+  it("계정별 시간당 한도를 넘은 추가는 429 로 막고, 해제와 다른 계정은 막지 않는다", async () => {
+    const hourly = ACCOUNT_RATE_LIMITS.favorite_add.perAccount.find((window) => window.name === "hour")!.limit;
+    const cookie = await cookieFor(USER);
+    for (let index = 0; index < hourly; index += 1) {
+      const response = await PUT(mutationRequest("PUT", "COMPANY_DEMO_001", cookie), contextFor("COMPANY_DEMO_001"));
+      expect(response.status).toBe(index === 0 ? 201 : 200);
+    }
+
+    const limited = await PUT(mutationRequest("PUT", "COMPANY_DEMO_002", cookie), contextFor("COMPANY_DEMO_002"));
+
+    expect(limited.status).toBe(429);
+    // 실제 시계로 돌므로 창이 열린 뒤 흐른 시간만큼 줄 수 있다.
+    expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(3_500);
+    expect(Number(limited.headers.get("retry-after"))).toBeLessThanOrEqual(3_600);
+    expect(await limited.json()).toMatchObject({
+      error: { code: "ACCOUNT_RATE_LIMITED", message: "즐겨찾기 추가가 너무 많습니다. 1시간 뒤에 다시 시도해 주세요." },
+    });
+    expect((await DELETE(mutationRequest("DELETE", "COMPANY_DEMO_001", cookie), contextFor("COMPANY_DEMO_001"))).status)
+      .toBe(200);
+    expect((await PUT(
+      mutationRequest("PUT", "COMPANY_DEMO_001", await cookieFor(OTHER_USER)),
+      contextFor("COMPANY_DEMO_001"),
+    )).status).toBe(201);
   });
 });

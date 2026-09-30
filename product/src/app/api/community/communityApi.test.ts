@@ -79,7 +79,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function hourlyLimit(action: "community_post" | "community_report"): number {
+function hourlyLimit(action: "community_post" | "community_post_edit" | "community_report"): number {
   return ACCOUNT_RATE_LIMITS[action].perAccount.find((window) => window.name === "hour")!.limit;
 }
 
@@ -503,5 +503,43 @@ describe("게시글·신고 계정 한도", () => {
     expect(await limited.json()).toMatchObject({
       error: { code: "ACCOUNT_RATE_LIMITED", message: expect.stringContaining("게시글 신고가 너무 많습니다.") },
     });
+  });
+
+  it("글 수정·삭제는 합산해 계정 단위로 세고, 넘으면 본문을 읽기 전에 429 로 막는다", async () => {
+    const cookie = await cookieFor(USER);
+    const created = await createPost(jsonMutation(
+      "http://localhost/api/community/posts",
+      "POST",
+      { category: "wage", title: "수정 한도 확인 글", body: "글 수정·삭제 한도를 확인하는 글입니다." },
+      cookie,
+    ));
+    const { post_id: postId } = await created.json() as { post_id: string };
+    const postUrl = `http://localhost/api/community/posts/${postId}`;
+    for (let index = 0; index < hourlyLimit("community_post_edit"); index += 1) {
+      const updated = await updatePost(
+        jsonMutation(postUrl, "PATCH", { title: `수정 ${index + 1}` }, cookie),
+        contextFor("postId", postId),
+      );
+      expect(updated.status).toBe(200);
+    }
+
+    // 본문을 읽었다면 415 가 났을 요청이다. 한도가 먼저 걸리는지 본다.
+    const limited = await updatePost(new Request(postUrl, {
+      method: "PATCH",
+      headers: { "content-type": "text/plain", origin: "http://localhost", cookie },
+      body: "not json",
+    }), contextFor("postId", postId));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toMatch(/^[1-9]\d*$/);
+    expect(await limited.json()).toMatchObject({
+      error: { code: "ACCOUNT_RATE_LIMITED", message: expect.stringContaining("게시글 수정·삭제가 너무 많습니다.") },
+    });
+
+    // 삭제도 같은 한도를 쓴다. 막힌 삭제는 글을 지우지 않는다.
+    const deleted = await deletePost(jsonMutation(postUrl, "DELETE", undefined, cookie), contextFor("postId", postId));
+    expect(deleted.status).toBe(429);
+    const stillThere = await getPost(new Request(postUrl, { headers: { cookie } }), contextFor("postId", postId));
+    expect(stillThere.status).toBe(200);
+    expect(await stillThere.json()).toMatchObject({ title: `수정 ${hourlyLimit("community_post_edit")}` });
   });
 });

@@ -94,14 +94,18 @@ describe("가입 시도 상한", () => {
     expect(() => assertSignupAllowed(signupRequest(marker(1)), BODY, NOW + HOUR)).not.toThrow();
   });
 
-  it("탭 표시값이 없거나 형식이 틀린 요청은 한 묶음으로 센다", () => {
-    const perClient = limitOf("perClient", "hour");
-    for (let index = 0; index < perClient; index += 1) {
+  it("탭 표시값이 없거나 형식이 틀린 요청은 한 묶음으로 세되 탭 한도의 5배를 준다", () => {
+    expect(SIGNUP_RATE_LIMITS.unmarkedClientMultiplier).toBe(5);
+    const unmarkedHourly = limitOf("perClient", "hour") * SIGNUP_RATE_LIMITS.unmarkedClientMultiplier;
+    for (let index = 0; index < unmarkedHourly; index += 1) {
       assertSignupAllowed(signupRequest(index % 2 === 0 ? undefined : "short"), BODY, NOW);
     }
 
-    expect(() => assertSignupAllowed(signupRequest(), BODY, NOW))
-      .toThrow(expect.objectContaining({ code: "SIGNUP_RATE_LIMITED" }));
+    const error = captureError(() => assertSignupAllowed(signupRequest(), BODY, NOW));
+    expect(error).toMatchObject({ code: "SIGNUP_RATE_LIMITED" });
+    expect(error.message.startsWith("가입 시도가 너무 많습니다.")).toBe(true);
+    // 표시값 없는 묶음이 막혀도 표시값을 보내는 탭은 영향을 받지 않는다.
+    expect(() => assertSignupAllowed(signupRequest(marker(1)), BODY, NOW)).not.toThrow();
   });
 
   it("탭 표시값을 바꿔 가며 보내도 사이트 전체 시간당 상한에서 막는다", () => {

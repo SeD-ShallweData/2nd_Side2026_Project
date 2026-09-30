@@ -20,7 +20,15 @@ interface LoginAttemptMemory {
 const MAX_FAILURES = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1_000;
 const FAILURE_RECORD_IDLE_MS = 15 * 60 * 1_000;
-const MAX_TRACKED_IDENTIFIERS = 10_000;
+/*
+ * 추적표 상한. 로그인 실패는 모두 비밀번호 해시(동시 2개, passwordHash.ts)를 거쳐야 기록되므로
+ * 초당 수십 건이 한계다(이 Mac 실측 약 43건). 그 속도로는 10만 개를 채우는 데 약 39분이 걸려
+ * 기록 유지 시간(15분) 안에 표를 가득 채울 수 없다. 키를 16바이트로 줄여 가득 차도 약 14MB 다.
+ */
+export const MAX_TRACKED_LOGIN_IDENTIFIERS = 100_000;
+
+/* 테스트가 작은 표로 포화 동작을 확인할 때만 바꾼다. resetLoginAttemptsForTests 가 되돌린다. */
+let trackedIdentifierCapacity = MAX_TRACKED_LOGIN_IDENTIFIERS;
 
 /*
  * 현재 운영은 단일 Next.js 프로세스다. 로그인 잠금도 같은 프로세스 메모리에
@@ -40,11 +48,16 @@ const memory = loginAttemptGlobal.__donworryLoginAttemptMemory ?? {
 memory.queues ??= new Map<string, Promise<void>>();
 loginAttemptGlobal.__donworryLoginAttemptMemory = memory;
 
-/* 원문 이메일을 메모리 키로 남기지 않는다. 입력은 서비스에서 이미 정규화된다. */
+/*
+ * 원문 이메일을 메모리 키로 남기지 않는다. 입력은 서비스에서 이미 정규화된다.
+ * 키는 HMAC 앞 16바이트(128비트)만 쓴다. 10만 개 사이에서 겹칠 확률은 무시할 만하고 메모리는 줄어든다.
+ */
 function identifierKey(email: string): string {
   return createHmac("sha256", memory.key_salt)
     .update(email.trim().toLocaleLowerCase("en-US"), "utf8")
-    .digest("hex");
+    .digest()
+    .subarray(0, 16)
+    .toString("base64url");
 }
 
 function retryAfterSeconds(lockedUntilMs: number, nowMs: number): number {
@@ -74,27 +87,34 @@ function activeRecord(key: string, nowMs: number): LoginAttemptRecord | null {
  * 비우는 순서는 이렇다.
  *   1. 만료된 기록. 기록은 마지막 실패 순서로 놓여 있고 잠금 시간과 실패 기록 유지 시간이 같아
  *      만료된 기록은 앞쪽에 모여 있다. 앞에서부터 만료되지 않은 기록을 만날 때까지만 본다.
- *   2. 잠기지 않은 기록 중 가장 오래된 것. 잠긴 기록을 먼저 밀어내면 새 이메일을 쏟아부어
- *      잠금을 일찍 풀 수 있으므로, 잠긴 기록은 표 전체가 잠긴 기록일 때만 밀어낸다.
- *   3. 가장 오래된 잠긴 기록.
+ *   2. 잠기지 않은 기록 가운데 실패 횟수가 가장 적은 것, 같으면 가장 오래된 것.
+ *      가장 오래된 것부터 비우면, 피해자 이메일로 4번 틀린 뒤 실패 1번짜리 이메일을 쏟아부어
+ *      그 기록을 밀어내고 5회 잠금 없이 계속 대입할 수 있다. 실패가 적은 기록부터 비우면 쏟아부은
+ *      기록끼리만 밀려난다. 실패 1번은 가장 적은 값이라 처음 만나는 즉시 비운다.
+ *   3. 가장 오래된 잠긴 기록. 잠긴 기록을 먼저 밀어내면 새 이메일을 쏟아부어 잠금을 일찍 풀 수
+ *      있으므로, 표 전체가 잠긴 기록일 때만 밀어낸다.
+ * 표 끝까지 훑는 것은 실패 1번짜리가 없을 때뿐이다(10만 개에 약 4ms). 새 기록은 비밀번호 해시를
+ * 거쳐야 생기므로 이 검사도 초당 수십 번을 넘지 않는다.
  */
 function ensureRoomForNewIdentifier(nowMs: number): void {
-  if (memory.attempts.size < MAX_TRACKED_IDENTIFIERS) return;
+  if (memory.attempts.size < trackedIdentifierCapacity) return;
 
   for (const [key, record] of memory.attempts) {
     if (recordExpiresAtMs(record) > nowMs) break;
     memory.attempts.delete(key);
   }
-  if (memory.attempts.size < MAX_TRACKED_IDENTIFIERS) return;
+  if (memory.attempts.size < trackedIdentifierCapacity) return;
 
+  let evictKey: string | undefined;
+  let evictFailures = Number.POSITIVE_INFINITY;
   for (const [key, record] of memory.attempts) {
-    if (record.locked_until_ms === null) {
-      memory.attempts.delete(key);
-      return;
-    }
+    if (record.locked_until_ms !== null || record.failures >= evictFailures) continue;
+    evictKey = key;
+    evictFailures = record.failures;
+    if (evictFailures <= 1) break;
   }
-  const oldestKey = memory.attempts.keys().next().value;
-  if (oldestKey !== undefined) memory.attempts.delete(oldestKey);
+  evictKey ??= memory.attempts.keys().next().value;
+  if (evictKey !== undefined) memory.attempts.delete(evictKey);
 }
 
 /* 고친 기록을 맨 뒤로 보내 Map 순서가 마지막 실패 순서가 되게 한다. */
@@ -179,7 +199,12 @@ export async function withLoginAttemptLock<T>(email: string, action: () => Promi
   }
 }
 
+export function setLoginAttemptCapacityForTests(capacity: number): void {
+  trackedIdentifierCapacity = capacity;
+}
+
 export function resetLoginAttemptsForTests(): void {
   memory.attempts.clear();
   memory.queues.clear();
+  trackedIdentifierCapacity = MAX_TRACKED_LOGIN_IDENTIFIERS;
 }

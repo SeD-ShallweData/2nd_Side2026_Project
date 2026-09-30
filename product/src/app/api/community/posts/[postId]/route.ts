@@ -6,6 +6,7 @@ import {
   getCommunityPost,
   updateCommunityPost,
 } from "@/services/communityService";
+import { assertAccountRateLimit } from "@/server/accountRateLimit";
 import {
   assertSameOriginRequest,
   noStoreError,
@@ -37,6 +38,8 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
     const user = requireAuthenticatedUser(
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
+    // 수정은 글 수가 늘지 않아도 DB 쓰기다. 본문을 읽기 전에 센다.
+    assertAccountRateLimit("community_post_edit", user.user_id);
     const { postId } = await context.params;
     return noStoreJson(await updateCommunityPost(
       postId,
@@ -54,6 +57,7 @@ export async function DELETE(request: Request, context: RouteContext): Promise<N
     const user = requireAuthenticatedUser(
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
+    assertAccountRateLimit("community_post_edit", user.user_id);
     const { postId } = await context.params;
     return noStoreJson(await deleteCommunityPost(postId, user));
   } catch (error) {

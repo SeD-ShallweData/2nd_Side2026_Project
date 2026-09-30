@@ -24,10 +24,14 @@ function limitOf(action: keyof typeof ACCOUNT_RATE_LIMITS, name: "hour" | "day")
   return window.limit;
 }
 
-function siteDayLimitOf(action: keyof typeof ACCOUNT_RATE_LIMITS): number {
-  const window = ACCOUNT_RATE_LIMITS[action].siteWide?.windows.find((candidate) => candidate.name === "day");
-  if (!window) throw new Error(`${action} 사이트 전체 하루 한도가 없습니다.`);
+function siteLimitOf(action: keyof typeof ACCOUNT_RATE_LIMITS, name: "hour" | "day"): number {
+  const window = ACCOUNT_RATE_LIMITS[action].siteWide?.windows.find((candidate) => candidate.name === name);
+  if (!window) throw new Error(`${action} 사이트 전체 ${name} 한도가 없습니다.`);
   return window.limit;
+}
+
+function hasSiteLimit(action: keyof typeof ACCOUNT_RATE_LIMITS, name: "hour" | "day"): boolean {
+  return ACCOUNT_RATE_LIMITS[action].siteWide?.windows.some((candidate) => candidate.name === name) ?? false;
 }
 
 function captureError(action: () => void): ServiceError {
@@ -96,19 +100,52 @@ describe("계정 단위 한도", () => {
     expect(() => assertAccountRateLimit("contract_review", USER_A, { now: NOW + DAY })).not.toThrow();
   });
 
-  it("게시글과 현장 제보는 계정을 바꿔 가며 써도 사이트 전체 하루 상한에서 막는다", () => {
-    for (const action of ["community_post", "worksite_tip"] as const) {
-      const siteDaily = siteDayLimitOf(action);
-      for (let index = 0; index < siteDaily; index += 1) {
-        assertAccountRateLimit(action, `site-user-${index}`, { now: NOW });
-      }
-
-      const error = captureError(() => assertAccountRateLimit(action, "one-more-user", { now: NOW + 1 }));
-      expect(error).toMatchObject({ code: "SITE_RATE_LIMITED", status: 429 });
-      expect(error.message).toBe(`${ACCOUNT_RATE_LIMITS[action].siteWide?.message} 24시간 뒤에 다시 시도해 주세요.`);
+  /*
+   * 가입 상한 안에서도 하루 1,000개까지 계정을 만들 수 있다. 계정마다 한도를 새로 받으므로
+   * LLM 비용(상담·계약서)과 저장 공간(제보·게시글·신고)은 사이트 전체 상한이 묶는다.
+   */
+  it.each([
+    "chat",
+    "contract_review",
+    "worksite_tip",
+    "community_post",
+    "community_report",
+  ] as const)("%s: 계정을 바꿔 가며 써도 사이트 전체 하루 상한에서 막는다", (action) => {
+    const siteDaily = siteLimitOf(action, "day");
+    // 시간당 전체 상한이 있으면 먼저 걸리므로 한 시간에 그만큼씩 나눠 보낸다.
+    const siteHourly = hasSiteLimit(action, "hour") ? siteLimitOf(action, "hour") : siteDaily;
+    for (let index = 0; index < siteDaily; index += 1) {
+      assertAccountRateLimit(action, `site-user-${index}`, { now: NOW + Math.floor(index / siteHourly) * HOUR });
     }
-    // 사이트 전체 상한은 다른 동작에 번지지 않는다.
-    expect(() => assertAccountRateLimit("community_report", "one-more-user", { now: NOW + 1 })).not.toThrow();
+    const nextHour = NOW + Math.ceil(siteDaily / siteHourly) * HOUR;
+
+    const error = captureError(() => assertAccountRateLimit(action, "one-more-user", { now: nextHour }));
+    expect(error).toMatchObject({ code: "SITE_RATE_LIMITED", status: 429 });
+    // 하루 창은 첫 요청부터 24시간이라 남은 시간으로 안내한다.
+    const seconds = (NOW + DAY - nextHour) / 1_000;
+    expect(error.message).toBe(`${ACCOUNT_RATE_LIMITS[action].siteWide?.message} ${formatRetryWait(seconds)} 뒤에 다시 시도해 주세요.`);
+    expect(error.details).toEqual([{ field: "retry_after_seconds", reason: String(seconds) }]);
+  });
+
+  it.each([
+    "chat",
+    "contract_review",
+    "community_post",
+    "community_report",
+  ] as const)("%s: 사이트 전체 시간당 상한으로 하루치를 한꺼번에 쓰지 못하게 한다", (action) => {
+    const siteHourly = siteLimitOf(action, "hour");
+    expect(siteHourly).toBeLessThan(siteLimitOf(action, "day"));
+    for (let index = 0; index < siteHourly; index += 1) {
+      assertAccountRateLimit(action, `burst-user-${index}`, { now: NOW });
+    }
+
+    const error = captureError(() => assertAccountRateLimit(action, "one-more-user", { now: NOW + 1 }));
+    expect(error).toMatchObject({ code: "SITE_RATE_LIMITED", status: 429 });
+    expect(error.details).toEqual([{ field: "retry_after_seconds", reason: String(Math.ceil((HOUR - 1) / 1_000)) }]);
+
+    // 사이트 전체 상한은 다른 동작에 번지지 않고, 시간 창이 끝나면 다시 받는다.
+    expect(() => assertAccountRateLimit("conversation_import", "one-more-user", { now: NOW + 1 })).not.toThrow();
+    expect(() => assertAccountRateLimit(action, "one-more-user", { now: NOW + HOUR })).not.toThrow();
   });
 
   it("계정 한도와 사이트 전체 상한에 함께 걸리면 계정 한도로 안내한다", () => {
@@ -116,7 +153,7 @@ describe("계정 단위 한도", () => {
     for (let index = 0; index < hourly; index += 1) {
       assertAccountRateLimit("worksite_tip", USER_A, { now: NOW });
     }
-    for (let index = hourly; index < siteDayLimitOf("worksite_tip"); index += 1) {
+    for (let index = hourly; index < siteLimitOf("worksite_tip", "day"); index += 1) {
       assertAccountRateLimit("worksite_tip", `site-user-${index}`, { now: NOW });
     }
 
@@ -180,12 +217,13 @@ describe("한도 저장소 관리", () => {
   });
 
   it("끝난 창의 버킷은 지워서 메모리가 계속 늘지 않게 한다", () => {
+    // 사이트 전체 상한이 없는 동작이라 계정마다 시간·하루 버킷 두 개씩만 생긴다.
     for (let index = 0; index < 50; index += 1) {
-      assertAccountRateLimit("community_report", `user-${index}`, { now: NOW });
+      assertAccountRateLimit("conversation_import", `user-${index}`, { now: NOW });
     }
     expect(accountRateLimitBucketCountForTests()).toBe(100);
 
-    assertAccountRateLimit("community_report", USER_A, { now: NOW + DAY });
+    assertAccountRateLimit("conversation_import", USER_A, { now: NOW + DAY });
 
     expect(accountRateLimitBucketCountForTests()).toBe(2);
   });
