@@ -8,6 +8,7 @@ import { DataFreshnessNotice } from "@/components/common/DataFreshnessNotice";
 import { EmptyState, ErrorState, LimitationNotice, LoadingSkeleton } from "@/components/common/AsyncStates";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import { getFavoriteEligibility } from "@/components/favorite/favoriteAuth";
+import { describeFavoriteError } from "@/components/favorite/favoriteErrorMessage";
 import { RiskInformationCard } from "@/components/risk/RiskInformationCard";
 import type { SessionResponse } from "@/app/api/auth/authApiContract";
 import type { Company } from "@/domain/company";
@@ -17,45 +18,67 @@ import { getFavorites } from "@/services/favoriteClient";
 import { readApiResponse } from "@/utils/clientApi";
 import { useMessages } from "@/i18n/LocaleProvider";
 import { companyMessages } from "@/i18n/messages/company";
+import { favoriteMessages } from "@/i18n/messages/favorite";
+
+type FavoriteStatus =
+  | { companyId: string; status: "loading" }
+  | { companyId: string; status: "error"; message: string }
+  | { companyId: string; status: "ready"; isFavorite: boolean };
 
 export function CompanyDetail({ company, dataMode }: { company: Company; dataMode: "mock" | "real" }) {
   const router = useRouter();
   const cm = useMessages(companyMessages);
+  const fm = useMessages(favoriteMessages);
   const m = cm.detail;
   const loadFailed = m.loadFailed;
   const [risk, setRisk] = useState<CompanyRiskResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<SessionResponse | "loading">("loading");
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteStatus, setFavoriteStatus] = useState<FavoriteStatus>({ companyId: company.company_id, status: "loading" });
+  const [favoriteReload, setFavoriteReload] = useState(0);
+  const favorite = favoriteStatus.companyId === company.company_id
+    ? favoriteStatus
+    : { companyId: company.company_id, status: "loading" as const };
+
+  useEffect(() => {
+    const refreshAfterRestore = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setFavoriteStatus({ companyId: company.company_id, status: "loading" });
+        setFavoriteReload((value) => value + 1);
+      }
+    };
+    window.addEventListener("pageshow", refreshAfterRestore);
+    return () => window.removeEventListener("pageshow", refreshAfterRestore);
+  }, [company.company_id]);
 
   // 검색 결과와 마찬가지로 진입 시 즐겨찾기 목록을 한 번 조회해 이 사업장의
   // 선택 상태만 뽑아 쓴다. 로그인하지 않았거나 일반 사용자가 아니면 건너뛴다.
   useEffect(() => {
     let ignore = false;
     const controller = new AbortController();
-    getSession({ signal: controller.signal })
-      .then((result) => {
+    async function loadFavorite() {
+      try {
+        const result = await getSession({ signal: controller.signal });
         if (ignore) return;
         setSession(result);
-        if (result.authenticated && result.user.role === "user") {
-          return getFavorites({ signal: controller.signal }).then((favorites) => {
-            if (!ignore) {
-              setIsFavorite(favorites.items.some((item) => item.company_id === company.company_id));
-            }
-          });
-        }
-        return undefined;
-      })
-      .catch((caught: unknown) => {
+        const isFavorite = result.authenticated && result.user.role === "user"
+          ? (await getFavorites({ signal: controller.signal })).items.some((item) => item.company_id === company.company_id)
+          : false;
+        if (!ignore) setFavoriteStatus({ companyId: company.company_id, status: "ready", isFavorite });
+      } catch (caught) {
         if (ignore || (caught instanceof DOMException && caught.name === "AbortError")) return;
-        setSession({ authenticated: false, user: null, expires_at: null });
-      });
+        setFavoriteStatus({ companyId: company.company_id, status: "error", message: describeFavoriteError(caught, fm.errors) });
+      }
+    }
+    void loadFavorite();
     return () => {
       ignore = true;
       controller.abort();
     };
-  }, [company.company_id]);
+    // 번역 사전은 렌더마다 새 객체일 수 있다. 사업장이 바뀌거나 재시도할 때만 조회한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company.company_id, favoriteReload]);
 
   async function loadRisk(signal?: AbortSignal) {
     setLoading(true);
@@ -117,13 +140,16 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
             <Link href="/companies" className="button button-outline change-company">
               {m.change}
             </Link>
-            <FavoriteButton
-              companyId={company.company_id}
-              companyName={company.company_name}
-              initialIsFavorite={isFavorite}
-              eligibility={getFavoriteEligibility(session)}
-              onChange={(_, nextIsFavorite) => setIsFavorite(nextIsFavorite)}
-            />
+            {favorite.status === "loading" ? <span className="detail-favorite-status" role="status">{fm.view.loading}</span>
+              : favorite.status === "error" ? <div className="detail-favorite-status"><p className="field-error" role="alert">{favorite.message}</p><button type="button" className="button button-outline" onClick={() => { setFavoriteStatus({ companyId: company.company_id, status: "loading" }); setFavoriteReload((value) => value + 1); }}>{cm.search.retry}</button></div>
+                : <FavoriteButton
+                  key={company.company_id}
+                  companyId={company.company_id}
+                  companyName={company.company_name}
+                  initialIsFavorite={favorite.isFavorite}
+                  eligibility={getFavoriteEligibility(session)}
+                  onChange={(_, nextIsFavorite) => setFavoriteStatus({ companyId: company.company_id, status: "ready", isFavorite: nextIsFavorite })}
+                />}
           </div>
         </div>
       </section>
