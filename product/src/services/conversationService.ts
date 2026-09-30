@@ -340,7 +340,8 @@ export async function hydrateConversationRequest(
       companies,
       statement_subjects: statementSubjects,
       active_statement_subject: request.company_id && request.company_id !== statementHistory.last_selection
-        ? request.company_id : statementHistory.active_subject,
+        ? request.company_id : detail.active_company_id !== statementHistory.last_selection
+          ? detail.active_company_id : statementHistory.active_subject,
       company_history: companyHistory,
       diagnostics: {
         summary_status: summary?.status ?? "absent", summary_version: summary?.summary_version ?? null,
