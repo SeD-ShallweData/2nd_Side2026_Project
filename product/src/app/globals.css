@@ -851,6 +851,12 @@ summary:focus-visible {
   padding: 30px;
 }
 
+/* 로그인·회원가입 폼은 좁게, 가운데에 둔다(다른 search-form은 그대로) */
+.search-form.auth-form {
+  max-width: 480px;
+  margin-inline: auto;
+}
+
 .search-form > label {
   display: block;
   margin-bottom: 9px;
@@ -2347,10 +2353,13 @@ summary:focus-visible {
   outline: 0;
 }
 
+.chat-input-wrap { position: relative; }
+
+/* 입력창 오른쪽 아래 안쪽. 입력창의 오른쪽 안쪽 여백(50px)이 이 버튼 자리다. */
 .chat-send {
   position: absolute;
-  right: 27px;
-  bottom: 26px;
+  right: 10px;
+  bottom: 10px;
   display: flex;
   width: 36px;
   height: 36px;
@@ -3407,7 +3416,9 @@ summary:focus-visible {
   color: var(--muted);
 }
 
-.community-shell {
+.community-shell,
+/* 현장 신고 탭도 커뮤니티 탭과 같은 폭으로 둔다(10-01). */
+.worksite-page .narrow-shell {
   width: min(960px, calc(100% - 40px));
 }
 
@@ -4811,14 +4822,14 @@ summary:focus-visible {
 .worksite-form-intro, .worksite-list-toolbar, .worksite-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .worksite-form-intro { margin-bottom: 22px; }
 .worksite-form-intro h2, .worksite-list-toolbar h2, .worksite-detail-head h2 { margin: 3px 0 0; font-size: 1.25rem; }
-.worksite-form-intro p, .worksite-list-toolbar p { max-width: 300px; margin: 5px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.6; }
+.worksite-form-intro p, .worksite-list-toolbar p { max-width: 3000px; margin: 5px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.6; }
 .worksite-tip-form > label, .worksite-upload-field > label { display: block; margin-top: 16px; color: var(--ink); font-size: .78rem; font-weight: 850; }
-.worksite-tip-form input:not([type="file"]), .worksite-tip-form textarea { display: block; width: 100%; margin-top: 7px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-warm); padding: 11px 12px; color: var(--ink); }
+.worksite-tip-form input:not([type="file"]), .worksite-tip-form textarea, .worksite-tip-form select { display: block; width: 100%; margin-top: 7px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-warm); padding: 11px 12px; color: var(--ink); }
 .worksite-tip-form textarea { resize: vertical; }
-.worksite-tip-form input:focus, .worksite-tip-form textarea:focus { border-color: var(--ink); outline: 3px solid rgb(255 214 0 / 20%); }
+.worksite-tip-form input:focus, .worksite-tip-form textarea:focus, .worksite-tip-form select:focus { border-color: var(--ink); outline: 3px solid rgb(255 214 0 / 20%); }
 .field-optional { color: var(--muted); font-size: .7rem; font-weight: 600; }
 .worksite-upload-field { margin-top: 16px; border: 1px dashed var(--line-strong); border-radius: 10px; background: var(--surface); padding: 13px; }
-.worksite-upload-field input[type="file"] { display: block; margin-top: 9px; color: var(--muted); font-size: .75rem; }
+.worksite-upload-field input[type="file"] { display: block; width: 100%; margin-top: 9px; color: var(--muted); font-size: .75rem; }
 .worksite-photo-list { display: grid; gap: 5px; margin: 10px 0 0; padding: 0; list-style: none; color: var(--ink-soft); font-size: .75rem; }
 .worksite-photo-list li { display: flex; justify-content: space-between; gap: 12px; border-radius: 7px; background: var(--white); padding: 7px 9px; }
 .worksite-photo-list span { color: var(--muted); }
@@ -5137,6 +5148,15 @@ summary:focus-visible {
   text-align: left;
 }
 
+/* 로그인 박스처럼 올리기 상자와 안내 띠만 좁혀 가운데에 둔다(10-01). 진단 결과는 전체 폭을 쓴다.
+   600px 는 버튼 두 개(14rem × 2 + 0.75rem)와 안쪽 여백(34px × 2)이 한 줄에 들어가는 폭이다. */
+.refresh-contract-page .contract-upload,
+.refresh-contract-page .mode-banner {
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+}
+
 
 /* 제목 상자의 기본 760px 제한 때문에 '계약서에서 놓친 항목이 있나요?' 와
    '현장의 목소리를 안전하게 전달하세요' 가 두 줄로 접혔다. 이 두 화면에서만
@@ -5438,6 +5458,8 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
 .language-switcher-pending li:hover .language-pending-tip,
 .language-switcher-pending li:focus-within .language-pending-tip { display: block; }
 
+/* 입력창 아랫선에 붙지 않도록 한 줄 띄운다. */
+.chat-voice-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .voice-pending { position: relative; display: inline-flex; }
 .voice-pending-button {
   border: 1px dashed var(--line-strong); border-radius: 999px; background: var(--white);
