@@ -18,6 +18,7 @@ import { clarificationFallback } from "@/services/chatFallback";
 import { hasActualUnpaidWageReport, reviewedLaborTopics } from "@/services/reviewedLaborGuidance";
 import { wageArrearsFallback } from "@/services/wageArrearsGuidance";
 import { finalizeConversationResponse, recallResponse } from "@/services/conversationRecallService";
+import { workRecordRequestTemplate } from "@/services/chatQuestionPurpose";
 import { referencedCompanyIds } from "@/services/companyAnswerScope";
 import { companySignalForAnswer } from "@/services/publicAnswerContext";
 import { asksSplitWageInjuryActions, splitWageInjuryGuidance } from "@/services/splitIssueGuidance";
@@ -72,10 +73,12 @@ function outOfScopeResponse(policyBaseline: ChatResponse, topic: string): ChatRe
   };
 }
 
-function generalCompanyIndicatorResponse(policyBaseline: ChatResponse): ChatResponse {
+function generalCompanyIndicatorResponse(policyBaseline: ChatResponse, question: string): ChatResponse {
   return {
     ...clarificationFallback(policyBaseline),
-    answer: "긍정 지표는 납부·고용 등 공개 자료에서 확인된 참고 신호입니다. 긍정 신호가 있어도 과거 임금체불이 없었다고 확정하거나 안전 인증으로 해석할 수는 없습니다. 긍정 지표가 0개이거나 자료가 부족하다는 것도 회사가 나쁘거나 위험하다는 판단은 아닙니다. 공식 명단 미등재도 체불 부재의 증명이 아닙니다. 실제 미지급 사실이 있다면 지표와 별개로 지급일·입금내역을 확인하고, 특정 사업장의 표시를 보려면 회사를 선택해 급여명세서·근로계약 조건을 함께 확인해 보세요.",
+    answer: /산재|안전|사고|지역.{0,6}업종/.test(question)
+      ? "아니요. 지역·업종 단위의 산업안전 지표는 해당 집단을 살펴보는 참고 정보이며, 특정 회사에서 사고가 났다거나 법을 위반했다는 증거가 아닙니다. 공개 카드만으로 개별 회사의 사고 발생이나 안전 여부를 확정할 수 없습니다. 개별 사업장의 공표 사실이 따로 연결되어 있다면 그 자료의 사업장 일치 여부·내용·기준일을 별도로 확인해야 합니다. 채용·근무 판단에는 실제 담당 업무와 현장 안전교육·보호구·작업 절차를 확인하세요."
+      : "긍정 지표는 납부·고용 등 공개 자료에서 확인된 참고 신호입니다. 긍정 신호가 있어도 과거 임금체불이 없었다고 확정하거나 안전 인증으로 해석할 수는 없습니다. 긍정 지표가 0개이거나 자료가 부족하다는 것도 회사가 나쁘거나 위험하다는 판단은 아닙니다. 공식 명단 미등재도 체불 부재의 증명이 아닙니다. 실제 미지급 사실이 있다면 지표와 별개로 지급일·입금내역을 확인하고, 특정 사업장의 표시를 보려면 회사를 선택해 급여명세서·근로계약 조건을 함께 확인해 보세요.",
     answer_type: "general_guidance",
     limitations: ["특정 사업장의 실제 상태나 향후 근로조건을 이 일반 설명만으로 판단할 수 없습니다."],
   };
@@ -246,6 +249,16 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
   const recall = recallResponse(parsedRequest, configs);
   if (recall) return recall;
 
+  const recordTemplate = workRecordRequestTemplate(parsedRequest.message);
+  if (recordTemplate) return policyShortCircuitResponse({
+    request: parsedRequest, configs,
+    policyBaseline: { ...clarificationFallback(policyBaseline), answer: recordTemplate,
+      answer_type: "general_guidance", sources: [], suggested_actions: [],
+      limitations: ["사용자가 요청한 자료 요청 문장 예시이며 법적 의무나 실제 자료 보유를 판단한 것이 아닙니다."] },
+    ragRetrieval: { query: parsedRequest.message, status: "no_match", reason: "user_requested_message_template", topic: null, threshold: null, documents: [] },
+    guardrailStatus: "passed", guardrailHits: [],
+  });
+
   const rewrite = await rewriteFollowupQuery(parsedRequest, configs);
   const request = rewrite.changed
     ? { ...parsedRequest, resolved_query: rewrite.query }
@@ -264,7 +277,7 @@ async function sendParsedComparedChatRequestInternal(parsedRequest: ChatRequest)
   if (primaryScope === "company_general") {
     return policyShortCircuitResponse({
       request,
-      policyBaseline: generalCompanyIndicatorResponse(policyBaseline),
+      policyBaseline: generalCompanyIndicatorResponse(policyBaseline, request.message),
       configs,
       intentDecision,
       ragRetrieval: {

@@ -32,6 +32,9 @@ import { extractRecallFacts } from "@/services/conversationRecallService";
 import { companyContextsForDetail, companyNamesForDetail } from "@/services/conversationCompanyNames";
 import { publicAnswerContext } from "@/services/publicAnswerContext";
 import { selectRecallFacts } from "@/services/conversationMemorySelection";
+import { userStatementSubjects } from "@/services/conversationCompanyScope";
+import { scopedConversationUsers } from "@/services/conversationStatementHistory";
+import type { ConversationRecallFact } from "@/domain/conversationRecall";
 
 const MAX_LIST_LIMIT = 50;
 const HISTORY_MESSAGE_LIMIT = 10;
@@ -299,23 +302,27 @@ export async function hydrateConversationRequest(
     .slice(-HISTORY_MESSAGE_LIMIT)
     .map(({ role, content }) => ({ role, content }));
   const companies = await companyContextsForDetail(detail, request.company_id);
+  const statementSubjects = userStatementSubjects([
+    ...allMessages.filter(message => message.role === "user").map(message => message.content), request.message,
+  ], companies);
+  const recallCompanies = [...companies, ...statementSubjects];
+  const statementHistory = scopedConversationUsers(detail, recallCompanies);
   const companyNames = new Map(companies.map(({ company_id, company_name }) => [company_id, company_name]));
   const legacyRecallRebuilt = through > 0 && (summary?.summary_version !== SUMMARY_VERSION || !summary?.summary.recall_facts);
   // Re-resolve retained owner-checked originals: v2 slots may carry a selected
   // company rather than the statement's subject; a later selection can name it.
-  const originals = detail.turns.flatMap((turn) => turn.messages.flatMap((message, index) => {
-    const sequence = (turn.turn_index - 1) * 2 + index + 1;
-    return message.role === "user"
-      ? extractRecallFacts({ content: message.content, source_message_id: message.message_id,
-        sequence, company_id: turn.company_id ?? null, companies }) : [];
-  }));
+  const originals: ConversationRecallFact[] = [];
+  for (const { message, sequence, company_id } of statementHistory.messages) {
+    originals.push(...extractRecallFacts({ content: message.content, source_message_id: message.message_id,
+      sequence, company_id, companies: recallCompanies, previous_facts: originals }));
+  }
   const recallFacts = selectRecallFacts(originals);
-  const documentStatements = selectDocumentStatements(detail, companies, request.message);
+  const documentStatements = selectDocumentStatements(detail, recallCompanies, request.message);
   const memory = toConversationMemoryContext(summary ? { ...summary,
     summary: { ...summary.summary,
-      user_stated_facts: selectUserFacts(detail, through, companies, request.message),
+      user_stated_facts: selectUserFacts(detail, through, recallCompanies, request.message),
       recall_facts: selectRecallFacts(originals.filter((fact) => fact.sequence <= through)) },
-  } : null, companies);
+  } : null, recallCompanies);
   const companyHistory = detail.turns.flatMap((turn) => {
     const companyName = turn.company_id ? companyNames.get(turn.company_id) : undefined;
     return turn.company_id && companyName
@@ -331,6 +338,9 @@ export async function hydrateConversationRequest(
       facts: recallFacts,
       document_statements: documentStatements,
       companies,
+      statement_subjects: statementSubjects,
+      active_statement_subject: request.company_id && request.company_id !== statementHistory.last_selection
+        ? request.company_id : statementHistory.active_subject,
       company_history: companyHistory,
       diagnostics: {
         summary_status: summary?.status ?? "absent", summary_version: summary?.summary_version ?? null,
