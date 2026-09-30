@@ -4,6 +4,9 @@
  * 기존 긴급 감지(PolicyChatProvider 의 ACUTE_INJURY·EMERGENCY_SIGNS 등)는 한국어 표현만 본다.
  * 외국인 근로자 산재 사망은 추락·깔림·매몰·끼임이 대부분이라(외국인 근로자 피해 통계 조사 2.3절),
  * 모국어로 "떨어졌다", "깔렸다", "기계에 끼었다"고 써도 곧바로 긴급 안내가 나가야 한다.
+ * 농·어업은 트랙터 전복·농약 중독·익사, 건설·제조업은 질식·가스 사고도 많아 함께 본다.
+ * 이 네 유형은 비유로도 쓰이므로("drowning in debt", "overturn the decision", "게임 중독")
+ * 물질·장비·배 같은 사고 맥락이 있을 때만 잡는다.
  *
  * - 모델을 부르지 않는다. 고정 사전과 고정 문구만 쓴다(번역 실패·지연과 무관하게 응답).
  * - 놓치지 않는 쪽으로 넓게 잡는다. 일반 상담이 긴급 안내로 바뀌는 비용보다 놓치는 비용이 크다.
@@ -38,6 +41,14 @@ const PATTERNS: Record<EmergencyDetectedLanguage, RegExp[]> = {
     /\belectr(?:ic|ical)\s+shock\b|\belectrocut/,
     /\b(?:on fire|caught fire|fire broke out|badly burn(?:ed|t)|scald(?:ed)?)\b/,
     /\b(?:seriously|severely|badly)\s+(?:injured|hurt)\b/,
+    // 중독: 물질이 함께 있을 때만. "addicted", "workaholic"은 걸리지 않는다.
+    /\b(?:pesticides?|insecticides?|herbicides?|weed ?killer|chemicals?|gas|fumes?|carbon monoxide|solvents?|bleach|ammonia|chlorine|hydrogen sulfide)\b.{0,30}\b(?:poison(?:ed|ing)?|inhal(?:ed|ing)|breath(?:ed|ing) in|swallow(?:ed)?|dr[au]nk|exposed|exposure|leak(?:s|ed|ing)?|collapsed|vomit(?:ed|ing)?|dizzy)\b|\b(?:poisoned|poisoning)\b|\b(?:swallowed|drank|inhaled|breathed in)\b.{0,20}\b(?:pesticide|chemical|gas|fumes|poison|bleach|solvent)/,
+    // 질식
+    /\bsuffocat|\basphyxi|\bchok(?:ed|ing)\b|\b(?:manhole|tank|silo|sewer|septic|pit|confined space|cargo hold)\b.{0,30}\b(?:collapsed|unconscious|fainted|passed out|not coming out|can'?t get out)\b|\b(?:no|not enough|lack of) (?:air|oxygen)\b(?!\s*-?\s*con)/,
+    // 익사: "drowning in debt/work" 같은 비유는 뺀다.
+    /\bdrown(?:ed|ing|s)?\b(?!\s+in\s+(?:debt|work|paperwork|bills|emails|stress|tasks))|\bfell (?:overboard|in(?:to)? the (?:water|sea|river|lake|pond|reservoir|canal))|\boverboard\b|\bswept away\b/,
+    // 전복: 장비·배가 있을 때만. "overturn the decision", "the court overturned"는 걸리지 않는다.
+    /\b(?:tractors?|forklifts?|trucks?|vehicles?|car|van|excavators?|loaders?|boats?|ships?|vessels?|tillers?|cultivators?|cranes?|lorry|harvesters?|quad bike)\b.{0,25}\b(?:overturn(?:ed|ing|s)?|roll(?:ed|s|ing)? over|tip(?:ped|s|ping)? over|flip(?:ped|s)?(?: over)?(?! out)|capsiz(?:e|ed|es|ing)|sank|sinking)\b|\b(?:overturned|flipped|capsized)\s+(?:tractor|forklift|truck|boat|vehicle)\b|\bcapsiz(?:e|ed|ing)\b/,
   ],
   zh: [
     /掉下来|摔下来|坠落|跌落|摔倒在地|从.{0,6}(?:上|高处|架子|梯子).{0,4}(?:掉|摔|跌)/,
@@ -50,9 +61,17 @@ const PATTERNS: Record<EmergencyDetectedLanguage, RegExp[]> = {
     /触电|被电(?:到|击)/,
     /烧伤|烫伤|着火|火灾/,
     /受了重伤|重伤|伤得很重/,
+    // 中毒: 물질이 함께 있거나 사람이 중독된 경우. "上瘾", "游戏中毒"는 걸리지 않는다.
+    /(?:农药|杀虫剂|除草剂|化学品|化学药品|化学物质|有毒|毒气|煤气|一氧化碳|硫化氢|有害物质|溶剂|甲醇|天然气|气体|油漆).{0,10}(?:中毒|喝了|喝下|误喝|误服|吸入|吸了|泄漏|泄露|熏倒|晕倒|昏倒)|(?:喝了|喝下|误喝|误服|吸入|吸了|闻了).{0,6}(?:农药|杀虫剂|除草剂|化学|毒气|煤气|有毒)|(?<!游戏|手机|网络|工作|购物|网)中毒/,
+    // 窒息
+    /窒息|憋死|闷死|缺氧|透不过气|(?:井|罐|池|窖|管道|下水道|化粪池|密闭|船舱|鱼舱).{0,8}(?:晕倒|昏迷|倒下|出不来)/,
+    // 溺水
+    /溺水|淹死|淹着了|落水|掉(?:进|到|入|下)(?:了)?(?:水|河|海|湖|池|水库|水塘|鱼塘|水沟)|掉下船|被水冲走|被浪卷走/,
+    // 翻车·翻船: 차·배·장비가 있을 때만. "翻车"만 쓴 인터넷 말투는 걸리지 않는다.
+    /侧翻|翻船|倾覆|(?:拖拉机|叉车|农机|铲车|挖掘机|卡车|货车|三轮车|车子|车辆|船|渔船|机器|收割机|吊车).{0,6}(?:翻了|翻倒|翻过来|翻车|沉了|沉没)|车翻了|翻车事故/,
   ],
   vi: [
-    /nga tu (?:tren )?cao|roi tu (?:tren )?cao|te tu (?:tren )?cao|nga xuong|roi xuong|te xuong|nga giao|nga thang/,
+    /nga tu (?:tren )?cao|roi tu (?:tren )?cao|te tu (?:tren )?cao|nga xuong|roi xuong|te xuong|nga giao|nga thang|(?:nga|roi|te) (?:tu )?(?:tren )?gian giao/,
     /bi de|de len nguoi|bi vui|vui lap|sap de/,
     /bi ket (?:vao )?may|ket tay|bi may (?:cuon|kep|nghien)|cuon vao may|kep vao may/,
     /chay mau (?:nhieu|khong ngung|khong cam)|mat nhieu mau|mau chay nhieu/,
@@ -62,6 +81,16 @@ const PATTERNS: Record<EmergencyDetectedLanguage, RegExp[]> = {
     /dien giat|bi giat dien/,
     /bong nang|bi bong/,
     /bi thuong nang/,
+    // ngộ độc: "nghiện"(중독성)은 넣지 않았다. "trúng độc đắc"(복권 당첨)는 뺀다.
+    // 성조를 지우면 khí độc(유독 가스)과 khi đọc(읽을 때)이 같아져, khi doc 은 들이마셨다는 말과만 본다.
+    /ngo doc|\btrung doc\b(?! dac)|nhiem doc|\b(?:thuoc tru sau|thuoc sau|hoa chat|khi ga|thuoc diet co|thuoc diet chuot|khi than)\b.{0,20}\b(?:ngat|xiu|choang|non|oi mua|kho tho|bat tinh)\b|\b(?:hit|uong|nuot)(?: phai| nham)? (?:thuoc tru sau|thuoc sau|hoa chat|khi doc|khi ga|thuoc diet co)\b|\bro ri (?:khi|ga)\b/,
+    // ngạt: 성조를 지우면 ngất(기절)과 같아진다. 둘 다 긴급이다.
+    /ngat tho|ngat khi|bi ngat|thieu oxy|thieu duong khi|khong co khong khi/,
+    // đuối nước: "bị đuổi (việc)"(해고)와 글자가 같아 "bi duoi"만으로는 보지 않는다.
+    // "rồi họ"도 roi ho 가 되므로 xuong(xuống) 이 있어야 한다.
+    /duoi nuoc|chet duoi|\b(?:roi|nga|te|rot) xuong (?:nuoc|song|bien|ho|ao|kenh|muong)\b|roi khoi (?:tau|thuyen|ghe)|nuoc cuon|song cuon|bi cuon troi/,
+    // lật: 장비·배가 있을 때만
+    /\blat (?:may cay|may keo|xe|thuyen|tau|ghe|may xuc)\b|\b(?:may cay|xe nang|xe cong nong|may keo|xe tai|xe|thuyen|tau ca|tau|ghe|may xuc|may gat)\b.{0,10}\b(?:bi lat|lat nhao|lat up|lat ngua|chim)\b|lat nhao|lat up/,
   ],
   th: [
     /ตกจากที่สูง|ตกลงมา|พลัดตก|ตกนั่งร้าน|ตกบันได|ตกจากหลังคา/,
@@ -74,12 +103,40 @@ const PATTERNS: Record<EmergencyDetectedLanguage, RegExp[]> = {
     /ไฟดูด|ไฟช็อต|ไฟฟ้าช็อต|ไฟฟ้าดูด/,
     /ไฟไหม้|ไฟลวก|น้ำร้อนลวก|ถูกไฟ/,
     /บาดเจ็บสาหัส|เจ็บหนัก/,
+    // พิษ: สาร·ยาฆ่าแมลง이 있을 때만. "ติดเกม"(게임 중독)은 걸리지 않는다. "ที่ทำงานเป็นพิษ" 같은 비유도 뺀다.
+    /(?:ได้รับ|โดน|ถูก|สูด|สูดดม|ดื่ม|กิน|กลืน|แพ้)(?:พิษ|สารเคมี|สารพิษ|ยาฆ่า|ยาปราบ|แก๊ส|ก๊าซ|ควัน)|พิษ(?:ยาฆ่า|สาร|แก๊ส|ก๊าซ)|(?:แก๊ส|ก๊าซ)รั่ว|(?:สารเคมี|ยาฆ่าแมลง|ยาฆ่าหญ้า|ยาปราบศัตรูพืช|แก๊ส|ก๊าซ|ควันพิษ).{0,15}(?:เป็นลม|หมดสติ|อาเจียน|วิงเวียน|หายใจ)|สารพิษ|ควันพิษ/,
+    // ขาดอากาศ
+    /ขาดอากาศ|ขาดออกซิเจน|สำลักควัน|หายใจไม่ได้/,
+    // จมน้ำ
+    /จมน้ำ|ตกน้ำ|ตกทะเล|ตกเรือ|ตกแม่น้ำ|ตกคลอง|ตกบ่อ|ตกลงไปในน้ำ|น้ำพัด/,
+    // พลิกคว่ำ: รถ·เรือ가 있을 때만. "ระบบล่ม"(시스템 장애)은 걸리지 않는다.
+    /(?:รถไถ|แทรกเตอร์|รถยก|โฟล์คลิฟ|รถ|เรือ|รถขุด|รถเกี่ยว|รถบรรทุก).{0,8}(?:พลิกคว่ำ|คว่ำ|พลิก|ล่ม|จม)|พลิกคว่ำ/,
   ],
-  uz: [/yiqil|balanddan|bosib qol|ko'?mil|qon ket|hushidan ket|nafas ol(?:ma|a ol)|tok ur|kuyd|yong'?in/],
-  ru: [/упал|упала|сорвал|придавил|завалил|затянул|зажал|кровотечен|кровь не останавлив|без сознания|потерял[аи]? сознание|не дышит|перелом|ударил[оа]? током|ожог|пожар/],
-  ne: [/खस्य|लड्य|अग्लो ठाउँ|थिचिय|पुरिय|रगत|बेहोस|सास फेर्न|करेन्ट|आगो|जल्य/],
-  id: [/jatuh dari|terjatuh|tertimpa|terjepit|tertimbun|pendarahan|berdarah banyak|pingsan|tidak sadar|tidak bernapas|sesak napas|patah tulang|kesetrum|tersengat listrik|terbakar|kebakaran/],
-  km: [/ធ្លាក់|សង្កត់|កប់|ជាប់ម៉ាស៊ីន|ហូរឈាម|សន្លប់|មិនដកដង្ហើម|ឆក់ភ្លើង|រលាក|ភ្លើងឆេះ/],
+  uz: [
+    /yiqil|balanddan|bosib qol|ko['ʻ’`]?mil|qon ket|hushidan ket|nafas ol(?:ma|a ol)|tok ur|kuyd|yong['ʻ’`]?in/,
+    // 중독·질식·익사·전복
+    /zaharlan|bo['ʻ’`]?g['ʻ’`]?il|cho['ʻ’`]?k(?:ib|di|yapti)|suvga (?:tush|yiqil|cho)|ag['ʻ’`]?daril/,
+  ],
+  ru: [
+    /упал|упала|сорвал|придавил|завалил|затянул|зажал|кровотечен|кровь не останавлив|без сознания|потерял[аи]? сознание|не дышит|перелом|ударил[оа]? током|ожог|пожар/,
+    // 중독·질식·익사·전복
+    /отравил|отравлен|задохн|удушь|угар|утон|тонет|за борт|упал[аи]? в (?:воду|реку|море)|(?:трактор|погрузчик|машина|лодка|судно|катер|грузовик|комбайн)\S*.{0,15}(?:перевернул|опрокинул|затонул)|перевернул(?:ся|ась) (?:трактор|погрузчик|машина|лодка)|затонул/,
+  ],
+  ne: [
+    /खस्य|लड्य|अग्लो ठाउँ|थिचिय|पुरिय|रगत|बेहोस|सास फेर्न|करेन्ट|आगो|जल्य/,
+    // 중독·질식·익사·전복
+    /विष|कीटनाशक|निसासि|निस्सासि|डुब्य|डुबे|डुबेर|पानीमा खस|पल्टि|पल्टी/,
+  ],
+  id: [
+    /jatuh dari|terjatuh|tertimpa|terjepit|tertimbun|pendarahan|berdarah banyak|pingsan|tidak sadar|tidak bernapas|sesak napas|patah tulang|kesetrum|tersengat listrik|terbakar|kebakaran/,
+    // 중독·질식·익사·전복
+    /keracunan|tercekik|kehabisan (?:napas|oksigen)|tenggelam(?! dalam (?:utang|hutang|pekerjaan|tugas))|terseret arus|jatuh ke (?:laut|sungai|air|kolam|danau)|(?:traktor|forklift|truk|mobil|kapal|perahu|mesin)\S*.{0,15}(?:terbalik|karam)|kapal karam/,
+  ],
+  km: [
+    /ធ្លាក់|សង្កត់|កប់|ជាប់ម៉ាស៊ីន|ហូរឈាម|សន្លប់|មិនដកដង្ហើម|ឆក់ភ្លើង|រលាក|ភ្លើងឆេះ/,
+    // 중독·질식·익사·전복
+    /ពុល|ថប់ដង្ហើម|លង់ទឹក|ក្រឡាប់|លិច/,
+  ],
 };
 
 /** 스크립트로 먼저 거른다. 한국어만 쓴 질문은 기존 한국어 감지가 맡는다. */
@@ -91,8 +148,16 @@ const SCRIPT_HINTS: Partial<Record<EmergencyDetectedLanguage, RegExp>> = {
   km: /[ក-៿]/,
 };
 
+/**
+ * NFKC 는 태국어 สระอำ(ำ)을 ํ+า 두 글자로 나눈다. 그대로 두면 "น้ำ", "คว่ำ", "สำลัก"이
+ * 들어간 표현이 전부 빠지므로 한 글자로 되돌린다.
+ */
+function recomposeThaiSaraAm(value: string): string {
+  return value.replace(/\u0e4d\u0e32/g, "\u0e33");
+}
+
 export function detectMultilingualEmergency(message: string): MultilingualEmergencyHit | null {
-  const text = message.normalize("NFKC").toLocaleLowerCase("en-US");
+  const text = recomposeThaiSaraAm(message.normalize("NFKC").toLocaleLowerCase("en-US"));
   const vietnamese = stripVietnameseMarks(text);
   for (const language of Object.keys(PATTERNS) as EmergencyDetectedLanguage[]) {
     const hint = SCRIPT_HINTS[language];
