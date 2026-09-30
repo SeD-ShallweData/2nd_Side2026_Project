@@ -4,7 +4,7 @@ import { getContractReviewProvider } from "@/services/providers";
 import { delay } from "@/utils/delay";
 import { ServiceError } from "@/utils/errors";
 
-export const MAX_CONTRACT_SIZE = 10 * 1024 * 1024;
+export const MAX_CONTRACT_SIZE = 15 * 1024 * 1024;
 export const ALLOWED_CONTRACT_TYPES = ["application/pdf", "image/png", "image/jpeg"] as const;
 
 export function validateContractRequest(request: ContractReviewRequest): void {
@@ -24,7 +24,7 @@ export function validateContractRequest(request: ContractReviewRequest): void {
   }
   if (request.file_metadata) {
     if (request.file_metadata.size_bytes > MAX_CONTRACT_SIZE) {
-      throw new ServiceError("FILE_TOO_LARGE", "파일은 10MB 이하만 업로드할 수 있습니다.", 413, false);
+      throw new ServiceError("FILE_TOO_LARGE", "파일은 15MB 이하만 업로드할 수 있습니다.", 413, false);
     }
     if (!ALLOWED_CONTRACT_TYPES.includes(request.file_metadata.content_type as (typeof ALLOWED_CONTRACT_TYPES)[number])) {
       throw new ServiceError(

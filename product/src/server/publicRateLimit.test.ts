@@ -6,6 +6,7 @@ import { assertPublicRateLimit, resetPublicRateLimitsForTests } from "@/server/p
 
 const token = "test-proxy-token-at-least-32-characters";
 const marker = "00000000-0000-4000-8000-000000000001";
+const afterDemo = Date.parse("2026-10-01T15:00:00.000Z");
 
 afterEach(() => {
   resetPublicRateLimitsForTests();
@@ -25,9 +26,9 @@ describe("public rate limits", () => {
     vi.stubEnv("TRUST_PROXY_HEADERS", "true");
     vi.stubEnv("PUBLIC_RATE_LIMIT_PROXY_TOKEN", token);
     vi.stubEnv("ANONYMOUS_CHAT_PER_HOUR", "2");
-    await assertPublicRateLimit(request(), "anonymous_chat", 1_000);
-    await assertPublicRateLimit(request(), "anonymous_chat", 1_001);
-    await expect(assertPublicRateLimit(request(), "anonymous_chat", 1_002)).rejects.toMatchObject({
+    await assertPublicRateLimit(request(), "anonymous_chat", afterDemo);
+    await assertPublicRateLimit(request(), "anonymous_chat", afterDemo + 1);
+    await expect(assertPublicRateLimit(request(), "anonymous_chat", afterDemo + 2)).rejects.toMatchObject({
       code: "PUBLIC_RATE_LIMITED", status: 429,
     });
   });
@@ -37,8 +38,8 @@ describe("public rate limits", () => {
     vi.stubEnv("TRUST_PROXY_HEADERS", "true");
     vi.stubEnv("PUBLIC_RATE_LIMIT_PROXY_TOKEN", token);
     vi.stubEnv("ANONYMOUS_CHAT_PER_HOUR", "1");
-    await assertPublicRateLimit(request(), "anonymous_chat", 1_000);
-    await expect(assertPublicRateLimit(request("00000000-0000-4000-8000-000000000002"), "anonymous_chat", 1_001))
+    await assertPublicRateLimit(request(), "anonymous_chat", afterDemo);
+    await expect(assertPublicRateLimit(request("00000000-0000-4000-8000-000000000002"), "anonymous_chat", afterDemo + 1))
       .rejects.toMatchObject({ status: 429 });
   });
 
@@ -47,8 +48,8 @@ describe("public rate limits", () => {
     vi.stubEnv("TRUST_PROXY_HEADERS", "true");
     vi.stubEnv("PUBLIC_RATE_LIMIT_PROXY_TOKEN", token);
     vi.stubEnv("PUBLIC_COMPANY_SEARCH_PER_MINUTE", "1");
-    await assertPublicRateLimit(request(marker, "203.0.113.5", { "x-moneyworry-proxy-token": "forged" }), "company_search", 1_000);
-    await expect(assertPublicRateLimit(request(marker, "198.51.100.9, 203.0.113.5"), "company_search", 1_001))
+    await assertPublicRateLimit(request(marker, "203.0.113.5", { "x-moneyworry-proxy-token": "forged" }), "company_search", afterDemo);
+    await expect(assertPublicRateLimit(request(marker, "198.51.100.9, 203.0.113.5"), "company_search", afterDemo + 1))
       .rejects.toMatchObject({ code: "PUBLIC_RATE_LIMITED" });
   });
 
@@ -57,10 +58,10 @@ describe("public rate limits", () => {
     vi.stubEnv("TRUST_PROXY_HEADERS", "true");
     vi.stubEnv("PUBLIC_RATE_LIMIT_PROXY_TOKEN", token);
     vi.stubEnv("PUBLIC_COMPANY_SEARCH_PER_MINUTE", "1");
-    await assertPublicRateLimit(request(), "company_search", 1_000);
-    await expect(assertPublicRateLimit(request("00000000-0000-4000-8000-000000000002"), "company_search", 1_001))
+    await assertPublicRateLimit(request(), "company_search", afterDemo);
+    await expect(assertPublicRateLimit(request("00000000-0000-4000-8000-000000000002"), "company_search", afterDemo + 1))
       .rejects.toMatchObject({ code: "PUBLIC_RATE_LIMITED" });
-    await expect(assertPublicRateLimit(request(marker, "198.51.100.9"), "company_search", 1_002)).resolves.toBeUndefined();
+    await expect(assertPublicRateLimit(request(marker, "198.51.100.9"), "company_search", afterDemo + 2)).resolves.toBeUndefined();
   });
 
   it("limits anonymous contract review independently of chat", async () => {
@@ -68,30 +69,32 @@ describe("public rate limits", () => {
     vi.stubEnv("TRUST_PROXY_HEADERS", "true");
     vi.stubEnv("PUBLIC_RATE_LIMIT_PROXY_TOKEN", token);
     vi.stubEnv("ANONYMOUS_CONTRACT_REVIEW_PER_HOUR", "1");
-    const afterDemo = Date.parse("2026-10-01T15:00:00.000Z");
     await assertPublicRateLimit(request(), "anonymous_contract_review", afterDemo);
     await expect(assertPublicRateLimit(request(), "anonymous_contract_review", afterDemo + 1))
       .rejects.toMatchObject({ code: "PUBLIC_RATE_LIMITED" });
     await expect(assertPublicRateLimit(request(), "anonymous_chat", afterDemo + 2)).resolves.toBeUndefined();
   });
 
-  it("exempts only contract review through the October 1 KST demo day", async () => {
+  it("exempts all public request scopes through the October 1 KST demo day", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("ANONYMOUS_CONTRACT_REVIEW_PER_HOUR", "1");
+    vi.stubEnv("ANONYMOUS_CHAT_PER_HOUR", "1");
+    vi.stubEnv("PUBLIC_COMPANY_SEARCH_PER_MINUTE", "1");
     const lastDemoMillisecond = Date.parse("2026-10-01T14:59:59.999Z");
-    await assertPublicRateLimit(request(), "anonymous_contract_review", lastDemoMillisecond);
-    await assertPublicRateLimit(request(), "anonymous_contract_review", lastDemoMillisecond);
-    const afterDemo = lastDemoMillisecond + 1;
-    await assertPublicRateLimit(request(), "anonymous_contract_review", afterDemo);
-    await expect(assertPublicRateLimit(request(), "anonymous_contract_review", afterDemo + 1))
-      .rejects.toMatchObject({ code: "PUBLIC_RATE_LIMITED" });
+    for (const scope of ["anonymous_chat", "anonymous_contract_review", "company_search"] as const) {
+      await assertPublicRateLimit(request(), scope, lastDemoMillisecond);
+      await assertPublicRateLimit(request(), scope, lastDemoMillisecond);
+      await assertPublicRateLimit(request(), scope, afterDemo);
+      await expect(assertPublicRateLimit(request(), scope, afterDemo + 1))
+        .rejects.toMatchObject({ code: "PUBLIC_RATE_LIMITED" });
+    }
   });
 
   it("restores a local allowance after its fixed window expires", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("PUBLIC_COMPANY_SEARCH_PER_MINUTE", "1");
-    await assertPublicRateLimit(request(), "company_search", 1_000);
-    await expect(assertPublicRateLimit(request(), "company_search", 1_001)).rejects.toMatchObject({ status: 429 });
-    await expect(assertPublicRateLimit(request(), "company_search", 61_000)).resolves.toBeUndefined();
+    await assertPublicRateLimit(request(), "company_search", afterDemo);
+    await expect(assertPublicRateLimit(request(), "company_search", afterDemo + 1)).rejects.toMatchObject({ status: 429 });
+    await expect(assertPublicRateLimit(request(), "company_search", afterDemo + 60_000)).resolves.toBeUndefined();
   });
 });

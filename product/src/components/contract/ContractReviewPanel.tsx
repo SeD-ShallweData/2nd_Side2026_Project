@@ -29,7 +29,7 @@ function rememberReviewForChat(result: ContractReviewResult): boolean {
     return false;
   }
 }
-const MAX_SIZE = 10 * 1024 * 1024;
+const MAX_SIZE = 15 * 1024 * 1024;
 
 function ReviewSection({
   title,
@@ -89,7 +89,7 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
     }
     if (next.size > MAX_SIZE) {
       setFile(null);
-      setError("파일은 10MB 이하만 선택할 수 있습니다.");
+      setError("파일은 15MB 이하만 선택할 수 있습니다.");
       event.target.value = "";
       return;
     }
@@ -145,7 +145,7 @@ export function ContractReviewPanel({ dataMode }: { dataMode: DataMode }) {
           </span>
           <div>
             <h3>근로계약서 파일 선택</h3>
-            <p>PDF, PNG, JPG · 최대 10MB</p>
+            <p>PDF, PNG, JPG · 최대 15MB</p>
           </div>
         </div>
         <input

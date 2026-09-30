@@ -384,4 +384,20 @@ describe("로그인 대화 원문 저장", () => {
     expect(detail.active_company_id).toBe("COMPANY_B");
     await expect(getUserConversation(first.conversation_id, OTHER)).rejects.toMatchObject({ code: "CONVERSATION_NOT_FOUND" });
   });
+
+  it("익명 상담은 30턴까지 가져오고 31턴은 거부한다", async () => {
+    vi.stubEnv("CONVERSATION_DATA_MODE", "mock");
+    const body = {
+      import_id: "guest_import_000000000030",
+      turns: Array.from({ length: 30 }, (_, index) => ({
+        user_message: `익명 질문 ${index + 1}`,
+        company_id: null,
+        response: response(`답변 ${index + 1}`),
+      })),
+    };
+    const imported = await importGuestConversation(body, USER);
+    expect((await getUserConversation(imported.conversation_id, USER)).turns).toHaveLength(30);
+    await expect(importGuestConversation({ ...body, turns: [...body.turns, body.turns[0]] }, USER))
+      .rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
 });
