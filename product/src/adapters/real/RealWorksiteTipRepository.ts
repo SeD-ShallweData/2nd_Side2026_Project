@@ -1,4 +1,5 @@
 import "server-only";
+import { canonicalRegion } from "@/domain/region";
 
 import { constants as fsConstants } from "node:fs";
 import {
@@ -148,7 +149,7 @@ function toTip(row: TipRow, attachments: StoredWorksiteTipAttachment[]): StoredW
     title: row.title,
     body: row.body,
     company_context: row.firm_id
-      ? { company_id: row.firm_id, region: row.sido, industry: row.industry }
+      ? { company_id: row.firm_id, region: row.sido ? canonicalRegion(row.sido) : null, industry: row.industry }
       : null,
     submitted_at: new Date(row.submitted_at).toISOString(),
     attachments,
@@ -304,7 +305,7 @@ export class RealWorksiteTipRepository implements WorksiteTipRepository {
     );
     const row = rows[0];
     return row
-      ? { company_id: row.firm_id, region: row.sido, industry: row.industry }
+      ? { company_id: row.firm_id, region: row.sido ? canonicalRegion(row.sido) : null, industry: row.industry }
       : null;
   }
 

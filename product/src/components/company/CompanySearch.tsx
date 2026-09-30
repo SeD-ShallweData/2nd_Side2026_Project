@@ -256,7 +256,7 @@ export function CompanySearch() {
                     <option value="">{m.allRegions}</option>
                     {filterOptions.regions.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.value} ({option.count_label})
+                        {option.value} ({option.count.toLocaleString("ko-KR")})
                       </option>
                     ))}
                   </select>
@@ -273,7 +273,7 @@ export function CompanySearch() {
                     <option value="">{m.allIndustries}</option>
                     {filterOptions.industries.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.value} ({option.count_label})
+                        {option.value} ({option.count.toLocaleString("ko-KR")})
                       </option>
                     ))}
                   </select>
@@ -328,7 +328,7 @@ export function CompanySearch() {
                     : format(m.resultsForFilters, {
                         filters: [appliedFilters.region, appliedFilters.industry].filter(Boolean).join(" · "),
                       })}
-                  <strong>{result.total.toLocaleString("ko-KR")}{result.total_is_capped ? "+" : ""}</strong>{m.resultsCountSuffix}
+                  <strong>{result.total.toLocaleString("ko-KR")}</strong>{m.resultsCountSuffix}
                 </h2>
               </div>
               <p>{m.noAutoSelect}</p>
@@ -421,6 +421,7 @@ export function CompanySearch() {
             ) : filterOptions ? (
               <RegionMap
                 counts={filterOptions.regions}
+                total={filterOptions.total}
                 selected={appliedFilters.region}
                 onSelect={selectRegionFromMap}
                 disabled={loading}

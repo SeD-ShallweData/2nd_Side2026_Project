@@ -359,11 +359,21 @@ WITH src AS (
   ORDER BY $FIRM_ID_SQL, nm COLLATE "C", bn COLLATE "C",
            sd COLLATE "C" NULLS LAST, ind COLLATE "C" NULLS LAST
 )
-INSERT INTO firms (firm_id, corp_key, name, biz_no, sido, industry, first_seen, last_seen)
-SELECT firm_id, corp_key, nm, bn, sd, ind, :'as_of_date'::date, :'as_of_date'::date FROM keyed
+INSERT INTO firms (firm_id, corp_key, name, biz_no, sido, sido_source, industry, first_seen, last_seen)
+SELECT firm_id, corp_key, nm, bn,
+       CASE sd
+         WHEN '광주광역시' THEN '전남광주통합특별시'
+         WHEN '전라남도' THEN '전남광주통합특별시'
+         WHEN '광주특별시' THEN '전남광주통합특별시'
+         WHEN '강원도' THEN '강원특별자치도'
+         WHEN '전라북도' THEN '전북특별자치도'
+         WHEN '제주도' THEN '제주특별자치도'
+         WHEN '세종시' THEN '세종특별자치시'
+         ELSE sd END,
+       sd, ind, :'as_of_date'::date, :'as_of_date'::date FROM keyed
 ON CONFLICT (firm_id) DO UPDATE
   SET corp_key=EXCLUDED.corp_key, name=EXCLUDED.name, biz_no=EXCLUDED.biz_no,
-      sido=EXCLUDED.sido, industry=EXCLUDED.industry,
+      sido=EXCLUDED.sido, sido_source=EXCLUDED.sido_source, industry=EXCLUDED.industry,
       first_seen=least(firms.first_seen, EXCLUDED.first_seen),
       last_seen=greatest(firms.last_seen, EXCLUDED.last_seen);
 

@@ -794,6 +794,21 @@ SELECT json_build_object(
         AND con.conname='conversation_requests_lease_ck' AND con.contype='c'
     )
   ),
+  '0022_current_sido_names', json_build_object(
+    'column_type:public.firms.sido_source_text', EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='firms'
+         AND column_name='sido_source' AND udt_name='text'
+    ),
+    'data:public.firms.no_former_sido_names',
+      EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema='public' AND table_name='firms' AND column_name='sido_source')
+      AND NOT EXISTS (
+        SELECT 1 FROM public.firms
+         WHERE sido IN ('광주광역시', '전라남도', '광주특별시',
+                        '강원도', '전라북도', '제주도', '세종시')
+      )
+  ),
   '0021_ops_console', json_build_object(
     'table:public.prompt_versions', EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='prompt_versions' AND c.relkind IN ('r','p')),
     'table:public.ops_audit_log', EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='ops_audit_log' AND c.relkind IN ('r','p')),

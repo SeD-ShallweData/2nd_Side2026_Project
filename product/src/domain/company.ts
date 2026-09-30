@@ -40,12 +40,13 @@ export interface CompanySearchFilters {
 
 export interface CompanyFilterOption {
   value: string;
-  /** Lower bound used only for ordering/map shading; never an exact public count. */
+  /** Exact number of browsable companies in this filter. */
   count: number;
-  count_label: string;
 }
 
 export interface CompanyFilterOptions {
+  /** Exact number of companies that can be found by name. */
+  total: number;
   regions: CompanyFilterOption[];
   industries: CompanyFilterOption[];
 }
@@ -58,6 +59,6 @@ export interface CompanyRepository {
     filters?: CompanySearchFilters,
   ): Promise<CompanySearchResult[]>;
   count(query: string, filters?: CompanySearchFilters): Promise<number>;
-  listFilterOptions(): Promise<CompanyFilterOptions>;
+  listFilterOptions(): Promise<Omit<CompanyFilterOptions, "total">>;
   getById(companyId: string): Promise<Company | null>;
 }
