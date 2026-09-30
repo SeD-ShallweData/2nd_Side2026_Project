@@ -2,6 +2,7 @@ import type { NextResponse } from "next/server";
 
 import { getOptionalSessionUser } from "@/services/authService";
 import { reportCommunityPost } from "@/services/communityService";
+import { assertAccountRateLimit } from "@/server/accountRateLimit";
 import {
   assertSameOriginRequest,
   noStoreError,
@@ -23,6 +24,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     const user = requireAuthenticatedUser(
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
+    assertAccountRateLimit("community_report", user.user_id);
     const { postId } = await context.params;
     return noStoreJson(await reportCommunityPost(
       postId,

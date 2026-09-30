@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useId, useState } from "react";
+import { SIGNUP_HONEYPOT_FIELD } from "@/app/api/auth/authApiContract";
 import { AuthApiError, signup } from "@/services/authClient";
-import type { ErrorDetail } from "@/utils/errors";
+import { displayableErrorDetails, type ErrorDetail } from "@/utils/errors";
 import { format, type MessageShape } from "@/i18n/defineMessages";
 import { useMessages } from "@/i18n/LocaleProvider";
 import { authMessages } from "@/i18n/messages/auth";
@@ -51,6 +52,8 @@ export function SignupForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // 숨은 칸(허니팟). 사람은 볼 수도 닿을 수도 없어 늘 빈 값이다. 봇이 채우면 서버가 거절한다.
+  const [honeypot, setHoneypot] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -86,13 +89,17 @@ export function SignupForm() {
 
     setSubmitting(true);
     try {
-      await signup({ email: email.trim(), password, name: name.trim() });
+      await signup({ email: email.trim(), password, name: name.trim(), [SIGNUP_HONEYPOT_FIELD]: honeypot });
       // 이동이 끝날 때까지 submitting을 유지해 중복 제출을 막는다.
       router.push("/community");
     } catch (caught) {
       setSubmitting(false);
       if (caught instanceof AuthApiError) {
-        setSubmitError({ code: caught.code, message: submitErrorMessage(caught, messages.errors), details: caught.details });
+        setSubmitError({
+          code: caught.code,
+          message: submitErrorMessage(caught, messages.errors),
+          details: displayableErrorDetails(caught.details),
+        });
         return;
       }
       setSubmitError({
@@ -153,6 +160,21 @@ export function SignupForm() {
             {format(f.passwordHelp, { min: PASSWORD_MIN, max: PASSWORD_MAX })}
           </p>
         )}
+
+      {/*
+        봇 걸러내기용 숨은 칸. 화면 밖에 두고(sr-only) 보조기기에서도 숨기며(aria-hidden)
+        탭으로도 닿지 않게 해(tabIndex -1) 사람은 채울 수 없다. 자동완성도 끈다.
+      */}
+      <div className="sr-only" aria-hidden="true">
+        <input
+          type="text"
+          name={SIGNUP_HONEYPOT_FIELD}
+          value={honeypot}
+          tabIndex={-1}
+          autoComplete="off"
+          onChange={(event) => setHoneypot(event.target.value)}
+        />
+      </div>
 
       <div className="contract-actions">
         <button type="submit" className="button button-dark" disabled={submitting}>

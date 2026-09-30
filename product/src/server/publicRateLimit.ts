@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 import { createClient } from "redis";
+import { publicClientMarker, UNMARKED_CLIENT } from "@/server/publicClientMarker";
 import { ServiceError } from "@/utils/errors";
 
 type PublicRateScope = "company_search" | "anonymous_chat" | "anonymous_contract_review";
@@ -10,7 +11,12 @@ type Window = { name: string; limit: number; ms: number };
 type Bucket = { count: number; resetAt: number };
 const DEMO_EXEMPT_UNTIL = Date.parse("2026-10-01T15:00:00.000Z"); // 2026-10-02 00:00 KST
 
+/* 주소를 모를 때 탭 표시값 없이 온 회사 조회는 한 버킷을 나눠 쓰므로 탭 한도의 10배를 준다. */
+const UNMARKED_COMPANY_SEARCH_MULTIPLIER = 10;
+const BUCKET_PRUNE_INTERVAL_MS = 60_000;
+
 const buckets = new Map<string, Bucket>();
+let nextBucketPruneAt = 0;
 let sharedClient: ReturnType<typeof createClient> | null = null;
 let sharedClientUrl = "";
 let sharedConnect: Promise<ReturnType<typeof createClient>> | null = null;
@@ -55,11 +61,6 @@ function trustedAddress(request: Request): string | null {
   return !address.includes(",") && isIP(address) ? address : null;
 }
 
-function clientMarker(request: Request): string {
-  const value = request.headers.get("x-moneyworry-client-id")?.trim() ?? "";
-  return /^[A-Za-z0-9_-]{16,100}$/.test(value) ? value : "unmarked";
-}
-
 function opaqueKey(address: string, marker: string): string {
   return createHash("sha256").update(`${address}|${marker}`, "utf8").digest("hex");
 }
@@ -92,17 +93,57 @@ function unavailable(): never {
   throw new ServiceError("PUBLIC_RATE_LIMIT_UNAVAILABLE", "Request protection is temporarily unavailable. Please retry later.", 503, true);
 }
 
-function localLimit(scope: PublicRateScope, address: string, marker: string, now: number): void {
+/* 주소를 아는 경우. 회사 조회는 주소로, 익명 AI 호출은 탭과 주소 양쪽으로 센다. */
+function knownAddressWindows(scope: PublicRateScope, address: string, marker: string) {
   const identity = opaqueKey(address, scope === "company_search" ? "" : marker);
   const ipIdentity = opaqueKey(address, "");
-  const scale = process.env.NODE_ENV === "test" ? 10_000 : 1;
-  const selected = windows(scope).flatMap((window) => {
+  return windows(scope).flatMap((window) => {
     if (window.name === "global-day") return [{ ...window, key: `${scope}:global-day` }];
     const perTab = { ...window, key: `${scope}:${window.name}:${identity}` };
     return scope === "company_search" ? [perTab] : [
       perTab, { ...window, key: `${scope}:ip-${window.name}:${ipIdentity}` },
     ];
   });
+}
+
+/*
+ * 주소를 모르는 경우(TRUST_PROXY_HEADERS 꺼짐). 이때 주소로 세면 모든 방문자가 'unknown' 이라는
+ * 같은 주소가 되어, 주소 버킷이 사이트 전체의 작은 한도 하나가 된다. 한 사람이 익명 기능을 모두
+ * 막을 수 있고 정상 사용만으로도 일찍 429 가 난다. 그래서
+ *   - 익명 상담·계약서: 주소 버킷을 빼고 탭 버킷과 사이트 전체 하루 상한(global-day)으로 센다.
+ *   - 회사 조회: 탭 표시값으로 센다. 표시값이 없는 요청은 한 버킷을 나눠 쓰므로 한도를 10배로 준다.
+ * 탭 표시값은 사용자가 바꿀 수 있으므로 AI 비용은 global-day 가 막는다.
+ */
+function unknownAddressWindows(scope: PublicRateScope, marker: string) {
+  const identity = opaqueKey("unknown", marker);
+  return windows(scope).flatMap((window) => {
+    if (window.name === "global-day") return [{ ...window, key: `${scope}:global-day` }];
+    if (scope === "company_search" && marker === UNMARKED_CLIENT) {
+      return [{
+        ...window,
+        key: `${scope}:${window.name}:${UNMARKED_CLIENT}`,
+        limit: window.limit * UNMARKED_COMPANY_SEARCH_MULTIPLIER,
+      }];
+    }
+    return [{ ...window, key: `${scope}:${window.name}:${identity}` }];
+  });
+}
+
+/* 탭 표시값은 요청이 정하므로 버킷이 계속 늘 수 있다. 끝난 창은 1분에 한 번 지운다. */
+function pruneExpiredBuckets(now: number): void {
+  if (now < nextBucketPruneAt) return;
+  for (const [key, bucket] of buckets) {
+    if (bucket.resetAt <= now) buckets.delete(key);
+  }
+  nextBucketPruneAt = now + BUCKET_PRUNE_INTERVAL_MS;
+}
+
+function localLimit(scope: PublicRateScope, address: string | null, marker: string, now: number): void {
+  pruneExpiredBuckets(now);
+  const scale = process.env.NODE_ENV === "test" ? 10_000 : 1;
+  const selected = address === null
+    ? unknownAddressWindows(scope, marker)
+    : knownAddressWindows(scope, address, marker);
   for (const window of selected) {
     const current = buckets.get(window.key);
     if (current && current.resetAt > now && current.count >= window.limit * scale) reject(current.resetAt - now);
@@ -177,20 +218,25 @@ export async function assertPublicRateLimit(request: Request, scope: PublicRateS
   if (process.env.PUBLIC_RATE_LIMIT_STORE === "redis") {
     if (!address) unavailable();
     try {
-      await sharedLimit(scope, address, clientMarker(request));
+      await sharedLimit(scope, address, publicClientMarker(request));
     } catch (error) {
       if (!(error instanceof ServiceError) || error.code !== "PUBLIC_RATE_LIMIT_UNAVAILABLE" ||
           scope !== "company_search") throw error;
       console.warn(JSON.stringify({ event: "public_rate_limit_local_fallback", scope }));
-      localLimit(scope, address, clientMarker(request), now);
+      localLimit(scope, address, publicClientMarker(request), now);
     }
     return;
   }
-  localLimit(scope, address ?? "unknown", clientMarker(request), now);
+  localLimit(scope, address, publicClientMarker(request), now);
+}
+
+export function publicRateLimitBucketCountForTests(): number {
+  return buckets.size;
 }
 
 export function resetPublicRateLimitsForTests(): void {
   buckets.clear();
+  nextBucketPruneAt = 0;
   sharedClient?.destroy();
   sharedClient = null;
   sharedClientUrl = "";

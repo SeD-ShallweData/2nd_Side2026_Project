@@ -8,6 +8,7 @@ import type {
   DeleteAccountResponse,
 } from "@/app/api/auth/authApiContract";
 import type { ErrorDetail } from "@/utils/errors";
+import { publicClientHeaders } from "@/utils/publicClientId";
 
 const LOGIN_PATH = "/api/auth/login";
 const SIGNUP_PATH = "/api/auth/signup";
@@ -115,10 +116,10 @@ async function requestAuthApi<T>(
   return parsed as T;
 }
 
-function jsonMutation(body: unknown): RequestInit {
+function jsonMutation(body: unknown, extraHeaders: Record<string, string> = {}): RequestInit {
   return {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...extraHeaders, "Content-Type": "application/json" },
     body: JSON.stringify(body),
   };
 }
@@ -134,7 +135,8 @@ export async function signup(
   input: SignupRequest,
   options: AuthRequestOptions = {},
 ): Promise<SignupResponse> {
-  return requestAuthApi<SignupResponse>(SIGNUP_PATH, jsonMutation(input), options);
+  // 서버는 가입 시도를 브라우저 탭 표시값별로도 센다(server/auth/signupGuard.ts).
+  return requestAuthApi<SignupResponse>(SIGNUP_PATH, jsonMutation(input, publicClientHeaders()), options);
 }
 
 export async function logout(options: AuthRequestOptions = {}): Promise<LogoutResponse> {

@@ -14,6 +14,7 @@ import { GET as listTips, POST as createTip } from "@/app/api/worksite-tips/rout
 import { GET as listCommunityPosts } from "@/app/api/community/posts/route";
 import { MockAuthRepository, resetMockSessions } from "@/adapters/mock/MockAuthRepository";
 import { resetMockCommunityState } from "@/adapters/mock/MockCommunityRepository";
+import { ACCOUNT_RATE_LIMITS, resetAccountRateLimitsForTests } from "@/server/accountRateLimit";
 import {
   resetMockWorksiteTipsForTests,
   WORKSITE_TIP_MOCK_MAX_TIPS_PER_REPORTER,
@@ -159,6 +160,7 @@ afterEach(() => {
   resetMockSessions();
   resetMockCommunityState();
   resetMockWorksiteTipsForTests();
+  resetAccountRateLimitsForTests();
   vi.unstubAllEnvs();
 });
 
@@ -750,5 +752,44 @@ describe("현장 제보 입력·조회 안전장치", () => {
     expect(await response.json()).toMatchObject({
       error: { code: "WORKSITE_TIP_DATABASE_NOT_CONFIGURED", retryable: true },
     });
+  });
+});
+
+describe("현장 제보 계정 한도", () => {
+  beforeEach(() => {
+    // 한도 실제 값으로 확인한다. 운영 모드의 Mock 인증은 시연 외곽 인증 설정을 요구한다.
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DEMO_BASIC_AUTH_USER", "demo-user");
+    vi.stubEnv("DEMO_BASIC_AUTH_PASSWORD", "demo-password");
+  });
+
+  it("계정 한도를 넘은 제보는 multipart 본문을 읽기 전에 429 로 막고 저장하지 않는다", async () => {
+    const hourly = ACCOUNT_RATE_LIMITS.worksite_tip.perAccount.find((window) => window.name === "hour")!.limit;
+    const cookie = await cookieFor(USER);
+    for (let index = 0; index < hourly; index += 1) {
+      const created = await createTip(submissionRequest({
+        cookie,
+        title: `계정 한도 확인 제보 ${index + 1}`,
+        body: "계정 단위 제보 한도를 확인합니다.",
+      }));
+      expect(created.status).toBe(201);
+    }
+
+    // 본문을 읽었다면 multipart 가 아니라서 거절됐을 요청이다. 한도가 먼저 걸리는지 본다.
+    const limited = await createTip(new Request("http://localhost/api/worksite-tips", {
+      method: "POST",
+      headers: { "content-type": "text/plain", origin: "http://localhost", cookie },
+      body: "not multipart",
+    }));
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toMatch(/^[1-9]\d*$/);
+    expect(await limited.json()).toMatchObject({
+      error: { code: "ACCOUNT_RATE_LIMITED", message: expect.stringContaining("현장 제보가 너무 많습니다.") },
+    });
+    const list = await listTips(new Request("http://localhost/api/worksite-tips", {
+      headers: { cookie: await cookieFor(INSPECTOR) },
+    }));
+    expect(await list.json()).toMatchObject({ total: hourly });
   });
 });

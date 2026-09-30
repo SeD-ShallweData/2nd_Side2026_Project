@@ -8,6 +8,8 @@ import {
 } from "node:crypto";
 import { promisify } from "node:util";
 
+import { ServiceError } from "@/utils/errors";
+
 /*
  * scrypt 는 매개변수를 받는 형태와 받지 않는 형태가 함께 정의돼 있어,
  * promisify 가 매개변수 없는 쪽으로 추론한다. 쓰려는 형태를 명시한다.
@@ -45,13 +47,79 @@ const SALT_LENGTH = 16;
  */
 const MAX_MEMORY = 64 * 1024 * 1024;
 
-async function derive(password: string, salt: Buffer, cost: number, blockSize: number, parallelization: number): Promise<Buffer> {
-  return scrypt(password.normalize("NFKC"), salt, KEY_LENGTH, {
-    N: cost,
-    r: blockSize,
-    p: parallelization,
-    maxmem: MAX_MEMORY,
+/*
+ * scrypt 동시 실행 상한.
+ *
+ * scrypt 는 libuv 작업 스레드(기본 4개)에서 돈다. 로그인·가입 요청이 몰리면 해시 계산이 스레드를
+ * 모두 차지해 파일 저장·DNS 조회 같은 다른 작업까지 멈춘다. 그래서 한 번에 2개만 계산하고 나머지는
+ * 줄을 세운다. 줄이 가득 찼으면 곧바로, 5초 넘게 기다렸으면 그때 503 AUTH_BUSY 로 돌려보낸다.
+ * 이 오류는 자격 증명 실패가 아니므로 로그인 잠금 횟수에 넣지 않는다(authService.loginUser).
+ * 계정이 없을 때의 대조(burnPasswordComparison)도 같은 줄을 서므로 응답으로 계정 존재 여부가
+ * 갈리지 않는다.
+ */
+const MAX_CONCURRENT_HASHES = 2;
+const MAX_QUEUED_HASHES = 50;
+const MAX_HASH_QUEUE_WAIT_MS = 5_000;
+
+interface HashWaiter {
+  start: () => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+let activeHashes = 0;
+const hashQueue: HashWaiter[] = [];
+
+function authBusy(): ServiceError {
+  return new ServiceError(
+    "AUTH_BUSY",
+    "지금은 로그인·가입 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    503,
+    true,
+  );
+}
+
+async function acquireHashSlot(): Promise<void> {
+  if (activeHashes < MAX_CONCURRENT_HASHES) {
+    activeHashes += 1;
+    return;
+  }
+  if (hashQueue.length >= MAX_QUEUED_HASHES) throw authBusy();
+  await new Promise<void>((resolve, reject) => {
+    const waiter: HashWaiter = {
+      start: resolve,
+      timer: setTimeout(() => {
+        const index = hashQueue.indexOf(waiter);
+        if (index >= 0) hashQueue.splice(index, 1);
+        reject(authBusy());
+      }, MAX_HASH_QUEUE_WAIT_MS),
+    };
+    hashQueue.push(waiter);
   });
+}
+
+/* 기다리는 요청이 있으면 자리를 그대로 넘기고, 없으면 자리를 비운다. */
+function releaseHashSlot(): void {
+  const next = hashQueue.shift();
+  if (next) {
+    clearTimeout(next.timer);
+    next.start();
+    return;
+  }
+  activeHashes -= 1;
+}
+
+async function derive(password: string, salt: Buffer, cost: number, blockSize: number, parallelization: number): Promise<Buffer> {
+  await acquireHashSlot();
+  try {
+    return await scrypt(password.normalize("NFKC"), salt, KEY_LENGTH, {
+      N: cost,
+      r: blockSize,
+      p: parallelization,
+      maxmem: MAX_MEMORY,
+    });
+  } finally {
+    releaseHashSlot();
+  }
 }
 
 export async function hashPassword(password: string): Promise<string> {
