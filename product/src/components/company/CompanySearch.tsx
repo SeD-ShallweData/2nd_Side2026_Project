@@ -17,7 +17,7 @@ import { getFavorites } from "@/services/favoriteClient";
 import { readApiResponse } from "@/utils/clientApi";
 import { publicClientHeaders } from "@/utils/publicClientId";
 import { format } from "@/i18n/defineMessages";
-import { useMessages } from "@/i18n/LocaleProvider";
+import { useLocale, useMessages } from "@/i18n/LocaleProvider";
 import { companyMessages } from "@/i18n/messages/company";
 
 // 추천 검색어는 한국어 사업장명에서 찾는 값이라 번역하지 않는다.
@@ -26,7 +26,12 @@ const EMPTY_FILTERS: CompanySearchFilters = {};
 
 export function CompanySearch() {
   const router = useRouter();
-  const m = useMessages(companyMessages).search;
+  const cm = useMessages(companyMessages);
+  const m = cm.search;
+  const locale = useLocale();
+  // 다른 언어는 지역 이름 표시만 번역한다. 선택값(검색 API 로 가는 값)은 항상 한국어 공식 명칭이다.
+  const regionLabel = (value: string): string =>
+    locale === "ko" || locale === "ko-easy" ? value : cm.regions[value as keyof typeof cm.regions]?.name ?? value;
   const inputId = useId();
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<CompanySearchResponse | null>(null);
@@ -256,7 +261,7 @@ export function CompanySearch() {
                     <option value="">{m.allRegions}</option>
                     {filterOptions.regions.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.value} ({option.count.toLocaleString("ko-KR")})
+                        {regionLabel(option.value)} ({option.count.toLocaleString("ko-KR")})
                       </option>
                     ))}
                   </select>

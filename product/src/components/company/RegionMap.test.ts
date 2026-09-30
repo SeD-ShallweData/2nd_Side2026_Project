@@ -82,8 +82,8 @@ describe("사업장 수 진하기", () => {
       }),
     );
     expect(markup).toContain(">Seoul</text>");
-    expect(markup).toContain(">전남광주</text>");
-    expect(markup).toContain("전남광주통합특별시: 1,234 workplaces");
+    expect(markup).toContain(">Jeonnam-Gwangju</text>");
+    expect(markup).toContain("Jeonnam-Gwangju Integrated Special City: 1,234 workplaces");
     expect(markup).toContain("3,456 workplaces available now");
   });
   it("지도에는 통합 지역 약칭과 실제 총수를 보여준다", () => {
