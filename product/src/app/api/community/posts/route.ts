@@ -22,6 +22,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     return noStoreJson(await listCommunityPosts({
       query: url.searchParams.get("q") ?? "",
       category: url.searchParams.get("category"),
+      language: url.searchParams.get("language"),
       limit: limitValue === null ? 10 : Number(limitValue),
       page: pageValue === null ? 1 : Number(pageValue),
     }, viewer));

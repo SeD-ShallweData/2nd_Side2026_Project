@@ -1,4 +1,4 @@
-import type { CommunityCompanyContextDto } from "@/app/api/community/communityApiContract";
+import type { CommunityCompanyContextDto, CommunityPostLanguage } from "@/app/api/community/communityApiContract";
 import { format, type MessageShape } from "@/i18n/defineMessages";
 import { communityMessages } from "@/i18n/messages/community";
 
@@ -30,4 +30,15 @@ export function relativeTimeLabel(isoDate: string, labels: CommunityFormatLabels
   const days = Math.floor(hours / 24);
   if (days < 7) return format(labels.daysAgo, { count: days });
   return isoDate.slice(0, 10);
+}
+
+export type CommunityPostLanguageLabels = MessageShape<typeof communityMessages.ko>["postLanguage"];
+
+/** "작성 언어: English". 글 내용은 번역하지 않고 어느 언어로 쓰였는지만 알린다. 값이 없으면(옛 응답) 표시하지 않는다. */
+export function postLanguageLabel(
+  language: CommunityPostLanguage | undefined,
+  labels: CommunityPostLanguageLabels = communityMessages.ko.postLanguage,
+): string | null {
+  if (!language) return null;
+  return format(labels.writtenIn, { language: labels.names[language] ?? language });
 }

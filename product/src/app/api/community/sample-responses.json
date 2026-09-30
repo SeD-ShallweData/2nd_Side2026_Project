@@ -25,6 +25,7 @@
     },
     "query": "임금",
     "category": "pre_employment",
+    "language": null,
     "items": [
       {
         "source": "mock_memory",
@@ -40,6 +41,7 @@
         "category_label": "입사 전 확인",
         "title": "면접에서 임금 지급일은 어떻게 물어보면 좋을까요?",
         "body": "계약서 작성 전에 지급일과 지급 방법을 자연스럽게 확인했던 경험을 나눠주세요.",
+        "language": "ko",
         "company_context": {
           "company_id": "COMPANY_DEMO_008",
           "region": "서울특별시",

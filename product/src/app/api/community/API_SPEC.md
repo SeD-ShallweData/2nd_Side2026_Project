@@ -141,14 +141,19 @@ DB 또는 Redis 같은 공유 저장소로 이전해야 한다.
 | 항목 | 내용 |
 | --- | --- |
 | 인증 | 선택 |
-| query | `q`, `category`, `page`, `limit` |
-| 기본값 | `q=""`, 전체 카테고리, `page=1`, `limit=10` |
+| query | `q`, `category`, `language`, `page`, `limit` |
+| 기본값 | `q=""`, 전체 카테고리, 모든 작성 언어, `page=1`, `limit=10` |
 | 제한 | `q` 최대 100자, `page` 1~100000, `limit` 1~20 |
 | 성공 | `200`, 검색 조건·페이지 정보·게시글 DTO 목록 |
 | 공개 범위 | `published` 게시글만 반환 |
 | 주요 오류 | `400 VALIDATION_ERROR`, `503 COMMUNITY_PROVIDER_UNAVAILABLE` |
 
 검색 대상은 제목, 본문, 서버가 확인한 사업장 지역·업종이다.
+
+`language`(언어 지원 3단계)는 `ko`·`en`·`zh`·`vi`·`th`·`other` 중 하나이며, 다른 값은
+`400 VALIDATION_ERROR`다. 작성 언어는 DB에 저장하지 않고 제목·본문의 글자 체계로 추정한다
+(`domain/textLanguage.ts`). 실제 DB에서는 같은 규칙을 SQL로 계산해 거르므로, 목록의 `total`·페이지도
+거른 결과 기준이다. 응답의 `language`는 적용한 필터(없으면 `null`)다. 게시글은 자동 번역하지 않는다.
 
 ### `POST /api/community/posts`
 
@@ -205,6 +210,7 @@ Mock 모드의 `company_id`는 기존 `MOCK_COMPANIES` 기준으로 검증하고
 | `category` | enum | 필터·내부 코드 |
 | `category_label` | string | 화면의 한글 카테고리 |
 | `title`, `body` | string | 게시글 내용 |
+| `language` | `ko`·`en`·`zh`·`vi`·`th`·`other` | 작성 언어 표시(글자 체계 추정, 번역하지 않음) |
 | `company_context` | object 또는 null | `company_id`, `region`, `industry` |
 | `anonymous` | boolean | 익명 여부 |
 | `author_label` | string 또는 null | null이면 `익명` 표시 |
