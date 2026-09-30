@@ -6,6 +6,12 @@ import type {
   SuggestedAction,
 } from "@/domain/chat";
 import type { RiskProvider, SourceReference } from "@/domain/risk";
+import {
+  detectMultilingualEmergency,
+  emergencyAnswerLocale,
+  MULTILINGUAL_EMERGENCY_ACTION_LABELS,
+  multilingualEmergencyAnswer,
+} from "@/domain/multilingualEmergency";
 import { CHAT_COPY } from "@/mocks/chatResponses";
 import { ServiceError } from "@/utils/errors";
 import { containsAny, normalizeSearchText } from "@/utils/text";
@@ -308,6 +314,25 @@ export class PolicyChatProvider implements ChatProvider {
           CALL_1350,
         ],
         limitations: ["온라인 상담은 긴급 구조나 현장 대응을 대신할 수 없습니다."],
+        guardrail_status: "escalated",
+        conversation_id: id,
+      };
+    }
+
+    // 한국어 긴급 표현에 걸리지 않은 외국어 긴급 상황. 모델 없이 고정 문구로 곧바로 답한다.
+    const foreignEmergency = detectMultilingualEmergency(message);
+    if (foreignEmergency) {
+      const locale = emergencyAnswerLocale(foreignEmergency, request.ui_locale);
+      const labels = MULTILINGUAL_EMERGENCY_ACTION_LABELS[locale];
+      return {
+        answer: multilingualEmergencyAnswer(locale),
+        answer_type: "emergency_guidance",
+        sources: [SAFETY_GUIDE_SOURCE],
+        suggested_actions: [
+          { code: "MOVE_TO_SAFETY", label: labels.safety, priority: "now" },
+          { ...CALL_1350, label: labels.call1350, description: undefined },
+        ],
+        limitations: [labels.limitation],
         guardrail_status: "escalated",
         conversation_id: id,
       };

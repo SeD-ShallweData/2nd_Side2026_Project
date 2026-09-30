@@ -2,22 +2,13 @@ import Image from "next/image";
 import { DataSourceList } from "@/components/common/DataSourceList";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { SafetyContextPublic, SourceReference, WageRiskPublic } from "@/domain/risk";
-import {
-  CONNECTED_WAGE_LISTING_LABEL,
-  UNCONNECTED_WAGE_OBSERVATION_LABELS,
-} from "@/domain/riskPresentation";
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { companyMessages } from "@/i18n/messages/company";
 
-const CONFIDENCE_LABEL = {
-  sufficient: "자료 충분",
-  limited: "제한적 자료",
-  unavailable: "확인 불가",
-} as const;
-
-const LISTING_LABEL = {
-  listed: "공개 명단 일치 결과 있음",
-  not_listed: "연계 데이터 내 일치 결과 없음",
-  unavailable: "공개 명단 확인 불가",
-} as const;
+// domain/riskPresentation 의 UNCONNECTED_WAGE_OBSERVATION_LABELS 와 같은 순서다.
+// 한국어 문구는 사전(risk.observationLabels, risk.listingLabel)에 같은 값으로 들어 있다.
+const OBSERVATION_KEYS = ["turnover", "employmentTrend", "dataCompleteness"] as const;
 
 type CardProps =
   | {
@@ -36,23 +27,24 @@ type CardProps =
     };
 
 export function RiskInformationCard(props: CardProps) {
+  const m = useMessages(companyMessages).risk;
   const isWage = props.kind === "wage";
   const validatedFirmSafety = !isWage && props.data.scope === "validated_firm_context";
   const title = isWage
-    ? "임금 지급 관련 정보"
+    ? m.titleWage
     : validatedFirmSafety
-      ? "산업재해 확인 우선순위 신호"
-      : "지역·업종 산업재해 신호";
+      ? m.titleSafetyValidated
+      : m.titleSafetyContext;
   const kicker = isWage
-    ? "사업장 단위 확인 정보"
+    ? m.kickerWage
     : validatedFirmSafety
-      ? "검증된 사업장 연결 · 사고확률 아님"
-      : "개별 사업장 판정 아님";
+      ? m.kickerSafetyValidated
+      : m.kickerSafetyContext;
   const question = isWage
     ? props.data.level === "normal"
-      ? "이 임금 지급 카드에서 무엇을 확인해야 하나요?"
-      : "왜 임금 관련 추가 확인이 필요한가요?"
-    : "산업재해 정보는 무엇을 확인해야 하나요?";
+      ? m.questionWageNormal
+      : m.questionWageReview
+    : m.questionSafety;
   const unknown = props.data.level === "unknown";
   const unavailable = props.data.availability === "unavailable";
 
@@ -70,21 +62,21 @@ export function RiskInformationCard(props: CardProps) {
 
       {!isWage ? (
         <div className="scope-strip">
-          <strong>분석 범위</strong>
+          <strong>{m.scopeTitle}</strong>
           <span>
-            {validatedFirmSafety ? "검증된 사업장 연결" : "지역·업종 맥락"} · {props.data.region ?? "지역 정보 없음"} · {props.data.industry ?? "업종 정보 없음"}
+            {validatedFirmSafety ? m.scopeValidated : m.scopeContext} · {props.data.region ?? m.noRegion} · {props.data.industry ?? m.noIndustry}
           </span>
         </div>
       ) : null}
 
       {unavailable ? (
         <div className="unknown-panel unavailable-panel" role="status">
-          <strong>현재 연결 상태를 확인해 주세요.</strong>
-          <p>이 카드의 데이터 공급자가 응답하지 않았습니다. 자료 부족이나 정상 상태로 해석하지 않습니다.</p>
+          <strong>{m.unavailableTitle}</strong>
+          <p>{m.unavailableBody}</p>
         </div>
       ) : !unknown ? (
         <div className="risk-section">
-          <h3>주요 확인 신호</h3>
+          <h3>{m.evidenceTitle}</h3>
           {props.data.evidence_items.length > 0 ? (
             <ul className="evidence-list">
               {props.data.evidence_items.map((item) => (
@@ -98,75 +90,75 @@ export function RiskInformationCard(props: CardProps) {
               ))}
             </ul>
           ) : (
-            <p className="muted-text">추가로 표시할 세부 확인 신호는 없습니다. 아래 체크리스트는 직접 확인해 주세요.</p>
+            <p className="muted-text">{m.evidenceEmpty}</p>
           )}
         </div>
       ) : (
         <div className="unknown-panel">
-          <strong>결과를 추정하지 않습니다.</strong>
-          <p>자료가 부족하다는 사실만 표시하며, 이를 정상이나 안전으로 바꾸지 않습니다.</p>
+          <strong>{m.unknownTitle}</strong>
+          <p>{m.unknownBody}</p>
         </div>
       )}
 
       {isWage ? (
         props.data.positive_signals ? (
-          <section className="risk-section" aria-label="긍정 신호 확인 항목">
-            <h3>긍정 신호 확인 항목</h3>
+          <section className="risk-section" aria-label={m.positiveTitle}>
+            <h3>{m.positiveTitle}</h3>
             {props.data.positive_signals.availability === "ready" && !unknown && !unavailable ? (
               <>
-                <p>확인된 긍정 신호 {props.data.positive_signals.confirmed_count}개</p>
+                <p>{format(m.positiveCount, { count: props.data.positive_signals.confirmed_count ?? "" })}</p>
                 <ul className="evidence-list">
                   {props.data.positive_signals.items.map((item) => (
                     <li key={item.label}>
                       <span aria-hidden="true">{item.status === "confirmed" ? "✓" : "—"}</span>
-                      <div><strong>{item.label}</strong><p>{item.status === "confirmed" ? "확인" : "미확인"}</p></div>
+                      <div><strong>{item.label}</strong><p>{item.status === "confirmed" ? m.statusConfirmed : m.statusUnconfirmed}</p></div>
                     </li>
                   ))}
                 </ul>
               </>
-            ) : <p>항목별 긍정 신호를 현재 확인할 수 없습니다.</p>}
-            <p className="observation-note">긍정 신호가 확인되지 않았다는 것은 이 기업에 문제가 있다는 뜻은 아닙니다. 확인 개수는 안전 점수나 입사 권고가 아니며, 공식 명단 등재 여부는 별도로 확인하세요.</p>
+            ) : <p>{m.positiveUnavailable}</p>}
+            <p className="observation-note">{m.positiveNote}</p>
           </section>
         ) : null
       ) : null}
 
       {isWage ? (
         <div className="wage-indicator-coverage" role="status">
-          <strong>공식 명단 1개 확인</strong>
-          <span>추가 공개 지표 3개 연동 준비 중</span>
+          <strong>{m.coverageOfficial}</strong>
+          <span>{m.coveragePending}</span>
         </div>
       ) : null}
 
       {isWage ? (
         <div className="listing-panel">
           <div>
-            <span>{CONNECTED_WAGE_LISTING_LABEL}</span>
-            <strong>{LISTING_LABEL[props.data.official_listing.status]}</strong>
+            <span>{m.listingLabel}</span>
+            <strong>{m.listing[props.data.official_listing.status]}</strong>
           </div>
           <small>
             {props.data.official_listing.as_of
-              ? `명단 공표 기준 ${props.data.official_listing.as_of}`
-              : "명단 공표 기준일 미수록"}
+              ? format(m.listingAsOf, { date: props.data.official_listing.as_of })
+              : m.listingAsOfMissing}
           </small>
-          <p>일치 결과가 없다는 표시는 연계 데이터 범위의 결과이며, 체불 이력이 전혀 없거나 미래 체불이 없다는 뜻이 아닙니다.</p>
+          <p>{m.listingNote}</p>
         </div>
       ) : null}
 
       {isWage ? (
         <section className="risk-section wage-observation-section" aria-labelledby="wage-observation-title">
           <div className="observation-title-row">
-            <h3 id="wage-observation-title">추가 공개 지표</h3>
-            <span>3개 연동 준비 중</span>
+            <h3 id="wage-observation-title">{m.observationTitle}</h3>
+            <span>{m.observationPending}</span>
           </div>
           <dl className="wage-observation-list">
-            {UNCONNECTED_WAGE_OBSERVATION_LABELS.map((label) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>확인할 수 없음</dd>
+            {OBSERVATION_KEYS.map((key) => (
+              <div key={key}>
+                <dt>{m.observationLabels[key]}</dt>
+                <dd>{m.observationUnavailable}</dd>
               </div>
             ))}
           </dl>
-          <p className="observation-note">값을 추정하거나 내부 ML 피처를 사용자 수치로 바꾸지 않습니다.</p>
+          <p className="observation-note">{m.observationNote}</p>
         </section>
       ) : null}
 
@@ -176,23 +168,23 @@ export function RiskInformationCard(props: CardProps) {
 
       <dl className="risk-meta">
         <div>
-          <dt>데이터 신뢰도</dt>
-          <dd>{CONFIDENCE_LABEL[props.data.confidence]}</dd>
+          <dt>{m.metaConfidence}</dt>
+          <dd>{m.confidence[props.data.confidence]}</dd>
         </div>
         <div>
-          <dt>데이터 기준일</dt>
-          <dd>{props.dataAsOf ?? "미확정"}</dd>
+          <dt>{m.metaAsOf}</dt>
+          <dd>{props.dataAsOf ?? m.metaAsOfMissing}</dd>
         </div>
       </dl>
 
       <details className="source-details">
-        <summary>데이터 출처 보기</summary>
+        <summary>{m.sourcesToggle}</summary>
         <DataSourceList sources={props.sources} />
       </details>
 
-      <button type="button" className="button button-outline card-action" aria-label={`AI에게 묻기: ${question}`} onClick={() => props.onAsk(question)}>
+      <button type="button" className="button button-outline card-action" aria-label={format(m.askAria, { question })} onClick={() => props.onAsk(question)}>
         <Image src="/brand/donworry-avatar.png" alt="" width={192} height={192} />
-        자세히 물어보기 <span aria-hidden="true">→</span>
+        {m.askButton} <span aria-hidden="true">→</span>
       </button>
     </article>
   );

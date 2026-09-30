@@ -6,23 +6,27 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import type { SessionResponse } from "@/app/api/auth/authApiContract";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { headerMessages } from "@/i18n/messages/header";
 import { AuthApiError, deleteAccount, getSession, logout } from "@/services/authClient";
 
 const NAV_ITEMS = [
-  { href: "/", label: "서비스 소개" },
-  { href: "/companies", label: "사업장 확인" },
-  { href: "/contracts", label: "계약서 진단" },
-  { href: "/community", label: "커뮤니티" },
-  { href: "/worksite-tips", label: "현장 신고" },
+  { href: "/", key: "home" },
+  { href: "/companies", key: "companies" },
+  { href: "/contracts", key: "contracts" },
+  { href: "/community", key: "community" },
+  { href: "/worksite-tips", key: "tips" },
 ] as const;
 
 const MOBILE_NAV_ITEMS = [
-  { href: "/", label: "소개" },
-  { href: "/companies", label: "사업장" },
-  { href: "/contracts", label: "계약서" },
-  { href: "/community", label: "커뮤니티" },
-  { href: "/worksite-tips", label: "현장 신고" },
-  { href: "/chat", label: "AI 상담" },
+  { href: "/", key: "home" },
+  { href: "/companies", key: "companies" },
+  { href: "/contracts", key: "contracts" },
+  { href: "/community", key: "community" },
+  { href: "/worksite-tips", key: "tips" },
+  { href: "/chat", key: "chat" },
 ] as const;
 
 // "/" 는 정확히 일치할 때만 현재 탭이다. 접두사로 보면 모든 경로가 홈이 된다.
@@ -52,8 +56,9 @@ export function chatHrefForPath(pathname: string): string {
 }
 
 export function Brand() {
+  const m = useMessages(headerMessages);
   return (
-    <span className="brand" aria-label="Co끼리 홈">
+    <span className="brand" aria-label={m.brandAria}>
       {/* alt 를 비워 장식으로 표시한다 — 이름은 옆의 brand-word 가 읽어 준다. */}
       <Image
         className="brand-mark"
@@ -63,13 +68,14 @@ export function Brand() {
         height={192}
         priority
       />
-      <span className="brand-word">Co끼리</span>
+      <span className="brand-word">{m.brandWord}</span>
     </span>
   );
 }
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const m = useMessages(headerMessages);
   const isInspector = pathname.startsWith("/inspector");
   const [sessionState, setSessionState] = useState<SessionState>({ status: "loading" });
   const [loggingOut, setLoggingOut] = useState(false);
@@ -118,16 +124,16 @@ export function SiteHeader() {
       setLoggingOut(false);
       setLogoutError(
         error instanceof AuthApiError
-          ? "로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요."
-          : "네트워크 문제로 로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+          ? m.logoutFailed
+          : m.logoutNetworkFailed,
       );
     }
   }
 
   async function handleDeleteAccount() {
     if (deletingAccount) return;
-    const confirmation = window.prompt("상담 원문·요약·근거·요청 기록과 계정을 삭제합니다. 계속하려면 ‘계정 삭제’를 입력하세요.");
-    if (confirmation !== "계정 삭제") return;
+    const confirmation = window.prompt(format(m.deletePrompt, { word: m.deleteConfirmWord }));
+    if (confirmation?.trim().toLocaleLowerCase() !== m.deleteConfirmWord.toLocaleLowerCase()) return;
     setDeletingAccount(true);
     setLogoutError(null);
     try {
@@ -135,7 +141,7 @@ export function SiteHeader() {
       window.location.assign(`//${window.location.host}/`);
     } catch {
       setDeletingAccount(false);
-      setLogoutError("계정을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      setLogoutError(m.deleteFailed);
     }
   }
 
@@ -165,13 +171,13 @@ export function SiteHeader() {
                    사업장 대시보드로 그대로 간다. */
                 href={user?.role === "admin" ? "/inspector/prompts" : "/inspector"}
                 className="consumer-mode-switch"
-                aria-label={`일반 사용자 모드에서 ${user?.role === "admin" ? "관리자" : "감독관"} 모드로 전환`}
+                aria-label={format(m.modeSwitchAria, { mode: user?.role === "admin" ? m.modeAdmin : m.modeInspector })}
               >
-                {user?.role === "admin" ? "관리자 모드" : "감독관 모드"} <span aria-hidden="true">↗</span>
+                {user?.role === "admin" ? m.modeAdmin : m.modeInspector} <span aria-hidden="true">↗</span>
               </Link>
             ) : null}
           </div>
-          <nav className="consumer-main-nav" aria-label="주요 메뉴">
+          <nav className="consumer-main-nav" aria-label={m.mainNavAria}>
             {NAV_ITEMS.map((item) => {
               const current = isCurrentNavPath(pathname, item.href);
               return (
@@ -181,7 +187,7 @@ export function SiteHeader() {
                   className={current ? "is-current" : undefined}
                   aria-current={current ? "page" : undefined}
                 >
-                  {item.label}
+                  {m.nav[item.key]}
                 </Link>
               );
             })}
@@ -193,20 +199,21 @@ export function SiteHeader() {
                 className={isCurrentNavPath(pathname, "/favorites") ? "is-current" : undefined}
                 aria-current={isCurrentNavPath(pathname, "/favorites") ? "page" : undefined}
               >
-                즐겨찾기
+                {m.favorites}
               </Link>
             ) : null}
           </nav>
           <div className="consumer-header-side" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <LanguageSwitcher />
             {sessionState.status === "loading" ? null : user ? (
               <div className="consumer-header-account" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="muted-text">{(user.display_name || "사용자").trim() || "사용자"}님</span>
+                <span className="muted-text">{format(m.userSuffix, { name: (user.display_name || m.userFallback).trim() || m.userFallback })}</span>
                 {user.role === "admin" ? (
-                  <Link href="/admin" className="button button-outline button-small">신고 관리</Link>
+                  <Link href="/admin" className="button button-outline button-small">{m.moderation}</Link>
                 ) : null}
                 {user.role === "user" ? (
                   <button type="button" className="button button-outline button-small" disabled={deletingAccount || loggingOut} onClick={handleDeleteAccount}>
-                    {deletingAccount ? "삭제 중" : "계정 삭제"}
+                    {deletingAccount ? m.deleting : m.deleteAccount}
                   </button>
                 ) : null}
                 <button
@@ -215,11 +222,11 @@ export function SiteHeader() {
                   disabled={loggingOut}
                   onClick={handleLogout}
                 >
-                  {loggingOut ? "로그아웃 중" : "로그아웃"}
+                  {loggingOut ? m.loggingOut : m.logout}
                 </button>
               </div>
             ) : (
-              <Link href="/login" className="button button-dark button-small">로그인</Link>
+              <Link href="/login" className="button button-dark button-small">{m.login}</Link>
             )}
           </div>
         </div>
@@ -228,12 +235,12 @@ export function SiteHeader() {
         <p className="shell field-error" role="alert">{logoutError}</p>
       ) : null}
       {!isInspector && pathname !== "/chat" ? (
-        <Link href={chatHrefForPath(pathname)} className="consumer-floating-chat" aria-label="돈워리 AI에게 상담하기">
+        <Link href={chatHrefForPath(pathname)} className="consumer-floating-chat" aria-label={m.floatingChat}>
           <Image src="/brand/donworry-mascot.png" alt="" width={192} height={192} />
-          <span className="consumer-floating-chat-label">돈워리 AI에게 상담하기</span>
+          <span className="consumer-floating-chat-label">{m.floatingChat}</span>
         </Link>
       ) : null}
-      <nav className="consumer-mobile-nav" aria-label="모바일 주요 메뉴">
+      <nav className="consumer-mobile-nav" aria-label={m.mobileNavAria}>
         {MOBILE_NAV_ITEMS.map((item) => {
           const current = isCurrentNavPath(pathname, item.href);
           return (
@@ -243,7 +250,7 @@ export function SiteHeader() {
               className={current ? "is-current" : undefined}
               aria-current={current ? "page" : undefined}
             >
-              {item.label}
+              {m.mobileNav[item.key]}
             </Link>
           );
         })}
@@ -253,7 +260,7 @@ export function SiteHeader() {
             className={isCurrentNavPath(pathname, "/favorites") ? "is-current" : undefined}
             aria-current={isCurrentNavPath(pathname, "/favorites") ? "page" : undefined}
           >
-            즐겨찾기
+            {m.favorites}
           </Link>
         ) : null}
       </nav>

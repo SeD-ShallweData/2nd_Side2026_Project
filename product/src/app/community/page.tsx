@@ -1,18 +1,24 @@
 import type { Metadata } from "next";
 import { CommunityBoard } from "@/components/community/CommunityBoard";
+import { communityMessages } from "@/i18n/messages/community";
+import { getMessages } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "커뮤니티" };
+export async function generateMetadata(): Promise<Metadata> {
+  const m = await getMessages(communityMessages);
+  return { title: m.page.metaTitle };
+}
 
-export default function CommunityPage() {
+export default async function CommunityPage() {
+  const m = await getMessages(communityMessages);
   return (
     <div className="page-section community-page refresh-community-page">
       <div className="shell community-shell">
         <div className="page-heading community-heading">
-          <span className="eyebrow">익명 커뮤니티</span>
-          <h1>일하는 사람들의 확인 경험</h1>
-          <p>혼자 묻기 어려웠던 질문과 확인 경험을 나눕니다. 일하는 사람들의 경험과 질문을 나누는 공간입니다.</p>
+          <span className="eyebrow">{m.eyebrow}</span>
+          <h1>{m.page.title}</h1>
+          <p>{m.page.description}</p>
         </div>
-        <div className="mock-banner" role="status"><span>안내</span>로그인 사용자는 게시글 작성과 신고를 이용할 수 있습니다.</div>
+        <div className="mock-banner" role="status"><span>{m.page.bannerTag}</span>{m.page.banner}</div>
         <CommunityBoard />
       </div>
     </div>

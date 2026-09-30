@@ -2,15 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { communityMessages } from "@/i18n/messages/community";
 import { CommunityApiError, deleteCommunityPost } from "@/services/communityClient";
 
-const ERROR_MESSAGES: Record<string, string> = {
-  AUTHENTICATION_REQUIRED: "로그인이 필요합니다. 로그인한 뒤 다시 시도해 주세요.",
-  RESOURCE_OWNERSHIP_REQUIRED: "본인이 작성한 게시글만 삭제할 수 있습니다.",
-  COMMUNITY_POST_NOT_FOUND: "게시글을 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.",
-};
-
 export function CommunityPostDeleteButton({ postId }: { postId: string }) {
+  const m = useMessages(communityMessages);
+  const errorMessages: Record<string, string> = m.deletion.errors;
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -27,10 +25,10 @@ export function CommunityPostDeleteButton({ postId }: { postId: string }) {
     } catch (caught) {
       setDeleting(false);
       if (caught instanceof CommunityApiError) {
-        setError(ERROR_MESSAGES[caught.code] ?? caught.message);
+        setError(errorMessages[caught.code] ?? caught.message);
         return;
       }
-      setError("네트워크 문제로 게시글을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      setError(m.deletion.networkError);
     }
   }
 
@@ -41,7 +39,7 @@ export function CommunityPostDeleteButton({ postId }: { postId: string }) {
     return (
       <>
         <button type="button" className="button button-outline button-small" onClick={() => setConfirming(true)}>
-          게시글 삭제
+          {m.deletion.button}
         </button>
         {error ? <span className="field-error" role="alert" style={{ margin: 0 }}>{error}</span> : null}
       </>
@@ -52,13 +50,13 @@ export function CommunityPostDeleteButton({ postId }: { postId: string }) {
     // 확인 패널은 버튼 한 칸이 아니라 한 줄을 통째로 쓴다.
     // 부모가 flex-wrap 이므로 flexBasis 100% 면 제자리에서 줄을 바꾼다.
     // order 로 밀지 않는다 — 보이는 순서와 탭 순서가 어긋나면 안 된다.
-    <div className="contract-actions" role="group" aria-label="게시글 삭제 확인" style={{ flexBasis: "100%" }}>
-      <span className="field-help">삭제한 게시글은 목록과 상세에서 다시 볼 수 없습니다. 삭제할까요?</span>
+    <div className="contract-actions" role="group" aria-label={m.deletion.confirmAria} style={{ flexBasis: "100%" }}>
+      <span className="field-help">{m.deletion.confirmText}</span>
       <button type="button" className="button button-dark" disabled={deleting} onClick={() => void handleDelete()}>
-        {deleting ? "삭제 중" : "삭제 확인"}
+        {deleting ? m.deletion.deleting : m.deletion.confirm}
       </button>
       <button type="button" className="button button-ghost" disabled={deleting} onClick={() => setConfirming(false)}>
-        취소
+        {m.deletion.cancel}
       </button>
       {error ? <p className="field-error" role="alert">{error}</p> : null}
     </div>

@@ -1,16 +1,23 @@
 import type { Metadata } from "next";
 import { SignupForm } from "@/components/auth/SignupForm";
+import { authMessages } from "@/i18n/messages/auth";
+import { getMessages } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "회원가입" };
+export async function generateMetadata(): Promise<Metadata> {
+  const m = await getMessages(authMessages);
+  return { title: m.signup.metaTitle };
+}
 
-export default function SignupPage() {
+export default async function SignupPage() {
+  const messages = await getMessages(authMessages);
+  const m = messages.signup;
   return (
     <div className="page-section">
       <div className="shell narrow-shell">
         <div className="page-heading">
-          <span className="eyebrow">Co끼리</span>
-          <h1>회원가입</h1>
-          <p>이름, 이메일, 비밀번호로 가입하면 바로 로그인 상태가 됩니다.</p>
+          <span className="eyebrow">{messages.brand}</span>
+          <h1>{m.heading}</h1>
+          <p>{m.intro}</p>
         </div>
         <SignupForm />
       </div>

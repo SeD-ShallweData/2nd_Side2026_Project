@@ -4,6 +4,7 @@ import { KOREA_MAP_VIEWBOX, KOREA_REGIONS } from "@/components/company/koreaRegi
 import { RegionMap, regionShadeLevels, resolveRegionValue } from "@/components/company/RegionMap";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
 
 describe("지역 경계 자료", () => {
   it("통합 이후 16개 광역 지역을 모두 담는다", () => {
@@ -65,6 +66,26 @@ describe("DB 지역명 맞추기", () => {
 });
 
 describe("사업장 수 진하기", () => {
+  it("영어 화면에서도 통합 지역 합계와 API의 정확한 총수를 유지한다", () => {
+    const markup = renderToStaticMarkup(
+      LocaleProvider({
+        locale: "en",
+        children: createElement(RegionMap, {
+          counts: [
+            { value: "광주광역시", count: 1200 },
+            { value: "전라남도", count: 34 },
+            { value: "서울특별시", count: 5 },
+          ],
+          total: 3456,
+          onSelect: () => {},
+        }),
+      }),
+    );
+    expect(markup).toContain(">Seoul</text>");
+    expect(markup).toContain(">전남광주</text>");
+    expect(markup).toContain("전남광주통합특별시: 1,234 workplaces");
+    expect(markup).toContain("3,456 workplaces available now");
+  });
   it("지도에는 통합 지역 약칭과 실제 총수를 보여준다", () => {
     const markup = renderToStaticMarkup(
       createElement(RegionMap, { counts: [{ value: "전남광주통합특별시", count: 1234 }], total: 3456, onSelect: () => {} }),
