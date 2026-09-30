@@ -7,6 +7,9 @@
  *   node scripts/scan-secrets.mjs --diff <base> [--head <rev>]
  *       <base>..<head>(기본 HEAD) 커밋들이 새로 넣은 줄만 검사한다. 커밋마다 따로 보므로
  *       한 커밋에서 넣고 다음 커밋에서 지운 값도 잡는다. push 하면 이력에 그대로 남기 때문이다.
+ *   node scripts/scan-secrets.mjs --outgoing <rev>
+ *       <rev> 에서 닿는 커밋 중 원격 추적 ref(refs/remotes/*) 어디에도 없는 커밋을 하나씩 검사한다.
+ *       pre-push 훅이 비교할 원격 기준을 찾지 못했을 때 쓴다. 원격 추적 ref 가 없으면 이력 전체를 본다.
  *   node scripts/scan-secrets.mjs --dir <경로> [--dir <경로> ...] [--ext js,css] [--canary <값> ...]
  *       디렉터리(빌드 산출물 등)를 검사한다. --canary 로 준 값이 그대로 보이면 실패한다.
  *
@@ -42,25 +45,41 @@ const TOKEN_RULES = [
 
 // 아래 규칙은 이름·URL 문맥으로 비밀값을 짐작한다. 테스트 고정값이 많아 테스트 경로에서는 보지 않는다.
 const URL_PASSWORD = /\b(?:postgres(?:ql)?|rediss?):\/\/([^\s:@/'"`]*):([^\s@/'"`]+)@/g;
-const SECRET_NAME = String.raw`(?<![A-Za-z0-9_])([A-Za-z0-9_]*(?:API_KEY|_TOKEN|_PASSWORD|_SECRET))(?![A-Za-z0-9_])`;
+// 코드 파일은 SKT_API_KEY 같은 대문자 이름만 본다. 코드 밖(env·문서·JSON·YAML·셸)에서는 skt_api_key,
+// apiKey, accessToken 같은 소문자·camelCase 이름도 본다. SKT 키는 형식을 몰라 이름으로만 잡을 수 있다.
+const STRICT_NAME = String.raw`[A-Za-z0-9_]*(?:API_KEY|_TOKEN|_PASSWORD|_SECRET)`;
+const LOOSE_NAME = String.raw`${STRICT_NAME}|[A-Za-z0-9_]*(?:api_key|_token|_password|_secret)|apiKey|[a-z][A-Za-z0-9]*(?:ApiKey|Token|Password|Secret)`;
 const QUOTED_VALUE = String.raw`"([^"\n]*)"|'([^'\n]*)'|\x60([^\x60\n]*)\x60`;
-// NAME=값 (env 파일, 셸, 코드). 코드 파일에서는 따옴표로 감싼 값만 본다.
-const NAME_ASSIGNMENT = new RegExp(
-  String.raw`${SECRET_NAME}\s*=(?![=>~])\s*(?:${QUOTED_VALUE}|([^\s"'\x60;,)\]}]+))`,
-  "g",
-);
-// "NAME": "값", NAME: '값' (JSON, YAML, 코드 객체)
-const NAME_QUOTED_PAIR = new RegExp(String.raw`${SECRET_NAME}["']?\s*:\s*(?:${QUOTED_VALUE})`, "g");
-// YAML 의 NAME: 값 (따옴표 없음). 줄 전체가 한 항목일 때만 본다.
-const YAML_NAME_PAIR = new RegExp(String.raw`^\s*(?:-\s+)?${SECRET_NAME}\s*:\s+([^\s"'#][^\s#]*)\s*(?:#.*)?$`);
+
+function nameRules(name) {
+  const secretName = String.raw`(?<![A-Za-z0-9_])(${name})(?![A-Za-z0-9_])`;
+  return {
+    // NAME=값 (env 파일, 셸, 코드). 코드 파일에서는 따옴표로 감싼 값만 본다.
+    // 따옴표 없는 값 뒤의 나머지 글자(공백 전까지)는 함수 호출인지 가릴 때 쓴다.
+    assignment: new RegExp(
+      String.raw`${secretName}\s*=(?![=>~])\s*(?:${QUOTED_VALUE}|([^\s"'\x60;,)\]}]+)(?=(\S*)))`,
+      "g",
+    ),
+    // "NAME": "값", NAME: '값' (JSON, YAML, 코드 객체)
+    quotedPair: new RegExp(String.raw`${secretName}["']?\s*:\s*(?:${QUOTED_VALUE})`, "g"),
+    // YAML 의 NAME: 값 (따옴표 없음). 줄 전체가 한 항목일 때만 본다.
+    yamlPair: new RegExp(String.raw`^\s*(?:-\s+)?${secretName}\s*:\s+([^\s"'#][^\s#]*)\s*(?:#.*)?$`),
+  };
+}
+const CODE_NAME_RULES = nameRules(STRICT_NAME);
+const TEXT_NAME_RULES = nameRules(LOOSE_NAME);
 
 // 자리표시·참조로 보는 값.
 const PLACEHOLDER_START = /^[<{[(%$\\*?:]/;
 const PLACEHOLDER_TEXT =
   /x{4,}|\*{3,}|\.{3,}|replace[_-]?with|change[_-]?me|placeholder|your[_-]|example|dummy|synthetic|redacted|ci-canary/i;
 const CONSTANT_NAME = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/;
-// 괄호가 있으면 함수 호출 같은 식으로 본다(문서 속 코드 예시).
-const REFERENCE = /process\.env|os\.environ|\(/;
+const REFERENCE = /process\.env|os\.environ/;
+// 값 전체가 함수 호출(os.getenv("X"), secrets.token_hex(32), randomBytes(24).toString('hex'))이면
+// 문서 속 코드 예시로 본다. 닫는 괄호 뒤에 글자가 더 붙는 Str0ng(Pass)word99 는 호출이 아니라 비밀번호다.
+const CALL_EXPRESSION = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\(.*\)[^A-Za-z0-9]*$/;
+// 코드 속 "refresh_token", "x-csrf-token" 같은 소문자 낱말 이음은 비밀값이 아니라 식별자·헤더 이름이다.
+const IDENTIFIER_LIKE = /^[a-z]+(?:[_-][a-z]+)+$/;
 const DUMMY_VALUES = new Set(["password", "passwd", "pass", "secret", "postgres", "root", "test", "admin", "user"]);
 
 const CODE_EXTENSIONS = new Set([".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx", ".py"]);
@@ -68,7 +87,8 @@ const YAML_EXTENSIONS = new Set([".yml", ".yaml"]);
 const TEST_PATH =
   /(?:^|\/)(?:tests?|__tests__|fixtures?)\/|(?:^|\/)test_[^/]*\.py$|_test\.py$|\.(?:test|spec)\.[cm]?[jt]sx?$/;
 
-function isPlaceholder(value) {
+// token 은 따옴표 없는 값이 괄호 등에서 끊겼을 때 공백 전까지 이어 붙인 전체 글자다.
+function isPlaceholder(value, token = value) {
   if (value.length === 0) return true;
   // 한글 안내문(<비밀번호>), 말줄임표(…) 같은 비ASCII 는 실제 키가 아니다.
   if (/[^\x20-\x7e]/.test(value)) return true;
@@ -76,7 +96,8 @@ function isPlaceholder(value) {
     PLACEHOLDER_START.test(value) ||
     PLACEHOLDER_TEXT.test(value) ||
     CONSTANT_NAME.test(value) ||
-    REFERENCE.test(value) ||
+    REFERENCE.test(token) ||
+    CALL_EXPRESSION.test(token) ||
     DUMMY_VALUES.has(value.toLowerCase())
   );
 }
@@ -118,21 +139,24 @@ function scanLine(line, context, canaries, report) {
     // postgres:postgres 처럼 계정명과 같은 비밀번호는 CI 임시 DB 다.
     if (password !== user && !isPlaceholder(password)) report("url-password", password);
   }
-  const reportNamed = (name, raw) => {
+  const reportNamed = (name, raw, token = raw) => {
     const value = raw.trim();
-    if (value.length >= MIN_NAMED_VALUE_LENGTH && !isPlaceholder(value)) report(`secret-assignment ${name}`, value);
+    if (value.length < MIN_NAMED_VALUE_LENGTH || isPlaceholder(value, token.trim())) return;
+    if (context.isCode && IDENTIFIER_LIKE.test(value)) return;
+    report(`secret-assignment ${name}`, value);
   };
-  for (const match of line.matchAll(NAME_ASSIGNMENT)) {
+  const rules = context.isCode ? CODE_NAME_RULES : TEXT_NAME_RULES;
+  for (const match of line.matchAll(rules.assignment)) {
     const quoted = match[2] ?? match[3] ?? match[4];
+    if (quoted !== undefined) reportNamed(match[1], quoted);
     // 코드에서 따옴표 없는 오른쪽은 변수·식이다.
-    const value = quoted ?? (context.isCode ? undefined : match[5]);
-    if (value !== undefined) reportNamed(match[1], value);
+    else if (!context.isCode) reportNamed(match[1], match[5], match[5] + match[6]);
   }
-  for (const match of line.matchAll(NAME_QUOTED_PAIR)) {
+  for (const match of line.matchAll(rules.quotedPair)) {
     reportNamed(match[1], match[2] ?? match[3] ?? match[4]);
   }
   if (context.isYaml) {
-    const match = YAML_NAME_PAIR.exec(line);
+    const match = rules.yamlPair.exec(line);
     if (match) reportNamed(match[1], match[2]);
   }
 }
@@ -250,16 +274,30 @@ function scanPatch(patch, collector) {
   }
 }
 
+// 사용자 git 설정(diff.noprefix 등)과 상관없이 경로가 b/ 로 시작하게 고정한다.
+const DIFF_OPTIONS = ["-p", "--unified=0", "--no-color", "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/"];
+
+function resolveCommit(root, rev) {
+  return git(["rev-parse", "--verify", `${rev}^{commit}`], root).trim();
+}
+
 function scanDiff(root, base, head, collector) {
-  const baseCommit = git(["rev-parse", "--verify", `${base}^{commit}`], root).trim();
-  const headCommit = git(["rev-parse", "--verify", `${head}^{commit}`], root).trim();
-  // 사용자 git 설정(diff.noprefix 등)과 상관없이 경로가 b/ 로 시작하게 고정한다.
-  const diffOptions = ["-p", "--unified=0", "--no-color", "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/"];
+  const baseCommit = resolveCommit(root, base);
+  const headCommit = resolveCommit(root, head);
   // 커밋마다 따로 본다. 병합 커밋은 아래의 전체 변경분 검사가 맡는다.
-  scanPatch(git(["log", "--no-merges", "--format=%x00%H", ...diffOptions, `${baseCommit}..${headCommit}`], root), collector);
-  scanPatch(git(["diff", ...diffOptions, `${baseCommit}...${headCommit}`], root), collector);
+  scanPatch(git(["log", "--no-merges", "--format=%x00%H", ...DIFF_OPTIONS, `${baseCommit}..${headCommit}`], root), collector);
+  scanPatch(git(["diff", ...DIFF_OPTIONS, `${baseCommit}...${headCommit}`], root), collector);
   const commits = git(["rev-list", "--count", `${baseCommit}..${headCommit}`], root).trim();
   return `${base}..${head} 커밋 ${commits}개`;
+}
+
+function scanOutgoing(root, head, collector) {
+  const range = [resolveCommit(root, head), "--not", "--remotes"];
+  // 병합 커밋은 첫 부모와 비교해 병합에서만 생긴 줄(충돌 해결 등)도 본다.
+  // --root 는 log.showRoot 설정과 상관없이 첫 커밋의 내용도 보게 한다.
+  scanPatch(git(["log", "--root", "--diff-merges=first-parent", "--format=%x00%H", ...DIFF_OPTIONS, ...range], root), collector);
+  const commits = git(["rev-list", "--count", ...range], root).trim();
+  return `${head} 에서 원격 추적 ref 에 없는 커밋 ${commits}개`;
 }
 
 function listDirectory(dir) {
@@ -294,6 +332,7 @@ function usage(message) {
       "사용법:",
       "  node scripts/scan-secrets.mjs --all",
       "  node scripts/scan-secrets.mjs --diff <base> [--head <rev>]",
+      "  node scripts/scan-secrets.mjs --outgoing <rev>",
       "  node scripts/scan-secrets.mjs --dir <경로> [--dir <경로> ...] [--ext js,css] [--canary <값> ...]",
     ].join("\n"),
   );
@@ -301,7 +340,7 @@ function usage(message) {
 }
 
 function parseArgs(argv) {
-  const options = { all: false, diff: undefined, head: "HEAD", dirs: [], ext: undefined, canaries: [] };
+  const options = { all: false, diff: undefined, outgoing: undefined, head: "HEAD", dirs: [], ext: undefined, canaries: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     const next = () => {
@@ -311,6 +350,7 @@ function parseArgs(argv) {
     };
     if (arg === "--all") options.all = true;
     else if (arg === "--diff") options.diff = next();
+    else if (arg === "--outgoing") options.outgoing = next();
     else if (arg === "--head") options.head = next();
     else if (arg === "--dir") options.dirs.push(next());
     else if (arg === "--ext") options.ext = new Set(next().split(",").map((value) => value.trim().replace(/^\./, "")).filter(Boolean));
@@ -327,8 +367,10 @@ function main(argv) {
   } catch (error) {
     return usage(error.message);
   }
-  const modes = [options.all, options.diff !== undefined, options.dirs.length > 0].filter(Boolean).length;
-  if (modes !== 1) return usage("--all, --diff, --dir 중 하나만 고릅니다.");
+  const modes = [options.all, options.diff !== undefined, options.outgoing !== undefined, options.dirs.length > 0].filter(
+    Boolean,
+  ).length;
+  if (modes !== 1) return usage("--all, --diff, --outgoing, --dir 중 하나만 고릅니다.");
   // 비어 있거나 짧은 canary 는 아무 데나 걸리거나, env 가 빠져 아무것도 안 보는 채로 통과한다.
   if (options.canaries.some((canary) => canary.trim().length < 8)) {
     return usage("--canary 값이 비었거나 8자보다 짧습니다. CI 의 canary env 가 설정됐는지 확인합니다.");
@@ -342,7 +384,9 @@ function main(argv) {
       scope = scanDirectories(options.dirs, options.ext, options.canaries, collector);
     } else {
       const root = git(["rev-parse", "--show-toplevel"], process.cwd()).trim();
-      scope = options.all ? scanTracked(root, collector) : scanDiff(root, options.diff, options.head, collector);
+      if (options.all) scope = scanTracked(root, collector);
+      else if (options.outgoing !== undefined) scope = scanOutgoing(root, options.outgoing, collector);
+      else scope = scanDiff(root, options.diff, options.head, collector);
     }
   } catch (error) {
     const detail = error.stderr ? String(error.stderr).trim() : error.message;
@@ -358,13 +402,17 @@ function main(argv) {
     const origin = finding.origin ? ` (커밋 ${finding.origin})` : "";
     console.error(`[scan-secrets] ${finding.path}:${finding.line}${origin}  ${finding.rule}  ${finding.masked}`);
   }
-  console.error(
-    [
-      `[scan-secrets] 비밀값으로 보이는 값 ${collector.findings.length}건 (${scope}). 값은 앞부분과 길이만 표시했습니다.`,
-      "  실제 키라면 커밋에서 지우는 것으로는 부족합니다. 공개 저장소에 push 됐다면 먼저 키를 폐기하고 재발급합니다.",
-      `  오탐이면 값을 <설명> 같은 자리표시로 바꾸거나, 같은 줄에 "${ALLOW_MARKER}" 를 적고 PR 에 이유를 남깁니다.`,
-    ].join("\n"),
-  );
+  const guide = [
+    `[scan-secrets] 비밀값으로 보이는 값 ${collector.findings.length}건 (${scope}). 값은 앞부분과 길이만 표시했습니다.`,
+    "  실제 키라면 커밋에서 지우는 것으로는 부족합니다. 공개 저장소에 push 됐다면 먼저 키를 폐기하고 재발급합니다.",
+    `  오탐이면 값을 <설명> 같은 자리표시로 바꾸거나, 같은 줄에 "${ALLOW_MARKER}" 를 적고 PR 에 이유를 남깁니다.`,
+  ];
+  if (collector.findings.some((finding) => finding.origin)) {
+    guide.push(
+      "  커밋마다 따로 검사하므로 앞 커밋의 오탐은 뒤 커밋에서 고쳐도 계속 걸립니다. rebase·squash 로 그 커밋을 고칩니다.",
+    );
+  }
+  console.error(guide.join("\n"));
   return 1;
 }
 

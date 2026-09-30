@@ -290,6 +290,10 @@ npm run test:e2e:openai-live
 두 번째 명령은 env 값은 읽거나 출력하지 않고 파일 권한만 검사합니다. 팀 공용 파일은 임의로 변경하지 말고
 소유자와 합의해 `0600` 또는 같은 팀 그룹 읽기용 `0640`으로 조정합니다.
 
+push 전 비밀값 검사는 저장소 루트에서 `git config core.hooksPath .githooks`를 한 번 실행해 켭니다. pre-push 훅이
+나가는 커밋을 `scripts/scan-secrets.mjs`로 검사합니다. CI의 Secret scan도 PR과 main push마다 같은 검사를 하지만,
+공개 저장소는 push하는 순간 공개되므로 CI는 사후 탐지입니다.
+
 `test:e2e:openai-live`는 기본적으로 `[SKIP]`을 출력하고 성공 종료하므로 비용이 발생하지 않습니다. 실제
 Responses·DB 도구 연결을 한 번 검증할 때만 실행 중인 `openai_responses` 서버 주소와 opt-in을 명시합니다.
 

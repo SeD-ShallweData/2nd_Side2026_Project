@@ -224,7 +224,6 @@ PDF·PNG·JPEG(15MB 이하)를 OCR로 읽고, 조항을 추출한 뒤 규칙 엔
 ## 보안과 데이터
 
 - API 키, `.env*`, 원본 계약서, 개인정보, 실존 사업장 식별정보는 Git에 넣지 않는다. 저장소는 공개다.
-- push 전 비밀값 검사를 켜려면 저장소 루트에서 `git config core.hooksPath .githooks`를 한 번 실행한다. pre-push 훅이 나가는 커밋을 `scripts/scan-secrets.mjs`로 검사하고, CI(Secret scan)도 PR과 main push마다 같은 검사를 한다.
 - 웹 프로세스는 읽기 전용 계정(`wg_bot`)과 기능별 최소권한 계정 5개(`wg_auth`·`wg_community`·`wg_tip`·`wg_conversation`·`wg_ops`)만 쓴다. `wg_ops`는 테이블 권한 없이 운영 함수만 실행한다. 소유자 계정은 DDL·적재에만 쓴다.
 - 계약서 원문은 저장하거나 로그에 남기지 않는다. 현장 제보 사진은 메타데이터를 지운 사본만 근로감독관에게 보인다.
 - 로그인 세션은 httpOnly 쿠키, 8시간 고정이고 DB에는 토큰 해시만 저장한다. 비밀번호는 scrypt로 저장하고, 5회 실패하면 15분 잠근다.
