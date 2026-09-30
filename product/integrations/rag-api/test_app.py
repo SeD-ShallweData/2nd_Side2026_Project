@@ -13,8 +13,8 @@ class HealthTest(unittest.TestCase):
         token = "RagInternal_7pQ2mV9xR4tK8nC3sL6wF"
         with patch.dict(os.environ, {"RAG_INTERNAL_TOKEN": token}, clear=True), patch.object(app.retriever, "status", return_value={
             "ready": False,
-            "document_count": 583,
-            "expected_document_count": 583,
+            "document_count": 806,
+            "expected_document_count": 806,
             "embedding_dimension": 1024,
             "query_compatible": False,
         }):
@@ -29,8 +29,8 @@ class HealthTest(unittest.TestCase):
         token = "RagInternal_7pQ2mV9xR4tK8nC3sL6wF"
         with patch.dict(os.environ, {"RAG_INTERNAL_TOKEN": token}, clear=True), patch.object(app.retriever, "status", return_value={
             "ready": True,
-            "document_count": 583,
-            "expected_document_count": 583,
+            "document_count": 806,
+            "expected_document_count": 806,
             "embedding_dimension": 1024,
             "query_compatible": True,
         }):

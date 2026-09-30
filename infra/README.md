@@ -85,7 +85,7 @@ sudo infra/scripts/install-systemd-units.sh \
 설치기는 env 내용을 출력하거나 source하지 않는다. 네 계정·그룹·파일 경계, read-only bot URL,
 loopback 주소, 금지된 관리자/secret 변수, Docker Compose 유효성을 모두 fail-closed로 확인한다.
 RAG는 추가로 sealed BGE-M3 snapshot과 Chroma 다섯 파일의 hash를 읽기 전용 검증하고, worker가 실제
-1024차원 embedding과 `labor_law` query를 통과해 정확히 583건을 확인해야 ready가 된다.
+1024차원 embedding과 `labor_law` query를 통과해 정확히 806건을 확인해야 ready가 된다.
 계약 분석 서비스도 시작 전에 고정 manifest로 prompt·few-shot·knowledge 26개 파일의 exact tree,
 size, SHA-256과 JSON/JSONL 구조를 검증하며, manifest digest가 Next readiness pin과 다르면 준비 상태로
 인정하지 않는다. 네 unit 모두 `LimitCORE=0`으로 provider key, internal token, 계약 원문이 core dump에

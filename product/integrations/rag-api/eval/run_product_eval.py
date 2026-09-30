@@ -21,6 +21,9 @@ from questions import (  # noqa: E402
     NARROW_ARTICLES,
     NARROW_CASES,
     NEGATIVES,
+    NEW_LAW_NEGATIVES,
+    NEW_LAW_POSITIVES,
+    NEW_LAW_VALIDATION,
     POSITIVES,
     USER_LANGUAGE_REGRESSIONS,
 )
@@ -31,17 +34,28 @@ def parse_args():
     parser.add_argument("--min-top1", type=float, default=0.744)
     parser.add_argument("--min-top5", type=float, default=0.922)
     parser.add_argument("--require-negative", type=float, default=1.0)
+    # 2026-10 산재보험법·외국인고용법 수록셋(개발+검증 합산) 하한. 근거: docs/qa/2026-09-30-rag-foreign-employment-iaci.md
+    parser.add_argument("--min-new-law-top5", type=float, default=NEW_LAW_TOP5_FLOOR)
     return parser.parse_args()
+
+
+NEW_LAW_TOP5_FLOOR = 0.90
 
 
 def citation_matches(citation, law, articles):
     return any(citation == f"{law} {article}" or citation.startswith(f"{law} {article} ") for article in articles)
 
 
+def item_matches(citation, item):
+    """기본 정답 법령 조문 또는 'also'로 함께 인정한 위임 시행령 조문이면 정답이다."""
+    answers = [item, *item.get("also", ())]
+    return any(citation_matches(citation, answer["law"], answer["articles"]) for answer in answers)
+
+
 def evaluate_positive(retriever, item):
     result = retriever.retrieve(item["q"], limit=5)
     citations = [entry["citation"] for entry in result["items"]]
-    hits = [citation_matches(citation, item["law"], item["articles"]) for citation in citations]
+    hits = [item_matches(citation, item) for citation in citations]
     return {
         "question": item["q"],
         "rank": hits.index(True) + 1 if any(hits) else None,
@@ -82,6 +96,11 @@ def main():
         core = [evaluate_positive(retriever, item) for item in POSITIVES]
         regressions = [evaluate_positive(retriever, item) for item in USER_LANGUAGE_REGRESSIONS]
         negatives = [retriever.retrieve(question, limit=5)["status"] == "no_match" for question in NEGATIVES]
+        new_law = [evaluate_positive(retriever, item) for item in NEW_LAW_POSITIVES]
+        new_law_validation = [evaluate_positive(retriever, item) for item in NEW_LAW_VALIDATION]
+        new_law_negatives = [
+            (question, retriever.retrieve(question, limit=5)) for question in NEW_LAW_NEGATIVES
+        ]
         narrow = [evaluate_narrow(retriever, case) for case in NARROW_CASES]
         # Chroma keeps Windows file handles open until the persistent client is
         # explicitly closed; release the temporary DB before cleanup.
@@ -97,7 +116,27 @@ def main():
     for row in regressions:
         print(f"생활어 회귀: {'PASS' if row['rank'] else 'FAIL'} · {row['question']} · {row['citations'][:2]}")
 
+    for label, rows in (("신규 법령 개발셋", new_law), ("신규 법령 검증셋", new_law_validation)):
+        print(
+            f"{label} top-1: {score(rows, 1):.1%} ({sum(1 for row in rows if row['rank'] == 1)}/{len(rows)}) · "
+            f"top-5: {score(rows, 5):.1%} ({sum(1 for row in rows if row['rank'] and row['rank'] <= 5)}/{len(rows)})"
+        )
+        for row in rows:
+            if row["rank"] != 1:
+                print(f"  {'MISS' if row['rank'] is None else 'rank ' + str(row['rank'])} · {row['question']} · {row['citations'][:3]}")
+    new_law_all = new_law + new_law_validation
+    new_law_top5 = score(new_law_all, 5)
+    new_law_blocked = [result["status"] == "no_match" for _, result in new_law_negatives]
+    print(f"신규 법령 인접 주제(산안법·중대재해) 차단: {sum(new_law_blocked)}/{len(new_law_blocked)}")
+    for (question, result), blocked in zip(new_law_negatives, new_law_blocked):
+        if not blocked:
+            print(f"  LEAK · {question} · {[item['citation'] for item in result['items']][:3]}")
+
     failures = []
+    if new_law_top5 < args.min_new_law_top5:
+        failures.append(f"new-law top-5 {new_law_top5:.3f} < {args.min_new_law_top5:.3f}")
+    if not all(new_law_blocked):
+        failures.append("신규 법령 인접 주제 차단 실패")
     if top1 < args.min_top1:
         failures.append(f"top-1 {top1:.3f} < {args.min_top1:.3f}")
     if top5 < args.min_top5:

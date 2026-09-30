@@ -1,5 +1,6 @@
 import type { ChatResponse } from "@/domain/chat";
 import type { RagDocument, RagRetrievalResult } from "@/domain/rag";
+import { asksNewCorpusLawTopic } from "@/domain/corpusLawTopics";
 import { asksNextAction, asksWageDocumentUse } from "@/services/chatQuestionPurpose";
 
 /** Narrow, source-reviewed evidence bundles; not a replacement for general retrieval.
@@ -13,6 +14,8 @@ const PAYSLIP_GUIDE = "고용노동부 「임금명세서 교부 의무」";
 
 /** Timing/recordkeeping intent, not a claim that retirement or agreement occurred. */
 export function isPaymentTimingQuestion(query: string): boolean {
+  // 산재 유족급여·휴업급여, 외국인 출국만기보험의 지급 시기는 근로기준법 제36조 청산이 아니다.
+  if (asksNewCorpusLawTopic(query)) return false;
   if (/퇴직금|퇴직연금/.test(query) && !/제?\s*36\s*조|금품\s*청산/.test(query)) return false;
   return /제?\s*36\s*조|금품\s*청산/.test(query)
     || (/퇴직|퇴사|사망/.test(query) && /임금|월급|급여|금품|지급|14일|2주/.test(query))
@@ -100,6 +103,9 @@ function nightWorkSize(query: string): "under_five" | "five_plus" | "unknown" {
 }
 
 export function reviewedLaborTopics(query: string): Topic[] {
+  // 산재보험·외국인고용 절차는 이 임금 번들의 근거가 아니다. RAG가 해당 법 조문을 찾게 둔다.
+  // ("요양급여 신청 서류", "산재 신청용 사업주 확인서"가 임금 진정·체불 확인서 번들로 가던 문제)
+  if (asksNewCorpusLawTopic(query)) return [];
   const topics: Topic[] = [];
   if (/(?:급여|임금)\s*명세서/.test(query) && /받지\s*못|못\s*받|미교부|요청|달라고|항목|공제|계산방법/.test(query)) topics.push("payslip");
   if (isPaymentTimingQuestion(query)) topics.push("payment");

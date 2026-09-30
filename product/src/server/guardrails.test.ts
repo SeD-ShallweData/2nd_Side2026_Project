@@ -145,7 +145,7 @@ describe("프롬프트 인젝션 대응", () => {
 });
 
 describe("법령 인용 검증", () => {
-  it("적재된 법령 7개를 모두 인식한다", () => {
+  it("적재된 법령을 모두 인식한다", () => {
     for (const law of LAW_NAMES) {
       expect(citationKeys(`${law} 제3조에 따르면`).size, law).toBe(1);
     }
@@ -180,6 +180,43 @@ describe("법령 인용 검증", () => {
     expect(citationKeys("남녀고용평등법 제11조")).toEqual(
       citationKeys("남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률 제11조"),
     );
+  });
+
+  it("산재보험법·외국인고용법과 그 시행령을 수록 법령으로 인식하고 약칭을 정식명으로 맞춘다", () => {
+    expect(citationKeys("산재보험법 제37조")).toEqual(citationKeys("산업재해보상보험법 제37조"));
+    expect(citationKeys("산재보험법 시행령 제2조")).toEqual(
+      citationKeys("산업재해보상보험법 시행령 제2조"),
+    );
+    expect(citationKeys("외국인고용법 제25조")).toEqual(
+      citationKeys("외국인근로자의 고용 등에 관한 법률 제25조"),
+    );
+    expect(citationKeys("「외국인근로자의 고용 등에 관한 법률 시행령」 제21조")).toEqual(
+      citationKeys("외국인고용법 시행령 제21조"),
+    );
+    expect(citationKeys("산업재해보상보험법 시행령 제2조")).not.toEqual(
+      citationKeys("산업재해보상보험법 제2조"),
+    );
+    expect(citationLabels("산재보험법 제41조")).toEqual(["산업재해보상보험법 제41조"]);
+  });
+
+  it("새 수록 법령도 검색된 조문만 인용해야 통과한다", () => {
+    const retrieved = [
+      "산업재해보상보험법 제41조",
+      "산업재해보상보험법 시행령 제2조",
+      "외국인근로자의 고용 등에 관한 법률 제25조",
+    ];
+    expect(hasUnverifiedCitation(
+      "산재보험법 제41조와 외국인고용법 제25조, 산업재해보상보험법 시행령 제2조를 보세요.",
+      "matched",
+      retrieved,
+    )).toBe(false);
+    expect(hasUnverifiedCitation("산재보험법 제999조에 따르면", "matched", retrieved)).toBe(true);
+    expect(hasUnverifiedCitation(
+      "외국인근로자의 고용 등에 관한 법률 제99조에 따르면",
+      "matched",
+      retrieved,
+    )).toBe(true);
+    expect(hasUnverifiedCitation("산업재해보상보험법 제41조", "no_match")).toBe(true);
   });
 
   it("축약 법률명의 확인되지 않은 조문도 우회하지 못한다", () => {

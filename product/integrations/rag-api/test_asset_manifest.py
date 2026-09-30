@@ -229,7 +229,7 @@ class AssetManifestTest(unittest.TestCase):
     def test_committed_manifest_matches_the_five_file_chroma_bundle(self):
         manifest = load_manifest(COMMITTED_MANIFEST)
         self.assertEqual("labor_law", manifest.collection.name)
-        self.assertEqual(583, manifest.collection.document_count)
+        self.assertEqual(806, manifest.collection.document_count)
         self.assertEqual(1024, manifest.collection.embedding_dimension)
         self.assertEqual(5, len(manifest.collection.files))
         for contract in manifest.collection.files:
@@ -252,7 +252,7 @@ class AssetManifestTest(unittest.TestCase):
                 """,
                 (manifest.collection.probe.expected_id,),
             ).fetchall())
-        self.assertEqual(583, count)
+        self.assertEqual(806, count)
         self.assertEqual(("labor_law", 1024), collection)
         self.assertEqual(manifest.collection.probe.expected_law, probe_rows["law"])
         self.assertEqual(
@@ -264,7 +264,7 @@ class AssetManifestTest(unittest.TestCase):
     def test_committed_model_is_full_revision_and_file_hash_pinned(self):
         manifest = load_manifest(COMMITTED_MANIFEST)
         self.assertEqual(
-            "f67ceeb88695eb9f681839bee857ea00e6b8f59853981180a13df547323b30d0",
+            "7ac893fba1819472129ac6056ca91a73edcc32e1746ce50de282668a85ead4ea",
             manifest_sha256(manifest),
         )
         self.assertEqual("BAAI/bge-m3", manifest.model.repo_id)

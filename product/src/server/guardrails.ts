@@ -35,7 +35,11 @@ const NEGATION_PATTERN =
  * 긴 이름을 먼저 두어 "근로기준법 시행령"이 "근로기준법"으로 잘리지 않게 한다.
  */
 export const LAW_NAMES = [
+  "외국인근로자의 고용 등에 관한 법률 시행령",
+  "외국인근로자의 고용 등에 관한 법률",
   "기간제 및 단시간근로자 보호 등에 관한 법률",
+  "산업재해보상보험법 시행령",
+  "산업재해보상보험법",
   "남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률",
   "근로자퇴직급여 보장법",
   "최저임금법 시행령",
@@ -113,7 +117,13 @@ function verifiableCitationKeys(text: string): Set<string> {
   const keys = new Set<string>();
   for (const citation of text.match(lawCitationPattern()) ?? []) keys.add(citationKey(citation));
   for (const citation of text.match(unknownLawCitationPattern()) ?? []) keys.add(citationKey(citation));
-  for (const citation of text.match(guideCitationPattern()) ?? []) keys.add(citationKey(citation));
+  for (const citation of text.match(guideCitationPattern()) ?? []) {
+    // "근로복지공단에 신청하세요(「산업재해보상보험법」 제41조)"처럼 기관명 뒤에 적재 법령명이
+    // 「」로 오면 안내 문서가 아니라 법령 인용이다. 조문 자체는 위 법령 패턴이 검증한다.
+    const quoted = citation.match(/「\s*([^」]+?)\s*」/)?.[1];
+    if (quoted && (LAW_CITATION_NAMES as readonly string[]).includes(quoted)) continue;
+    keys.add(citationKey(citation));
+  }
   return keys;
 }
 

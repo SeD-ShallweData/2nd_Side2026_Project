@@ -321,7 +321,7 @@ try {
       HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', RAG_MODEL_LOCAL_ONLY: '1', RAG_REQUIRE_ASSET_SEAL: '1',
       RAG_ASSET_MANIFEST: resolve(ragRoot, 'config/rag_assets.v1.json'),
       RAG_MODEL_REVISION: '5617a9f61b028005a4858fdac845db406aefb181',
-      RAG_EXPECTED_DOCUMENT_COUNT: '583', RAG_EXPECTED_EMBEDDING_DIMENSION: '1024',
+      RAG_EXPECTED_DOCUMENT_COUNT: '806', RAG_EXPECTED_EMBEDDING_DIMENSION: '1024',
       RAG_COLLECTION: 'labor_law', RAG_DISTANCE_THRESHOLD: '0.42', RAG_STRONG_MATCH_DISTANCE: '0.30',
       TOKENIZERS_PARALLELISM: 'false' });
   await ready(`http://${host}:${ragPort}/api/health`, rag, { authorization: `Bearer ${token}` });
