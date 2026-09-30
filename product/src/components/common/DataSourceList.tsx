@@ -1,8 +1,14 @@
+"use client";
+
 import type { SourceReference } from "@/domain/risk";
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { commonMessages } from "@/i18n/messages/common";
 
 export function DataSourceList({ sources }: { sources: SourceReference[] }) {
+  const m = useMessages(commonMessages).sources;
   if (sources.length === 0) {
-    return <p className="muted-text">확인 가능한 출처가 없습니다.</p>;
+    return <p className="muted-text">{m.empty}</p>;
   }
   return (
     <ul className="source-list">
@@ -17,8 +23,8 @@ export function DataSourceList({ sources }: { sources: SourceReference[] }) {
           <small>
             {[
               source.organization,
-              source.as_of && `기준 ${source.as_of}`,
-              source.document_id && `문서 ${source.document_id}`,
+              source.as_of && format(m.asOf, { date: source.as_of }),
+              source.document_id && format(m.document, { id: source.document_id }),
             ].filter(Boolean).join(" · ")}
           </small>
         </li>

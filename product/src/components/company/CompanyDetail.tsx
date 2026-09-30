@@ -15,9 +15,14 @@ import type { CompanyRiskResult } from "@/domain/risk";
 import { getSession } from "@/services/authClient";
 import { getFavorites } from "@/services/favoriteClient";
 import { readApiResponse } from "@/utils/clientApi";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { companyMessages } from "@/i18n/messages/company";
 
 export function CompanyDetail({ company, dataMode }: { company: Company; dataMode: "mock" | "real" }) {
   const router = useRouter();
+  const cm = useMessages(companyMessages);
+  const m = cm.detail;
+  const loadFailed = m.loadFailed;
   const [risk, setRisk] = useState<CompanyRiskResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +65,7 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
       setRisk(await readApiResponse<CompanyRiskResult>(response));
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") return;
-      setError(caught instanceof Error ? caught.message : "사업장 정보를 불러오지 못했습니다.");
+      setError(caught instanceof Error ? caught.message : loadFailed);
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -73,12 +78,14 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
       .then((data) => setRisk(data))
       .catch((caught: unknown) => {
         if (caught instanceof DOMException && caught.name === "AbortError") return;
-        setError(caught instanceof Error ? caught.message : "사업장 정보를 불러오지 못했습니다.");
+        setError(caught instanceof Error ? caught.message : loadFailed);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
+    // 문구 사전은 렌더마다 새 객체일 수 있어 의존성에 넣지 않는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company.company_id]);
 
   function ask(question: string) {
@@ -91,24 +98,24 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
       <section className="detail-hero">
         <div className="shell">
           <div className="detail-breadcrumb">
-            <Link href="/companies">사업장 검색</Link>
+            <Link href="/companies">{m.breadcrumbSearch}</Link>
             <span aria-hidden="true">/</span>
-            <span>상세 정보</span>
+            <span>{m.breadcrumbDetail}</span>
           </div>
           <div className="detail-company-row">
             <div className="company-avatar company-avatar-large" aria-hidden="true">
               {company.company_name.slice(0, 2)}
             </div>
             <div className="detail-company-copy">
-              <span className="demo-pill">{dataMode === "real" ? "DB 연결 사업장" : "데모 사업장"}</span>
+              <span className="demo-pill">{dataMode === "real" ? m.pillReal : m.pillDemo}</span>
               <h1>{company.company_name}</h1>
               <div className="detail-tags">
-                <span>{company.region ?? "지역 정보 없음"}</span>
-                <span>{company.industry ?? "업종 정보 없음"}</span>
+                <span>{company.region ?? cm.card.noRegion}</span>
+                <span>{company.industry ?? cm.card.noIndustry}</span>
               </div>
             </div>
             <Link href="/companies" className="button button-outline change-company">
-              사업장 변경
+              {m.change}
             </Link>
             <FavoriteButton
               companyId={company.company_id}
@@ -122,12 +129,12 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
       </section>
 
       <div className="shell detail-content">
-        {loading ? <LoadingSkeleton label="임금·산업재해 신호를 불러오고 있습니다." /> : null}
+        {loading ? <LoadingSkeleton label={m.loading} /> : null}
         {!loading && error ? <ErrorState message={error} onRetry={() => void loadRisk()} /> : null}
         {!loading && !error && !risk ? (
           <EmptyState
-            title="표시할 위험 정보가 없습니다"
-            description="이 사업장은 아직 임금·산업재해 신호 분석 결과가 연결되지 않았습니다. 사업장 정보를 다시 확인하거나 다른 사업장을 검색해 보세요."
+            title={m.emptyTitle}
+            description={m.emptyDescription}
           />
         ) : null}
         {!loading && risk ? (
@@ -153,11 +160,8 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
               />
             </div>
             <LimitationNotice>
-              <strong>결과를 하나의 점수로 합치지 않습니다.</strong>
-              <p>
-                임금 공개 판정과 산업재해 공표 우선순위는 서로 다른 모델 결과입니다. 산업재해 신호는 검증된
-                사업장 연결을 거쳤더라도 사고 확률이나 안전 판정이 아니며, 두 결과 모두 입사 여부를 확정하지 않습니다.
-              </p>
+              <strong>{m.limitTitle}</strong>
+              <p>{m.limitBody}</p>
             </LimitationNotice>
 
             <div className="detail-section">
@@ -166,9 +170,9 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
 
             <section className="detail-section next-action-section" aria-labelledby="next-action-title">
               <div className="section-heading section-heading-left">
-                <span className="eyebrow">다음 단계</span>
-                <h2 id="next-action-title">상세 기능은 필요한 화면에서 이어가세요</h2>
-                <p>사업장 상세는 신호와 체크리스트에 집중하고, 상담과 계약서 검토는 별도 화면에서 진행합니다.</p>
+                <span className="eyebrow">{m.nextEyebrow}</span>
+                <h2 id="next-action-title">{m.nextTitle}</h2>
+                <p>{m.nextBody}</p>
               </div>
               <div className="next-action-grid">
                 <Link
@@ -177,16 +181,16 @@ export function CompanyDetail({ company, dataMode }: { company: Company; dataMod
                 >
                   <span aria-hidden="true">AI</span>
                   <div>
-                    <strong>이 사업장을 기준으로 AI 상담</strong>
-                    <p>같은 공식 근거를 사용한 두 모델의 답변과 한계를 비교합니다.</p>
+                    <strong>{m.chatTitle}</strong>
+                    <p>{m.chatBody}</p>
                   </div>
                   <b aria-hidden="true">→</b>
                 </Link>
                 <Link href="/contracts" className="next-action-card">
                   <span aria-hidden="true">✓</span>
                   <div>
-                    <strong>근로계약서 별도 검토</strong>
-                    <p>파일을 올려 확인·누락·추가 검토 항목을 구조적으로 살펴봅니다.</p>
+                    <strong>{m.contractTitle}</strong>
+                    <p>{m.contractBody}</p>
                   </div>
                   <b aria-hidden="true">→</b>
                 </Link>

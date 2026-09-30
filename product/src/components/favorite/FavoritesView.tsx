@@ -8,6 +8,9 @@ import { describeFavoriteError } from "@/components/favorite/favoriteErrorMessag
 import type { FavoriteCompanyDto } from "@/app/api/users/me/favorites/favoriteApiContract";
 import { getSession } from "@/services/authClient";
 import { getFavorites, removeFavorite } from "@/services/favoriteClient";
+import { useLocale, useMessages } from "@/i18n/LocaleProvider";
+import { htmlLang, type Locale } from "@/i18n/locales";
+import { favoriteMessages } from "@/i18n/messages/favorite";
 
 type ViewState =
   | { status: "loading" }
@@ -16,13 +19,15 @@ type ViewState =
   | { status: "error"; message: string }
   | { status: "ready"; items: FavoriteCompanyDto[] };
 
-function formatDate(value: string): string {
+function formatDate(value: string, locale: Locale): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString("ko-KR");
+  return parsed.toLocaleDateString(locale === "ko" || locale === "ko-easy" ? "ko-KR" : htmlLang(locale));
 }
 
 export function FavoritesView() {
+  const locale = useLocale();
+  const m = useMessages(favoriteMessages);
   const [view, setView] = useState<ViewState>({ status: "loading" });
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
@@ -44,7 +49,7 @@ export function FavoritesView() {
         if (!ignore) setView({ status: "ready", items: result.items });
       } catch (caught) {
         if (ignore || (caught instanceof DOMException && caught.name === "AbortError")) return;
-        setView({ status: "error", message: describeFavoriteError(caught) });
+        setView({ status: "error", message: describeFavoriteError(caught, m.errors) });
       }
     }
 
@@ -53,6 +58,8 @@ export function FavoritesView() {
       ignore = true;
       controller.abort();
     };
+    // 쉬운 한국어 사전은 렌더마다 새 객체라 의존성에 넣으면 목록을 계속 다시 부른다. 진입 시 한 번이면 된다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleRemove(companyId: string) {
@@ -66,24 +73,24 @@ export function FavoritesView() {
           : current,
       );
     } catch (caught) {
-      setRemoveError(describeFavoriteError(caught));
+      setRemoveError(describeFavoriteError(caught, m.errors));
     } finally {
       setRemovingId(null);
     }
   }
 
   if (view.status === "loading") {
-    return <LoadingSkeleton label="즐겨찾기 목록을 불러오고 있습니다." />;
+    return <LoadingSkeleton label={m.view.loading} />;
   }
 
   if (view.status === "login-required") {
     return (
       <EmptyState
-        title="로그인이 필요합니다"
-        description="즐겨찾기는 로그인한 사용자만 사용할 수 있습니다."
+        title={m.view.loginTitle}
+        description={m.view.loginDescription}
         action={
           <Link href="/login?next=%2Ffavorites" className="button button-dark">
-            로그인하러 가기
+            {m.view.loginButton}
           </Link>
         }
       />
@@ -93,8 +100,8 @@ export function FavoritesView() {
   if (view.status === "forbidden") {
     return (
       <EmptyState
-        title="일반 사용자 전용 기능입니다"
-        description="즐겨찾기는 구직자·근로자 계정에서만 사용할 수 있습니다."
+        title={m.view.forbiddenTitle}
+        description={m.view.forbiddenDescription}
       />
     );
   }
@@ -106,11 +113,11 @@ export function FavoritesView() {
   if (view.items.length === 0) {
     return (
       <EmptyState
-        title="저장한 관심 사업장이 없습니다"
-        description="사업장을 검색해 마음에 드는 곳을 즐겨찾기에 추가해 보세요."
+        title={m.view.emptyTitle}
+        description={m.view.emptyDescription}
         action={
           <Link href="/companies" className="button button-dark">
-            사업장 찾아보기
+            {m.view.emptyButton}
           </Link>
         }
       />
@@ -132,22 +139,22 @@ export function FavoritesView() {
                 </div>
                 <dl className="company-meta-list">
                   <div>
-                    <dt>지역</dt>
-                    <dd>{item.region ?? "정보 없음"}</dd>
+                    <dt>{m.view.region}</dt>
+                    <dd>{item.region ?? m.view.noInfo}</dd>
                   </div>
                   <div>
-                    <dt>업종</dt>
-                    <dd>{item.industry ?? "정보 없음"}</dd>
+                    <dt>{m.view.industry}</dt>
+                    <dd>{item.industry ?? m.view.noInfo}</dd>
                   </div>
                   <div>
-                    <dt>추가일</dt>
-                    <dd>{formatDate(item.created_at)}</dd>
+                    <dt>{m.view.addedAt}</dt>
+                    <dd>{formatDate(item.created_at, locale)}</dd>
                   </div>
                 </dl>
               </div>
             </div>
             <Link href={`/companies/${encodeURIComponent(item.company_id)}`} className="button button-outline">
-              상세 보기
+              {m.view.details}
             </Link>
             <button
               type="button"
@@ -155,7 +162,7 @@ export function FavoritesView() {
               disabled={removingId === item.company_id}
               onClick={() => void handleRemove(item.company_id)}
             >
-              {removingId === item.company_id ? "처리 중" : "관심 해제"}
+              {removingId === item.company_id ? m.button.pending : m.button.remove}
             </button>
           </article>
         ))}

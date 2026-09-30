@@ -3,6 +3,9 @@
 import { useId } from "react";
 
 import { KOREA_MAP_VIEWBOX, KOREA_REGIONS } from "@/components/company/koreaRegions";
+import { format } from "@/i18n/defineMessages";
+import { useLocale, useMessages } from "@/i18n/LocaleProvider";
+import { companyMessages } from "@/i18n/messages/company";
 
 export interface RegionCount {
   value: string;
@@ -62,6 +65,14 @@ export function RegionMap({
   disabled?: boolean;
 }) {
   const titleId = useId();
+  const locale = useLocale();
+  const cm = useMessages(companyMessages);
+  const m = cm.regionMap;
+  // 한국어 화면은 DB 에 있는 지역 이름을 그대로 보여 준다. 다른 언어는 표시만 번역하고
+  // onSelect 로는 항상 DB 의 한국어 값을 넘긴다.
+  const isKorean = locale === "ko" || locale === "ko-easy";
+  // 한글 두 글자 자리에 들어가는 로마자·태국 문자 이름은 길어서 조금 작게 적는다.
+  const labelStyle = isKorean || locale === "zh" ? undefined : { fontSize: "6px" };
   const levels = regionShadeLevels(counts);
   const total = counts.reduce((sum, entry) => sum + entry.count, 0);
   const regionData = KOREA_REGIONS.map((region) => {
@@ -70,11 +81,14 @@ export function RegionMap({
     const count = matched?.count ?? 0;
     const level = levels.get(regionValue) ?? 0;
     const isSelected = selected === regionValue;
+    const translated = cm.regions[region.name as keyof typeof cm.regions];
+    const displayName = isKorean || !translated ? regionValue : translated.name;
+    const shortName = isKorean || !translated ? region.short : translated.short;
     const label =
       count > 0
-        ? `${regionValue} 사업장 ${count.toLocaleString("ko-KR")}곳`
-        : `${regionValue} 등록된 사업장 없음`;
-    return { region, regionValue, count, level, isSelected, label };
+        ? format(m.countLabel, { region: displayName, count: count.toLocaleString("ko-KR") })
+        : format(m.noneLabel, { region: displayName });
+    return { region, regionValue, count, level, isSelected, label, shortName };
   });
 
   return (
@@ -85,7 +99,7 @@ export function RegionMap({
         role="group"
         aria-labelledby={titleId}
       >
-        <title id={titleId}>지역별 사업장 수 지도. 지역을 고르면 그 지역의 사업장을 보여줍니다.</title>
+        <title id={titleId}>{m.title}</title>
         {/* SVG는 그린 순서대로 위에 덮인다. 도형과 글자를 한 지역씩 묶어 두면
             뒤에 그려지는 이웃 지역의 도형이 앞 지역의 글자를 가린다(충북이
             그랬다). 그래서 도형을 전부 먼저 그리고, 글자는 그 다음에
@@ -113,10 +127,10 @@ export function RegionMap({
             }}
           />
         ))}
-        {regionData.map(({ region, count }) => (
+        {regionData.map(({ region, count, shortName }) => (
           <g key={region.name} className="region-map-label-group">
-            <text className="region-map-label" x={region.labelX} y={region.labelY}>
-              {region.short}
+            <text className="region-map-label" x={region.labelX} y={region.labelY} style={labelStyle}>
+              {shortName}
             </text>
             {count > 0 ? (
               <text className="region-map-count" x={region.labelX} y={region.labelY + 11}>
@@ -128,12 +142,12 @@ export function RegionMap({
       </svg>
 
       <div className="region-map-legend">
-        <span>사업장 적음</span>
+        <span>{m.legendFew}</span>
         <i data-level={1} /><i data-level={2} /><i data-level={3} /><i data-level={4} />
-        <span>많음</span>
+        <span>{m.legendMany}</span>
       </div>
       <p className="region-map-note">
-        지금 조회 가능한 사업장 {total.toLocaleString("ko-KR")}곳
+        {format(m.total, { count: total.toLocaleString("ko-KR") })}
       </p>
     </div>
   );

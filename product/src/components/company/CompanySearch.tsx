@@ -16,12 +16,17 @@ import { getSession } from "@/services/authClient";
 import { getFavorites } from "@/services/favoriteClient";
 import { readApiResponse } from "@/utils/clientApi";
 import { publicClientHeaders } from "@/utils/publicClientId";
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { companyMessages } from "@/i18n/messages/company";
 
+// 추천 검색어는 한국어 사업장명에서 찾는 값이라 번역하지 않는다.
 const RECOMMENDED_QUERIES = ["건설", "한빛", "테크"] as const;
 const EMPTY_FILTERS: CompanySearchFilters = {};
 
 export function CompanySearch() {
   const router = useRouter();
+  const m = useMessages(companyMessages).search;
   const inputId = useId();
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<CompanySearchResponse | null>(null);
@@ -89,7 +94,7 @@ export function CompanySearch() {
     const trimmed = nextQuery.trim();
     const hasFilter = Boolean(nextFilters.region || nextFilters.industry);
     if (trimmed.length < 1 && !hasFilter) {
-      setValidation("사업장명을 한 글자 이상 입력하거나 지도에서 지역을 골라 주세요.");
+      setValidation(m.validationEmpty);
       setResult(null);
       return;
     }
@@ -106,7 +111,7 @@ export function CompanySearch() {
       setAppliedFilters(nextFilters);
     } catch (caught) {
       setResult(null);
-      setError(caught instanceof Error ? caught.message : "검색 결과를 불러오지 못했습니다.");
+      setError(caught instanceof Error ? caught.message : m.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -136,7 +141,7 @@ export function CompanySearch() {
       const response = await fetch("/api/companies/filters", { headers: publicClientHeaders() });
       setFilterOptions(await readApiResponse<CompanyFilterOptions>(response));
     } catch (caught) {
-      setFilterOptionsError(caught instanceof Error ? caught.message : "필터 목록을 불러오지 못했습니다.");
+      setFilterOptionsError(caught instanceof Error ? caught.message : m.filterLoadFailed);
     } finally {
       setFilterOptionsLoading(false);
     }
@@ -152,7 +157,7 @@ export function CompanySearch() {
     // 지도에서 지역만 고른 뒤 업종을 더하는 흐름이 있어 사업장명 없이도 적용한다.
     // 사업장명도 필터도 없으면 search() 가 안내 문구를 띄운다.
     if (!query.trim() && !draftFilters.region && !draftFilters.industry) {
-      setValidation("사업장명을 입력하거나 지역·업종을 하나 이상 골라 주세요.");
+      setValidation(m.validationFilters);
       return;
     }
     setFiltersOpen(false);
@@ -176,7 +181,7 @@ export function CompanySearch() {
     if (!result) return;
     const nextPage = Number(pageDraft);
     if (!Number.isInteger(nextPage) || nextPage < 1 || nextPage > result.total_pages) {
-      setPageValidation(`1부터 ${result.total_pages.toLocaleString("ko-KR")} 사이의 페이지를 입력해 주세요.`);
+      setPageValidation(format(m.pageRange, { max: result.total_pages.toLocaleString("ko-KR") }));
       return;
     }
     setEditingPage(false);
@@ -186,7 +191,7 @@ export function CompanySearch() {
   return (
     <div className="search-workspace">
       <form className="search-form" onSubmit={handleSubmit} noValidate>
-        <label htmlFor={inputId}>회사명 또는 사업장명</label>
+        <label htmlFor={inputId}>{m.label}</label>
         <div className="search-input-row">
           {/* 돋보기를 입력칸 위에 겹쳐 놓으면 글자와 부딪힌다. 테두리를 감싸는
               상자에 돋보기와 입력칸을 나란히 두고, 입력칸 자체는 테두리를 없앤다. */}
@@ -198,7 +203,7 @@ export function CompanySearch() {
               id={inputId}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="예: 건설, 한빛테크"
+              placeholder={m.placeholder}
               aria-describedby={validation ? `${inputId}-error` : `${inputId}-help`}
               aria-invalid={Boolean(validation)}
               autoComplete="off"
@@ -212,11 +217,13 @@ export function CompanySearch() {
               aria-controls={`${inputId}-filters`}
               onClick={toggleFilters}
             >
-              필터{appliedFilters.region || appliedFilters.industry ? ` (${Number(Boolean(appliedFilters.region)) + Number(Boolean(appliedFilters.industry))})` : ""}
+              {appliedFilters.region || appliedFilters.industry
+                ? format(m.filterWithCount, { count: Number(Boolean(appliedFilters.region)) + Number(Boolean(appliedFilters.industry)) })
+                : m.filter}
               <span className="filter-toggle-caret" aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
             </button>
             <button type="submit" className="button button-dark" disabled={loading}>
-              {loading ? "검색 중" : "검색"}
+              {loading ? m.searching : m.submit}
             </button>
           </div>
         </div>
@@ -224,29 +231,29 @@ export function CompanySearch() {
           <div className="search-filter-panel" id={`${inputId}-filters`}>
             <div className="filter-panel-heading">
               <div>
-                <strong>검색 결과 필터</strong>
-                <span>지역과 업종을 선택하면 결과 수와 페이지가 다시 계산됩니다.</span>
+                <strong>{m.filterPanelTitle}</strong>
+                <span>{m.filterPanelHint}</span>
               </div>
               {draftFilters.region || draftFilters.industry ? (
-                <button type="button" className="filter-reset" onClick={clearFilters}>전체 해제</button>
+                <button type="button" className="filter-reset" onClick={clearFilters}>{m.clearAll}</button>
               ) : null}
             </div>
-            {filterOptionsLoading ? <p className="filter-state" role="status">지역·업종 목록을 불러오는 중입니다.</p> : null}
+            {filterOptionsLoading ? <p className="filter-state" role="status">{m.filterLoading}</p> : null}
             {!filterOptionsLoading && filterOptionsError ? (
               <div className="filter-state filter-state-error" role="alert">
                 <span>{filterOptionsError}</span>
-                <button type="button" onClick={() => void loadFilterOptions()}>다시 시도</button>
+                <button type="button" onClick={() => void loadFilterOptions()}>{m.retry}</button>
               </div>
             ) : null}
             {filterOptions ? (
               <div className="filter-controls">
                 <label>
-                  <span>지역</span>
+                  <span>{m.region}</span>
                   <select
                     value={draftFilters.region ?? ""}
                     onChange={(event) => setDraftFilters((current) => ({ ...current, region: event.target.value || undefined }))}
                   >
-                    <option value="">전체 지역</option>
+                    <option value="">{m.allRegions}</option>
                     {filterOptions.regions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.value} ({option.count_label})
@@ -254,16 +261,16 @@ export function CompanySearch() {
                     ))}
                   </select>
                   {filterOptions.regions.length === 0 ? (
-                    <small className="filter-state">등록된 지역 정보가 없어 지역 필터를 적용할 수 없습니다.</small>
+                    <small className="filter-state">{m.noRegions}</small>
                   ) : null}
                 </label>
                 <label>
-                  <span>업종</span>
+                  <span>{m.industry}</span>
                   <select
                     value={draftFilters.industry ?? ""}
                     onChange={(event) => setDraftFilters((current) => ({ ...current, industry: event.target.value || undefined }))}
                   >
-                    <option value="">전체 업종</option>
+                    <option value="">{m.allIndustries}</option>
                     {filterOptions.industries.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.value} ({option.count_label})
@@ -271,11 +278,11 @@ export function CompanySearch() {
                     ))}
                   </select>
                   {filterOptions.industries.length === 0 ? (
-                    <small className="filter-state">등록된 업종 정보가 없어 업종 필터를 적용할 수 없습니다.</small>
+                    <small className="filter-state">{m.noIndustries}</small>
                   ) : null}
                 </label>
                 <button type="button" className="button button-dark filter-apply" disabled={loading} onClick={applyFilters}>
-                  필터 적용
+                  {m.applyFilters}
                 </button>
               </div>
             ) : null}
@@ -287,13 +294,13 @@ export function CompanySearch() {
           </p>
         ) : (
           <p className="field-help" id={`${inputId}-help`}>
-            이름이 같은 사업장이 있을 수 있으니 지역과 업종을 꼭 확인하세요.
+            {m.help}
           </p>
         )}
       </form>
 
-      <div className="demo-query-row" aria-label="추천 검색어">
-        <span>추천 검색어</span>
+      <div className="demo-query-row" aria-label={m.recommended}>
+        <span>{m.recommended}</span>
         {RECOMMENDED_QUERIES.map((value) => (
           <button key={value} type="button" onClick={() => applyRecommendedQuery(value)} disabled={loading}>
             {value}
@@ -302,34 +309,36 @@ export function CompanySearch() {
       </div>
 
       <section className="search-results" aria-live="polite" aria-busy={loading}>
-        {loading ? <LoadingSkeleton label="사업장 후보를 찾고 있습니다." /> : null}
+        {loading ? <LoadingSkeleton label={m.loading} /> : null}
         {!loading && error ? <ErrorState message={error} onRetry={() => void search(query)} /> : null}
         {!loading && !error && result?.items.length === 0 ? (
           <EmptyState
-            title="검색 결과가 없습니다"
-            description="법인명이나 사업장명의 띄어쓰기를 바꾸고, 검색된 지역·업종 단서를 함께 확인해 보세요."
+            title={m.emptyTitle}
+            description={m.emptyDescription}
           />
         ) : null}
         {!loading && !error && result && result.items.length > 0 ? (
           <>
             <div className="result-summary">
               <div>
-                <span className="eyebrow">검색 결과</span>
+                <span className="eyebrow">{m.resultsEyebrow}</span>
                 <h2>
                   {result.query
-                    ? `‘${result.query}’ 관련 사업장 `
-                    : `${[appliedFilters.region, appliedFilters.industry].filter(Boolean).join(" · ")} 사업장 `}
-                  <strong>{result.total.toLocaleString("ko-KR")}{result.total_is_capped ? "+" : ""}</strong>곳
+                    ? format(m.resultsForQuery, { query: result.query })
+                    : format(m.resultsForFilters, {
+                        filters: [appliedFilters.region, appliedFilters.industry].filter(Boolean).join(" · "),
+                      })}
+                  <strong>{result.total.toLocaleString("ko-KR")}{result.total_is_capped ? "+" : ""}</strong>{m.resultsCountSuffix}
                 </h2>
               </div>
-              <p>첫 번째 결과가 자동 선택되지 않습니다.</p>
+              <p>{m.noAutoSelect}</p>
             </div>
             {appliedFilters.region || appliedFilters.industry ? (
-              <div className="applied-filter-row" aria-label="적용 중인 필터">
-                <span>적용 필터</span>
-                {appliedFilters.region ? <strong>지역 · {appliedFilters.region}</strong> : null}
-                {appliedFilters.industry ? <strong>업종 · {appliedFilters.industry}</strong> : null}
-                <button type="button" onClick={clearFilters}>전체 해제</button>
+              <div className="applied-filter-row" aria-label={m.appliedAria}>
+                <span>{m.appliedLabel}</span>
+                {appliedFilters.region ? <strong>{format(m.appliedRegion, { value: appliedFilters.region })}</strong> : null}
+                {appliedFilters.industry ? <strong>{format(m.appliedIndustry, { value: appliedFilters.industry })}</strong> : null}
+                <button type="button" onClick={clearFilters}>{m.clearAll}</button>
               </div>
             ) : null}
             <div className="company-result-list">
@@ -346,14 +355,14 @@ export function CompanySearch() {
               ))}
             </div>
             {result.total_pages > 1 ? (
-              <nav className="search-pagination" aria-label="사업장 검색 결과 페이지">
+              <nav className="search-pagination" aria-label={m.paginationAria}>
                 <button
                   type="button"
                   className="button button-outline"
                   disabled={loading || result.page <= 1}
                   onClick={() => void search(result.query, result.page - 1)}
                 >
-                  ← 이전
+                  {m.prev}
                 </button>
                 <span className="pagination-page">
                   {editingPage ? (
@@ -364,7 +373,7 @@ export function CompanySearch() {
                       max={result.total_pages}
                       step="1"
                       value={pageDraft}
-                      aria-label={`이동할 페이지, 전체 ${result.total_pages}페이지`}
+                      aria-label={format(m.pageInputAria, { total: result.total_pages })}
                       onChange={(event) => setPageDraft(event.target.value)}
                       onBlur={goToDraftPage}
                       onKeyDown={(event) => {
@@ -382,13 +391,13 @@ export function CompanySearch() {
                     <button
                       type="button"
                       className="pagination-current-page"
-                      aria-label={`현재 ${result.page}페이지. 클릭하여 이동할 페이지 입력`}
+                      aria-label={format(m.currentPageAria, { page: result.page })}
                       onClick={startEditingPage}
                     >
                       {result.page}
                     </button>
                   )}
-                  <span>/ {result.total_pages.toLocaleString("ko-KR")} 페이지</span>
+                  <span>{format(m.pageTotal, { total: result.total_pages.toLocaleString("ko-KR") })}</span>
                 </span>
                 <button
                   type="button"
@@ -396,7 +405,7 @@ export function CompanySearch() {
                   disabled={loading || !result.has_more}
                   onClick={() => void search(result.query, result.page + 1)}
                 >
-                  다음 →
+                  {m.next}
                 </button>
               </nav>
             ) : null}
@@ -405,10 +414,8 @@ export function CompanySearch() {
         ) : null}
         {!loading && !error && result === null ? (
           <div className="search-placeholder">
-            <h2>어느 지역부터 볼까요?</h2>
-            <p>지도에서 지역을 고르면 그 지역의 사업장을 바로 보여드립니다.
-            <br />
-            회사명을 알고 있다면 위에서 바로 검색하세요.</p>
+            <h2>{m.mapHeading}</h2>
+            <p>{m.mapIntro1}<br />{m.mapIntro2}</p>
             {filterOptionsError ? (
               <p className="field-error" role="alert">{filterOptionsError}</p>
             ) : filterOptions ? (
@@ -419,7 +426,7 @@ export function CompanySearch() {
                 disabled={loading}
               />
             ) : (
-              <p className="muted-text">지역별 사업장 수를 불러오는 중입니다.</p>
+              <p className="muted-text">{m.mapLoading}</p>
             )}
           </div>
         ) : null}

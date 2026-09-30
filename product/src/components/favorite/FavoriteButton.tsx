@@ -5,7 +5,14 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { FavoriteEligibility } from "@/components/favorite/favoriteAuth";
 import { performFavoriteToggle } from "@/components/favorite/favoriteAuth";
-import { describeFavoriteError, favoriteErrorRequiresLogin } from "@/components/favorite/favoriteErrorMessage";
+import {
+  describeFavoriteError,
+  favoriteErrorRequiresLogin,
+  localizeFavoriteReason,
+} from "@/components/favorite/favoriteErrorMessage";
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { favoriteMessages } from "@/i18n/messages/favorite";
 
 interface FavoriteButtonProps {
   companyId: string;
@@ -27,6 +34,7 @@ export function FavoriteButton({
   onChange,
 }: FavoriteButtonProps) {
   const pathname = usePathname();
+  const m = useMessages(favoriteMessages);
   const [isFavorite, setIsFavorite] = useState(initialIsFavorite);
   // 부모는 즐겨찾기 목록을 비동기로 불러와 initialIsFavorite 를 나중에 true 로 바꾼다.
   // useState 초기값은 처음 한 번만 쓰이므로, 값이 바뀌면 렌더 중에 따라간다.
@@ -45,14 +53,14 @@ export function FavoriteButton({
     try {
       const result = await performFavoriteToggle(companyId, isFavorite, eligibility);
       if (result.status === "blocked") {
-        setError(result.reason);
+        setError({ ...result.reason, message: localizeFavoriteReason(result.reason.message, m.errors) });
         return;
       }
       setIsFavorite(result.isFavorite);
       onChange?.(companyId, result.isFavorite);
     } catch (caught) {
       setError({
-        message: describeFavoriteError(caught),
+        message: describeFavoriteError(caught, m.errors),
         requiresLogin: favoriteErrorRequiresLogin(caught),
       });
     } finally {
@@ -67,10 +75,10 @@ export function FavoriteButton({
         className={["button", isFavorite ? "button-outline" : "button-dark", className].filter(Boolean).join(" ")}
         disabled={pending}
         aria-pressed={isFavorite}
-        aria-label={`${companyName} ${isFavorite ? "관심 해제" : "관심 사업장 추가"}`}
+        aria-label={format(m.button.aria, { name: companyName, action: isFavorite ? m.button.remove : m.button.add })}
         onClick={() => void handleClick()}
       >
-        {pending ? "처리 중" : isFavorite ? "관심 해제" : "관심 사업장 추가"}
+        {pending ? m.button.pending : isFavorite ? m.button.remove : m.button.add}
       </button>
       {error ? (
         <p className="field-error" role="alert">
@@ -78,7 +86,7 @@ export function FavoriteButton({
           {error.requiresLogin ? (
             <>
               {" "}
-              <Link href={`/login?next=${encodeURIComponent(pathname)}`}>로그인하기</Link>
+              <Link href={`/login?next=${encodeURIComponent(pathname)}`}>{m.button.login}</Link>
             </>
           ) : null}
         </p>

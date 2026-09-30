@@ -6,6 +6,11 @@ import { type FormEvent, useId, useState } from "react";
 import { AuthApiError, login } from "@/services/authClient";
 import { hasGuestConversation } from "@/services/guestConversationClient";
 import type { ErrorDetail } from "@/utils/errors";
+import { format, type MessageShape } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { authMessages } from "@/i18n/messages/auth";
+
+type AuthErrorMessages = MessageShape<typeof authMessages.ko>["errors"];
 
 interface FieldErrors {
   email?: string;
@@ -53,7 +58,8 @@ export function resolveLoginRedirect(options: { hasGuestConversation: boolean; n
 }
 
 // 로그인 자체 실패의 원인은 노출하지 않는다 — 계정 존재 여부가 드러나면 안 된다.
-export function submitErrorMessage(error: AuthApiError): string {
+// 서버 문구(error.message)는 받은 그대로 두고, 화면이 만드는 문구만 현재 언어 사전에서 고른다.
+export function submitErrorMessage(error: AuthApiError, m: AuthErrorMessages = authMessages.ko.errors): string {
   switch (error.code) {
     case "VALIDATION_ERROR":
     case "INVALID_CREDENTIALS":
@@ -66,16 +72,19 @@ export function submitErrorMessage(error: AuthApiError): string {
       const minutes = error.retryAfterSeconds === null ? null : Math.ceil(error.retryAfterSeconds / 60);
       return minutes === null
         ? error.message
-        : `로그인 시도가 너무 많습니다. ${minutes}분 후 다시 시도해 주세요.`;
+        : format(m.locked, { minutes });
     }
     default:
       return error.retryable
-        ? "인증 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."
-        : "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+        ? m.unavailable
+        : m.failed;
   }
 }
 
 export function LoginForm() {
+  const messages = useMessages(authMessages);
+  const f = messages.fields;
+  const m = messages.login;
   const router = useRouter();
   const fieldId = useId();
   const [email, setEmail] = useState("");
@@ -87,10 +96,10 @@ export function LoginForm() {
   function validate(): FieldErrors {
     const errors: FieldErrors = {};
     if (!EMAIL_PATTERN.test(email.trim())) {
-      errors.email = "올바른 이메일 형식을 입력해 주세요.";
+      errors.email = f.emailInvalid;
     }
     if (password.length < 1) {
-      errors.password = "비밀번호를 입력해 주세요.";
+      errors.password = f.passwordRequired;
     }
     return errors;
   }
@@ -118,40 +127,40 @@ export function LoginForm() {
     } catch (caught) {
       setSubmitting(false);
       if (caught instanceof AuthApiError) {
-        setSubmitError({ code: caught.code, message: submitErrorMessage(caught), details: caught.details });
+        setSubmitError({ code: caught.code, message: submitErrorMessage(caught, messages.errors), details: caught.details });
         return;
       }
       setSubmitError({
         code: "NETWORK_ERROR",
-        message: "네트워크 문제로 로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        message: messages.errors.loginNetwork,
       });
     }
   }
 
   return (
     <form className="search-form" onSubmit={handleSubmit} noValidate>
-      <label htmlFor={`${fieldId}-email`}>이메일</label>
+      <label htmlFor={`${fieldId}-email`}>{f.email}</label>
       <input
         id={`${fieldId}-email`}
         type="email"
         value={email}
         disabled={submitting}
         autoComplete="email"
-        placeholder="이메일을 입력해 주세요"
+        placeholder={f.emailPlaceholder}
         aria-invalid={Boolean(fieldErrors.email)}
         aria-describedby={fieldErrors.email ? `${fieldId}-email-error` : undefined}
         onChange={(event) => setEmail(event.target.value)}
       />
       {fieldErrors.email ? <p className="field-error" id={`${fieldId}-email-error`} role="alert">{fieldErrors.email}</p> : null}
 
-      <label htmlFor={`${fieldId}-password`}>비밀번호</label>
+      <label htmlFor={`${fieldId}-password`}>{f.password}</label>
       <input
         id={`${fieldId}-password`}
         type="password"
         value={password}
         disabled={submitting}
         autoComplete="current-password"
-        placeholder="비밀번호를 입력해 주세요"
+        placeholder={f.passwordPlaceholder}
         aria-invalid={Boolean(fieldErrors.password)}
         aria-describedby={fieldErrors.password ? `${fieldId}-password-error` : undefined}
         onChange={(event) => setPassword(event.target.value)}
@@ -160,7 +169,7 @@ export function LoginForm() {
 
       <div className="contract-actions">
         <button type="submit" className="button button-dark" disabled={submitting}>
-          {submitting ? "로그인 중" : "로그인"}
+          {submitting ? m.submitting : m.submit}
         </button>
       </div>
 
@@ -180,7 +189,7 @@ export function LoginForm() {
       ) : null}
 
       <p className="field-help">
-        아직 계정이 없으신가요? <Link href="/signup">회원가입</Link>
+        {m.noAccount} <Link href="/signup">{m.signupLink}</Link>
       </p>
     </form>
   );
