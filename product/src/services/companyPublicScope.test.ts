@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { publicCountBand, searchCompanies } from "@/services/companyService";
+import { getCompanyFilterOptions, searchCompanies } from "@/services/companyService";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -27,10 +27,11 @@ describe("public company search request bounds", () => {
     await expect(searchCompanies("회사", 20, 100)).resolves.toMatchObject({ page: 100 });
   });
 
-  it.each([
-    [0, 0, "0"], [1, 1, "1–9"], [49, 10, "10–49"],
-    [99, 50, "50–99"], [499, 100, "100–499"], [999, 500, "500–999"], [1_000, 1_000, "1,000+"],
-  ] as const)("publishes count %i as a range", (raw, count, label) => {
-    expect(publicCountBand(raw)).toEqual({ count, count_label: label });
+  it("publishes exact filter counts and the exact total", async () => {
+    vi.stubEnv("APP_DATA_MODE", "mock");
+    const options = await getCompanyFilterOptions();
+    expect(options.total).toBe(9);
+    expect(options.regions.reduce((sum, entry) => sum + entry.count, 0)).toBe(9);
+    expect(options.regions[0]).toEqual({ value: "서울특별시", count: 1 });
   });
 });

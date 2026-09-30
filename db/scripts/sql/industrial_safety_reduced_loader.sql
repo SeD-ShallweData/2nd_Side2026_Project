@@ -633,9 +633,9 @@ $loader$;
     IF EXISTS (
       (SELECT firm_id, name, biz_no, sido, industry FROM stg_firms_snapshot
        EXCEPT
-       SELECT firm_id, name, biz_no, sido, industry FROM public.firms)
+       SELECT firm_id, name, biz_no, COALESCE(sido_source,sido), industry FROM public.firms)
       UNION ALL
-      (SELECT firm_id, name, biz_no, sido, industry FROM public.firms
+      (SELECT firm_id, name, biz_no, COALESCE(sido_source,sido), industry FROM public.firms
        EXCEPT
        SELECT firm_id, name, biz_no, sido, industry FROM stg_firms_snapshot)
     ) THEN
@@ -656,7 +656,7 @@ $loader$;
       SELECT 1
       FROM stg_firm_results AS staged
       LEFT JOIN public.firms AS firm ON firm.firm_id = staged.firm_id
-      LEFT JOIN stg_sido_map AS sido_map ON sido_map.source_sido = firm.sido
+      LEFT JOIN stg_sido_map AS sido_map ON sido_map.source_sido = COALESCE(firm.sido_source,firm.sido)
       WHERE staged.run_code IS DISTINCT FROM 'nps_existing_firm_prediction'
          OR staged.firm_id IS NULL
          OR staged.firm_id !~ '^[0-9a-f]{16}$'

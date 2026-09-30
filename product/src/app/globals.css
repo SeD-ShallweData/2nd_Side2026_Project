@@ -4856,12 +4856,18 @@ summary:focus-visible {
 .region-map-area[data-level="2"] { fill: #ffe98a; }
 .region-map-area[data-level="3"] { fill: #ffd600; }
 .region-map-area[data-level="4"] { fill: #e0b800; }
+.region-map-area[data-combined="true"] { stroke: none; }
 
 /* 자료가 있는 지역만 누를 수 있다. 없는 지역은 커서도 바뀌지 않는다. */
 .region-map-area:not([aria-disabled="true"]) { cursor: pointer; }
 .region-map-area:not([aria-disabled="true"]):hover { fill: var(--brand-deep); }
 .region-map-area:focus-visible { outline: 0; stroke: var(--ink); stroke-width: 2.4; }
 .region-map-area[data-selected="true"] { stroke: var(--ink); stroke-width: 2.4; }
+.region-map-area[data-combined="true"]:focus-visible,
+.region-map-area[data-combined="true"][data-selected="true"] {
+  stroke: none;
+  filter: drop-shadow(0 0 1px var(--ink));
+}
 
 .region-map-label {
   fill: var(--ink);

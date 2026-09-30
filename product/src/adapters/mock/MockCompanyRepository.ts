@@ -9,6 +9,7 @@ import type {
 import { MOCK_COMPANIES } from "@/mocks/companies";
 import { ServiceError } from "@/utils/errors";
 import { normalizeSearchText } from "@/utils/text";
+import { canonicalRegion } from "@/domain/region";
 
 interface Match {
   matchedName: string;
@@ -58,7 +59,7 @@ export class MockCompanyRepository implements CompanyRepository {
 
     return MOCK_COMPANIES.map((company) => ({ company, match: findMatch(company, query) }))
       .filter((entry): entry is { company: Company; match: Match } => entry.match !== null)
-      .filter(({ company }) => !filters.region || company.region === filters.region)
+      .filter(({ company }) => !filters.region || (company.region && canonicalRegion(company.region) === canonicalRegion(filters.region)))
       .filter(({ company }) => !filters.industry || company.industry === filters.industry)
       .sort((a, b) => a.match.rank - b.match.rank || a.company.company_name.localeCompare(b.company.company_name, "ko"));
   }
@@ -75,7 +76,7 @@ export class MockCompanyRepository implements CompanyRepository {
         company_id: company.company_id,
         company_name: company.company_name,
         address: company.address,
-        region: company.region,
+        region: company.region ? canonicalRegion(company.region) : null,
         industry: company.industry,
         size_label: company.size_label,
         matched_name: match.matchedName,
@@ -87,17 +88,17 @@ export class MockCompanyRepository implements CompanyRepository {
     return this.matches(query, filters).length;
   }
 
-  async listFilterOptions(): Promise<CompanyFilterOptions> {
+  async listFilterOptions(): Promise<Omit<CompanyFilterOptions, "total">> {
     function summarize(values: Array<string | null>) {
       const counts = new Map<string, number>();
       for (const value of values) {
         if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
       }
-      return [...counts.entries()].map(([value, count]) => ({ value, count, count_label: String(count) }));
+      return [...counts.entries()].map(([value, count]) => ({ value, count }));
     }
 
     return {
-      regions: summarize(MOCK_COMPANIES.map((company) => company.region))
+      regions: summarize(MOCK_COMPANIES.map((company) => company.region ? canonicalRegion(company.region) : null))
         .sort((a, b) => a.value.localeCompare(b.value, "ko")),
       industries: summarize(MOCK_COMPANIES.map((company) => company.industry))
         .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value, "ko")),
@@ -105,6 +106,7 @@ export class MockCompanyRepository implements CompanyRepository {
   }
 
   async getById(companyId: string): Promise<Company | null> {
-    return MOCK_COMPANIES.find((company) => company.company_id === companyId) ?? null;
+    const company = MOCK_COMPANIES.find((item) => item.company_id === companyId);
+    return company ? { ...company, region: company.region ? canonicalRegion(company.region) : null } : null;
   }
 }

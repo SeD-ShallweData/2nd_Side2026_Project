@@ -97,7 +97,9 @@ acceptance 기준선은 다음과 같다. 네 결과 집합은 서로
 3. 이 원본 이름·번호로 계산한 candidate `firm_id`가 `public.firms.firm_id`와 같다.
 4. source 원본 이름과 `firms.name`이 정확히 같다.
 5. source 번호 앞 6자리와 `firms.biz_no`가 정확히 같다.
-6. source 시도와 canonicalized `firms.sido`가 정확히 같다.
+6. source 시도와 canonicalized `firms.sido_source`가 정확히 같다.
+   `sido_source`가 없는 이관 전 행은 `firms.sido`를 사용한다.
+   공개용 통합 시도명만으로 구 광주·전남의 일치 판정을 넓히지 않는다.
 7. source 업종명과 `firms.industry`가 정확히 같다.
 8. 최종 source와 target이 모두 run 안에서 1:1이다.
 

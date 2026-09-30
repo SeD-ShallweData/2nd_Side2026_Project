@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import { KOREA_MAP_VIEWBOX, KOREA_REGIONS } from "@/components/company/koreaRegions";
-import { regionShadeLevels, resolveRegionValue } from "@/components/company/RegionMap";
+import { RegionMap, regionShadeLevels, resolveRegionValue } from "@/components/company/RegionMap";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
 
 describe("지역 경계 자료", () => {
-  it("17개 시·도를 모두 담는다", () => {
-    expect(KOREA_REGIONS).toHaveLength(17);
+  it("통합 이후 16개 광역 지역을 모두 담는다", () => {
+    expect(KOREA_REGIONS).toHaveLength(16);
     const names = KOREA_REGIONS.map((region) => region.name);
-    expect(new Set(names).size).toBe(17);
+    expect(new Set(names).size).toBe(16);
     expect(names).toContain("서울특별시");
     expect(names).toContain("제주특별자치도");
+    expect(names).toContain("전남광주통합특별시");
+    expect(names).not.toContain("광주광역시");
+    expect(names).not.toContain("전라남도");
   });
 
   it("모든 지역이 그릴 수 있는 path 와 지도 안쪽 라벨 위치를 갖는다", () => {
@@ -20,14 +26,14 @@ describe("지역 경계 자료", () => {
       expect(region.labelX).toBeLessThan(KOREA_MAP_VIEWBOX.width);
       expect(region.labelY).toBeGreaterThan(0);
       expect(region.labelY).toBeLessThan(KOREA_MAP_VIEWBOX.height);
-      expect(region.short.length).toBeLessThanOrEqual(2);
+      expect(region.short.length).toBeLessThanOrEqual(4);
     }
   });
 });
 
 describe("DB 지역명 맞추기", () => {
   it("이름이 바뀐 지역을 별칭으로 찾는다", () => {
-    const gangwon = KOREA_REGIONS.find((region) => region.name === "강원도")!;
+    const gangwon = KOREA_REGIONS.find((region) => region.name === "강원특별자치도")!;
     const matched = resolveRegionValue(gangwon, [{ value: "강원특별자치도", count: 7 }]);
 
     // 2018년 경계 자료는 '강원도', DB 는 2023년 개칭 후 '강원특별자치도' 다.
@@ -35,9 +41,22 @@ describe("DB 지역명 맞추기", () => {
   });
 
   it("옛 이름이 그대로 들어 있어도 찾는다", () => {
-    const jeonbuk = KOREA_REGIONS.find((region) => region.name === "전라북도")!;
+    const jeonbuk = KOREA_REGIONS.find((region) => region.name === "전북특별자치도")!;
     expect(resolveRegionValue(jeonbuk, [{ value: "전라북도", count: 3 }])?.count).toBe(3);
     expect(resolveRegionValue(jeonbuk, [{ value: "전북특별자치도", count: 4 }])?.count).toBe(4);
+    expect(resolveRegionValue(jeonbuk, [
+      { value: "전라북도", count: 3 },
+      { value: "전북특별자치도", count: 4 },
+    ])).toEqual({ value: "전북특별자치도", count: 7 });
+  });
+
+  it("구 광주와 전남의 건수를 한 지역으로 더한다", () => {
+    const combined = KOREA_REGIONS.find((region) => region.name === "전남광주통합특별시")!;
+    expect(resolveRegionValue(combined, [
+      { value: "광주광역시", count: 12 },
+      { value: "전라남도", count: 20 },
+      { value: "전남광주통합특별시", count: 8 },
+    ])).toEqual({ value: "전남광주통합특별시", count: 40 });
   });
 
   it("자료가 없는 지역은 찾지 못한다", () => {
@@ -47,6 +66,37 @@ describe("DB 지역명 맞추기", () => {
 });
 
 describe("사업장 수 진하기", () => {
+  it("영어 화면에서도 통합 지역 합계와 API의 정확한 총수를 유지한다", () => {
+    const markup = renderToStaticMarkup(
+      LocaleProvider({
+        locale: "en",
+        children: createElement(RegionMap, {
+          counts: [
+            { value: "광주광역시", count: 1200 },
+            { value: "전라남도", count: 34 },
+            { value: "서울특별시", count: 5 },
+          ],
+          total: 3456,
+          onSelect: () => {},
+        }),
+      }),
+    );
+    expect(markup).toContain(">Seoul</text>");
+    expect(markup).toContain(">전남광주</text>");
+    expect(markup).toContain("전남광주통합특별시: 1,234 workplaces");
+    expect(markup).toContain("3,456 workplaces available now");
+  });
+  it("지도에는 통합 지역 약칭과 실제 총수를 보여준다", () => {
+    const markup = renderToStaticMarkup(
+      createElement(RegionMap, { counts: [{ value: "전남광주통합특별시", count: 1234 }], total: 3456, onSelect: () => {} }),
+    );
+    expect(markup).toContain(">전남광주</text>");
+    expect(markup).not.toContain(">전남광주통합특별시</text>");
+    expect(markup).toContain("전남광주통합특별시");
+    expect(markup).toContain("1,234");
+    expect(markup).toContain("3,456");
+    expect(markup).not.toContain("광주광역시</text>");
+  });
   it("사업장이 없는 지역은 단계를 받지 않는다", () => {
     const levels = regionShadeLevels([
       { value: "서울특별시", count: 5 },
