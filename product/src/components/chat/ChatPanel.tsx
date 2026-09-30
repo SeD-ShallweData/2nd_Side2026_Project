@@ -56,7 +56,7 @@ const GUIDE_GROUPS = [
 ] as const;
 
 const CONTRACT_FILE_TYPES = ["application/pdf", "image/png", "image/jpeg"];
-const MAX_CONTRACT_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_CONTRACT_FILE_SIZE = 15 * 1024 * 1024;
 
 interface UiMessage {
   id: string;

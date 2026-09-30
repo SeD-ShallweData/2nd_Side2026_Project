@@ -222,7 +222,7 @@ describe("계약서 검증과 Mock 결과", () => {
     ).toThrow("PDF, PNG, JPG");
   });
 
-  it("10MB를 초과한 파일을 차단한다", () => {
+  it("15MB를 초과한 파일을 차단한다", () => {
     expect(() =>
       validateContractRequest({
         file_metadata: {
@@ -231,7 +231,7 @@ describe("계약서 검증과 Mock 결과", () => {
           size_bytes: MAX_CONTRACT_SIZE + 1,
         },
       }),
-    ).toThrow("10MB 이하");
+    ).toThrow("15MB 이하");
   });
 
   it("누락 항목이 없는 Mock 결과를 제공한다", async () => {

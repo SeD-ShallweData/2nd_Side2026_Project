@@ -32,7 +32,7 @@ function rememberReviewForChat(result: ContractReviewResult): boolean {
     return false;
   }
 }
-const MAX_SIZE = 10 * 1024 * 1024;
+const MAX_SIZE = 15 * 1024 * 1024;
 
 /** 상담 입력창에 미리 채울 질문. 공백은 +로 둔다. */
 function chatPromptQuery(prompt: string): string {

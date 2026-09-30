@@ -176,7 +176,7 @@ export const chatMessages = defineMessages({
       guestImportFailed: "익명 상담을 가져오지 못했습니다.",
       guestDeleted: "익명 상담 임시 기록을 삭제했습니다.",
       fileTypeInvalid: "계약서는 PDF, PNG, JPG 파일만 선택할 수 있습니다.",
-      fileTooLarge: "계약서 파일은 10MB 이하여야 합니다.",
+      fileTooLarge: "계약서 파일은 15MB 이하여야 합니다.",
     },
     topbar: {
       dualCompare: "Upstage·SKT 답변 비교",
@@ -242,7 +242,7 @@ export const chatMessages = defineMessages({
     upload: {
       attach: "상담에 계약서 첨부",
       selected: "{file} · 전송 후 선택 해제",
-      hint: "선택 사항 · 최대 10MB",
+      hint: "선택 사항 · 최대 15MB",
     },
     input: {
       label: "상담 질문",
@@ -475,7 +475,7 @@ export const chatMessages = defineMessages({
       guestImportFailed: "Could not import the anonymous consultation.",
       guestDeleted: "The temporary anonymous consultation record was deleted.",
       fileTypeInvalid: "Only PDF, PNG and JPG files can be selected for a contract.",
-      fileTooLarge: "The contract file must be 10MB or smaller.",
+      fileTooLarge: "The contract file must be 15MB or smaller.",
     },
     topbar: {
       dualCompare: "Upstage·SKT answer comparison",
@@ -541,7 +541,7 @@ export const chatMessages = defineMessages({
     upload: {
       attach: "Attach a contract",
       selected: "{file} · cleared after sending",
-      hint: "Optional · up to 10MB",
+      hint: "Optional · up to 15MB",
     },
     input: {
       label: "Consultation question",
@@ -726,7 +726,7 @@ export const chatMessages = defineMessages({
       guestImportFailed: "未能导入匿名咨询。",
       guestDeleted: "已删除匿名咨询的临时记录。",
       fileTypeInvalid: "合同只能选择 PDF、PNG、JPG 文件。",
-      fileTooLarge: "合同文件必须在 10MB 以下。",
+      fileTooLarge: "合同文件必须在 15MB 以下。",
     },
     topbar: {
       dualCompare: "Upstage·SKT 回答比较",
@@ -792,7 +792,7 @@ export const chatMessages = defineMessages({
     upload: {
       attach: "在咨询中附上合同",
       selected: "{file} · 发送后取消选择",
-      hint: "可选 · 最大 10MB",
+      hint: "可选 · 最大 15MB",
     },
     input: {
       label: "咨询问题",
@@ -977,7 +977,7 @@ export const chatMessages = defineMessages({
       guestImportFailed: "Không nhập được buổi tư vấn ẩn danh.",
       guestDeleted: "Đã xóa bản lưu tạm của buổi tư vấn ẩn danh.",
       fileTypeInvalid: "Chỉ có thể chọn tệp hợp đồng dạng PDF, PNG, JPG.",
-      fileTooLarge: "Tệp hợp đồng phải từ 10MB trở xuống.",
+      fileTooLarge: "Tệp hợp đồng phải từ 15MB trở xuống.",
     },
     topbar: {
       dualCompare: "So sánh câu trả lời Upstage·SKT",
@@ -1043,7 +1043,7 @@ export const chatMessages = defineMessages({
     upload: {
       attach: "Đính kèm hợp đồng vào buổi tư vấn",
       selected: "{file} · bỏ chọn sau khi gửi",
-      hint: "Không bắt buộc · tối đa 10MB",
+      hint: "Không bắt buộc · tối đa 15MB",
     },
     input: {
       label: "Câu hỏi tư vấn",
@@ -1228,7 +1228,7 @@ export const chatMessages = defineMessages({
       guestImportFailed: "นำเข้าการปรึกษาแบบไม่ระบุตัวตนไม่สำเร็จ",
       guestDeleted: "ลบบันทึกชั่วคราวของการปรึกษาแบบไม่ระบุตัวตนแล้ว",
       fileTypeInvalid: "เลือกไฟล์สัญญาได้เฉพาะ PDF, PNG, JPG",
-      fileTooLarge: "ไฟล์สัญญาต้องมีขนาดไม่เกิน 10MB",
+      fileTooLarge: "ไฟล์สัญญาต้องมีขนาดไม่เกิน 15MB",
     },
     topbar: {
       dualCompare: "เปรียบเทียบคำตอบ Upstage·SKT",
@@ -1294,7 +1294,7 @@ export const chatMessages = defineMessages({
     upload: {
       attach: "แนบสัญญาในการปรึกษา",
       selected: "{file} · ยกเลิกการเลือกหลังส่ง",
-      hint: "ไม่บังคับ · สูงสุด 10MB",
+      hint: "ไม่บังคับ · สูงสุด 15MB",
     },
     input: {
       label: "คำถามปรึกษา",
