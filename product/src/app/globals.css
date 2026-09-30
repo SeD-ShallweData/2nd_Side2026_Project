@@ -5099,6 +5099,15 @@ summary:focus-visible {
 .ml-ops-cuts input { width: 5.5rem; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--white); color: var(--ink); padding: 6px 8px; font-size: .78rem; font-weight: 800; text-align: right; }
 
 .ml-ops-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ml-ops-server-notice { margin: 0 0 14px; border-radius: 10px; background: var(--info-bg); color: var(--info); padding: 10px 12px; font-size: .76rem; line-height: 1.6; }
+.ml-ops-server-notice strong { color: var(--inspector-navy); }
+.ml-ops-tag { display: inline-flex; margin-left: 6px; border: 1px dashed var(--line-strong); border-radius: 999px; background: var(--white); color: var(--muted); padding: 2px 8px; font-size: .62rem; font-weight: 850; vertical-align: middle; }
+.ml-ops-tag.is-live { border-style: solid; border-color: var(--inspector-navy); background: var(--inspector-navy); color: var(--white); }
+.ml-ops-card.is-live { border-color: var(--inspector-navy); background: var(--white); }
+.ml-ops-card.is-design { border-style: dashed; }
+.ml-ops-select { display: grid; gap: 5px; margin: 0 0 12px; color: var(--ink-soft); font-size: .72rem; font-weight: 750; }
+.ml-ops-select select { width: 100%; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--white); color: var(--ink); padding: 8px 10px; font-size: .78rem; }
+.ml-ops-card .ops-reason-form, .ml-ops-card .ops-notice { margin: 0 0 12px; }
 .ml-ops-log { display: grid; gap: 4px; margin: 16px 0 0; border-top: 1px solid var(--line); padding: 12px 0 0 18px; color: var(--muted); font-size: .72rem; }
 
 /* ── 프롬프트 화면 ─────────────────────────────────────── */
@@ -5154,6 +5163,53 @@ summary:focus-visible {
 .batch-mode-label { justify-self: start; border-radius: 999px; background: var(--watch-bg); color: var(--watch); padding: 3px 9px; font-size: .66rem; font-weight: 850; }
 .batch-mode-card.is-pinned .batch-mode-label { background: var(--inspector-navy); color: var(--white); }
 .batch-switch-button { padding: 6px 10px; font-size: .72rem; white-space: nowrap; }
+
+/* ── 배치 현황 정의서 항목: 드리프트(수동 기입)·도메인별 현황(합산 금지) ─────── */
+.batch-drift-card, .batch-domain-card { border: 1px solid var(--line); border-radius: 12px; background: var(--white); padding: 16px; }
+.batch-drift-card { display: grid; gap: 10px; margin-bottom: 14px; }
+.batch-drift-card header, .batch-domain-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.batch-drift-card h2 { margin: 4px 0 0; color: var(--inspector-navy); font-size: .95rem; }
+.batch-manual-badge { border: 1px dashed var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink-soft); padding: 3px 9px; font-size: .68rem; font-weight: 850; }
+.batch-drift-result { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: .8rem; color: var(--ink-soft); }
+.batch-drift-result code { color: var(--muted); font-size: .7rem; }
+.batch-drift-badge { border-radius: 999px; padding: 3px 10px; font-size: .72rem; font-weight: 850; }
+.batch-drift-badge.is-ok { background: var(--info-bg); color: var(--info); }
+.batch-drift-badge.is-mismatch { background: var(--review-bg); color: var(--review); }
+.batch-drift-facts, .batch-domain-facts { display: grid; gap: 6px; margin: 0; }
+.batch-drift-facts { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+.batch-drift-facts dt, .batch-domain-facts dt { color: var(--muted); font-size: .68rem; font-weight: 750; }
+.batch-drift-facts dd, .batch-domain-facts dd { margin: 2px 0 0; color: var(--ink); font-size: .78rem; font-weight: 750; overflow-wrap: anywhere; }
+.batch-domain-facts small { display: block; color: var(--muted); font-size: .66rem; font-weight: 600; }
+.batch-warning-line { margin: 0; border-radius: 8px; background: var(--watch-bg); color: var(--ink-soft); padding: 8px 10px; font-size: .74rem; font-weight: 750; line-height: 1.55; }
+.batch-muted-line { margin: 0; color: var(--muted); font-size: .7rem; line-height: 1.55; }
+.batch-unverifiable-line { margin: 0; border: 1px dashed var(--line-strong); border-radius: 8px; color: var(--ink-soft); padding: 8px 10px; font-size: .74rem; line-height: 1.55; }
+.batch-note-list { margin: 0; padding-left: 18px; color: var(--ink-soft); font-size: .72rem; line-height: 1.6; }
+.batch-domain-panel { margin-bottom: 14px; }
+.batch-no-sum-notice { margin: 0 0 10px; border-left: 4px solid var(--inspector-navy); border-radius: 8px; background: var(--surface); color: var(--ink-soft); padding: 9px 12px; font-size: .76rem; line-height: 1.55; }
+.batch-no-sum-notice strong { margin-right: 6px; color: var(--inspector-navy); }
+.batch-domain-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 14px; }
+.batch-domain-card { display: grid; gap: 12px; align-content: start; }
+.batch-domain-card h3 { margin: 0; color: var(--inspector-navy); font-size: 1rem; }
+.batch-domain-card h4 { margin: 0 0 6px; color: var(--ink-soft); font-size: .74rem; font-weight: 850; }
+.batch-domain-card section { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
+.batch-check-badge { border-radius: 999px; padding: 3px 9px; font-size: .68rem; font-weight: 850; }
+.batch-check-badge.is-stale { background: var(--watch-bg); color: var(--ink); border: 1px solid var(--line-strong); }
+.batch-check-badge.is-current { background: var(--info-bg); color: var(--info); }
+.batch-check-badge.is-unverifiable { border: 1px dashed var(--line-strong); color: var(--muted); }
+.batch-domain-count { display: grid; gap: 2px; margin: 0; }
+.batch-domain-count strong { color: var(--inspector-navy); font-size: .95rem; }
+.batch-domain-count small { color: var(--muted); font-size: .68rem; }
+.batch-grade-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.batch-grade-list li { display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 2px 10px; font-size: .76rem; }
+.batch-grade-list li span { color: var(--ink-soft); font-weight: 750; }
+.batch-grade-list li strong { color: var(--ink); }
+.batch-grade-list li small { color: var(--muted); font-size: .68rem; }
+.batch-grade-list li i { grid-column: 1 / -1; display: block; height: 6px; border-radius: 999px; background: var(--surface); overflow: hidden; }
+.batch-grade-list li em { display: block; height: 100%; background: var(--watch); }
+/* 임금체불: 회색 계열만. 초록(긍정) 없음, "안전 신호 미확인"은 회색, "분석 자료 부족"은 옅은 빗금. */
+.batch-grade-list li.tone-insufficient em { background: repeating-linear-gradient(45deg, var(--line-strong) 0 4px, var(--surface) 4px 8px); }
+.batch-domain-card.is-wage .batch-grade-list li.tone-priority em { background: var(--review); }
+.batch-domain-card.is-safety .batch-grade-list li.tone-priority em { background: var(--inspector-navy); }
 
 @media (max-width: 900px) {
   .prompt-studio-layout { grid-template-columns: 1fr; }

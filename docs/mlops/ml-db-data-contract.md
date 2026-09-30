@@ -714,6 +714,59 @@ db/config/industrial_safety_sources.v1.json   (원본 위치 registry)
 
 ---
 
+## 15. 운영 명령(화면→ML) — 반대 방향 계약
+
+> **2026-09-30 추가.** 1~14절은 ML→DB 방향만 정의한다. 이 절은 운영 관리자 화면이 ML·배치 쪽에
+> 내리는 지시(화면→ML)를 적는다. **구현된 것과 설계만 있는 것을 섞지 않는다.**
+
+### 15.1 한눈에
+
+| 명령 | 상태 | 화면 | 서버 경로 | 기록 |
+| --- | --- | --- | --- | --- |
+| 서비스 배치 고정(승인) | ✅ **구현** | `/inspector/batches`, `/admin/batches`, ML 대시보드 「모델 운영 → 배치 승인」 | `POST /api/admin/batches/{batchId}/activate` → `ops_activate_batch` | `ops_audit_log` `batch.activate` |
+| 고정 해제(자동 복귀) | ✅ **구현** | 위와 같음 | `POST /api/admin/batches/deactivate` → `ops_deactivate_batches` | `ops_audit_log` `batch.auto` |
+| 등급 임계값 변경 | 📝 **설계안 · 미구현** | 「모델 운영 → 등급 임계값」 버튼 비활성 | 없음 | 없음 |
+| 재학습 요청 | 📝 **설계안 · 미구현** | 「모델 운영 → 재학습」 버튼 비활성 | 없음 | 없음 |
+
+화면은 미구현 명령을 **보내지 않고, 성공처럼 보이는 상태도 만들지 않는다**(`MlOperationsPanel.tsx`).
+
+### 15.2 구현 — 서비스 배치 고정/해제 (migration `0021_ops_console`)
+
+- **무엇을 바꾸나**: `public.batches.is_active` 한 행(유니크 부분 인덱스 `batches_one_active_uq`).
+  고정이 있으면 그 배치, 없으면 기준월(as_of_date)·적재 시각·id 순 최신 배치를 서비스한다
+  (`v_current_batch`, 앱은 같은 조건을 `product/src/server/latestBatchSql.ts` 로 쓴다).
+  ML 산출물·적재 데이터는 바꾸지 않는다 — 어떤 배치를 **보여 줄지**만 바꾼다.
+- **누가**: admin 세션만. 앱 경로(`requireOpsMutation`)가 같은 출처 → admin → 운영 DB 연결(`OPS_DATABASE_URL`,
+  사용자명 `wg_ops`) 순서로 확인하고, DB 함수 `ops_assert_actor` 가 `users.auth_role = 'admin'` 을 다시 확인한다.
+  운영 DB 연결이 없는 서버에서는 화면이 전환 버튼 대신 "연결되지 않음"을 보인다.
+- **입력**: `batchId`(양의 정수), `reason`(2~300자, 필수).
+- **거부 조건**: 배치 없음, `as_of_date IS NULL` 또는 `n_scored`·`n_queue`·`n_safe` 중 하나라도 0 이하(불완전 배치).
+  고정된 배치는 재적재(DELETE)로 지울 수 없다(`batches_protect_active` 트리거) — 먼저 해제해야 한다.
+- **동시성**: `pg_advisory_xact_lock(hashtext('batches:serving'))` 로 전환·해제를 한 줄로 세운다.
+- **감사 기록**: `ops_audit_log(action, target, by_user_id, reason, before, after)` —
+  `before`/`after` 에 `served_batch_id`, `mode`(pinned/auto)를 남긴다.
+- **CLI**: 서버에서 `db/scripts/activate-batch.sh --status | --batch-id N --by <admin> --reason "…" | --deactivate …`.
+  같은 함수·같은 검사·같은 감사 기록을 쓴다.
+- **ML 쪽 의무**: 없음. 새 배치는 지금처럼 `ingest.sh` 로 적재한다. 적재만으로는 고정된 배치가 바뀌지 않으므로,
+  고정 중이면 운영자가 비교 후 승인(고정 변경) 또는 해제해야 새 배치가 서비스된다.
+
+### 15.3 설계안 — 등급 임계값 (미구현)
+
+- 지금 등급 경계는 ML 파이프라인이 배치를 만들 때 정한다(`risk_tier`, `risk_tier_meta`, §7.1). 화면에서 바꿀 수 없다.
+- 설계: 화면이 "다음 배치부터 적용" 요청을 남기고(예: `ops_ml_requests(kind='threshold', payload jsonb, status)`),
+  ML 담당이 다음 학습·채점에서 읽어 반영한 뒤 manifest 에 적용한 요청 id 를 적는다. **이미 서비스 중인 배치는 다시 계산하지 않는다.**
+- 필요한 것: 요청 테이블 migration, `wg_ops` 전용 `ops_*` 함수, ML 파이프라인 입력 규격, manifest 필드. 모두 없음.
+
+### 15.4 설계안 — 재학습 요청 (미구현)
+
+- 지금은 ML 담당이 파이프라인을 직접 실행하고 결과를 `ingest.sh` 로 적재하면 새 배치가 생긴다.
+- 설계: 화면이 재학습 요청을 대기열에 올리고(`kind='retrain'`), 파이프라인이 요청을 가져가 상태
+  (`queued → running → done/failed`)와 결과 배치 id 를 되돌려 적는다. 화면은 그 상태를 읽기만 한다.
+  새 배치는 자동 서비스하지 않고 15.2 의 승인을 거친다.
+- 필요한 것: 요청·상태 테이블, 파이프라인 쪽 작업 실행기, 실패 알림. 모두 없음. 그래서 화면은 진행률을 보여 주지 않는다.
+
+---
+
 ## 부록 A. 자가 검증 체크리스트
 
 자가 검증 도구가 확인해야 할 항목이다.
@@ -835,6 +888,8 @@ df.to_csv(dst, index=False, encoding='utf-8')
 `na_rep`을 지정하지 않으면 pandas는 결측을 빈 칸으로 쓴다. 이것이 계약과 일치한다.
 
 ## 갱신 기록
+- **2026-09-30**: §15 「운영 명령(화면→ML)」 추가 — 구현된 서비스 배치 고정/해제(0021 ops 함수·감사 로그)와
+  설계만 있는 임계값·재학습을 구분해 적었다.
 - **2026-09-13 (v1.0 → v1.1)**: §13 검토 회신(2026-09-09)을 반영했다. Q1·Q3·Q9·Q10·Q11 을 닫고
   남은 6건을 §14 로 옮겼다. §3 규칙 1 의 `HEADER MATCH` 를 「제안」에서 「적용 완료」로,
   §6.2 의 `as_of_date` NULL 전제를 실측(전 배치 NULL 0건)으로 정정했다.
