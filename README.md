@@ -1,60 +1,256 @@
-# Co끼리 - 일하기 전에도, 일하는 중에도 미리 대비하는 노동정보 서비스. 
+# Co끼리 — 일하기 전에도, 일하는 중에도 미리 대비하는 노동정보 서비스
 
-AI Rookie · 창의종합설계 경진대회 팀 프로젝트 저장소.
+작품명은 「Co끼리: 커뮤니티 기반 AI 일터위험 조기경보 플랫폼(CoAmong)」이다. 여기서 조기경보는 체불사업주 명단에 오르기 전에도 확인할 수 있는 신호를 미리 보여 준다는 뜻이며, 경보를 울리거나 판정하지 않는다.
 
-사업장 검색 → 임금체불·산업재해 신호 카드 → 노동법 상담(RAG + LLM) → 근로계약서 진단 → 커뮤니티·현장 제보로 이어지는 흐름을 하나의 Next.js 서비스로 제공한다. 챗봇 이름은 「돈워리」.
+공공데이터로 사업장의 임금체불·산업재해 **확인 신호**를 만들고, 근거가 강제되는 노동 상담 AI 「돈워리」, 근로계약서 진단, 커뮤니티·현장 제보, 근로감독관·운영 화면을 하나의 Next.js 서비스로 제공한다. Co끼리는 회사를 「위험」이나 「안전」으로 **판정하지 않는다.** 확인할 신호, 공식 법령 근거, 다음 행동을 보여 주고 판단은 사용자가 한다. 상담과 계약서 진단도 개별 사안의 법률 판단을 대신하지 않으며, 결과는 공식 창구(고용노동부 1350, 관할 노동관서)에서 다시 확인하도록 안내한다.
 
-## 지금 어디에 무엇이 있나
+- 대회: 제22회(2026년) 인천대학교 창의적 종합설계 경진대회 본선(2026-10-01, 부스 8). 같은 주제로 2026 인공지능 루키 본선(국내 AI 트랙)에도 참가했다(팀명 SeD of Rookie, 8명).
+- 팀: SeD(Shall we Data?) — 인천대학교 데이터사이언스 연합동아리, 산업경영공학과 7명 · 컴퓨터공학부 3명
+- 서비스: https://moneyworry-demo.tail87a779.ts.net (대회 시연 서버, 기간 한정. 기본 가동 시간 매일 07:00~다음 날 01:00 KST)
+- 3분 시연 영상: https://youtu.be/nF3lwztQjC8 (2026-09-21 제출본)
+- 기준: 최종 운영 배포 `bd438f9`(2026-09-30)
+
+## 한눈에 보기
+
+| 항목 | 최종 구현 |
+| --- | --- |
+| 데이터 | 공공기관 공개 자료만 사용: 국민연금 가입 사업장 내역(월별), 고용노동부 체불사업주 명단, 4대보험 체납 공개 명단, 근로복지공단 최초요양 승인 기록, 안전보건공단 통계, 법제처 법령 원문(Open API) |
+| 사업장 | 국민연금 가입 사업장 639,137곳. 최신 임금 배치(2026-06) 553,598곳 채점 |
+| 임금체불 신호 | 국민연금 월별 기록과 4대보험 체납 신호로 만든 변수 39개, LightGBM(5-seed)·CatBoost 소프트 보팅. 6개월 뒤 체불사업주 명단에 오를 가능성의 상대 순위(확률 아님). ROC-AUC 0.691(전체 차수)·0.753(최근 차수). 최근 차수 교차검증(LORO)에서 LightGBM 5-seed 점수 상위 2%가 명단공개 사업장의 22.1%를 포착(평가 표본 안의 비율이라 적중률로 읽지 않는다) |
+| 산업재해 신호 | 17개 시도 × 10개 대업종 셀의 주간 최초요양 승인 건수를 과거 발생률 기준선으로 예측하고 사업장에 합계보존 배분. 기준선이 Poisson XGBoost를 2020~2022년 세 시험연도 모두 앞섬. 상위 2% 셀-주가 실제 승인의 33.3% 포착(이론 상한의 98%. 근로자 수만으로 정렬해도 29.5%라 모델의 추가분은 +3.8%p). 셀 단위 지표이며 사업장별 사고 예측 정확도가 아니다. 결과 연결 사업장 515,608곳 |
+| AI 상담 「돈워리」 | 노동법령 11종 806개 조문 청크(BGE-M3 + Chroma) 검색, 근거 충분성 게이트(거리 0.42), 인용 후처리 검증. 검색 top-5 96.7%, 범위 밖 질문 16/16 차단. 기본 답변 Upstage Solar Pro 3, 비교 선택 시 SKT A.X-K1 |
+| 근로계약서 진단 | Upstage Document Parse OCR → Solar 조항 추출 → 파이썬 규칙 12개로 항목 분류. 확인됨·누락 가능·추가 확인 3분류와 회사에 물어볼 질문 |
+| 다국어 | 일반 사용자 화면 6종(한국어·쉬운 한국어·영어·중국어·베트남어·태국어) + 지원 예정 5종. 질문과 답만 번역하고 검증은 한국어 파이프라인으로 하는 한국어 피벗 |
+| 시스템 | Next.js 16.3 · React 19.1 · Node.js 22, PostgreSQL 16(36개 테이블, migration 0000~0023, 기능별 앱 DB 계정 6종), GCP 서울 VM 1대 |
+| 품질 | 최종 main에서 자동 테스트 1,793건 통과(웹 1,408 · 인프라 216 · GCP 62 · DB 45 · RAG 36 · 계약서 26) |
+
+## 설계 원칙: 판정하지 않는 확인
+
+원칙은 화면 문구에만 기대지 않고 API 타입, DB 권한, 출력 가드레일로도 강제한다(예외는 '알려진 한계'). 자세한 규칙은 [`product/docs/service-policy.md`](product/docs/service-policy.md).
+
+1. **판정 대신 확인.** 위험·안전·위법·입사 여부를 확정하지 않고, 확인 항목과 다음 행동으로 답한다.
+2. **두 신호는 합산하지 않는다.** 임금체불과 산업재해는 단위·목표·검증 방식이 달라 별도 카드, 별도 스키마(`public` / `industrial_safety`)로 둔다.
+3. **점수는 확률이 아니다.** 모델 점수는 상대적인 점검 순서다. 임금 모델의 원점수·등급·순위·SHAP은 공개 API 타입에 없고, 산업재해는 공표 우선순위 구간만 보인다.
+4. **미확인은 안전이 아니다.** 자료가 부족하면 "분석 자료 부족", 안정 신호 조건을 채우지 못하면 "안전 신호 미확인"(임금 카드 표기 "추가 확인 필요")으로 쓰고, 어느 쪽도 안전으로 바꾸지 않는다. 명단 미등재는 "연계 데이터 내 일치 결과 없음"으로만 쓴다.
+5. **근거가 없으면 답하지 않는다.** 「돈워리」 상담은 검색 근거가 부족하면 LLM을 부르지 않고 공식 창구(고용노동부 1350, 관할 노동관서)를 안내하며, 검색 결과에 없는 조문 인용은 코드가 교체한다. 계약서 진단 요약이 연결된 계약 상담만 예외로 요약을 근거로 답한다.
+6. **출처와 기준일을 붙이고, 실패를 성공으로 위장하지 않는다.**
+
+## 기능과 사용자
+
+화면 20개(일반 13 · 감독관·운영 7), API 라우트 43개 파일(핸들러 51개).
+
+| 사용자 | 할 수 있는 일 |
+| --- | --- |
+| 비로그인 | 사업장 검색(부분 문자열, 지역·업종 필터, 지도), 임금·산업재해 두 카드와 입사 전 체크리스트, AI 상담, 계약서 진단, 커뮤니티 열람 |
+| 일반 사용자 | 위에 더해 커뮤니티 글쓰기·신고, 현장 제보(사진 최대 3장, 근로감독관만 열람), 관심 사업장, 상담 기록 30일 보관, 계정 삭제 |
+| 근로감독관 | 위험큐(점수 상위 3,000곳), 모델 원점수("확률 아님" 고정 표기), SHAP 사유(한국어 라벨 39종), 안정 신호 G1~G6, AI 점검 보조(두 모델 비교), ML 대시보드(지역×업종 집계), 현장 제보 열람 |
+| 운영 관리자 | 현장 제보 열람을 뺀 감독관 기능, 커뮤니티 신고 심사, 운영 콘솔(서비스 배치 전환, 프롬프트 4종 편집·적용·되돌리기). 운영 콘솔의 변경은 DB 함수가 사유(2~300자)를 확인하고 감사 로그에 남긴다 |
+
+보던 사업장, 관심 사업장, 계약서 진단 요약(원본 제외)을 AI 상담에 이어 줄 수 있다.
+
+근로감독관·운영 관리자는 서비스 안의 역할이며 고용노동부와 연결돼 있지 않다. 현장 제보는 행정 신고·진정이 아니다. 실제 신고·상담은 고용노동부 1350이나 노동포털로 한다.
+
+## 구성
+
+```text
+ [오프라인 배치: 임금체불]                 [오프라인 배치: 산업재해]
+ 국민연금 월별 원장 + 체납 명단            국민연금 모집단 + 최초요양 승인 + KOSHA 통계
+          │                                         │
+          ▼                                         ▼
+ 39피처 보팅 앙상블 (월별 배치)            셀×주 기준선 예측 → 사업장 배분 → 엄격 연결
+          └──────────────────┬──────────────────────┘
+                             ▼
+              PostgreSQL 16 (public + industrial_safety)
+                             │  기능별 DB 계정 · 읽기 전용 뷰
+                             ▼
+        Next.js 16.3 서버 (TypeScript · React 19.1 · Node.js 22)
+          │                     │                          │
+          ▼                     ▼                          ▼
+   법령 RAG 서비스          계약서 분석 서비스           국내 LLM API
+   (BGE-M3 + Chroma)     (Document Parse → Solar      (Upstage Solar Pro 3 기본,
+                          추출 → 규칙 엔진 분류)        SKT A.X-K1 비교)
+```
+
+- 웹 서버는 요청마다 ML 모델을 돌리지 않는다. 미리 계산해 적재한 결과를 읽는다.
+- LLM은 DB에 접근하지 않는다. 운영 경로에서는 서버가 서비스 함수로 조회한 허용 목록 DTO만 모델에 넘긴다(도구 호출은 검증하지 않은 실험 모드에만 있다).
+- 공개 화면과 감독관 화면은 노출 계약이 다르다. 공개 응답에는 내부 점수·등급·SHAP을 싣지 않는다.
+
+## 어떻게 작동하나
+
+### 임금체불 신호
+
+- **시간 계약**: t-18~t-6의 13개 시점을 관측하고, 6개월을 비운 뒤 t 시점의 명단공개 여부를 예측 대상으로 삼는다. 평가는 사업장당 1행으로 하고, 명단공개 차수를 통째로 빼는 교차검증(LORO)과 사업장 그룹 교차검증(GKF)을 함께 보고한다.
+- **공개 화면**: 점수 대신 설명형 상태만 보인다(최신 배치 553,598곳 기준). 뚜렷한 이상 신호 없음 5.89% · 안전 신호 미확인 77.97%(임금 카드 표기 "추가 확인 필요") · 분석 자료 부족 12.15% · 우선 확인 필요 3.99%. 이 3.99%(22,098곳)는 모델 예측이 아니라 이미 공개된 명단에 오른 사실이다. 대부분 4대보험 체납 명단(20,863곳)이고, 공개 체납 1,102곳, 체불사업주 명단공개 133곳이다. 카드에는 해당 명단 이름이 배지로 보인다.
+- **감독관 화면**: 점수 상위 3,000곳을 긴급 100 · 우선 400 · 주의 1,000 · 관찰 1,500으로 나누고, 사업장마다 SHAP 상위 3개 사유를 붙인다. 점검 순서를 돕는 참고 자료이며 행정 결정의 근거가 아니다.
+- **운영 원칙**: 새 월별 자료는 같은 모델로 채점하고, 재학습은 명단공개 새 차수가 나올 때만 한다. 현재 월별 배치 7개(2025-12~2026-06)는 같은 모델로 한 번에 채점했다. 재학습 파이프라인은 저장소에 없다.
+
+### 산업재해 신호
+
+- 공개된 최초요양 승인 기록에는 사업장 식별자가 없어, 사업장별로 학습·검증할 수 없다. 그래서 170개 셀의 주간 승인 건수를 예측한다(노출량 × 축소한 셀 발생률 × 주차 계절성).
+- 셀 기대건수를 근로자 수와 규모별 상대위험으로 사업장에 나누고(합계 보존), 상위 1% · 1~5% · 5~10% · 일반 구간으로만 공개한다. 배분값으로 만든 연구용 확률값은 검증된 사고 확률이 아니어서 쓰지 않는다. 사업장 카드에는 상위 5% 안이 "우선 확인 필요", 5~10%가 "안전 신호 미확인"으로 나온다(임금 카드의 "우선 확인 필요"와 뜻이 다르다).
+- 사업장 연결은 이름·마스킹 사업자번호·시도·업종 4개가 모두 일치하고 1:1인 경우만 자동 승인한다(549,558곳 중 515,608곳).
+
+### 노동 상담 「돈워리」
+
+```text
+긴급 감지(LLM 없이 119 안내) → 대화 회상 → 질의 재작성 → 의도·범위 분류
+→ 법령 검색(후보 20 → 5) → 근거 충분성 게이트(모든 문서 거리 ≤ 0.42)
+→ 생성(Solar Pro 3) → 출력 가드레일
+```
+
+- 긴급 감지는 한국어(긴급어 7개, 의식 저하·급성 부상, 사고 유형 13종)와 외국어 9개로 한다.
+- 사업장 질문은 법령 검색을 건너뛰고, 요청마다 사업장을 다시 조회해 허용 목록 DTO(표시 라벨·가용성·확인 항목·출처)만 모델에 넘긴다.
+- 가드레일은 문장 규칙 17개, 인용 검증(검색 밖 조문·미적재 법령·지어낸 안내 문서), 회사 카드 왜곡·사용자 진술 모순 가드, 기관 연락처 교정(근로복지공단 1588-0075와 고용노동부 1350 혼동)으로 이뤄진다. 근거 카드에는 답변이 실제로 인용한 조문만 보인다. 조문 이름 없이 내용을 옮긴 답변에는, 검색된 조문 낱말의 35% 이상이 답변에 나올 때만 그 조문을 출처로 붙인다.
+- 대화 기록은 로그인 사용자만 7개 테이블에 30일 보관한다. 외부 LLM 전송은 요청마다 동의를 받는다.
+
+### 근로계약서 진단
+
+PDF·PNG·JPEG(15MB 이하)를 OCR로 읽고, 조항을 추출한 뒤 규칙 엔진이 항목을 분류한다(서면 명시 7항목, 불리 조항 15종, 근거 조문 21개, 2026년 최저임금 시급 10,320원). 분류 경로에서는 LLM 해설을 꺼 두었다. 결과는 위법 판정 대신 확인됨·누락 가능·추가 확인 3분류와 회사에 물어볼 질문(최대 5개)으로 준다. 계약서 원문은 저장하거나 로그에 남기지 않는다.
+
+### 다국어 (외국인 근로자)
+
+- 긴급 문장은 번역·모델 호출 없이 고정 문구와 한국어 한 줄로 답한다.
+- 상담은 질문을 한국어로 옮겨 한국어 파이프라인을 그대로 거친 뒤, 검증된 답만 옮긴다. 숫자·금액·전화번호·조문명·기관명이 바뀌거나 새 판정 표현이 생기면 한국어 원문을 보인다. 번역 답변마다 "한국어 원문 보기"가 붙는다.
+- 화면 문구, 계약서 진단 결과, 사업장 카드 문구, 지역명은 모델 대신 고정 번역 사전을 쓴다.
+- 외국어 현장 제보는 한국어 번역본을 함께 저장해 감독관에게 원문과 나란히 보인다. 나이·체류자격은 묻거나 저장하지 않는다.
+- 자세한 내용: [`docs/i18n/LANGUAGE_SUPPORT.md`](docs/i18n/LANGUAGE_SUPPORT.md)
+
+## 알려진 한계
+
+- 임금 점수는 1:1 균형 학습표로 만든, 보정하지 않은 순위 신호다. 확률로 쓰려면 모집단 보정과 전향 검증이 필요하다. 22.1% 포착률은 앙상블이 아니라 LightGBM 5-seed 점수로 계산했다.
+- 감독관 위험큐 3,000곳 중 2,067곳은 이미 공개된 4대보험 체납 사업장이라, 모델이 공개 명단 밖에서 새로 알려 주는 몫은 따로 따져 봐야 한다.
+- 산업재해 최신 산출의 대상 주(2026-04-20~26)가 지났고, 주간 갱신 체계가 없다.
+- 답변 품질: 최종 배포 전인 2026-09-29에 고정한 후보(법령 7종 583 청크·모의 회사 자료 사용)를 개발에 쓰지 않은 질문 72행으로 평가해, 사전 기준 7개를 모두 충족하지 못했다. 중대 오류는 원시·최종 답변 각 4건(기준 0건)이었고, 최종 답변 유용성 32.4%, 기억 충실도 24.4%, 근거 적합성 39.5%(기준 각 90%)였다. 중대 오류에는 의식이 흐린 동료에 대한 질문에 119 대신 임금 기록을 안내한 답도 있었다. 판정은 AI 검토와 사용자 판단 2건으로 한 내부 평가다. 이후 수정(응급 분기 보강, 동명 회사 구분, 회사 카드 가드 등)은 같은 질문의 회귀로만 확인했고, 최종 사용자 QA(U01~U11)는 실행하지 않아 운영 인수는 보류 상태다([`docs/qa/2026-09-28-personal-10.md`](docs/qa/2026-09-28-personal-10.md), [`docs/qa/2026-09-28-personal-11.md`](docs/qa/2026-09-28-personal-11.md)).
+- 상담 범위: 법령 RAG에 산업안전보건법·중대재해 관련 법령을 넣지 않아 그 질문은 범위 밖으로 처리한다. 근거 부족 안내와 가드레일 교체 문구가 임금 중심이라, 산재 질문에도 고용노동부 1350을 안내한다. 감독관 AI 점검 보조의 인용 검증은 검색 성공 여부만 보고, 인용한 조문이 검색 결과와 맞는지는 대조하지 않는다.
+- 다국어: 고정 번역 사전, 외국어 긴급 문구·감지 사전, 모델 번역 모두 원어민 검수 전이고, 운영 환경의 번역 품질은 아직 재지 않았다. 외국어 질문의 검색·게이트 성능은 따로 평가하지 않았다(임계값 0.42는 한국어 질문 기준). 외국어 긴급 감지에는 사후 절차 예외가 없어, 산재 보상 절차를 묻는 질문도 긴급 안내로 갈 수 있다. 사업장 검색은 한국어 회사명만 받는다.
+- 운영: 단일 VM이다. 로그인 잠금과 공개 호출 한도는 운영에서 프로세스 메모리에 있어 재시작하면 초기화된다. 운영 앱은 방문자를 구분하지 못해 공개 호출 한도를 방문자 전체가 함께 쓰므로, 10-02부터 혼잡하면 잠시 제한될 수 있다(로그인하면 상담·계약서 한도에서 빠진다). 여러 인스턴스가 나눠 쓰는 Redis 저장소와 방문자 IP 게이트웨이는 코드만 있다.
+- 개인정보: 외부 LLM 공급자(Upstage·SKT)의 공개 약관은 대조했지만, 실제 계정의 로깅·학습 동의, 처리 지역, 보존 기간은 계정 소유자 확인 전이다. 운영 백업의 범위·보관 기간·복원 성공도 확인하지 않았다(복원 리허설은 빈 데이터로만 했다).
+- 사업장 키(`firm_id`)는 이름 기반 잠정키라 개명하면 이력이 끊긴다.
+- 저장소에는 ML 학습·채점 코드, 모델 파일, 원천 산출물, 사업장 DB가 없고 적재·검증 코드만 있다. 임금 모델의 하이퍼파라미터와 일부 재채점 코드는 서버에만 있어, 처음부터 다시 학습할 수 없다.
+- 표기 충돌: 임금 카드는 안정 신호 조건을 채우지 못한 사업장(77.97%)을 "추가 확인 필요"로 표시한다. 서비스 정책 문서와 09-08 결정 기록은 이 상태를 "안전 신호 미확인"으로 정하고 "추가 확인 권장" 류 표현을 금지하므로, 어느 쪽으로 맞출지 팀 결정이 필요하다.
+
+## 저장소 구조
 
 | 경로 | 역할 | 주 담당 |
 | --- | --- | --- |
-| [`product/`](product/) | 통합 제품 (Next.js 웹·API, RAG·계약서 분석 통합) | 프론트 수현·지유, API 민규·창의, 프롬프트 성현 |
-| [`db/`](db/) | PostgreSQL 스키마·migration(0000~0011)·ML 결과 적재·Path B 재구축 | 나연(사용자 DB), 승석(ML·DB 검토), 팀장(적재·게이트) |
-| [`docs/`](docs/) | 팀 공용 문서 — 결정 기록·데이터 계약·프롬프트·MLOps·QA·페르소나·시연 | 전원 |
-| [`infra/`](infra/) | GCP VM 배포·systemd·환경 검증·공개 진입점 | 팀장 |
-| [`prototypes/`](prototypes/) | 8월 프로토타입 보존(수정하지 않음) | — |
+| [`product/`](product/) | 통합 제품. Next.js 화면·API(`src/app`), 서비스 계층(`src/services`), 실연동 어댑터(`src/adapters`), 다국어 사전(`src/i18n`), 시스템 프롬프트 4종(`prompts/`), 내부 서비스 [`integrations/rag-api`](product/integrations/rag-api/)(법령 RAG)·[`integrations/contract-api`](product/integrations/contract-api/)(계약서 분석), 평가 도구(`eval/`) | 프론트엔드, 백엔드·API, LLM·RAG, 프롬프트·계약서 |
+| [`db/`](db/) | PostgreSQL 스키마(`schema.ts`)·migration 0000~0023(24개)·기능별 DB 계정 스크립트·드리프트 검사·ML 결과 적재·Path B 재구축 | 사용자 DB, ML·데이터 계약, 팀장(적재·게이트) |
+| [`docs/`](docs/) | 팀 공용 문서. 결정 기록·데이터 계약·MLOps·다국어·계획·QA·페르소나·시연 | 전원 |
+| [`infra/`](infra/) | GCP VM 배포 스크립트·systemd 유닛·환경 검증·헬스 감시·공개 진입점·GCP 자동화 | 팀장 |
+| [`prototypes/`](prototypes/) | 8월 개인 프로토타입 보존(수정하지 않음. 제품 수정은 `product/`에서) | — |
+| [`.github/workflows/`](.github/workflows/) | CI 2종(DB·계약서·인프라 / 제품 웹·RAG 품질) | — |
 
 ## 먼저 읽을 문서
 
 | 알고 싶은 것 | 문서 |
 | --- | --- |
-| 최근 결정 사항 | [`docs/decisions/`](docs/decisions/) — 날짜별. 다른 문서와 어긋나면 결정 기록이 우선 |
+| 로컬 실행·환경 설정 | [`product/README.md`](product/README.md) |
+| 최근 결정 사항 | [`docs/decisions/`](docs/decisions/) — 날짜별 결정 기록(최신 2026-09-08). 그 뒤 구현으로 바뀐 항목은 이 README와 각 문서를 함께 본다 |
 | 화면 문구·배지·금지 표현 | [`product/docs/service-policy.md`](product/docs/service-policy.md) |
 | API 요청·응답 형태 | [`product/docs/api-contract.md`](product/docs/api-contract.md) |
 | DB 값의 의미(판정·등급·피처) | [`docs/data-contract/`](docs/data-contract/) |
-| 프롬프트에 무엇이 들어 있나 | [`docs/prompt/CONTENTS.md`](docs/prompt/CONTENTS.md) |
-| ML 결과를 DB에 넣는 규격·배치 운영 | [`docs/mlops/`](docs/mlops/) |
+| DB 구조 | [`db/schema.ts`](db/schema.ts) · [`db/docs/SCHEMA_MAP.md`](db/docs/SCHEMA_MAP.md) · [`db/README.md`](db/README.md) |
 | DB 변경(migration)·복구·드리프트 검사 | [`db/docs/MIGRATION_OPERATIONS.md`](db/docs/MIGRATION_OPERATIONS.md) · [`db/docs/DRIFT_CHECK_COVERAGE.md`](db/docs/DRIFT_CHECK_COVERAGE.md) |
-| 서버 배포·롤백·접속 | [`infra/OPERATIONS.md`](infra/OPERATIONS.md) · 공개 진입점 문서 |
-| 배포 이력·관문 승인 감사 | [`infra/DEPLOY_HISTORY.md`](infra/DEPLOY_HISTORY.md) |
+| 법령 RAG 검색 서비스 | [`product/integrations/rag-api/README.md`](product/integrations/rag-api/README.md) |
+| 계약서 분석 서비스 | [`product/integrations/contract-api/README.md`](product/integrations/contract-api/README.md) |
+| 프롬프트 파일과 내용 | [`product/prompts/README.md`](product/prompts/README.md) · [`docs/prompt/CONTENTS.md`](docs/prompt/CONTENTS.md) |
+| 다국어 지원 | [`docs/i18n/LANGUAGE_SUPPORT.md`](docs/i18n/LANGUAGE_SUPPORT.md) · [`docs/i18n/TRANSLATION_STATUS.md`](docs/i18n/TRANSLATION_STATUS.md) |
+| ML 결과 적재·배치 운영 | [`docs/mlops/`](docs/mlops/) · [`docs/mlops/MLOps_배치현황정의서.md`](docs/mlops/MLOps_배치현황정의서.md) |
+| 운영 콘솔(배치 전환·프롬프트 편집) 설계 | [`docs/plans/2026-09-29-운영콘솔-프롬프트편집-배치전환-설계.md`](docs/plans/2026-09-29-운영콘솔-프롬프트편집-배치전환-설계.md) |
+| 서버 배포·롤백·접속 | [`infra/README.md`](infra/README.md) · [`infra/OPERATIONS.md`](infra/OPERATIONS.md) · [`infra/PUBLIC_ACCESS.md`](infra/PUBLIC_ACCESS.md) |
+| 운영 환경 변수 | [`infra/systemd/ENVIRONMENT_FILES.md`](infra/systemd/ENVIRONMENT_FILES.md) |
+| 헬스 감시 | [`infra/HEALTH_WATCH.md`](infra/HEALTH_WATCH.md) |
 | 자동 배포(pull 방식)·켜고 끄기 | [`infra/AUTODEPLOY.md`](infra/AUTODEPLOY.md) |
-| QA 항목·페르소나·시연 대본 | [`docs/qa/`](docs/qa/) · [`docs/persona/`](docs/persona/) · [`docs/demo/`](docs/demo/) |
+| 배포 이력·관문 승인 감사 | [`infra/DEPLOY_HISTORY.md`](infra/DEPLOY_HISTORY.md) |
+| 상담 품질 평가 도구 | [`product/eval/README.md`](product/eval/README.md) |
+| QA 기록 · 초기 페르소나·시연 대본(09-13 초안) | [`docs/qa/`](docs/qa/) · [`docs/persona/`](docs/persona/) · [`docs/demo/`](docs/demo/) |
 
-## 시연 서버
+> 일부 문서는 최종 구현보다 늦다. 내용이 어긋나면 이 README와 코드를 기준으로 본다.
+>
+> - `db/docs/SCHEMA_MAP.md`: 34개 테이블 기준(운영 콘솔의 `prompt_versions`·`ops_audit_log` 없음)
+> - `db/docs/DRIFT_CHECK_COVERAGE.md`: 요약의 후조건 수가 129개(실제 136개)
+> - `product/README.md`: 데이터 모드 기본값(실제는 real), `/api/system/status` 안내, 배지 이름, Basic Auth·임시 배포 절이 옛 기준
+> - `product/docs/api-contract.md`: 8월 확정본이라 Basic Auth 시점 기준이고, 운영 콘솔·대화 기록·관심 사업장·현장 제보 API가 없다
+> - `infra/PUBLIC_ACCESS.md`, `infra/OPERATIONS.md` 앞부분: Basic Auth가 켜져 있던 시점과 8월 서버 기준 문단이 남아 있다
+> - `docs/data-contract/public-ai-privacy.md`: 옛 호출 한도
+> - `docs/decisions/2026-09-08.md`: 일반 사용자의 사업장 연결(2번)과 과거 대화 미저장(8번)은 이후 구현으로 바뀌었다
+> - `docs/persona/persona_script.md`, `docs/demo/demo_script.md`(09-13 초안): 사업장 직접 연결, 리뷰, 감독관 2차 인증처럼 구현하지 않은 기능을 전제한다
 
-- 주소: 팀 공유 문서 참조(Basic Auth). 매일 07:00~다음 날 01:00(KST) 가동.
-- 상태 확인: `/api/health/live`, `/api/health/ready`(인증 불필요), `/api/system/status`(인증 필요).
-- 배포는 [`infra/scripts/deploy-run.sh`](infra/scripts/) 로만(이력이 남는다). migration은 배포와 분리해 적용한다.
+## 개발 환경과 테스트
+
+- 런타임: Node.js 22(CI는 22.23.2), Python 3.12.13(RAG·계약서·인프라 테스트).
+- 로컬 실행: `cd product && npm install && cp .env.example .env.local && npm run dev`(http://localhost:3000). `.env.local` 설정은 [`product/README.md`](product/README.md)를 따른다.
+  - `.env.example`은 사업장·계약서를 실제 연동(real)으로 둔다. DB·키 없이 화면만 보려면 `APP_DATA_MODE`·`COMPANY_DATA_MODE`·`CONTRACT_DATA_MODE`를 `mock`으로 바꾸고, Mock 로그인 비밀번호 3개(`MOCK_AUTH_*_PASSWORD`, 12자 이상·서로 다르게)를 넣는다.
+  - 상담 RAG는 `npm run dev:rag`(5051), 계약서 분석은 `npm run dev:contract`(8000)로 각각 다른 터미널에서 띄운다. 웹과 두 서비스는 같은 내부 토큰을 써야 한다. `.env.local`에 `RAG_INTERNAL_TOKEN`과 `CONTRACT_INTERNAL_TOKEN`(서로 다른 임의 값)을 넣고, 각 서비스 터미널에서도 같은 값을 export한다(계약서 터미널에는 `UPSTAGE_API_KEY`도). 토큰이 없거나 다르면 두 서비스가 모든 요청을 401로 거절한다.
+  - 가상환경은 서비스별 README를 따른다. RAG는 해시를 고정한 CPU 전용 torch 절차([`product/integrations/rag-api/README.md`](product/integrations/rag-api/README.md)), 계약서 분석은 [`product/integrations/contract-api/README.md`](product/integrations/contract-api/README.md)다.
+
+바꾼 영역의 검사를 CI와 같은 명령으로 통과시킨다. 오른쪽 숫자는 최종 main에서 통과한 테스트 수다.
+
+| 영역 | 명령 | 통과 |
+| --- | --- | ---: |
+| 웹 | `cd product && npm run check` (테스트·typecheck·lint·빌드) | 1,408 |
+| DB | `cd db && npm ci && npm run test:migration-drift && npm run test:ingest-cli && PATH_B_TEST_PYTHON=<Python 3.12.13 경로> npm run test:path-b-static` | 45 |
+| 인프라 | `python -m unittest discover -s infra/tests -p 'test_*.py'` (저장소 루트) | 216 |
+| GCP 자동화 | `infra/gcp/tests/test-gcp-automation.sh` (가짜 gcloud) | 62 |
+| RAG | `cd product/integrations/rag-api && .venv/bin/python -m unittest test_retriever.py test_asset_manifest.py test_app.py` | 36 |
+| 계약서 분석 | `product/integrations/contract-api/.venv/bin/python -m unittest discover -s product/integrations/contract-api/tests -p 'test_*.py'` (저장소 루트) | 26 |
+
+- 빈 PostgreSQL 16이 있으면 `cd db && npm run migrate && npm run check:migration-drift`로 migration 적용과 드리프트를 확인한다.
+- 이미 적용된 migration 파일을 고쳤는지는 저장소 루트에서 `db/scripts/check-migration-immutability.sh origin/main`으로 본다.
+- RAG 검색 품질은 `product/integrations/rag-api/eval/run_product_eval.py`로 오프라인 평가한다(CI 하한 포함).
+- 공개 호출 한도 게이트웨이(`infra/scripts/public-quota-gateway.mjs`, 운영에는 켜지 않음)를 바꾸면 저장소 루트에서 `node --test infra/tests/public_quota_gateway.test.mjs`도 돌린다(CI 밖).
+
+## 시연 서버와 운영
+
+- 주소: https://moneyworry-demo.tail87a779.ts.net (Tailscale Funnel). 대회 시연 서버라 기간이 한정돼 있다. 기본 가동 시간은 매일 07:00~다음 날 01:00(KST)이고, 시연·심사 기간용 24시간 모드를 따로 둔다.
+- 사이트 전체에 걸던 Basic Auth는 꺼 두어, 일반 사용자 화면은 로그인 없이 열람할 수 있다. 감독관 화면은 inspector·admin, 운영 화면은 admin 계정으로 로그인해야 열린다.
+- `/api/*`는 브라우저 문맥(Sec-Fetch-Site, 없으면 같은 호스트 Referer)이 없는 직접 호출을 403으로 돌려보낸다. 인가가 아니라 크롤러와 우발적 수집을 거르는 장치이고, 로그인·역할은 각 API가 따로 검사한다. 재빌드 없이 끌 수 있다(`DEMO_API_GUARD=off`).
+- 상태 확인: `/api/health/live`, `/api/health/ready`는 인증 없이 열린다(직접 호출 차단 예외). `/api/system/status`는 운영 관리자 세션이 필요하고 전용 화면이 없다. 주소창으로 열면 직접 호출 차단에 걸리므로, 운영 관리자로 로그인한 탭의 개발자 도구에서 `fetch('/api/system/status').then(r => r.json())`로 본다.
+- 배포는 서버의 배포 래퍼 `moneyworry-deploy-run`([`infra/scripts/deploy-run.sh`](infra/scripts/deploy-run.sh)의 설치 사본)으로만 한다. migration·잠금 파일·systemd 유닛 같은 관문 경로가 바뀌면 멈추고 사람의 승인을 받으며, 실패하면 이전 버전으로 자동 롤백한다. 배포마다 서버 원장에 시작·결과·관문 승인이 남는다.
+- migration은 배포와 분리한다. 덤프 → migration 적용 → DB 계정·환경 변수 설정 → 앱 배포 순서로 사람이 적용하고, migration별 순서는 [`db/docs/MIGRATION_OPERATIONS.md`](db/docs/MIGRATION_OPERATIONS.md)를 따른다(계정이 먼저 있어야 하는 migration도 있다).
+- pull 방식 자동 배포는 발표 직전 변동을 막으려고 2026-09-29 24:00(KST)에 만료되게 했다. 그 뒤 배포는 사람이 한다.
+- 공개 호출 한도(사업장 조회·비로그인 상담·비로그인 계약서 진단)는 시연을 위해 2026-10-01(KST)까지 면제하고, 10-02 00:00부터 자동으로 적용한다. 운영에서는 방문자를 구분하지 못해 이 한도를 방문자 전체가 함께 쓴다.
 
 ## 개발 흐름
 
 1. 최신 `main`에서 `task/<주제>` 브랜치를 만든다.
 2. 자기 담당 경로만 수정한다. 공통 파일(`product/src/server/**`, `db/migrations/**`, `infra/**`)은 담당자와 먼저 맞춘다.
-3. `cd product && npm run check`(웹) 또는 `cd db && npm test`(DB)를 통과시킨다.
+3. 바꾼 영역의 검사를 위 표의 명령(CI와 같음)으로 통과시킨다.
 4. PR을 올리고 팀장이 병합한다. 셀프 머지·`main` 직접 push·force push는 하지 않는다.
-5. 브랜치는 오래 두지 않는다. 오래 두면 병합이 아니라 재적용이 된다(8월 프롬프트 브랜치 사례).
-6. 새 migration을 만들면 드리프트 검사 후조건 등록을 같은 PR에서 한다.
+5. 브랜치는 오래 두지 않는다. 오래 두면 main과 크게 어긋나 병합 대신 변경을 다시 적용해야 한다.
+6. 새 migration을 만들면 드리프트 검사 후조건 등록을 같은 PR에서 한다. 이미 적용된 migration 파일은 고치지 않는다(CI가 막는다).
+7. 프롬프트 파일(`product/prompts/`)을 고쳐도, 서버에 운영 콘솔로 적용한 버전이 있으면 그 버전이 우선한다(다른 웹 프로세스에는 30초 안에 반영). 파일 내용을 쓰려면 콘솔에서 "파일 기본값으로 복귀"를 한다.
 
 ## 보안과 데이터
 
 - API 키, `.env*`, 원본 계약서, 개인정보, 실존 사업장 식별정보는 Git에 넣지 않는다. 저장소는 공개다.
-- 웹 프로세스는 읽기 전용 DB 계정(`wg_bot`)과 기능별 최소권한 계정(`wg_auth`·`wg_community`·`wg_tip`)만 쓴다.
-- ML 산출물 원본과 대용량 데이터는 저장소 밖에 두고 복원 절차만 문서화한다.
-- 팀원 실명 대신 역할명으로 문서를 쓴다.
+- 웹 프로세스는 읽기 전용 계정(`wg_bot`)과 기능별 최소권한 계정 5개(`wg_auth`·`wg_community`·`wg_tip`·`wg_conversation`·`wg_ops`)만 쓴다. `wg_ops`는 테이블 권한 없이 운영 함수만 실행한다. 소유자 계정은 DDL·적재에만 쓴다.
+- 계약서 원문은 저장하거나 로그에 남기지 않는다. 현장 제보 사진은 메타데이터를 지운 사본만 근로감독관에게 보인다.
+- 로그인 세션은 httpOnly 쿠키, 8시간 고정이고 DB에는 토큰 해시만 저장한다. 비밀번호는 scrypt로 저장하고, 5회 실패하면 15분 잠근다.
+- 데이터를 바꾸는 API는 동일 출처 검사를 거친다. 업로드 사진은 실제로 디코드해 검증하고 위치 정보 등 메타데이터를 지운다.
+- 외부 LLM으로 보내기 전에 요청마다 사용자 동의를 받는다. 환경 변수는 허용 목록으로 검증하고, 컨테이너 이미지와 CI 액션은 SHA로 고정한다.
+- ML 학습 코드와 산출물 원본, 대용량 데이터는 저장소 밖에 두고 복원 절차만 문서화한다. 예외로 법령 원문 XML과 RAG 색인(Chroma)은 저장소에 있다.
+- 새 문서는 팀원 실명 대신 역할명으로 쓴다(초기 문서 일부에는 이름이 남아 있다).
+
+## 팀
+
+SeD(Shall we Data?) — 인천대학교 데이터사이언스 연합동아리. 산업경영공학과 7명과 컴퓨터공학부 3명, 지도교수(산업경영공학과).
+
+| 역할 | 맡은 일 |
+| --- | --- |
+| 팀장 | 기획, 통합, 인프라·배포, ML 산출물 적재 |
+| LLM·RAG | 상담 API, 법령 검색 |
+| 프롬프트·계약서 | 프롬프트, 가드레일, 계약서 진단 |
+| ML·데이터 계약 | 예측 모델, DB 의미 검토 |
+| 프론트엔드 | 프론트엔드 총괄, 커뮤니티·인증 화면 |
+| 백엔드 | 인증·권한, 커뮤니티 API |
+| 사용자 DB | migration, DB 계정 |
+| 정보 설계 | 대시보드 설계, 검수 |
+| QA | 페르소나, 시연 대본·영상 |
 
 ## 프로토타입
 
-8월 개인 작업본은 [`prototypes/`](prototypes/)에 원형대로 보존한다(jcu·csh·hb·hss·shyun_64). 실행법은 각 폴더 README 참조. 운영 코드로 간주하지 않는다.
+8월 개인 작업본은 [`prototypes/`](prototypes/)에 보존하고 수정하지 않는다(jcu·csh·hb·hss·shyun_64). 제품 수정은 `product/`에서 한다. csh에는 09-06에 평가 스크립트와 계약서 경계 테스트가 더해졌고, hss는 DB 기여 기록만 있다. 실행법은 각 폴더 README를 본다. 운영 코드로 간주하지 않는다.
 
 ## 라이선스
 
