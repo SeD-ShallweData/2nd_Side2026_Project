@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useId, useRef, useState } from "react";
+import { SafeMarkdown } from "@/components/common/SafeMarkdown";
 import type { DataMode } from "@/config/dataMode";
 import { format } from "@/i18n/defineMessages";
 import { useLocale, useMessages } from "@/i18n/LocaleProvider";
@@ -68,7 +69,7 @@ function ReviewSection({
           {items.map((item) => (
             <li key={item.code}>
               <strong>{item.label}</strong>
-              <p>{item.description}</p>
+              <div className="contract-item-description"><SafeMarkdown>{item.description}</SafeMarkdown></div>
               {item.legal_basis ? <small>{item.legal_basis}</small> : null}
             </li>
           ))}
@@ -109,10 +110,10 @@ function LocalizedReviewSection({
             <li key={item.code}>
               <strong>{item.label}</strong>
               {item.about ? <p>{item.about}</p> : null}
-              <p className="contract-korean-original" lang="ko">
+              <div className="contract-korean-original" lang="ko">
                 {item.translated ? <span>{koreanLabel} · {item.korean_label}</span> : null}
-                {item.korean_description}
-              </p>
+                <SafeMarkdown>{item.korean_description}</SafeMarkdown>
+              </div>
               {item.legal_basis ? <small>{item.legal_basis}</small> : null}
             </li>
           ))}

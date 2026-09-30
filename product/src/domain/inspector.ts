@@ -1,4 +1,4 @@
-import type { LlmProviderId, TokenUsage } from "@/domain/chatComparison";
+import type { TokenUsage } from "@/domain/chatComparison";
 import type { RagRetrievalStatus } from "@/domain/rag";
 import type { SourceReference } from "@/domain/risk";
 
@@ -109,7 +109,7 @@ export interface InspectorChatRequest {
 export type InspectorProviderStatus = "success" | "guardrail_replaced" | "fallback";
 
 export interface InspectorProviderResult {
-  provider: LlmProviderId;
+  provider: "upstage";
   provider_label: string;
   model: string;
   status: InspectorProviderStatus;
@@ -127,15 +127,10 @@ export interface InspectorProviderResult {
 }
 
 export interface InspectorChatResponse {
-  comparison_id: string;
+  response_id: string;
   company_id: string;
   completed_at: string;
-  fair_comparison: {
-    concurrent: true;
-    same_context: true;
-    same_retrieval: true;
-  };
   rag_status: RagRetrievalStatus;
   sources: SourceReference[];
-  results: InspectorProviderResult[];
+  result: InspectorProviderResult;
 }

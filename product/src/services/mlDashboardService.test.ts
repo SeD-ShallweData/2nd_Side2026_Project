@@ -32,6 +32,10 @@ const unavailable = () => new ServiceError("DATABASE_UNAVAILABLE", "사업장 �
 
 const BATCH_META = [{ batch_id: 7, data_as_of: "2026-06-01", target_label: "2026-12-01" }];
 
+function wageCell(region: string, industry: string, count: number) {
+  return { region, industry, firm_count: count, normal_count: count, watch_count: 0, review_count: 0, unknown_count: 0 };
+}
+
 describe("ML 대시보드 집계 경로", () => {
   beforeEach(() => {
     queryReadOnlyMock.mockReset();
@@ -59,7 +63,10 @@ describe("ML 대시보드 집계 경로", () => {
       denominator: 100,
       data_as_of: "2026-06-01",
       filters: { region: "서울특별시", industry: "제조업" },
-      options: { regions: ["부산광역시", "서울특별시"], industries: ["건설업", "제조업"] },
+      options: {
+        regions: [{ value: "서울특별시", count: 100 }, { value: "부산광역시", count: 0 }],
+        industries: [{ value: "제조업", count: 100 }, { value: "건설업", count: 0 }],
+      },
     });
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0]?.categories.map(({ count, ratio }) => ({ count, ratio }))).toEqual([
@@ -128,7 +135,7 @@ describe("ML 대시보드 집계 경로", () => {
     for (const relation of relationsIn(sql)) expect(WG_BOT_READABLE.has(relation), relation).toBe(true);
     expect(result).toMatchObject({
       tab: "safety",
-      denominator: 120,
+      denominator: null,
       data_as_of: "2026-04-19",
       target_label: "2026-04-26",
       stale_notice: expect.stringContaining("대상 기간이 지나"),
@@ -146,5 +153,50 @@ describe("ML 대시보드 집계 경로", () => {
       ]);
     const result = await getMlDashboard("safety", null, null);
     expect(result.stale_notice).toBeNull();
+  });
+
+  it("구·신 지역을 통합하고 실제 조회값과 지역 행정 순서·업종 건수순을 맞춘다", async () => {
+    queryReadOnlyMock.mockResolvedValueOnce(BATCH_META).mockResolvedValueOnce([
+      wageCell("서울특별시", "제조업", 100),
+      wageCell("광주광역시", "제조업", 20),
+      wageCell("전라남도", "제조업", 15),
+      wageCell("전남광주통합특별시", "건설업", 50),
+      wageCell("강원도", "제조업", 40),
+      wageCell("전라북도", "건설업", 40),
+    ]);
+    const result = await getMlDashboard("wage", "광주광역시", "제조업");
+    expect(result.filters.region).toBe("전남광주통합특별시");
+    expect(result.denominator).toBe(35);
+    expect(result.rows).toMatchObject([{ region: "전남광주통합특별시", industry: "제조업", firm_count: 35 }]);
+    expect(result.options.regions.map((option) => option.value)).toEqual([
+      "서울특별시", "전남광주통합특별시", "강원특별자치도", "전북특별자치도",
+    ]);
+    expect(result.options.industries).toEqual([
+      { value: "건설업", count: 50 }, { value: "제조업", count: 35 },
+    ]);
+  });
+
+  it("작은 셀이 섞인 총계와 선택지는 숨기고 빈 교차 결과에서도 필터를 남긴다", async () => {
+    queryReadOnlyMock.mockResolvedValueOnce(BATCH_META).mockResolvedValueOnce([
+      wageCell("서울특별시", "제조업", 40),
+      wageCell("서울특별시", "소매업", 10),
+      wageCell("부산광역시", "건설업", 40),
+    ]);
+    const result = await getMlDashboard("wage", "서울특별시", null);
+    expect(result.denominator).toBeNull();
+    expect(result.rows.map((row) => row.industry)).toEqual(["제조업"]);
+    expect(result.options.regions[0]).toEqual({ value: "서울특별시", count: null });
+    expect(result.options.industries).toEqual([
+      { value: "제조업", count: 40 },
+      { value: "건설업", count: 0 },
+      { value: "소매업", count: null },
+    ]);
+
+    queryReadOnlyMock.mockResolvedValueOnce(BATCH_META);
+    const empty = await getMlDashboard("wage", "부산광역시", "제조업");
+    expect(empty.denominator).toBe(0);
+    expect(empty.rows).toEqual([]);
+    expect(empty.options.regions).toHaveLength(2);
+    expect(empty.options.industries).toHaveLength(3);
   });
 });

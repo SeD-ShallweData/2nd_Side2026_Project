@@ -1,4 +1,5 @@
 import type { MlDashboardDistributionRow, MlDashboardResponse, MlDashboardTab } from "@/domain/mlDashboard";
+import { canonicalRegion, regionOrder } from "@/domain/region";
 import { LATEST_BATCH_ORDER_SQL } from "@/server/latestBatchSql";
 import { cachedAggregate } from "@/server/aggregateCache";
 import { queryReadOnly } from "@/server/postgres";
@@ -142,10 +143,62 @@ function matches(row: { region: string; industry: string }, region: string | nul
   return (region === null || row.region === region) && (industry === null || row.industry === industry);
 }
 
-function optionsOf(rows: Array<{ region: string; industry: string }>): MlDashboardResponse["options"] {
+function normalizeWageCells(rows: WageRow[]): WageRow[] {
+  const merged = new Map<string, WageRow>();
+  for (const row of rows) {
+    const region = canonicalRegion(row.region);
+    const key = JSON.stringify([region, row.industry]);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...row, region });
+      continue;
+    }
+    existing.firm_count += row.firm_count;
+    existing.normal_count += row.normal_count;
+    existing.watch_count += row.watch_count;
+    existing.review_count += row.review_count;
+    existing.unknown_count += row.unknown_count;
+  }
+  return [...merged.values()].sort((a, b) => b.firm_count - a.firm_count || regionOrder(a.region) - regionOrder(b.region) || a.region.localeCompare(b.region, "ko") || a.industry.localeCompare(b.industry, "ko"));
+}
+
+function normalizeSafetyCells(rows: SafetyCellRow[]): SafetyCellRow[] {
+  const merged = new Map<string, SafetyCellRow>();
+  for (const row of rows) {
+    const region = canonicalRegion(row.region);
+    const key = JSON.stringify([region, row.industry]);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...row, region });
+      continue;
+    }
+    existing.firm_count += row.firm_count;
+    existing.top1_count += row.top1_count;
+    existing.top5_count += row.top5_count;
+    existing.top10_count += row.top10_count;
+    existing.normal_count += row.normal_count;
+    existing.stale_count += row.stale_count;
+    existing.data_as_of = maxText([existing.data_as_of, row.data_as_of]);
+    existing.target_label = maxText([existing.target_label, row.target_label]);
+  }
+  return [...merged.values()].sort((a, b) => b.firm_count - a.firm_count || regionOrder(a.region) - regionOrder(b.region) || a.region.localeCompare(b.region, "ko") || a.industry.localeCompare(b.industry, "ko"));
+}
+
+/** 작은 셀이 포함된 합계는 보이는 카드와의 차이로 역산될 수 있어 숨긴다. */
+function publicCount(rows: Array<{ firm_count: number }>): number | null {
+  return rows.some((row) => row.firm_count > 0 && row.firm_count < MIN_CELL_SIZE)
+    ? null
+    : rows.reduce((sum, row) => sum + row.firm_count, 0);
+}
+
+function optionsOf(rows: Array<{ region: string; industry: string; firm_count: number }>, region: string | null, industry: string | null): MlDashboardResponse["options"] {
+  const regions = [...new Set(rows.map((row) => row.region))];
+  const industries = [...new Set(rows.map((row) => row.industry))];
   return {
-    regions: [...new Set(rows.map((row) => row.region))].sort((a, b) => a.localeCompare(b, "ko")),
-    industries: [...new Set(rows.map((row) => row.industry))].sort((a, b) => a.localeCompare(b, "ko")),
+    regions: regions.map((value) => ({ value, count: publicCount(rows.filter((row) => row.region === value && (industry === null || row.industry === industry))) }))
+      .sort((a, b) => regionOrder(a.value) - regionOrder(b.value) || a.value.localeCompare(b.value, "ko")),
+    industries: industries.map((value) => ({ value, count: publicCount(rows.filter((row) => row.industry === value && (region === null || row.region === region))) }))
+      .sort((a, b) => (b.count ?? -1) - (a.count ?? -1) || a.value.localeCompare(b.value, "ko")),
   };
 }
 
@@ -193,7 +246,8 @@ export async function getMlDashboard(
   rawIndustry: string | null,
 ): Promise<MlDashboardResponse> {
   if (tab !== "wage" && tab !== "safety") throw new ServiceError("VALIDATION_ERROR", "대시보드 탭을 확인해 주세요.", 400, false);
-  const region = filterValue(rawRegion);
+  const regionValue = filterValue(rawRegion);
+  const region = regionValue === null ? null : canonicalRegion(regionValue);
   const industry = filterValue(rawIndustry);
 
   const [meta] = await queryReadOnly<BatchMetaRow>(
@@ -204,32 +258,32 @@ export async function getMlDashboard(
   const batchKey = String(meta?.batch_id ?? "none");
 
   if (tab === "wage") {
-    const cells = await cachedAggregate(`ml-dashboard:wage:${batchKey}`, CELL_CACHE_TTL_MS, readWageCells);
+    const cells = normalizeWageCells(await cachedAggregate(`ml-dashboard:wage:${batchKey}`, CELL_CACHE_TTL_MS, readWageCells));
     const rows = cells.filter((row) => matches(row, region, industry));
     return {
-      tab, denominator: rows.reduce((sum, row) => sum + row.firm_count, 0),
+      tab, denominator: publicCount(rows),
       data_as_of: meta?.data_as_of ?? null, target_label: meta?.target_label ?? null,
       stale_notice: null, basis_notice: "최신 임금체불 채점 대상 전체 기준입니다. 개별 사업장 값·점수·순위는 표시하지 않습니다.",
       filters: { region, industry },
-      options: optionsOf(cells),
+      options: optionsOf(cells, region, industry),
       rows: toWageRows(rows),
     };
   }
 
-  const cells = await cachedAggregate(`ml-dashboard:safety:${batchKey}`, CELL_CACHE_TTL_MS, () =>
+  const cells = normalizeSafetyCells(await cachedAggregate(`ml-dashboard:safety:${batchKey}`, CELL_CACHE_TTL_MS, () =>
     queryReadOnly<SafetyCellRow>(SAFETY_CELLS_SQL, [], {
       relation: "industrial_safety.v_llm_firm_safety_context+public.scored_active",
     }),
-  );
+  ));
   const rows = cells.filter((row) => matches(row, region, industry));
   const stale = cells.some((row) => row.stale_count > 0);
   return {
-    tab, denominator: rows.reduce((sum, row) => sum + row.firm_count, 0),
+    tab, denominator: publicCount(rows),
     data_as_of: maxText(cells.map((row) => row.data_as_of)), target_label: maxText(cells.map((row) => row.target_label)),
     stale_notice: stale ? "대상 기간이 지나 최신 현장 정보를 추가로 확인해야 합니다." : null,
     basis_notice: "전국 전체 기준 밴드를 지역·업종별 비율로 보여줍니다. 임금체불 통계와 합산하지 않습니다.",
     filters: { region, industry },
-    options: optionsOf(cells),
+    options: optionsOf(cells, region, industry),
     rows: toSafetyRows(rows),
   };
 }
