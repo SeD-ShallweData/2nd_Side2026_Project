@@ -8,23 +8,13 @@ import type {
 import { delay } from "@/utils/delay";
 import { ServiceError } from "@/utils/errors";
 import { getCompanyRepository } from "@/services/providers";
+import { canonicalRegion, regionOrder } from "@/domain/region";
 
-export const PUBLIC_COMPANY_RESULT_LIMIT = 2_000;
 export const PUBLIC_COMPANY_PAGE_LIMIT = 100;
-
-export function publicCountBand(count: number): { count: number; count_label: string } {
-  if (count <= 0) return { count: 0, count_label: "0" };
-  if (count < 10) return { count: 1, count_label: "1–9" };
-  if (count < 50) return { count: 10, count_label: "10–49" };
-  if (count < 100) return { count: 50, count_label: "50–99" };
-  if (count < 500) return { count: 100, count_label: "100–499" };
-  if (count < 1_000) return { count: 500, count_label: "500–999" };
-  return { count: 1_000, count_label: "1,000+" };
-}
 
 function normalizeFilters(filters: CompanySearchFilters): CompanySearchFilters {
   const normalized = {
-    region: filters.region?.trim() || undefined,
+    region: filters.region ? canonicalRegion(filters.region) || undefined : undefined,
     industry: filters.industry?.trim() || undefined,
   };
   if ((normalized.region?.length ?? 0) > 100 || (normalized.industry?.length ?? 0) > 200) {
@@ -87,15 +77,14 @@ export async function searchCompanies(
     repository.search(normalizedQuery, limit, (page - 1) * limit, normalizedFilters),
     repository.count(normalizedQuery, normalizedFilters),
   ]);
-  const publicTotal = Math.min(total, PUBLIC_COMPANY_RESULT_LIMIT);
-  const totalPages = publicTotal === 0
+  const totalPages = total === 0
     ? 0
-    : Math.min(PUBLIC_COMPANY_PAGE_LIMIT, Math.ceil(publicTotal / limit));
+    : Math.min(PUBLIC_COMPANY_PAGE_LIMIT, Math.ceil(total / limit));
   return {
     query: normalizedQuery,
     items,
-    total: publicTotal,
-    total_is_capped: total > PUBLIC_COMPANY_RESULT_LIMIT,
+    total,
+    total_is_capped: false,
     has_more: page < totalPages,
     page,
     page_size: limit,
@@ -105,10 +94,12 @@ export async function searchCompanies(
 
 export async function getCompanyFilterOptions(): Promise<CompanyFilterOptions> {
   if (getCompanyDataMode() === "mock") await delay(getMockDelayMs());
-  const options = await getCompanyRepository().listFilterOptions();
+  const repository = getCompanyRepository();
+  const [options, total] = await Promise.all([repository.listFilterOptions(), repository.count("")]);
   return {
-    regions: options.regions.map((option) => ({ value: option.value, ...publicCountBand(option.count) })),
-    industries: options.industries.map((option) => ({ value: option.value, ...publicCountBand(option.count) })),
+    total,
+    regions: options.regions.sort((a, b) => regionOrder(a.value) - regionOrder(b.value) || a.value.localeCompare(b.value, "ko")),
+    industries: options.industries.sort((a, b) => b.count - a.count || a.value.localeCompare(b.value, "ko")),
   };
 }
 

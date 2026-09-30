@@ -179,6 +179,10 @@ export const POSTCONDITION_KEYS = Object.freeze({
     "function_public_execute_revoked:public.ops_activate_batch",
     "view_definition:public.v_current_batch_honors_pinned_batch",
   ]),
+  "0022_current_sido_names": Object.freeze([
+    "column_type:public.firms.sido_source_text",
+    "data:public.firms.no_former_sido_names",
+  ]),
 });
 
 function migrationLabel(migration) {

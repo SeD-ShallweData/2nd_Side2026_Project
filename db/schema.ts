@@ -75,6 +75,8 @@ export const firms = pgTable(
     /** 마스킹 6자리. 비고유 — 단독으로 키가 될 수 없다 */
     bizNo: text("biz_no").notNull(),
     sido: text(),
+    /** 원본 지역명: 산업안전 source와 기존 사업장을 엄격하게 연결할 때 사용 */
+    sidoSource: text("sido_source"),
     industry: text(),
     firstSeen: date("first_seen", { mode: "string" }),
     lastSeen: date("last_seen", { mode: "string" }),

@@ -430,7 +430,7 @@ if [[ "$SCOPE" == "existing-firms" ]]; then
     cd -- "$PREPARED_DIR"
     PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=120000' \
       psql_run -q -c \
-      "\\copy (select firm_id,name,biz_no,sido,industry from public.firms order by firm_id) to 'firms_snapshot.csv' with (format csv, header true, encoding 'UTF8')"
+      "\\copy (select firm_id,name,biz_no,coalesce(sido_source,sido) as sido,industry from public.firms order by firm_id) to 'firms_snapshot.csv' with (format csv, header true, encoding 'UTF8')"
   )
   chmod 600 "$PREPARED_DIR/firms_snapshot.csv"
 fi

@@ -1,4 +1,5 @@
 import "server-only";
+import { canonicalRegion } from "@/domain/region";
 
 import type {
   CommunityApiSource,
@@ -156,7 +157,7 @@ function toPost(row: PostRow): StoredCommunityPost {
     title: row.title,
     body: row.body,
     company_context: row.firm_id
-      ? { company_id: row.firm_id, region: row.sido, industry: row.industry }
+      ? { company_id: row.firm_id, region: row.sido ? canonicalRegion(row.sido) : null, industry: row.industry }
       : null,
     anonymous: row.anonymous,
     created_at: new Date(row.created_at).toISOString(),
@@ -581,6 +582,6 @@ export class RealCommunityRepository implements CommunityRepository {
     );
     const row = rows[0];
     if (!row) return null;
-    return { company_id: row.firm_id, region: row.sido, industry: row.industry };
+    return { company_id: row.firm_id, region: row.sido ? canonicalRegion(row.sido) : null, industry: row.industry };
   }
 }

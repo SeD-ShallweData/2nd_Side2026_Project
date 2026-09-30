@@ -15,6 +15,7 @@ import type {
   InspectorSearchResponse,
 } from "@/domain/inspector";
 import { labelRiskReasons } from "@/domain/riskReasonLabels";
+import { canonicalRegion } from "@/domain/region";
 import {
   INSPECTOR_OUTPUT_GUARDRAILS,
   hasUnverifiedCitation,
@@ -130,7 +131,7 @@ function asQueueItem(row: QueueRow): InspectorQueueItem {
   return {
     company_id: row.firm_id,
     company_name: row.name,
-    region: row.sido,
+    region: row.sido ? canonicalRegion(row.sido) : null,
     industry: row.industry,
     rank: row.rank,
     grade: row.grade as InspectorQueueGrade,
@@ -258,7 +259,7 @@ export async function searchInspectorCompanies(query: string, limit = 10): Promi
       company_id: row.firm_id,
       company_name: row.name,
       masked_business_number: row.biz_no,
-      region: row.sido,
+      region: row.sido ? canonicalRegion(row.sido) : null,
       industry: row.industry,
     })),
     total: rows.length,
@@ -352,7 +353,7 @@ export async function getInspectorCompanyDetail(companyId: string): Promise<Insp
       company_id: row.firm_id,
       company_name: row.name,
       masked_business_number: row.biz_no,
-      region: row.sido,
+      region: row.sido ? canonicalRegion(row.sido) : null,
       industry: row.industry,
     },
     batch: asBatch(row),

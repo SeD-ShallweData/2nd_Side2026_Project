@@ -16,18 +16,16 @@ export interface RegionCount {
  * 같은 색으로 눌러 버린다. 그래서 값이 있는 지역만 모아 4분위로 끊는다.
  * 0단계는 "자료 없음" 이고 색이 아니라 회색으로 표시한다.
  */
-/*
- * 지도의 지역 하나가 DB 에서 어떤 이름으로 불리는지 찾는다.
- *
- * 2018년 경계 자료는 '강원도' 라고 부르지만 DB 에는 '강원특별자치도' 가 들어
- * 있다. 못 찾으면 사업장이 없는 지역으로 본다.
- */
+/* Historical names are accepted while the DB and its source batches transition. */
 export function resolveRegionValue(
   shape: { name: string; aliases?: readonly string[] },
   counts: readonly RegionCount[],
 ): RegionCount | undefined {
-  const candidates = [shape.name, ...(shape.aliases ?? [])];
-  return counts.find((entry) => candidates.includes(entry.value));
+  const candidates = new Set([shape.name, ...(shape.aliases ?? [])]);
+  const matched = counts.filter((entry) => candidates.has(entry.value));
+  return matched.length > 0
+    ? { value: shape.name, count: matched.reduce((sum, entry) => sum + entry.count, 0) }
+    : undefined;
 }
 
 export function regionShadeLevels(counts: readonly RegionCount[]): Map<string, number> {
@@ -52,21 +50,24 @@ export function regionShadeLevels(counts: readonly RegionCount[]): Map<string, n
 
 export function RegionMap({
   counts,
+  total,
   selected,
   onSelect,
   disabled = false,
 }: {
   counts: readonly RegionCount[];
+  total: number;
   selected?: string;
   onSelect: (region: string) => void;
   disabled?: boolean;
 }) {
   const titleId = useId();
-  const levels = regionShadeLevels(counts);
-  const total = counts.reduce((sum, entry) => sum + entry.count, 0);
+  const mappedCounts = KOREA_REGIONS.map((region) => resolveRegionValue(region, counts))
+    .filter((entry): entry is RegionCount => entry !== undefined);
+  const levels = regionShadeLevels(mappedCounts);
   const regionData = KOREA_REGIONS.map((region) => {
     const matched = resolveRegionValue(region, counts);
-    const regionValue = matched?.value ?? region.name;
+    const regionValue = region.name;
     const count = matched?.count ?? 0;
     const level = levels.get(regionValue) ?? 0;
     const isSelected = selected === regionValue;
@@ -96,6 +97,7 @@ export function RegionMap({
             className="region-map-area"
             d={region.path}
             data-level={level}
+            data-combined={region.name === "전남광주통합특별시" ? "true" : undefined}
             data-selected={isSelected ? "true" : undefined}
             role="button"
             tabIndex={disabled || count === 0 ? -1 : 0}

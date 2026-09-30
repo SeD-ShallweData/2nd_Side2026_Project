@@ -249,7 +249,7 @@ export function CompanySearch() {
                     <option value="">전체 지역</option>
                     {filterOptions.regions.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.value} ({option.count_label})
+                        {option.value} ({option.count.toLocaleString("ko-KR")})
                       </option>
                     ))}
                   </select>
@@ -266,7 +266,7 @@ export function CompanySearch() {
                     <option value="">전체 업종</option>
                     {filterOptions.industries.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.value} ({option.count_label})
+                        {option.value} ({option.count.toLocaleString("ko-KR")})
                       </option>
                     ))}
                   </select>
@@ -319,7 +319,7 @@ export function CompanySearch() {
                   {result.query
                     ? `‘${result.query}’ 관련 사업장 `
                     : `${[appliedFilters.region, appliedFilters.industry].filter(Boolean).join(" · ")} 사업장 `}
-                  <strong>{result.total.toLocaleString("ko-KR")}{result.total_is_capped ? "+" : ""}</strong>곳
+                  <strong>{result.total.toLocaleString("ko-KR")}</strong>곳
                 </h2>
               </div>
               <p>첫 번째 결과가 자동 선택되지 않습니다.</p>
@@ -414,6 +414,7 @@ export function CompanySearch() {
             ) : filterOptions ? (
               <RegionMap
                 counts={filterOptions.regions}
+                total={filterOptions.total}
                 selected={appliedFilters.region}
                 onSelect={selectRegionFromMap}
                 disabled={loading}
