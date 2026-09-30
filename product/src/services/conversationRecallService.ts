@@ -1,21 +1,21 @@
 import type { ChatRequest } from "@/domain/chat";
 import type { ChatComparisonResponse, ChatResultProviderId } from "@/domain/chatComparison";
 import type { ConversationRecallFact } from "@/domain/conversationRecall";
-import { hasCompanyLocationQualifier, mentionedCompanies, recallCompanyLabel, statementCompany, type RecallCompany } from "@/services/conversationCompanyScope";
-import { asksNextAction } from "@/services/chatQuestionPurpose";
+import { defaultStatementSubject, hasCompanyLocationQualifier, mentionedCompanies, recallCompanyLabel, statementCompanies, statementCompany, type RecallCompany } from "@/services/conversationCompanyScope";
+import { asksExplicitRecall, asksNextAction } from "@/services/chatQuestionPurpose";
 import { asksUserDocumentStatus, asksWageDocumentUse } from "@/services/chatQuestionPurpose";
 import { DOCUMENT_LABELS, DOCUMENT_STATE_LABELS, documentStatusesForRequest } from "@/services/conversationDocumentStatus";
 
-const PAYDAY = /(?:급여일|월급날|(?:급여|월급|임금)\s*지급일)/;
+const PAYDAY = /(?:급여일|월급날|(?:급여|월급|임금)\s*지급일|(?:급여|월급|임금).{0,6}(?:매달|매월))/;
 const PROMISE = /(?:지급\s*약속|회사\s*(?:답변|응답)|입금\s*약속)/;
 const RECALL = /(?:말한|말했던|말했는지|정정한(?!다)|알려\s*주|기억|회상|다시\s*(?:말|알려|정리)|지금까지|앞서|아까|였나|였죠|였지|정리해)/;
-const LEGAL = /(?:법적|법률|신고|진정|신청|청구|문의|어디|어떻게|무엇부터|뭘\s*해야|해야\s*하|할\s*수|가산|계산|위법|투자|주식|추천)/;
+const LEGAL = /(?:법적|법률|신고|진정|접수|신청|청구|문의|어떻게|무엇부터|뭘\s*해야|해야\s*하|할\s*수|가산|계산|위법|투자|주식|추천)/;
 const COMPANY_NAME_RECALL = /(?:회사|사업장)\s*(?:이름|명)|어느\s*(?:회사|사업장)|사용한\s*(?:회사|사업장)|연결한\s*(?:회사|사업장)/;
 const COMPANY_CONTEXT_RECALL = /(?:앞선|이전|앞서|아까|순서대로|다시|말해|알려)/;
-const RESIGNATION = /퇴사일|퇴직일|그만둔\s*날|(?:지난달\s*)?\d{1,2}\s*일에\s*퇴사/;
-const WORK_HOURS = /하루\s*\d{1,2}\s*시간|(?:근무|근로)\s*시간/;
+const RESIGNATION = /퇴사일|퇴직일|(?:퇴사한|퇴직한|그만둔)\s*날|(?:지난달\s*)?\d{1,2}\s*일에\s*퇴사/;
+const WORK_HOURS = /하루(?:에)?\s*(?:\d{1,2}|몇)\s*시간|(?:근무|근로)\s*시간/;
 const ACCIDENT_LOCATION = /사고\s*장소|다친\s*(?:곳|장소)|(?:어디|어느\s*곳).{0,12}(?:넘어|다쳤)|집\s*계단|(?:일터|작업장).{0,15}(?:넘어|다쳤)/;
-const WAGE_BALANCE = /잔액|미지급\s*금액|(?:남은|받은)\s*(?:임금|월급|급여|금액)|나머지|부분\s*입금/;
+const WAGE_BALANCE = /잔액|미지급\s*(?:금액|임금)|(?:남은|받은|받아야\s*할)\s*(?:임금|월급|급여|금액)|나머지|일부\s*(?:지급|입금)|부분\s*(?:지급|입금)/;
 
 function needsEvidence(message: string): boolean {
   // Reporting what was said is recall; "어떻게 신고하나" still needs evidence.
@@ -74,11 +74,13 @@ function documentStatusRecall(request: ChatRequest, allowMixed = false): { answe
 export function extractRecallFacts(input: {
   content: string; source_message_id: string; sequence: number; company_id: string | null;
   companies?: RecallCompany[];
+  previous_facts?: ConversationRecallFact[];
 }): ConversationRecallFact[] {
   const facts: ConversationRecallFact[] = [];
   const isCorrection = /정정|수정|아니라|아니고|잘못\s*말/.test(input.content);
   let subjectId = input.company_id;
   let unresolvedSubject = false;
+  let pendingTopic: "payday" | "resignation_date" | "work_hours" | null = null;
   const add = (kind: ConversationRecallFact["kind"], value: string | null, state?: ConversationRecallFact["state"]) => facts.push({
     kind, value, source_message_id: input.source_message_id, sequence: input.sequence,
     company_id: subjectId, is_correction: isCorrection, ...(state ? { state } : {}),
@@ -86,31 +88,34 @@ export function extractRecallFacts(input: {
   // Questions, hypotheticals and recall requests are not new assertions.
   for (const sentence of input.content.match(/[^.!?。？\n]+[.!?。？]?/g) ?? []) {
     if (/(?:만약|가정|라면|이라면|인지|인가요|맞나요|맞는지)/.test(sentence)
-      || /(?:동료|친구|다른\s*(?:회사|상담|사람)|예시|답변에서는|챗봇|모델|상담사)/.test(sentence)
-      || RECALL.test(sentence)
+      || /(?:동료|친구|다른\s*(?:상담|사람)|예시|답변에서는|챗봇|모델|상담사)/.test(sentence)
+      || (RECALL.test(sentence) && !/정정할|수정할|잘못\s*말/.test(sentence))
       || (/[?？]$/.test(sentence) && !/(?:이고|이며|입니다|있습니다|했다고|겠다고)/.test(sentence))) continue;
     const scope = statementCompany(sentence, subjectId, input.companies ?? []);
     if (scope.ambiguous) { unresolvedSubject = true; continue; }
     if (mentionedCompanies(sentence, input.companies ?? []).length === 1) unresolvedSubject = false;
     if (unresolvedSubject) continue;
+    if (scope.company_id !== subjectId) pendingTopic = null;
     subjectId = scope.company_id;
-    if (PAYDAY.test(sentence)) {
-      const tail = sentence.slice(sentence.search(PAYDAY));
+    const explicitTopic = PAYDAY.test(sentence) ? "payday" : RESIGNATION.test(sentence) ? "resignation_date" : WORK_HOURS.test(sentence) ? "work_hours" : null;
+    const continuation = pendingTopic && /(?:아니라|아니고|맞아요|맞습니다|이에요|입니다)/.test(sentence) ? pendingTopic : null;
+    if (explicitTopic) pendingTopic = explicitTopic;
+    if (PAYDAY.test(sentence) || continuation === "payday") {
+      const tail = PAYDAY.test(sentence) ? sentence.slice(sentence.search(PAYDAY)) : sentence;
       const corrected = tail.split(/아니라|아니고/).at(-1)!;
       const days = [...corrected.matchAll(/(?:매월\s*)?([12]?\d|3[01])\s*일/g)];
       if (/아닙|아니에요|모르|미정|확실하지/.test(corrected)) add("payday", null);
       else if (days.length === 1 && Number(days[0][1]) > 0) add("payday", `${Number(days[0][1])}일`);
-      else if (days.length > 1 || isCorrection) add("payday", null);
+      else if (days.length > 1) add("payday", null);
     }
-    if (RESIGNATION.test(sentence)) {
+    if (RESIGNATION.test(sentence) || continuation === "resignation_date") {
       const corrected = sentence.split(/아니라|아니고/).at(-1)!;
-      const day = corrected.match(/(?:지난달\s*)?(?:[12]?\d|3[01])\s*일/);
+      const day = corrected.match(/(?:(?:\d{4}\s*년\s*)?\d{1,2}\s*월\s*|지난달\s*|이번\s*달\s*)?([12]?\d|3[01])\s*일/);
       if (day && !/[?？]$/.test(sentence)) {
-        const month = /지난달/.test(sentence) ? "지난달 " : "";
-        add("resignation_date", `${month}${Number(day[0].match(/\d+/)![0])}일`);
+        add("resignation_date", day[0].replace(/\s+/g, " ").trim());
       }
     }
-    if (WORK_HOURS.test(sentence)) {
+    if (WORK_HOURS.test(sentence) || continuation === "work_hours") {
       const corrected = sentence.split(/아니라|아니고|잘못\s*말(?:했습니다|했어요)/).at(-1)!;
       const hours = [...corrected.matchAll(/(?:하루\s*)?(\d{1,2})\s*시간/g)];
       const hour = hours.at(-1);
@@ -122,12 +127,29 @@ export function extractRecallFacts(input: {
       const location = corrected.match(/(?:퇴근\s*뒤\s*)?집\s*계단|(?:회사\s*)?(?:일터|작업장|사업장)/);
       if (location) add("accident_location", location[0].replace(/\s+/g, " "));
     }
-    const payment = sentence.match(/(\d{1,7})\s*만\s*원?\s*중\s*(\d{1,7})\s*만\s*원?.{0,24}입금/);
-    if (payment && /미지급|못\s*받|나머지|잔액/.test(sentence)) {
-      const total = Number(payment[1]);
-      const paid = Number(payment[2]);
-      if (total > 0 && paid <= total) add("wage_balance",
-        `${total}만 원 중 ${paid}만 원 입금, 남은 금액 ${total - paid}만 원`);
+    const amount = "([\\d,]+(?:\\.\\d+)?)\\s*(만\\s*원|만원|원)";
+    const won = (number: string, unit: string) => Number(number.replaceAll(",", "")) * (unit.includes("만") ? 10000 : 1);
+    const paymentMatch = sentence.match(new RegExp(`${amount}\\s*(?:중|가운데)\\s*${amount}.{0,20}?(?:입금(?:됐|되었|했고|받았|됨)|입금(?=\\s*[,，])|들어왔|받았|받음|지급받았)`));
+    const payment = paymentMatch && !/(?:못|안)\s*받|받기로|예정|약속/.test(paymentMatch[0]) ? paymentMatch : null;
+    const prior = [...(input.previous_facts ?? []), ...facts].findLast(fact => fact.company_id === subjectId && fact.kind === "wage_balance");
+    const priorAmounts = prior?.value?.match(/([\d.]+)만 원 중 ([\d.]+)만 원 입금/);
+    let total: number | null = null;
+    let paid: number | null = null;
+    if (payment) {
+      total = won(payment[1], payment[2]); paid = won(payment[3], payment[4]);
+    } else if (/(?:임금|월급|급여)/.test(sentence) && /못\s*받|미지급|안\s*들어/.test(sentence)) {
+      const due = sentence.match(new RegExp(amount));
+      if (due && !/일부|중|나머지|부분|잔액|남은/.test(sentence)
+        && (!priorAmounts || /총|원래|받아야/.test(sentence))) { total = won(due[1], due[2]); paid = 0; }
+    } else if (priorAmounts && /추가로|추가\s*입금|그\s*(?:임금|돈)|방금/.test(sentence)) {
+      const received = sentence.match(new RegExp(`${amount}.{0,16}(?:받았|들어왔|입금됐|입금되었)`));
+      if (received && !/못|않|안\s*받/.test(sentence)) {
+        total = Number(priorAmounts[1]) * 10000;
+        paid = Number(priorAmounts[2]) * 10000 + won(received[1], received[2]);
+      }
+    }
+    if (total !== null && paid !== null && Number.isSafeInteger(total) && Number.isSafeInteger(paid) && total > 0 && paid >= 0 && paid <= total) {
+      add("wage_balance", `${total / 10000}만 원 중 ${paid / 10000}만 원 입금, 남은 금액 ${(total - paid) / 10000}만 원`);
     }
     if ((/(?:회사|사장|사업주|대표|문자|약속)/.test(sentence) || mentionedCompanies(sentence, input.companies ?? []).length === 1)
       && /(?:지급|입금|주겠|준다고)/.test(sentence)) {
@@ -152,12 +174,13 @@ export function extractRecallFacts(input: {
 export function recallAnswer(request: ChatRequest, allowMixed = false): { answer: string; found: boolean } | null {
   // A correction is a new user assertion, not a request to repeat the old value.
   // Normalize only supported facts; do not mutate stored history or trust model text.
-  const companies = request.conversation_recall?.companies ?? request.conversation_recall?.company_history ?? [];
+  const companies = statementCompanies(request);
+  const defaultSubject = defaultStatementSubject(request);
   const currentFacts = extractRecallFacts({ content: request.message, source_message_id: "current_request",
-    sequence: 0, company_id: request.company_id ?? null, companies });
+    sequence: 0, company_id: defaultSubject, companies, previous_facts: request.conversation_recall?.facts });
   const facts = request.conversation_recall?.facts ?? request.recent_messages.flatMap((message, index) =>
     message.role === "user" ? extractRecallFacts({ content: message.content,
-      source_message_id: `recent_${index}`, sequence: index + 1, company_id: request.company_id ?? null, companies }) : []);
+      source_message_id: `recent_${index}`, sequence: index + 1, company_id: defaultSubject, companies }) : []);
   const oldDay = request.message.match(/(?:이전|앞서).{0,18}?([12]?\d|3[01])\s*일.{0,24}(?:기준|계산)/)?.[1];
   const explicitDateCompanies = mentionedCompanies(request.message, companies);
   const dateCorrections = oldDay ? (["payday", "resignation_date"] as const).flatMap((kind) =>
@@ -173,7 +196,7 @@ export function recallAnswer(request: ChatRequest, allowMixed = false): { answer
   const safeDateFollowup = dateCorrections.length === 1;
   const asksCorrection = /(?:정정|수정|바뀐|최신\s*사실)/.test(request.message);
   const asksBalance = WAGE_BALANCE.test(request.message);
-  const asksKnownFact = /(?:퇴사일|퇴직일|그만둔\s*날|근무시간|근로시간|사고\s*장소).{0,16}(?:언제|얼마|어디|무엇|몇)/.test(request.message)
+  const asksKnownFact = /(?:급여일|월급날|퇴사일|퇴직일|그만둔\s*날|근무\s*시간|근로\s*시간|사고\s*장소).{0,16}(?:언제|얼마|어디|무엇|몇)|하루(?:에)?\s*몇\s*시간/.test(request.message)
     && !/법적|산재\s*여부|신고|진정|신청|청구|계산/.test(request.message);
   if ((!RECALL.test(request.message) && !asksCorrection && !asksBalance && !asksKnownFact && currentFacts.length === 0)
     || (!PAYDAY.test(request.message) && !PROMISE.test(request.message) && !RESIGNATION.test(request.message)
@@ -189,14 +212,14 @@ export function recallAnswer(request: ChatRequest, allowMixed = false): { answer
       && request.message.includes(company.company_name.slice(0, 2))
       && companies.filter((other) => other.company_name.startsWith(company.company_name.slice(0, 2))).length === 1);
   }
-  if ((named.length === 0 && statementCompany(request.message, request.company_id ?? null, companies).ambiguous)
+  if ((named.length === 0 && statementCompany(request.message, defaultSubject, companies).ambiguous)
     || named.some((item, index) => named.some((other, otherIndex) => index !== otherIndex && item.company_name === other.company_name))
       && !named.every((item) => hasCompanyLocationQualifier(request.message, item))) {
     return { answer: "이 상담의 회사별 진술과 질문의 회사 대상을 확실하게 연결하지 못했습니다. 회사 이름과 해당 진술을 함께 알려 주세요.", found: false };
   }
   const selected = named.length ? named
     : /(?:두|각|모든)\s*회사|회사별/.test(request.message) ? companies
-    : [{ company_id: request.company_id ?? null, company_name: companies.find((item) => item.company_id === request.company_id)?.company_name }];
+    : [{ company_id: defaultSubject, company_name: companies.find((item) => item.company_id === defaultSubject)?.company_name }];
   const targets = selected.filter((item, index) => selected.findIndex((candidate) => candidate.company_id === item.company_id) === index);
   const explicitKinds = new Set<ConversationRecallFact["kind"]>([
     ...(PAYDAY.test(request.message) ? ["payday" as const] : []),
@@ -261,7 +284,8 @@ export function recallResponse(request: ChatRequest, providers: Array<{
   const fact = recallAnswer(request);
   const document = documentStatusRecall(request);
   const combined = fact && document ? { answer:`${fact.answer}\n\n${document.answer}`, found:fact.found || document.found } : fact ?? document;
-  const recall = companyRecall ?? documentAdmissionRecall(request) ?? combined;
+  const numbered = numberedRecall(request);
+  const recall = numbered ?? companyRecall ?? documentAdmissionRecall(request) ?? combined;
   if (!recall) return null;
   const now = new Date().toISOString();
   return {
@@ -289,15 +313,43 @@ export function recallResponse(request: ChatRequest, providers: Array<{
   };
 }
 
+/** Preserve an explicit list of requested memory fields, including mixed facts/documents. */
+function numberedRecall(request: ChatRequest): { answer: string; found: boolean } | null {
+  if (needsEvidence(request.message)) return null;
+  const markers = [...request.message.matchAll(/(?:^|\s)([1-8])\s*(?:번|[.)])\s*(?:은|는|:)?\s*/g)];
+  if (markers.length < 2) return null;
+  const named = mentionedCompanies(request.message, statementCompanies(request));
+  const subject = named.length === 1 ? named[0].company_id : defaultStatementSubject(request);
+  const answers = markers.map((marker, index) => {
+    const start = marker.index! + marker[0].length;
+    const section = request.message.slice(start, markers[index + 1]?.index ?? request.message.length);
+    const scoped = { ...request, message: `앞서 말한 ${section}`,
+      ...(request.conversation_recall ? { conversation_recall: { ...request.conversation_recall, active_statement_subject: subject } } : {}) };
+    const fact = recallAnswer(scoped);
+    const document = documentStatusRecall(scoped);
+    if (!fact && !document) return null;
+    const answer = [fact?.answer, document?.answer].filter(Boolean).join("\n")
+      .replace(/이 상담에서 말씀하신 내용 기준입니다\.\s*/g, "")
+      .replace(/이 상담에서 사용자가 말한 문서 상태입니다\. 서류 자체를 확인한 결과는 아닙니다\.\s*/g, "");
+    return { answer: `${marker[1]}. ${answer}`, found: Boolean(fact?.found || document?.found) };
+  });
+  if (answers.some(answer => !answer)) return null;
+  return { answer: `이 상담의 사용자 진술 기준입니다.\n\n${answers.map(answer => answer!.answer).join("\n\n")}`,
+    found: answers.some(answer => answer!.found) };
+}
+
 export function finalizeConversationResponse(request: ChatRequest, response: ChatComparisonResponse): ChatComparisonResponse {
-  const mixedRecall = needsEvidence(request.message) ? recallAnswer(request, true) : null;
-  const documentRecall = documentStatusRecall(request, true);
+  const mixedRecall = needsEvidence(request.message) && asksExplicitRecall(request.message) ? recallAnswer(request, true) : null;
+  const documentRecall = asksExplicitRecall(request.message)
+    || asksUserDocumentStatus(request.message) && /정리|구분|목록/.test(request.message)
+    ? documentStatusRecall(request, true) : null;
   return { ...response, results: response.results.map((result) => {
     if (result.trace.recall_mode) return result;
     // Even a legal-generation replacement keeps the separately sourced recall.
     // Emergency answers always retain priority and are not prefixed.
-    const recall = result.answer_type === "emergency_guidance" ? null : mixedRecall;
-    const document = result.answer_type === "emergency_guidance" ? null : documentRecall;
+    const recall = result.answer_type === "emergency_guidance" || !mixedRecall?.found ? null : mixedRecall;
+    const document = result.answer_type === "emergency_guidance" || !documentRecall?.found
+      || result.trace.guardrail_hits.includes("USER_DOCUMENT_STATE_CONTRADICTION") ? null : documentRecall;
     const prefixes = [recall?.answer, document?.answer].filter(Boolean);
     const answer = prefixes.length ? `${prefixes.join("\n\n")}\n\n추가 질문에 대한 안내: ${result.answer}` : result.answer;
     return { ...result, answer, metrics: { ...result.metrics, answer_chars: answer.length },

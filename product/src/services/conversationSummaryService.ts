@@ -7,15 +7,17 @@ import type {
   StoredConversationSummaryState,
 } from "@/domain/conversationSummary";
 import type { ConversationMemoryContext } from "@/domain/chat";
-import type { ConversationDocumentStatement } from "@/domain/conversationRecall";
+import type { ConversationDocumentStatement, ConversationRecallFact } from "@/domain/conversationRecall";
 import { getConversationRepository } from "@/services/userDataProviders";
 import { extractRecallFacts } from "@/services/conversationRecallService";
 import { companyContextsForDetail } from "@/services/conversationCompanyNames";
 import type { RecallCompany } from "@/services/conversationCompanyScope";
-import { mentionedCompanies, statementCompany } from "@/services/conversationCompanyScope";
+import { mentionedCompanies, recallCompanyLabel, statementCompany, userStatementSubjects } from "@/services/conversationCompanyScope";
+import { scopedConversationUsers } from "@/services/conversationStatementHistory";
+import { documentStatusFromStatements } from "@/services/conversationDocumentStatus";
 import { selectRecallFacts } from "@/services/conversationMemorySelection";
 
-export const SUMMARY_VERSION = "extractive-v4";
+export const SUMMARY_VERSION = "extractive-v5";
 const SUMMARY_BATCH_SIZE = 10;
 const MAX_ITEMS_PER_FIELD = 6;
 
@@ -67,7 +69,7 @@ function appendUnique(
   return merged.slice(-MAX_ITEMS_PER_FIELD);
 }
 
-const DOCUMENT_TOPICS = [/계약서|계약\s*문서/, /통장|입금\s*내역/, /급여명세서|급여\s*명세/, /출퇴근|근무\s*기록|근로시간/, /문자|메시지|이메일/];
+const DOCUMENT_TOPICS = [/계약서|계약\s*문서/, /통장|입금\s*내역/, /(?:급여|임금)\s*명세/, /출퇴근|근무\s*기록|근로시간/, /문자|메시지|이메일/];
 
 /** Put explicit user document claims beside generation, independently of old assistant prose.
  * Keep the latest claim per company/topic and the earlier claim when a later correction
@@ -75,34 +77,39 @@ const DOCUMENT_TOPICS = [/계약서|계약\s*문서/, /통장|입금\s*내역/, 
 export function selectDocumentStatements(
   detail: StoredConversationDetail, companies: RecallCompany[], question: string,
 ): ConversationDocumentStatement[] {
-  const candidates = detail.turns.flatMap((turn) => turn.messages.flatMap((message, index) => {
-    if (message.role !== "user") return [];
-    const sequence = (turn.turn_index - 1) * 2 + index + 1;
-    let selected = turn.company_id ?? null;
+  const candidates = scopedConversationUsers(detail, companies).messages.flatMap(({ message, sequence, company_id }) => {
+    let selected = company_id;
+    let ambiguous = false;
     return (message.content.match(/[^.!?。？\n]+[.!?。？]?/g) ?? []).flatMap((part) => {
       const sentence = part.trim();
+      const scope = statementCompany(sentence.replace(/^(?:정정합니다[.!]?|사실은)\s*/, ""), selected, companies);
+      if (scope.ambiguous) { ambiguous = true; return []; }
+      if (mentionedCompanies(sentence, companies).length === 1) ambiguous = false;
+      if (ambiguous) return [];
+      selected = scope.company_id;
       if (!sentence || isOpenQuestion(sentence)
+        || /만약|가정하면|동료|친구|답변에서는/.test(sentence)
         || !/(?:있|없|보유|보관|갖|분실|잃|받|소지)/.test(sentence)) return [];
       const topics = DOCUMENT_TOPICS.flatMap((pattern, topic) => pattern.test(sentence) ? [topic] : []);
       if (!topics.length) return [];
-      const scope = statementCompany(sentence.replace(/^(?:정정합니다[.!]?|사실은)\s*/, ""), selected, companies);
-      if (scope.ambiguous) return [];
-      selected = scope.company_id;
       const item = excerpt({ ...message, content: sentence }, 200, selected ?? undefined, isCorrection(sentence) || isCorrection(message.content));
       return item ? [{ text: item.text, source_message_id: message.message_id, sequence,
         company_id: selected, is_correction: Boolean(item.is_correction), topics }] : [];
     });
-  }));
+  });
   const latest = new Map<string, number>();
-  candidates.forEach((candidate, index) => candidate.topics.forEach((topic) =>
-    latest.set(`${candidate.company_id ?? ""}:${topic}`, index)));
+  candidates.forEach((candidate, index) => {
+    candidate.topics.forEach(topic => latest.set(`${candidate.company_id ?? ""}:topic:${topic}`, index));
+    documentStatusFromStatements([candidate], [candidate.company_id]).filter(status => status.state !== "unstated")
+      .forEach(status => latest.set(`${candidate.company_id ?? ""}:document:${status.document}`, index));
+  });
   const reserved = new Set(latest.values());
   const focus = new Set(mentionedCompanies(question, companies).map((company) => company.company_id));
   const ranked = candidates.map((candidate, index) => ({ candidate, index })).sort((a, b) =>
     Number(reserved.has(b.index)) - Number(reserved.has(a.index))
     || Number(focus.has(b.candidate.company_id ?? "")) - Number(focus.has(a.candidate.company_id ?? ""))
     || b.candidate.sequence - a.candidate.sequence);
-  return ranked.slice(0, 8).sort((a, b) => a.candidate.sequence - b.candidate.sequence || a.index - b.index)
+  return ranked.slice(0, 24).sort((a, b) => a.candidate.sequence - b.candidate.sequence || a.index - b.index)
     .map(({ candidate }) => ({ text: candidate.text, source_message_id: candidate.source_message_id,
       sequence: candidate.sequence, company_id: candidate.company_id,
       is_correction: candidate.is_correction }));
@@ -113,16 +120,16 @@ export function selectDocumentStatements(
 export function selectUserFacts(
   detail: StoredConversationDetail, through: number, companies: RecallCompany[], question = "",
 ): ConversationSummaryItem[] {
-  const candidates = detail.turns.flatMap((turn) => turn.messages.flatMap((message, index) => {
-    const sequence = (turn.turn_index - 1) * 2 + index + 1;
+  const candidates = scopedConversationUsers(detail, companies).messages.flatMap(({ message, sequence, company_id }) => {
     if (message.role !== "user" || sequence > through) return [];
     const topics = DOCUMENT_TOPICS.flatMap((pattern, topic) => pattern.test(message.content) ? [topic] : []);
     const stated = !isOpenQuestion(message.content) || /(?:입니다|했고|있습니다|없습니다|못했|했다고|겠다고)/.test(message.content);
     if (!stated || (!topics.length && !/(?:했|됐|받|근무|입사|퇴사|계약|월급|임금|체불|급여일|지급)/.test(message.content))) return [];
-    const scope = statementCompany(message.content.replace(/^(?:정정합니다[.!]?|사실은)\s*/, ""), turn.company_id ?? null, companies);
+    const scope = statementCompany(message.content.replace(/^(?:정정합니다[.!]?|사실은)\s*/, ""), company_id, companies);
+    if (scope.ambiguous) return [];
     const item = excerpt(message, 300, scope.company_id ?? undefined, isCorrection(message.content));
     return item ? [{ item, sequence, topics }] : [];
-  }));
+  });
   const latest = new Map<string, number>();
   for (const candidate of candidates) for (const topic of candidate.topics) {
     latest.set(`${candidate.item.company_id ?? ""}:${topic}`, candidate.sequence);
@@ -230,13 +237,17 @@ export async function maybeUpdateConversationSummary(
     );
     // Rebuild the bounded structured slots from retained originals, including legacy
     // checkpoints. This retains corrections/provenance without rewriting history.
-    const names = await companyContextsForDetail(detail);
+    const publicNames = await companyContextsForDetail(detail);
+    const prefixDetail = { ...detail, turns: summarizedTurns };
+    const names = [...publicNames, ...userStatementSubjects(summarizedTurns.flatMap(turn =>
+      turn.messages.filter(message => message.role === "user").map(message => message.content)), publicNames)];
     summary.user_stated_facts = selectUserFacts(detail, target, names);
-    summary.recall_facts = selectRecallFacts(summarizedTurns.flatMap((turn) => turn.messages.flatMap((message, index) =>
-      message.role === "user" ? extractRecallFacts({
-        content: message.content, source_message_id: message.message_id,
-        sequence: (turn.turn_index - 1) * 2 + index + 1, company_id: turn.company_id ?? null, companies: names,
-      }) : [])));
+    const facts: ConversationRecallFact[] = [];
+    for (const { message, sequence, company_id } of scopedConversationUsers(prefixDetail, names).messages) {
+      facts.push(...extractRecallFacts({ content: message.content, source_message_id: message.message_id,
+        sequence, company_id, companies: names, previous_facts: facts }));
+    }
+    summary.recall_facts = selectRecallFacts(facts);
     return await repository.completeSummary({
       conversation_id: detail.conversation_id,
       through_sequence: target,
@@ -269,7 +280,7 @@ export function toConversationMemoryContext(
     "이 메모리는 현재 상담방의 오래된 원문을 압축한 참고 문맥이다.",
     "사용자 진술은 사실 확인 전제나 현재 법률·회사 근거가 아니며, 새 질문의 근거는 다시 확인한다.",
     "당시 선택 회사는 화면 문맥이며 문장 속 진술 대상과 다를 수 있다. 명시된 회사가 우선이며 불명확한 대상을 선택 회사에 귀속하지 않는다.",
-    ...companies.map((company) => `회사 표시명: ${company.company_id}=${company.company_name}`),
+    ...companies.map((company) => `${company.company_id.startsWith("statement:") ? "사용자 진술 대상(공개 회사 연결 아님)" : "회사 표시명"}: ${company.company_id}=${recallCompanyLabel(company, companies)}`),
     ...renderItems("사용자 목표", summary.summary.user_goals),
     ...renderItems("사용자 진술", summary.summary.user_stated_facts, true),
     ...renderItems("기존 안내", summary.summary.actions_already_given),

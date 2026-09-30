@@ -18,6 +18,7 @@ export function isPaymentTimingQuestion(query: string): boolean {
   if (asksNewCorpusLawTopic(query)) return false;
   if (/퇴직금|퇴직연금/.test(query) && !/제?\s*36\s*조|금품\s*청산/.test(query)) return false;
   return /제?\s*36\s*조|금품\s*청산/.test(query)
+    || (/일부|부분|남은|잔액/.test(query) && /지급|입금|임금/.test(query) && /기록|정리|남겨|보관/.test(query))
     || (/퇴직|퇴사|사망/.test(query) && /임금|월급|급여|금품|지급|14일|2주/.test(query))
     || (/지급|입금/.test(query) && /약속|하겠|예정|기일.{0,10}(?:연장|합의)/.test(query)
       // Payroll context does not depend on a literal "회사": a real company name
@@ -34,6 +35,9 @@ function needsSettlementConditions(query: string): boolean {
 }
 
 function paymentTimingAnswer(query: string): string {
+  if (/일부|부분|잔액/.test(query) && /기록|정리|남겨|보관/.test(query)) {
+    return `대상 임금 기간과 원래 받아야 할 금액, 실제 받은 날짜·금액, 남은 금액을 한 줄씩 구분해 적으세요. 일부 입금 내역과 회사가 보낸 지급 관련 문자를 함께 보관하고, 잔액은 같은 임금 기간의 총액에서 실제 받은 금액을 빼서 대조하세요. 회사의 지급 약속과 실제 입금은 별도 항목으로 남기세요. 자료가 모두 갖춰져야만 진정할 수 있는 것은 아니며, 미지급이 계속되면 노동포털 온라인 또는 관할 고용노동관서 방문으로 진정할 수 있습니다(${GUIDE}). 1350은 상담 창구입니다.`;
+  }
   const record = needsPaymentRecords(query)
     ? `회사 문자 원문과 앞뒤 대화가 보이도록 캡처하고 원본도 보관하세요. 발신자 이름·번호와 수신 날짜·시각, 약속 금액, 대상 임금 기간, 약속 지급일을 따로 적어 두세요. ${/다음\s*주/.test(query) ? "‘다음 주’는 문자에 적힌 표현 그대로 남기고 임의의 날짜로 바꾸지 마세요. " : ""}금액이나 정확한 지급 날짜가 없으면 미확인으로 표시하고 회사에 문자로 확인을 요청하세요. 기존 정기 급여일·미지급액과 실제 입금 내역도 구분해 보관하세요. 이는 사실관계 확인을 돕는 기록 제안이며 전부 갖춰야만 진정할 수 있는 필수서류 목록은 아닙니다.`
     : "기존 정기 급여일, 대상 임금 기간·금액, 실제 입금 내역과 회사가 약속한 지급일을 구분해 정리하세요.";
@@ -43,17 +47,21 @@ function paymentTimingAnswer(query: string): string {
   const filing = needsSettlementConditions(query)
     ? "퇴직·사망 후 청산기한과 연장 합의 내용, 재직 중 정기 지급일에 이미 발생한 미지급을 구분해 확인하세요. 합의한 날짜·대상 금품이 불명확하면 회사에 서면 확인을 요청하고 관할 노동관서에 적용을 문의하세요."
     : "정기 급여일이 이미 지났는데 임금을 받지 못했다면 회사의 새 약속일까지 기다려야만 진정할 수 있는 것은 아닙니다.";
-  return [record, "재직 중 정기 임금은 원칙적으로 매월 1회 이상 정해진 날에 지급해야 합니다(근로기준법 제43조).", settlement,
-    `${filing} 정식 임금체불 진정은 고용노동부 노동포털 온라인 신청 또는 사업장 소재지 관할 고용노동관서 방문으로 접수합니다. 1350은 절차 상담 창구로 정식 진정 접수와 별개입니다(${GUIDE}).`].join("\n\n");
+  const deadlineAnswer = /14\s*일|2\s*주/.test(query) && /신고|진정|권리|사라|기한/.test(query)
+    ? "아니요. 퇴사 후 14일 안에 신고하지 않았다는 이유로 임금을 받을 권리가 사라지는 것은 아닙니다. 여기서 14일은 사용자의 금품 청산기한이며 근로자의 신고기한이 아닙니다(근로기준법 제36조)." : "";
+  return [deadlineAnswer, record, "재직 중 정기 임금은 원칙적으로 매월 1회 이상 정해진 날에 지급해야 합니다(근로기준법 제43조).", settlement,
+    `${filing} 정식 임금체불 진정은 고용노동부 노동포털 온라인 신청 또는 사업장 소재지 관할 고용노동관서 방문으로 접수합니다. 1350은 절차 상담 창구로 정식 진정 접수와 별개입니다(${GUIDE}).`].filter(Boolean).join("\n\n");
 }
 
 /** Checks conditional relations and necessary content, not just one observed phrase. */
 export function paymentTimingGuardrailHits(query: string, answer: string): string[] {
   const text = answer.replace(/[*_]/g, "");
   const hits: string[] = [];
-  if (/(?:자료|서류|증빙)[^.\n]{0,70}(?:모두|전부).{0,15}(?:갖춘\s*뒤|갖춰야|준비해야)|(?:자료|서류|증빙)[^.\n]{0,70}함께\s*제출해야/.test(text)
-    && /진정|체불/.test(text) && !/없어도|어려워도|필수.{0,12}아닙/.test(text)) hits.push("WAGE_EVIDENCE_NOT_PREREQUISITE");
   const clauses = text.split(/[.。!?\n]+/);
+  if (/진정|체불|신고/.test(query) && clauses.some(clause =>
+    /서류|증빙|증거|계약서|명세서|확인서/.test(clause)
+    && /모두.{0,20}(?:갖춰|준비)|전부.{0,20}(?:갖춰|준비)|갖춘\s*뒤|함께\s*제출해야|(?:먼저|우선|반드시).{0,25}(?:필요|받아야|준비해야)|공식.{0,8}증거.{0,15}(?:부족|인정되지)/.test(clause)
+    && !/없어도|어려워도|아닙|아니|필수.{0,12}않|필요.{0,12}없/.test(clause))) hits.push("WAGE_EVIDENCE_NOT_PREREQUISITE");
   for (const clause of clauses) {
     if (!/14\s*일|2\s*주|십사\s*일/.test(clause)) continue;
     if (!/임금|금품|지급|청산|36\s*조/.test(clause)) continue;
@@ -76,15 +84,19 @@ export function paymentTimingGuardrailHits(query: string, answer: string): strin
   // Article 36 states a payment period, not a separate 14-day filing window.
   // Limit this check to an asserted filing deadline; "unpaid after 14 days,
   // then file" is a different relation and must not be rejected by this hit.
-  if (/(?:14\s*일|2\s*주)\s*(?:이내|안에)\s*(?:에)?\s*(?:진정|신고)(?:을|를|서)?\s*(?:제기|신청|접수|할\s*수)/.test(text)
-    || /(?:퇴직|퇴사|사망)\s*후\s*(?:14\s*일|2\s*주)\s*(?:이내|안에)[^.。!?\n]{0,25}(?:진정|신고)/.test(text)
-    || /(?:진정|신고)(?:을|를|서)?[^.。!?\n]{0,25}(?:퇴직|퇴사|사망)\s*후\s*(?:14\s*일|2\s*주)\s*(?:이내|안에)/.test(text)) {
+  if (clauses.some(clause => !/아닙|아니|않|없/.test(clause) && (
+    /(?:14\s*일|2\s*주)\s*(?:이내|안에)\s*(?:에)?\s*(?:진정|신고)(?:을|를|서)?\s*(?:제기|신청|접수|할\s*수)/.test(clause)
+    || /(?:퇴직|퇴사|사망)\s*후\s*(?:14\s*일|2\s*주)\s*(?:이내|안에).{0,25}(?:진정|신고)/.test(clause)
+    || /(?:진정|신고)(?:을|를|서)?.{0,25}(?:퇴직|퇴사|사망)\s*후\s*(?:14\s*일|2\s*주)\s*(?:이내|안에)/.test(clause)))) {
     hits.push("PAYMENT_NEW_FILING_DEADLINE");
   }
   return [...new Set(hits)];
 }
 
 export function hasUnpaidWageQuestion(query: string): boolean {
+  if (/(?:급여|임금|월급).{0,10}(?:입금됐|입금되었|받았|지급됐)/.test(query)
+    && /명세서.{0,12}(?:못\s*받|받지\s*못|없)/.test(query)
+    && !/미지급|체불|나머지|잔액|일부/.test(query)) return false;
   const wage = "(?:월급|급여|임금|수당)";
   const unpaid = "(?:못\\s*받|받지\\s*못|안\\s*(?:들어|줬|주)|들어오지\\s*않|미지급|미입금|체불|밀렸|밀린|지급일.{0,5}(?:지났|넘겼)|월급날.{0,5}(?:지났|넘겼)|입금.{0,7}(?:없|안\\s*됐|되지\\s*않|들어오지\\s*않))";
   return new RegExp(`${wage}.{0,18}${unpaid}|${unpaid}.{0,18}${wage}`).test(query);
@@ -107,18 +119,20 @@ export function reviewedLaborTopics(query: string): Topic[] {
   // ("요양급여 신청 서류", "산재 신청용 사업주 확인서"가 임금 진정·체불 확인서 번들로 가던 문제)
   if (asksNewCorpusLawTopic(query)) return [];
   const topics: Topic[] = [];
-  if (/(?:급여|임금)\s*명세서/.test(query) && /받지\s*못|못\s*받|미교부|요청|달라고|항목|공제|계산방법/.test(query)) topics.push("payslip");
+  if (/(?:급여|임금)\s*명세서/.test(query) && /받지\s*못|못\s*받|미교부|요청|달라고|항목|공제|계산\s*방법|세전|세후|실수령/.test(query)) topics.push("payslip");
   if (isPaymentTimingQuestion(query)) topics.push("payment");
-  if (/야간|야근|(?:22\s*시|23\s*시|밤\s*(?:10|11|열|열한)\s*시|오후\s*(?:10|11)\s*시)/.test(query)
+  if (/야간|(?:22\s*시|23\s*시|밤\s*(?:10|11|열|열한)\s*시|오후\s*(?:10|11)\s*시)|야근/.test(query)
+    && (!/연장근로|초과근무/.test(query) || /야간|22\s*시|23\s*시|밤/.test(query))
     && /근로|근무|수당|가산|일하|시키|퇴근|임금|야근/.test(query)) topics.push("night");
   if (/연장근로|초과근무|토요일|휴일근로/.test(query)
-    && /가산|수당|임금|근무|일했|일하/.test(query)) topics.push("overtime");
+    && /가산|수당|임금|근무|일했|일하|1\.5\s*배|받을/.test(query)) topics.push("overtime");
   if (/체불.{0,20}확인서|사업주\s*확인서/.test(query)) topics.push("certificate");
   if ((/\b1350\b|진정(?:서|을|은|에|의|\s|$)|온라인.{0,12}(?:신고|접수)/.test(query)
     && /체불|임금|월급|급여|노동|진정|상담/.test(query))
     || (/노동포털/.test(query) && /(?:회사.{0,16}(?:답.{0,8}(?:안|않|없|못)|응답.{0,8}(?:안|않|없|못))|임금|급여|월급|체불)/.test(query)
       && /어떻게|방식|이어|접수|제출|신청/.test(query))
-    || (asksWageDocumentUse(query) && /진정|접수|제출|체불|활용|사용|증거/.test(query))) topics.push("filing");
+    || (asksWageDocumentUse(query) && /신고|진정|접수|제출|체불|활용|사용|증거/.test(query))
+    || (hasUnpaidWageQuestion(query) && asksNextAction(query))) topics.push("filing");
   return topics;
 }
 
@@ -178,21 +192,34 @@ export function reviewedLaborFallback(query: string, baseline: ChatResponse): Ch
   const retrieval = reviewedLaborRetrieval(query);
   if (!retrieval) return null;
   const paragraphs = reviewedLaborTopics(query).map((topic) => {
-    if (topic === "payslip") return `회사에 임금명세서의 구성항목·계산방법·공제내역을 서면이나 전자문서로 요청하고, 요청 일시와 회신을 보관하세요. 임금 지급 시 명세서 교부 의무는 근로기준법 제48조 제2항에 따른 것입니다(${PAYSLIP_GUIDE}). 실제 입금액·지급일은 거래내역으로, 근무시간은 출퇴근·근무표로 각각 대조하세요. 명세서가 없다는 사실만으로 임금 미지급을 확정하지 않습니다.`;
+    if (topic === "payslip") {
+      if (/공제|항목|계산\s*방법|세전|세후|실수령/.test(query) && !/못\s*받|받지\s*못|미교부/.test(query)) {
+        return `임금명세서에서 지급 항목별 금액과 지급액 합계, 공제 항목별 금액과 공제액 합계, 실제 지급액을 함께 확인하세요. 세전 금액과 통장에 들어온 금액을 비교하려면 지급액 합계에서 어떤 항목이 공제되었는지 대조하면 됩니다. 명세서에는 구성항목·계산방법·공제내역 등이 표시되어야 합니다(근로기준법 제48조 제2항, ${PAYSLIP_GUIDE}). 개별 공제가 맞는지는 항목명·금액·계산 근거를 회사에 확인하고 실제 입금 내역과 비교하세요.`;
+      }
+      return `회사에 임금명세서의 구성항목·계산방법·공제내역을 서면이나 전자문서로 요청하고, 요청 일시와 회신을 보관하세요. 임금 지급 시 명세서 교부 의무는 근로기준법 제48조 제2항에 따른 것입니다(${PAYSLIP_GUIDE}). 실제 입금액·지급일은 거래내역으로, 근무시간은 출퇴근·근무표로 각각 대조하세요. 명세서가 없다는 사실만으로 임금 미지급을 확정하지 않습니다.`;
+    }
     if (topic === "payment") return paymentTimingAnswer(query);
     if (topic === "night") return [
       `${/(?:22\s*시|10\s*시|열\s*시)까지/.test(query) ? "22시까지 일하고 바로 종료했다면 그 사실만으로 야간근로가 되는 것은 아닙니다. " : ""}야간근로는 22시부터 다음 날 6시 사이의 실제 근로이며, 22시 이후 일한 시간이 있는지 구분해야 합니다(근로기준법 제56조).`,
       `${nightWorkSize(query) === "under_five" ? "상시 4명인 경우처럼 상시 5명 미만이면 제56조의 법정 야간 가산임금 규정은 적용되지 않습니다. " : ""}상시 5명 이상 사업장에서는 해당 야간근로에 통상임금의 50% 이상을 가산하는 것이 원칙입니다. ${nightWorkSize(query) !== "under_five" ? "상시 5명 미만이면 이 법정 가산임금 규정은 적용되지 않습니다. " : ""}${nightWorkSize(query) === "unknown" ? "상시근로자 수가 몇 명인지 확인해 주시겠어요? " : ""}(근로기준법 제11조, 근로기준법 시행령 제7조, 근로기준법 제56조).`,
       "법정 가산 대상이 아니어도 실제 일한 시간의 임금은 별개이며, 근로계약·취업규칙에 별도 수당 지급 약정이 있는지도 확인하세요(근로기준법 제4조). 출퇴근·휴게 기록과 급여명세서를 대조하고, 22시 이전의 연장근로수당은 실제 근로시간과 적용 요건을 따로 확인하세요(근로기준법 제56조). 상시근로자 수나 기록 해석이 어렵다면 1350에서 상담받을 수 있습니다.",
     ].join("\n\n");
-    if (topic === "overtime") return "토요일에 일했다는 사실만으로 연장근로 가산임금이 무조건 발생하지는 않습니다. 상시근로자 수가 5명 이상인지, 그날이 소정근로일·휴무일·휴일 중 무엇인지, 실제 일한 시간과 휴게시간을 먼저 확인하세요(근로기준법 제11조, 근로기준법 제56조). 상시 5명 미만이면 제56조의 법정 연장·야간·휴일 가산 규정은 적용되지 않지만 실제 일한 시간의 임금과 근로계약·취업규칙의 별도 지급 약정은 구분해 확인해야 합니다(근로기준법 시행령 제7조). 출퇴근 기록·근무표·계약서·급여명세서를 대조하고 적용이 불명확하면 1350에 문의하세요(고용노동부 빠른인터넷상담 「5인 미만 사업장 토요일 추가 근무」).";
+    if (topic === "overtime") {
+      const lead = nightWorkSize(query) === "under_five"
+        ? "무조건 1.5배를 받는 것은 아닙니다. 상시근로자가 5명 미만인 사업장에는 제56조의 법정 연장근로 가산임금 규정이 적용되지 않습니다(근로기준법 제11조, 근로기준법 시행령 제7조)."
+        : /토요일/.test(query) ? "토요일에 일했다는 사실만으로 연장근로 가산임금이 무조건 발생하지는 않습니다."
+        : "연장근로 가산 여부는 상시근로자 수와 실제 근로시간 등 적용 요건에 따라 확인해야 합니다(근로기준법 제11조, 근로기준법 제56조).";
+      return `${lead} ${nightWorkSize(query) !== "under_five" ? "상시 5명 미만이면 제56조의 법정 연장·야간·휴일 가산 규정은 적용되지 않습니다(근로기준법 시행령 제7조). " : ""}실제 일한 시간의 임금과 근로계약·취업규칙에서 별도로 약정한 수당은 구분해 확인하세요. 상시 5명 이상인지, 실제 근로시간·휴게시간이 얼마인지 확인하고, 토요일·휴일 근무라면 그날이 소정근로일·휴무일·휴일 중 무엇인지도 확인해야 합니다(근로기준법 제11조, 근로기준법 제56조). 출퇴근 기록·근무표·계약서·급여명세서를 대조하고 적용이 불명확하면 1350에서 상담받으세요.`;
+    }
     if (topic === "certificate") return [
       "체불 임금등·사업주 확인서는 임금등을 지급받지 못한 근로자가 대지급금 청구 또는 법률구조 등 소송에 필요한 경우 신청하는 서류입니다. 약속한 지급일이 지났다는 이유만으로 자동 발급되지는 않고, 근로감독 과정에서 체불 내용이 확인되어야 합니다(임금채권보장법 제12조).",
       `먼저 미지급 임금·지급일과 근로계약서·급여명세서·입금내역을 정리해 노동포털 온라인 진정 또는 관할 고용노동관서 방문으로 접수하세요. 조사·확인 후 담당 근로감독관에게 사용 목적을 알리고 확인서 발급을 신청합니다. 이미 조사를 받았다면 새 진정부터 반복하기보다 담당자에게 발급 가능 여부를 확인하세요(${GUIDE}).`,
       `발급받은 뒤 대지급금 청구는 근로복지공단, 법률구조·소송은 대한법률구조공단 등 해당 절차로 이어집니다. 확인서 발급이 곧 지급 확정은 아니며 각 제도의 자격·기한·지급요건은 별도 확인이 필요합니다(${GUIDE}).`,
     ].join("\n\n");
-    const documentUse = asksWageDocumentUse(query) ? "보유한 계약서 사본에서 약정 임금·지급일·근로시간을 확인하세요. 통장 사본만으로 거래내역을 보유했다고 추정하지 말고, 실제 입금 날짜·금액은 은행 거래내역으로 별도 확인하세요. 명세서를 받지 못했다면 구성항목·계산방법·공제내역을 요청하고 요청 기록을 남기세요. 이는 자료 대조 제안이며 서류를 모두 갖춰야만 진정할 수 있다는 뜻은 아닙니다.\n\n" : "";
-    return `${documentUse}${/지표|긍정|신호/.test(query) ? "납부·고용 지표는 실제 임금 지급이나 과거 체불 부재를 증명하지 않습니다. 미지급 사실은 지표와 별개로 지급일과 입금내역을 대조해야 합니다.\n\n" : ""}1350은 전화 상담·안내 창구이며, 전화 상담만으로 임금체불 진정서가 정식 접수되는 것은 아닙니다(고용노동부 「고용노동부 고객상담센터 1350」).\n\n진정은 고용노동부 노동포털에서 온라인으로 신청하거나 사업장 소재지 관할 고용노동관서를 방문해 접수하세요. 지급일·미지급 내역과 근로계약서·급여명세서·입금·근무 기록을 정리하고, 접수 후 담당자의 조사 안내를 확인하세요(${GUIDE}).`;
+    const documentUse = asksWageDocumentUse(query) ? "아니요. 근로계약서나 임금명세서가 없어도 임금체불 진정을 제기할 수 있습니다. 현재 갖고 있는 출근 문자·실제 입금 내역 등으로 근무 기간, 약정 임금과 지급일, 받은 금액과 못 받은 금액을 정리하세요. 부족한 사실은 접수 후 담당 감독관의 조사에서 확인할 수 있습니다(고용노동부 빠른인터넷상담 「임금체불 진정 입증자료 안내」). 통장 사본은 계좌 정보이고 실제 거래내역과는 다릅니다. 갖고 있지 않은 서류를 이미 보유한다고 가정하거나, 서류를 전부 갖출 때까지 접수를 미루라는 뜻은 아닙니다.\n\n" : "";
+    const immediateActions = asksNextAction(query) ? "오늘 할 일은 두 가지입니다.\n1. 약정 지급일·대상 임금 기간·못 받은 금액을 적고 현재 가진 근무 기록과 입금 내역을 보관하세요.\n2. 회사에 미지급액과 지급 예정일을 문자 등 기록이 남는 방식으로 확인해 요청과 회신을 보관하세요.\n\n" : "";
+    if (/한\s*문장|문장\s*하나/.test(query) && /1350/.test(query) && /노동포털/.test(query) && /차이|구분|다른/.test(query)) return `1350은 전화 상담·안내 창구이고, 노동포털은 임금체불 진정을 온라인으로 접수하는 창구입니다(${GUIDE}).`;
+    return `${documentUse}${immediateActions}${/지표|긍정|신호/.test(query) ? "납부·고용 지표는 실제 임금 지급이나 과거 체불 부재를 증명하지 않습니다. 미지급 사실은 지표와 별개로 지급일과 입금내역을 대조해야 합니다.\n\n" : ""}정식 진정은 고용노동부 노동포털에서 온라인으로 신청하거나 사업장 소재지 관할 고용노동관서를 방문해 접수하세요. 현재 갖고 있는 자료를 제출하고 접수 후 담당자의 조사 안내를 확인하세요(${GUIDE}).\n\n1350은 전화 상담·안내 창구이며, 전화 상담만으로 진정서가 정식 접수되는 것은 아닙니다(고용노동부 「고용노동부 고객상담센터 1350」).`;
   });
   return { ...baseline, answer: paragraphs.join("\n\n"), answer_type: "general_guidance",
     sources: retrieval.documents.map((doc) => doc.source), guardrail_status: "limited",
@@ -210,7 +237,7 @@ export function applicabilityGuardrailHits(query: string, answer: string): strin
     if (topic === "payment") continue;
     const size = nightWorkSize(query);
     const requirements = topic === "payslip"
-      ? [/명세서/, /요청/, /공제|계산방법|계산\s*내역/, /입금|거래/]
+      ? [/명세서/, /공제|계산방법|계산\s*내역/, ...(/못\s*받|미교부|받지\s*못/.test(query) ? [/요청/] : [])]
       : topic === "night"
       ? [/(?:22\s*시|10\s*시|열\s*시)/, /(?:6\s*시|여섯\s*시)/, /(?:5|다섯)\s*(?:명|인)/,
         ...(size === "under_five" ? [/적용(?:되지|하지|\s*제외)|의무.{0,8}없/, /약정|계약|취업규칙/] : [/50\s*%|100분의\s*50/]),
@@ -218,10 +245,12 @@ export function applicabilityGuardrailHits(query: string, answer: string): strin
         ...(/약정|계약/.test(query) ? [/약정|계약/] : []),
         ...(/(?:22\s*시|10\s*시|열\s*시)까지/.test(query) ? [/(?:22\s*시|10\s*시|열\s*시)(?:까지|에)[^.\n]{0,100}(?:아니|아닙|않|없)/] : [])]
       : topic === "overtime"
-        ? [/토요일|연장근로|휴일근로/, /(?:5|다섯)\s*(?:명|인)/, /소정근로일|휴무일|휴일/, /실제\s*(?:일한|근로)/, /계약|취업규칙/]
+        ? [/토요일|연장근로|휴일근로/, /(?:5|다섯|4|네)\s*(?:명|인)/, /실제\s*(?:일한|근로)/, /계약|취업규칙/,
+          ...(/토요일|휴일/.test(query) ? [/소정근로일|휴무일|휴일/] : []),
+          ...(size === "under_five" ? [/적용(?:되지|하지|\s*제외)|의무.{0,8}없/] : [])]
       : topic === "certificate"
         ? [/대지급금/, /소송|법률구조/, /조사|근로감독/, /확인서[^.\n]{0,40}(?:신청|요청)|발급[^.\n]{0,15}신청/, /지급.{0,15}(?:요건|심사)|요건.{0,12}(?:확인|심사)/]
-        : [/1350/, /상담/, /노동포털/, /진정/, /관할|고용노동관서/];
+        : [/1350/, /상담/, /노동포털/, /진정/, ...(/한\s*문장|문장\s*하나/.test(query) ? [] : [/관할|고용노동관서/])];
     if (requirements.some((pattern) => !pattern.test(text))) hits.push(`APPLICABILITY_${topic.toUpperCase()}_CONDITIONS`);
   }
   if (reviewedLaborTopics(query).includes("payslip") && text.split(/[.!?。\n]/).some(sentence =>
@@ -229,7 +258,7 @@ export function applicabilityGuardrailHits(query: string, answer: string): strin
   if (/(?:22\s*시|10\s*시|열\s*시)까지[^.\n]{0,50}(?:야간근로(?:에\s*해당합니다|입니다|로\s*분류됩니다)|야간\s*수당을\s*(?:지급해야|받을\s*수\s*있))/.test(text)) hits.push("NIGHT_END_TIME_CONFUSION");
   if (/(?:5\s*(?:명|인)\s*미만|4\s*(?:명|인)(?:\s*이하)?)[^.\n]{0,60}(?:법정|법적)[^.\n]{0,45}(?:의무가\s*(?:있|적용)|반드시\s*지급|적용됩니다)/.test(text)) hits.push("SMALL_WORKPLACE_PREMIUM_CONFUSION");
   const hotlineFiling = text.split(/[.!?。\n]/).some((sentence) => {
-    if (!/1350/.test(sentence) || !/진정(?:서)?(?:을|를|이|가)?\s*(?:제출|접수)/.test(sentence)) return false;
+    if (!/1350/.test(sentence) || !/진정(?:서)?(?:을|를|이|가)?\s*(?:제출|접수)|신고(?:하|를|해)/.test(sentence)) return false;
     // A negated phone-filing claim or a separate filing step after consultation is valid.
     if (/(?:제출|접수).{0,35}(?:아닙|아니|않|없|불가)/.test(sentence)
       || /상담.{0,8}(?:후|뒤).{0,35}(?:노동포털|노동관서)/.test(sentence)) return false;

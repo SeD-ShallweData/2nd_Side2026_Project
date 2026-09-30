@@ -10,9 +10,10 @@ import { hasActualUnpaidWageReport, hasUnpaidWageQuestion, reviewedLaborTopics }
 import { asksPublicCompanyComparison, referencedCompanyIds } from "@/services/companyAnswerScope";
 import { asksSplitWageInjuryActions } from "@/services/splitIssueGuidance";
 import { asksNewCorpusLawTopic } from "@/domain/corpusLawTopics";
+import { mentionedCompanies, statementCompanies } from "@/services/conversationCompanyScope";
 
 const DIRECT_LABOR_TERMS = [
-  "체불", "근로계약", "근로시간", "퇴근", "수당", "연차", "해고", "휴가", "야근", "노동",
+  "체불", "근로계약", "근로시간", "퇴근", "퇴사", "근무표", "출퇴근", "수당", "연차", "해고", "휴가", "야근", "노동",
 ];
 const WAGE_TROUBLE_PATTERN = /(?:임금|월급|급여).{0,18}(?:밀|못\s*받|지급|체불|문제|상담|받는\s*방법)|(?:밀|못\s*받|지급|체불|문제|상담).{0,18}(?:임금|월급|급여)/;
 
@@ -90,6 +91,9 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
     && !hasActualUnpaidWageReport(request.message);
   const publicCompanyComparison = asksPublicCompanyComparison(request.message,
     referencedCompanyIds(request.message, request.conversation_recall?.companies ?? [], request.company_id));
+  const indicatorMeaning = /카드|지표|신호|지역.{0,6}업종/.test(request.message)
+    && /뜻|의미|단정|결론|위법|위반|확정|입증|증명|사고.{0,12}(?:발생|났)|안전.{0,8}인증/.test(request.message)
+    && !hasActualUnpaidWageReport(request.message);
   if (hasLaborRequest(request.message) && outOfScopeTopic) {
     return {
       request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },
@@ -101,6 +105,22 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
     };
   }
 
+  if (indicatorMeaning && !outOfScopeTopic && (/입증|증명|단정|결론/.test(request.message)
+    || (!request.company_id && /뜻|의미/.test(request.message)))) {
+    return {
+      request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },
+      parts: [part("company_general", "공개 지표로 확인할 수 있는 범위와 개별 사실의 구별", request)],
+      requires_clarification: false,
+    };
+  }
+  if (/공개|카드|지표|신호/.test(request.message)
+    && mentionedCompanies(request.message, statementCompanies(request)).some(company => company.company_id.startsWith("statement:"))) {
+    return {
+      request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },
+      parts: [part("clarification", "사용자 진술 속 사업장의 공개 자료 연결 확인", request,
+        { missing_fact: "공개 자료에서 확인할 사업장 선택" })], requires_clarification: true,
+    };
+  }
   if (selectedCompanyCardQuestion || publicCompanyComparison) {
     return {
       request: { message: request.message, company_id: request.company_id, chat_mode: request.chat_mode },
@@ -109,7 +129,8 @@ export function createAnswerPlan(request: ChatRequest, decision: IntentDecision)
     };
   }
 
-  if (decision.intent === "labor" || laborPortalProcedure || asksSplitWageInjuryActions(request.message)
+  if (decision.intent === "labor" || (!outOfScopeTopic && decision.intent === "unclear"
+    && /근로계약서|근무표|출퇴근\s*기록|(?:임금|급여)\s*명세서/.test(request.message)) || laborPortalProcedure || asksSplitWageInjuryActions(request.message)
     || (hasUnpaidWageQuestion(request.message)
       && (decision.intent !== "company" || hasActualUnpaidWageReport(request.message)))
     || (!outOfScopeTopic && reviewedLaborTopics(request.message).length > 0)
