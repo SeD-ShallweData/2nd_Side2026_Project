@@ -33,6 +33,7 @@ import { companyAnswerGuardrailHits } from "@/services/companyAnswerGuardrails";
 import { userFactGuardrailHits } from "@/services/userFactAnswerGuardrails";
 import { recallAnswer } from "@/services/conversationRecallService";
 import { asksSplitWageInjuryActions, splitWageInjuryGuardrailHits, splitWageInjuryGuidance } from "@/services/splitIssueGuidance";
+import { correctAgencyContacts } from "@/services/agencyContactCorrection";
 
 export const CHAT_POLICY_VERSION = "donworry-chat-policy-2026-09-29-v20";
 const EMPTY_USAGE: TokenUsage = {
@@ -188,6 +189,17 @@ function replacementBaseline(context: ComparisonContext, hits: string[] = []): C
   return clarificationFallback(context.policyBaseline);
 }
 
+/** 검색 조문 본문의 두 글자 이상 한글 낱말 중 답변에 나온 비율. 짧은 조문은 판단하지 않는다. */
+// 09-30 실측: 옮겨 쓴 조문 0.39~0.70, 무관 조문 최대 0.28.
+const RETRIEVED_CONTENT_OVERLAP = 0.35;
+function contentOverlap(content: string, answer: string): number {
+  const words = new Set(content.match(/[가-힣]{2,}/g) ?? []);
+  if (words.size < 12) return 0;
+  let found = 0;
+  for (const word of words) if (answer.includes(word)) found += 1;
+  return found / words.size;
+}
+
 function supportedResponseSources(answer: string, response: ChatResponse, context: ComparisonContext): ChatResponse["sources"] {
   if (context.questionIntent === "company") {
     // An interview question about conditions at a named firm is not a claim
@@ -200,7 +212,7 @@ function supportedResponseSources(answer: string, response: ChatResponse, contex
   }
   if (context.questionIntent === "labor" && context.ragRetrieval.status === "matched") {
     const answerKeys = citationKeys(answer);
-    return response.sources.filter(source => {
+    const cited = response.sources.filter(source => {
       if ((source.citation && answer.includes(source.citation)) || answer.includes(source.name)) return true;
       // 약칭(산재보험법·외국인고용법)이나 「」 표기로 인용해도 같은 조문이면 출처를 유지한다.
       if (source.citation && [...citationKeys(source.citation)].some(key => answerKeys.has(key))) return true;
@@ -209,6 +221,12 @@ function supportedResponseSources(answer: string, response: ChatResponse, contex
       return Boolean(source.url?.startsWith("https://labor.moel.go.kr/")
         && /노동포털/.test(answer) && /진정|접수|신청/.test(answer));
     });
+    if (cited.length > 0 || answerKeys.size > 0) return cited;
+    // 조문 이름을 하나도 적지 않았지만 검색된 조문 내용을 그대로 옮긴 답변은 그 조문을 근거로 보인다.
+    // 인용 검증과는 별개다: 답변에 조문 번호를 새로 넣지 않고, 출처 카드만 붙인다.
+    return response.sources.filter(source => context.ragRetrieval.documents.some(document =>
+      (document.citation === source.citation || document.source.name === source.name)
+      && contentOverlap(document.content, answer) >= RETRIEVED_CONTENT_OVERLAP));
   }
   return response.sources;
 }
@@ -420,7 +438,8 @@ export class DualLlmChatProvider implements ChatComparisonProvider {
     const runs = this.configs.map(async (config): Promise<ProviderComparisonResult> => {
       try {
         const completion = await this.client.complete(config, messages);
-        const generatedAnswer = publicAnswerText(completion.answer);
+        // 기관 연락처(근로복지공단 ↔ 1350) 혼동은 가드레일 교체 대신 결정적으로 고친다.
+        const generatedAnswer = correctAgencyContacts(publicAnswerText(completion.answer));
         const guardrailHits = scanGuardrails(generatedAnswer, context);
         const replaced = guardrailHits.length > 0;
         const responseBaseline = replaced ? replacementBaseline(context, guardrailHits) : context.policyBaseline;
