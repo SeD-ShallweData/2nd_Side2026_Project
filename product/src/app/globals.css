@@ -4396,9 +4396,11 @@ summary:focus-visible {
 .batch-status-pill { border: 1px solid; border-radius: 999px; display: inline-flex; font-size: .67rem; font-weight: 850; padding: 5px 9px; }
 .batch-status-pill.is-active { background: #e7f5ec; border-color: #acd2b9; color: #24633f; }
 .batch-status-pill.is-archived { background: #f1f3f5; border-color: #d4d9df; color: #69727c; }
-/* 규모 칸은 세 줄로 쌓는다. td 자체를 flex 로 만들면 표 칸이 아니게 되어 행 높이를 따라가지 못하므로 안쪽 묶음에 건다. */
-.batch-status-table td.batch-scale-cell > div { display: flex; flex-direction: column; gap: 3px; }
-.batch-status-table td.batch-scale-cell span { color: var(--muted); font-size: .68rem; font-weight: 600; }
+/* 규모 값은 각 항목을 독립된 행에 놓고 좁은 화면에서는 표를 가로로 스크롤한다. */
+.batch-status-table td.batch-scale-cell dl { display: grid; gap: 4px; min-width: 132px; margin: 0; }
+.batch-status-table td.batch-scale-cell dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.batch-status-table td.batch-scale-cell dt { color: var(--muted); font-size: .68rem; font-weight: 600; }
+.batch-status-table td.batch-scale-cell dd { color: var(--ink-soft); font-size: .68rem; font-weight: 750; margin: 0; text-align: right; }
 .batch-table-note { border-top: 1px solid var(--line); color: var(--muted); font-size: .72rem; margin: 0; padding: 13px 15px; }
 .batch-state-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); padding: 24px; }
 .batch-state-card strong { color: var(--inspector-navy); display: block; margin-bottom: 5px; }
@@ -4409,8 +4411,8 @@ summary:focus-visible {
 .ml-dashboard-notice { display: grid; gap: 5px; margin-bottom: 16px; border: 1px solid #cbd8e5; border-radius: 12px; background: #f3f7fb; color: var(--muted); padding: 13px 15px; font-size: .75rem; }
 .ml-dashboard-notice strong { color: var(--inspector-navy); font-size: .8rem; }
 .ml-dashboard-filters { display: flex; gap: 12px; margin-bottom: 18px; }
-.ml-dashboard-filters label { display: grid; gap: 6px; color: var(--muted); font-size: .72rem; font-weight: 800; }
-.ml-dashboard-filters select { min-width: 190px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; color: var(--ink); padding: 9px 11px; }
+.ml-dashboard-filters label { display: grid; gap: 6px; min-width: 0; color: var(--muted); font-size: .72rem; font-weight: 800; }
+.ml-dashboard-filters select { min-width: 190px; max-width: 100%; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; color: var(--ink); padding: 9px 11px; }
 .ml-distribution-panel { display: grid; gap: 14px; }
 .ml-distribution-summary { align-items: baseline; display: flex; gap: 8px; color: var(--muted); }
 .ml-distribution-summary strong { color: var(--inspector-navy); font-size: 1.35rem; }
@@ -4429,7 +4431,7 @@ summary:focus-visible {
 .ml-category-grid small { color: var(--muted); font-size: .66rem; }
 .ml-category-grid i { display: block; height: 5px; overflow: hidden; border-radius: 999px; background: #edf0f3; }
 .ml-category-grid em { display: block; height: 100%; border-radius: inherit; background: var(--inspector-navy); }
-@media (max-width: 760px) { .ml-distribution-list { grid-template-columns: 1fr; } .ml-dashboard-filters { flex-direction: column; } .ml-dashboard-filters select { width: 100%; } }
+@media (max-width: 760px) { .ml-distribution-list { grid-template-columns: 1fr; } .ml-dashboard-filters { flex-direction: column; } .ml-dashboard-filters select { min-width: 0; width: 100%; } }
 
 .inspector-alert {
   align-items: flex-start;
