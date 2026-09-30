@@ -1,19 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { commonMessages } from "@/i18n/messages/common";
 
+// [체크 상태 id, 분류 사전 키, 항목 사전 키]
 const CHECK_ITEMS = [
-  ["payday", "임금", "임금 지급일이 계약서에 명시되어 있는지"],
-  ["wage-parts", "임금", "기본급, 수당, 상여금이 구분되어 있는지"],
-  ["hours", "근로시간", "소정근로시간과 휴게시간이 명시되어 있는지"],
-  ["overtime", "근로시간", "연장·야간·휴일근로 수당 기준이 명시되어 있는지"],
-  ["contract-copy", "계약서", "서명한 근로계약서를 서면이나 전자문서로 교부받았는지"],
-  ["location", "근무조건", "계약서의 근무 장소와 실제 안내가 일치하는지"],
-  ["report", "산업안전", "산업재해 발생 시 보고 절차를 안내받았는지"],
-  ["equipment", "산업안전", "안전교육과 보호구 지급 여부를 확인했는지"],
+  ["payday", "wage", "payday"],
+  ["wage-parts", "wage", "wageParts"],
+  ["hours", "hours", "hours"],
+  ["overtime", "hours", "overtime"],
+  ["contract-copy", "contract", "contractCopy"],
+  ["location", "conditions", "location"],
+  ["report", "safety", "report"],
+  ["equipment", "safety", "equipment"],
 ] as const;
 
 export function ActionChecklist() {
+  const m = useMessages(commonMessages).checklist;
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const count = CHECK_ITEMS.filter(([id]) => checked[id]).length;
 
@@ -21,19 +26,19 @@ export function ActionChecklist() {
     <section className="checklist-card" aria-labelledby="checklist-title">
       <div className="section-title-row">
         <div>
-          <span className="eyebrow">직접 확인할 항목</span>
-          <h2 id="checklist-title">입사 전 행동 체크리스트</h2>
-          <p>모델 상태와 관계없이 실제 계약과 근무 환경을 직접 확인하세요.</p>
+          <span className="eyebrow">{m.eyebrow}</span>
+          <h2 id="checklist-title">{m.title}</h2>
+          <p>{m.desc}</p>
         </div>
         <div className="check-progress" aria-live="polite">
-          <strong>{count}</strong> / {CHECK_ITEMS.length} 확인
+          <strong>{count}</strong>{format(m.progress, { total: CHECK_ITEMS.length })}
         </div>
       </div>
       <div className="progress-track" aria-hidden="true">
         <span style={{ width: `${(count / CHECK_ITEMS.length) * 100}%` }} />
       </div>
       <div className="check-grid">
-        {CHECK_ITEMS.map(([id, category, label]) => (
+        {CHECK_ITEMS.map(([id, categoryKey, itemKey]) => (
           <label className={`check-item ${checked[id] ? "is-checked" : ""}`} key={id}>
             <input
               type="checkbox"
@@ -44,13 +49,13 @@ export function ActionChecklist() {
               {checked[id] ? "✓" : ""}
             </span>
             <span>
-              <small>{category}</small>
-              <strong>{label}</strong>
+              <small>{m.categories[categoryKey]}</small>
+              <strong>{m.items[itemKey]}</strong>
             </span>
           </label>
         ))}
       </div>
-      <p className="checklist-note">체크 상태는 현재 브라우저 화면에서만 유지되며 새로고침하면 초기화됩니다.</p>
+      <p className="checklist-note">{m.note}</p>
     </section>
   );
 }

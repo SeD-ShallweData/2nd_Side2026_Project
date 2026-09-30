@@ -1,0 +1,357 @@
+import { defineMessages } from "@/i18n/defineMessages";
+import { EXCLUDED_VERDICT_META, SIGNAL_STATUS_META, getWageStatusMeta } from "@/domain/riskPresentation";
+
+/*
+ * 여러 화면이 함께 쓰는 공통 부품 문구(불러오기·오류 상태, 출처, 기준일, 체크리스트, 상태 배지, 하단, 404).
+ * 한국어 상태 배지 문구는 도메인 상수를 그대로 가져와 상담 문맥(publicAnswerContext)과 어긋나지 않게 한다.
+ */
+export const commonMessages = defineMessages({
+  ko: {
+    async: {
+      loading: "정보를 불러오는 중입니다.",
+      errorTitle: "정보를 불러오지 못했습니다",
+      retry: "다시 시도",
+    },
+    sources: {
+      empty: "확인 가능한 출처가 없습니다.",
+      asOf: "기준 {date}",
+      document: "문서 {id}",
+    },
+    freshness: {
+      title: "분석 기준",
+      dataAsOf: "데이터 기준 {date}",
+      dataUnknown: "데이터 기준월 미확정",
+      target: "예측 대상 {month}",
+    },
+    checklist: {
+      eyebrow: "직접 확인할 항목",
+      title: "입사 전 행동 체크리스트",
+      desc: "모델 상태와 관계없이 실제 계약과 근무 환경을 직접 확인하세요.",
+      progress: " / {total} 확인",
+      note: "체크 상태는 현재 브라우저 화면에서만 유지되며 새로고침하면 초기화됩니다.",
+      categories: { wage: "임금", hours: "근로시간", contract: "계약서", conditions: "근무조건", safety: "산업안전" },
+      items: {
+        payday: "임금 지급일이 계약서에 명시되어 있는지",
+        wageParts: "기본급, 수당, 상여금이 구분되어 있는지",
+        hours: "소정근로시간과 휴게시간이 명시되어 있는지",
+        overtime: "연장·야간·휴일근로 수당 기준이 명시되어 있는지",
+        contractCopy: "서명한 근로계약서를 서면이나 전자문서로 교부받았는지",
+        location: "계약서의 근무 장소와 실제 안내가 일치하는지",
+        report: "산업재해 발생 시 보고 절차를 안내받았는지",
+        equipment: "안전교육과 보호구 지급 여부를 확인했는지",
+      },
+    },
+    status: {
+      signal: {
+        normal: SIGNAL_STATUS_META.normal.label,
+        watch: SIGNAL_STATUS_META.watch.label,
+        review: SIGNAL_STATUS_META.review.label,
+        unknown: SIGNAL_STATUS_META.unknown.label,
+      },
+      wageWatch: getWageStatusMeta("watch").label,
+      excluded: {
+        wageList: EXCLUDED_VERDICT_META["배제_임금체불공개"].label,
+        taxArrears: EXCLUDED_VERDICT_META["배제_공개체납"].label,
+        insuranceArrears: EXCLUDED_VERDICT_META["배제_4대보험체납(door1)"].label,
+      },
+    },
+    footer: {
+      inspectorCopy: "공공데이터의 관측 신호와 공식 노동 정보를 연결하는 구직자·근로자용 정보 서비스",
+      inspectorNote: "본 서비스는 회사의 안전·위법 여부나 입사 결정을 확정하지 않습니다.",
+      consumerLine1: "Co끼리는 공개 데이터에서 관측된 사실과 공식 노동 정보를 연결하여 제공하며",
+      consumerLine2: "회사의 안전·위법 여부나 입사 결정을 확정하지 않습니다.",
+      clubLogoAlt: "SeD 동아리 로고",
+      clubName: "인천대학교 데이터사이언스 연합 동아리 SeD(Shall we Data?)",
+    },
+    notFound: {
+      title: "요청한 사업장을 찾을 수 없습니다",
+      desc: "사업장 검색에서 이름, 지역, 업종을 다시 확인해 주세요.",
+      action: "사업장 다시 검색",
+    },
+  },
+  "ko-easy": {
+    async: {
+      loading: "정보를 불러오고 있어요.",
+      errorTitle: "정보를 불러오지 못했어요",
+      retry: "다시 하기",
+    },
+    checklist: {
+      eyebrow: "직접 확인할 것",
+      title: "일하기 전 확인할 것",
+      desc: "실제 계약서와 일할 곳을 직접 확인해 보세요.",
+      note: "체크한 것은 이 화면에서만 남아요. 새로고침하면 지워져요.",
+      categories: { wage: "월급", hours: "일하는 시간", conditions: "일하는 조건", safety: "안전" },
+      items: {
+        payday: "월급 받는 날이 계약서에 적혀 있나요",
+        wageParts: "기본급, 수당, 보너스가 나뉘어 적혀 있나요",
+        hours: "일하는 시간과 쉬는 시간이 적혀 있나요",
+        overtime: "밤 일, 휴일 일, 더 일한 시간의 돈 계산이 적혀 있나요",
+        contractCopy: "서명한 계약서를 종이나 파일로 받았나요",
+        location: "계약서의 일하는 곳과 실제로 들은 곳이 같나요",
+        report: "일하다 다쳤을 때 알리는 방법을 들었나요",
+        equipment: "안전교육을 받고 보호구를 받았나요",
+      },
+    },
+    footer: {
+      consumerLine1: "Co끼리는 공개 자료와 공식 노동 정보를 모아 보여 줘요.",
+      consumerLine2: "회사가 안전한지, 법을 어겼는지, 들어가도 되는지는 정하지 않아요.",
+    },
+    notFound: {
+      title: "찾는 회사가 없어요",
+      desc: "회사 이름, 지역, 업종을 다시 확인해 주세요.",
+      action: "다시 찾기",
+    },
+  },
+  en: {
+    async: {
+      loading: "Loading information.",
+      errorTitle: "Could not load the information",
+      retry: "Try again",
+    },
+    sources: {
+      empty: "No sources available to check.",
+      asOf: "As of {date}",
+      document: "Document {id}",
+    },
+    freshness: {
+      title: "Analysis basis",
+      dataAsOf: "Data as of {date}",
+      dataUnknown: "Data reference month not set",
+      target: "Forecast for {month}",
+    },
+    checklist: {
+      eyebrow: "Items to check yourself",
+      title: "Checklist before you start a job",
+      desc: "Whatever the model status, check the actual contract and working conditions yourself.",
+      progress: " / {total} checked",
+      note: "Checkmarks stay only on this browser screen and reset when you refresh.",
+      categories: { wage: "Wages", hours: "Working hours", contract: "Contract", conditions: "Working conditions", safety: "Workplace safety" },
+      items: {
+        payday: "Whether the payday is stated in the contract",
+        wageParts: "Whether base pay, allowances and bonuses are listed separately",
+        hours: "Whether contractual working hours and break times are stated",
+        overtime: "Whether pay rules for overtime, night and holiday work are stated",
+        contractCopy: "Whether you received the signed employment contract on paper or electronically",
+        location: "Whether the workplace in the contract matches what you were told",
+        report: "Whether you were told how to report an industrial accident",
+        equipment: "Whether you checked on safety training and protective gear",
+      },
+    },
+    status: {
+      signal: {
+        normal: "No clear unusual signal",
+        watch: "Safe signal not confirmed",
+        review: "Check first",
+        unknown: "Not enough data to analyze",
+      },
+      wageWatch: "More checking needed",
+      excluded: {
+        wageList: "Public list of unpaid wages",
+        taxArrears: "Publicly listed tax arrears",
+        insuranceArrears: "Social insurance arrears",
+      },
+    },
+    footer: {
+      inspectorCopy: "An information service for job seekers and workers that connects signals observed in public data with official labor information",
+      inspectorNote: "This service does not decide whether a company is safe or unlawful, or whether you should join it.",
+      consumerLine1: "CoAmong connects facts observed in public data with official labor information,",
+      consumerLine2: "and does not decide whether a company is safe or unlawful, or whether you should join it.",
+      clubLogoAlt: "SeD club logo",
+      clubName: "SeD (Shall we Data?), data science club at Incheon National University",
+    },
+    notFound: {
+      title: "We couldn't find the workplace you requested",
+      desc: "Please check the name, region and industry again in workplace search.",
+      action: "Search workplaces again",
+    },
+  },
+  zh: {
+    async: {
+      loading: "正在加载信息。",
+      errorTitle: "未能加载信息",
+      retry: "重试",
+    },
+    sources: {
+      empty: "没有可查看的出处。",
+      asOf: "基准 {date}",
+      document: "文件 {id}",
+    },
+    freshness: {
+      title: "分析基准",
+      dataAsOf: "数据基准 {date}",
+      dataUnknown: "数据基准月未确定",
+      target: "预测对象 {month}",
+    },
+    checklist: {
+      eyebrow: "需要亲自确认的项目",
+      title: "入职前行动清单",
+      desc: "无论模型状态如何,请亲自确认实际合同和工作环境。",
+      progress: " / {total} 已确认",
+      note: "勾选状态仅保留在当前浏览器页面,刷新后会重置。",
+      categories: { wage: "工资", hours: "工作时间", contract: "合同", conditions: "工作条件", safety: "安全生产" },
+      items: {
+        payday: "合同中是否写明工资发放日",
+        wageParts: "基本工资、津贴和奖金是否分开列明",
+        hours: "是否写明约定工作时间和休息时间",
+        overtime: "是否写明加班、夜班、节假日工作的津贴标准",
+        contractCopy: "是否以书面或电子文件形式领取了已签字的劳动合同",
+        location: "合同中的工作地点是否与实际告知一致",
+        report: "是否被告知发生工伤时的报告程序",
+        equipment: "是否确认了安全培训和防护用品发放情况",
+      },
+    },
+    status: {
+      signal: {
+        normal: "无明显异常信号",
+        watch: "未确认安全信号",
+        review: "建议优先确认",
+        unknown: "分析资料不足",
+      },
+      wageWatch: "需要进一步确认",
+      excluded: {
+        wageList: "拖欠工资公开名单",
+        taxArrears: "公开欠缴",
+        insuranceArrears: "四大保险欠缴",
+      },
+    },
+    footer: {
+      inspectorCopy: "面向求职者和劳动者的信息服务,连接公共数据中观测到的信号与官方劳动信息",
+      inspectorNote: "本服务不判定公司是否安全或违法,也不替您决定是否入职。",
+      consumerLine1: "CoAmong 将公开数据中观测到的事实与官方劳动信息结合提供,",
+      consumerLine2: "不判定公司是否安全或违法,也不替您决定是否入职。",
+      clubLogoAlt: "SeD 社团标志",
+      clubName: "仁川大学数据科学联合社团 SeD(Shall we Data?)",
+    },
+    notFound: {
+      title: "找不到您要查找的工作单位",
+      desc: "请在工作单位搜索中重新确认名称、地区和行业。",
+      action: "重新搜索工作单位",
+    },
+  },
+  vi: {
+    async: {
+      loading: "Đang tải thông tin.",
+      errorTitle: "Không thể tải thông tin",
+      retry: "Thử lại",
+    },
+    sources: {
+      empty: "Không có nguồn nào để kiểm tra.",
+      asOf: "Tính đến {date}",
+      document: "Tài liệu {id}",
+    },
+    freshness: {
+      title: "Cơ sở phân tích",
+      dataAsOf: "Dữ liệu tính đến {date}",
+      dataUnknown: "Chưa xác định tháng tham chiếu dữ liệu",
+      target: "Dự báo cho {month}",
+    },
+    checklist: {
+      eyebrow: "Những mục tự kiểm tra",
+      title: "Danh sách việc cần làm trước khi vào làm",
+      desc: "Dù trạng thái mô hình thế nào, hãy tự kiểm tra hợp đồng thực tế và môi trường làm việc.",
+      progress: " / {total} đã kiểm tra",
+      note: "Trạng thái đánh dấu chỉ được giữ trên màn hình trình duyệt này và sẽ mất khi tải lại trang.",
+      categories: { wage: "Tiền lương", hours: "Giờ làm việc", contract: "Hợp đồng", conditions: "Điều kiện làm việc", safety: "An toàn lao động" },
+      items: {
+        payday: "Hợp đồng có ghi rõ ngày trả lương không",
+        wageParts: "Lương cơ bản, phụ cấp và tiền thưởng có được ghi riêng không",
+        hours: "Có ghi rõ giờ làm việc theo thỏa thuận và thời gian nghỉ không",
+        overtime: "Có ghi rõ cách tính tiền làm thêm giờ, làm đêm và làm ngày nghỉ không",
+        contractCopy: "Bạn đã nhận hợp đồng lao động đã ký (bản giấy hoặc điện tử) chưa",
+        location: "Nơi làm việc trong hợp đồng có khớp với nơi được thông báo thực tế không",
+        report: "Bạn đã được hướng dẫn cách báo cáo khi xảy ra tai nạn lao động chưa",
+        equipment: "Bạn đã kiểm tra việc đào tạo an toàn và cấp đồ bảo hộ chưa",
+      },
+    },
+    status: {
+      signal: {
+        normal: "Không có tín hiệu bất thường rõ rệt",
+        watch: "Chưa xác nhận tín hiệu an toàn",
+        review: "Nên kiểm tra trước",
+        unknown: "Chưa đủ dữ liệu để phân tích",
+      },
+      wageWatch: "Cần kiểm tra thêm",
+      excluded: {
+        wageList: "Danh sách công khai nợ lương",
+        taxArrears: "Nợ đọng được công khai",
+        insuranceArrears: "Nợ bảo hiểm xã hội",
+      },
+    },
+    footer: {
+      inspectorCopy: "Dịch vụ thông tin cho người tìm việc và người lao động, kết nối tín hiệu quan sát từ dữ liệu công với thông tin lao động chính thức",
+      inspectorNote: "Dịch vụ này không khẳng định công ty có an toàn hay vi phạm pháp luật hay không, cũng không quyết định thay bạn việc có vào làm hay không.",
+      consumerLine1: "CoAmong kết nối các sự việc quan sát được từ dữ liệu công với thông tin lao động chính thức,",
+      consumerLine2: "và không khẳng định công ty có an toàn hay vi phạm pháp luật hay không, cũng không quyết định thay bạn việc có vào làm hay không.",
+      clubLogoAlt: "Logo câu lạc bộ SeD",
+      clubName: "SeD (Shall we Data?), câu lạc bộ liên kết khoa học dữ liệu của Đại học Quốc gia Incheon",
+    },
+    notFound: {
+      title: "Không tìm thấy nơi làm việc bạn yêu cầu",
+      desc: "Vui lòng kiểm tra lại tên, khu vực và ngành trong mục tìm nơi làm việc.",
+      action: "Tìm lại nơi làm việc",
+    },
+  },
+  th: {
+    async: {
+      loading: "กำลังโหลดข้อมูล",
+      errorTitle: "โหลดข้อมูลไม่สำเร็จ",
+      retry: "ลองอีกครั้ง",
+    },
+    sources: {
+      empty: "ไม่มีแหล่งที่มาที่ตรวจสอบได้",
+      asOf: "ข้อมูล ณ {date}",
+      document: "เอกสาร {id}",
+    },
+    freshness: {
+      title: "เกณฑ์การวิเคราะห์",
+      dataAsOf: "ข้อมูล ณ {date}",
+      dataUnknown: "ยังไม่กำหนดเดือนอ้างอิงของข้อมูล",
+      target: "เดือนที่คาดการณ์ {month}",
+    },
+    checklist: {
+      eyebrow: "รายการที่ควรตรวจสอบด้วยตนเอง",
+      title: "เช็กลิสต์สิ่งที่ควรทำก่อนเข้างาน",
+      desc: "ไม่ว่าสถานะของโมเดลจะเป็นอย่างไร โปรดตรวจสอบสัญญาจริงและสภาพการทำงานด้วยตนเอง",
+      progress: " / {total} ตรวจแล้ว",
+      note: "สถานะที่ติ๊กไว้จะอยู่แค่ในหน้าเบราว์เซอร์นี้ และจะรีเซ็ตเมื่อรีเฟรช",
+      categories: { wage: "ค่าจ้าง", hours: "เวลาทำงาน", contract: "สัญญาจ้าง", conditions: "สภาพการทำงาน", safety: "ความปลอดภัยในการทำงาน" },
+      items: {
+        payday: "สัญญาระบุวันจ่ายค่าจ้างไว้หรือไม่",
+        wageParts: "แยกเงินเดือนพื้นฐาน เงินเพิ่ม และโบนัสไว้หรือไม่",
+        hours: "ระบุเวลาทำงานปกติและเวลาพักไว้หรือไม่",
+        overtime: "ระบุเกณฑ์ค่าล่วงเวลา ค่าทำงานกลางคืน และค่าทำงานวันหยุดไว้หรือไม่",
+        contractCopy: "ได้รับสัญญาจ้างที่ลงนามแล้วเป็นกระดาษหรือไฟล์อิเล็กทรอนิกส์หรือไม่",
+        location: "สถานที่ทำงานในสัญญาตรงกับที่ได้รับแจ้งจริงหรือไม่",
+        report: "ได้รับแจ้งขั้นตอนการรายงานเมื่อเกิดอุบัติเหตุจากการทำงานหรือไม่",
+        equipment: "ได้ตรวจสอบเรื่องการอบรมความปลอดภัยและการแจกอุปกรณ์ป้องกันแล้วหรือไม่",
+      },
+    },
+    status: {
+      signal: {
+        normal: "ไม่พบสัญญาณผิดปกติที่ชัดเจน",
+        watch: "ยังไม่พบสัญญาณว่าปลอดภัย",
+        review: "ควรตรวจสอบก่อน",
+        unknown: "ข้อมูลสำหรับวิเคราะห์ไม่เพียงพอ",
+      },
+      wageWatch: "ควรตรวจสอบเพิ่มเติม",
+      excluded: {
+        wageList: "รายชื่อค้างจ่ายค่าจ้างที่เปิดเผย",
+        taxArrears: "การค้างชำระที่เปิดเผยต่อสาธารณะ",
+        insuranceArrears: "ค้างชำระประกันสังคม",
+      },
+    },
+    footer: {
+      inspectorCopy: "บริการข้อมูลสำหรับผู้หางานและลูกจ้าง ที่เชื่อมสัญญาณที่สังเกตได้จากข้อมูลสาธารณะกับข้อมูลแรงงานทางการ",
+      inspectorNote: "บริการนี้ไม่ได้ชี้ขาดว่าบริษัทปลอดภัยหรือผิดกฎหมายหรือไม่ และไม่ได้ตัดสินใจแทนคุณว่าจะเข้าทำงานหรือไม่",
+      consumerLine1: "CoAmong เชื่อมข้อเท็จจริงที่สังเกตได้จากข้อมูลสาธารณะกับข้อมูลแรงงานทางการ",
+      consumerLine2: "โดยไม่ได้ชี้ขาดว่าบริษัทปลอดภัยหรือผิดกฎหมายหรือไม่ และไม่ได้ตัดสินใจแทนคุณว่าจะเข้าทำงานหรือไม่",
+      clubLogoAlt: "โลโก้ชมรม SeD",
+      clubName: "SeD (Shall we Data?) ชมรมวิทยาศาสตร์ข้อมูลของมหาวิทยาลัยแห่งชาติอินชอน",
+    },
+    notFound: {
+      title: "ไม่พบสถานที่ทำงานที่คุณค้นหา",
+      desc: "โปรดตรวจสอบชื่อ พื้นที่ และอุตสาหกรรมอีกครั้งในหน้าค้นหาสถานที่ทำงาน",
+      action: "ค้นหาสถานที่ทำงานอีกครั้ง",
+    },
+  },
+});

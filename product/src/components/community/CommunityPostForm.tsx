@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useId, useState } from "react";
 import {
   COMMUNITY_CATEGORIES,
-  COMMUNITY_CATEGORY_LABELS,
   type CommunityCategory,
 } from "@/app/api/community/communityApiContract";
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { communityMessages } from "@/i18n/messages/community";
 import { CommunityApiError, createCommunityPost } from "@/services/communityClient";
 import type { ErrorDetail } from "@/utils/errors";
 
@@ -29,6 +31,8 @@ interface SubmitError {
 }
 
 export function CommunityPostForm() {
+  const m = useMessages(communityMessages);
+  const n = (value: number) => value.toLocaleString(m.numberLocale);
   const router = useRouter();
   const fieldId = useId();
   const [category, setCategory] = useState<CommunityCategory | "">("");
@@ -41,14 +45,14 @@ export function CommunityPostForm() {
 
   function validate(): FieldErrors {
     const errors: FieldErrors = {};
-    if (!category) errors.category = "게시글 분류를 선택해 주세요.";
+    if (!category) errors.category = m.form.categoryRequired;
     const trimmedTitle = title.trim();
     if (trimmedTitle.length < TITLE_MIN || trimmedTitle.length > TITLE_MAX) {
-      errors.title = `제목은 ${TITLE_MIN}자 이상 ${TITLE_MAX}자 이하여야 합니다.`;
+      errors.title = format(m.form.titleLength, { min: TITLE_MIN, max: TITLE_MAX });
     }
     const trimmedBody = body.trim();
     if (trimmedBody.length < BODY_MIN || trimmedBody.length > BODY_MAX) {
-      errors.body = `내용은 ${BODY_MIN}자 이상 ${BODY_MAX.toLocaleString("ko-KR")}자 이하여야 합니다.`;
+      errors.body = format(m.form.bodyLength, { min: BODY_MIN, max: n(BODY_MAX) });
     }
     return errors;
   }
@@ -81,14 +85,14 @@ export function CommunityPostForm() {
       }
       setSubmitError({
         code: "NETWORK_ERROR",
-        message: "네트워크 문제로 게시글을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        message: m.form.createNetworkError,
       });
     }
   }
 
   return (
     <form className="search-form" onSubmit={handleSubmit} noValidate>
-      <label htmlFor={`${fieldId}-category`}>분류</label>
+      <label htmlFor={`${fieldId}-category`}>{m.form.category}</label>
       <select
         id={`${fieldId}-category`}
         value={category}
@@ -97,46 +101,46 @@ export function CommunityPostForm() {
         aria-describedby={fieldErrors.category ? `${fieldId}-category-error` : undefined}
         onChange={(event) => setCategory(event.target.value as CommunityCategory | "")}
       >
-        <option value="">분류를 선택해 주세요</option>
+        <option value="">{m.form.categoryPlaceholder}</option>
         {COMMUNITY_CATEGORIES.map((item) => (
-          <option key={item} value={item}>{COMMUNITY_CATEGORY_LABELS[item]}</option>
+          <option key={item} value={item}>{m.categories[item]}</option>
         ))}
       </select>
       {fieldErrors.category ? <p className="field-error" id={`${fieldId}-category-error`} role="alert">{fieldErrors.category}</p> : null}
 
-      <label htmlFor={`${fieldId}-title`}>제목</label>
+      <label htmlFor={`${fieldId}-title`}>{m.form.title}</label>
       <input
         id={`${fieldId}-title`}
         value={title}
         maxLength={TITLE_MAX}
         disabled={submitting}
         autoComplete="off"
-        placeholder="확인하고 싶은 내용을 한 줄로 적어주세요"
+        placeholder={m.form.titlePlaceholder}
         aria-invalid={Boolean(fieldErrors.title)}
         aria-describedby={fieldErrors.title ? `${fieldId}-title-error` : `${fieldId}-title-help`}
         onChange={(event) => setTitle(event.target.value)}
       />
       {fieldErrors.title
         ? <p className="field-error" id={`${fieldId}-title-error`} role="alert">{fieldErrors.title}</p>
-        : <p className="field-help" id={`${fieldId}-title-help`}>{TITLE_MIN}~{TITLE_MAX}자 · 현재 {title.trim().length}자</p>}
+        : <p className="field-help" id={`${fieldId}-title-help`}>{format(m.form.lengthHelp, { min: TITLE_MIN, max: TITLE_MAX, count: title.trim().length })}</p>}
 
-      <label htmlFor={`${fieldId}-body`}>내용</label>
+      <label htmlFor={`${fieldId}-body`}>{m.form.body}</label>
       <textarea
         id={`${fieldId}-body`}
         value={body}
         rows={10}
         maxLength={BODY_MAX}
         disabled={submitting}
-        placeholder="겪은 상황과 확인한 방법을 적어주세요. 개인을 특정할 수 있는 정보는 적지 말아주세요."
+        placeholder={m.form.bodyPlaceholder}
         aria-invalid={Boolean(fieldErrors.body)}
         aria-describedby={fieldErrors.body ? `${fieldId}-body-error` : `${fieldId}-body-help`}
         onChange={(event) => setBody(event.target.value)}
       />
       {fieldErrors.body
         ? <p className="field-error" id={`${fieldId}-body-error`} role="alert">{fieldErrors.body}</p>
-        : <p className="field-help" id={`${fieldId}-body-help`}>{BODY_MIN}~{BODY_MAX.toLocaleString("ko-KR")}자 · 현재 {body.trim().length.toLocaleString("ko-KR")}자</p>}
+        : <p className="field-help" id={`${fieldId}-body-help`}>{format(m.form.lengthHelp, { min: BODY_MIN, max: n(BODY_MAX), count: n(body.trim().length) })}</p>}
 
-      <label htmlFor={`${fieldId}-anonymous`}>익명 설정</label>
+      <label htmlFor={`${fieldId}-anonymous`}>{m.form.anonymousLabel}</label>
       <p className="field-help">
         <input
           id={`${fieldId}-anonymous`}
@@ -145,18 +149,18 @@ export function CommunityPostForm() {
           disabled={submitting}
           onChange={(event) => setAnonymous(event.target.checked)}
         />
-        {" "}익명으로 작성합니다. 해제하면 목록과 상세에 표시 이름이 노출됩니다.
+        {" "}{m.form.anonymousCreate}
       </p>
 
       <div className="contract-actions">
         <button type="submit" className="button button-dark" disabled={submitting}>
-          {submitting ? "등록 중" : "게시글 등록"}
+          {submitting ? m.form.submitting : m.form.submit}
         </button>
-        <Link href="/community" className="button button-outline">취소</Link>
+        <Link href="/community" className="button button-outline">{m.form.cancel}</Link>
       </div>
 
       {submitError?.code === "AUTHENTICATION_REQUIRED" ? (
-        <p className="field-error" role="alert">로그인이 필요합니다. 로그인한 뒤 다시 시도해 주세요.</p>
+        <p className="field-error" role="alert">{m.form.loginRequired}</p>
       ) : null}
       {submitError && submitError.code !== "AUTHENTICATION_REQUIRED" ? (
         <>
@@ -175,7 +179,7 @@ export function CommunityPostForm() {
 
       <p className="privacy-note">
         <span aria-hidden="true">🔒</span>
-        게시글은 사용자 경험이며 공식 데이터나 법률 근거가 아닙니다. 익명 글의 작성자 식별정보는 공개 API에 포함하지 않습니다.
+        {m.form.privacyNote}
       </p>
     </form>
   );

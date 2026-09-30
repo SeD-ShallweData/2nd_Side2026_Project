@@ -2,25 +2,29 @@ import type { Metadata } from "next";
 import { CompanySearch } from "@/components/company/CompanySearch";
 import { DataModeNotice } from "@/components/company/DataModeNotice";
 import { getCompanyDataMode } from "@/config/dataMode";
+import { companyMessages } from "@/i18n/messages/company";
+import { getMessages } from "@/i18n/server";
 
-export const metadata: Metadata = {
-  title: "사업장 확인",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const m = await getMessages(companyMessages);
+  return { title: m.page.metaTitle };
+}
 
-export default function CompaniesPage() {
+export default async function CompaniesPage() {
   const dataMode = getCompanyDataMode();
+  const m = await getMessages(companyMessages);
   return (
     <div className="page-section search-page">
       <div className="shell narrow-shell">
         <div className="page-heading">
-          <span className="eyebrow">AI 분석 기반 사업장 신뢰 정보</span>
-          <h1>궁금한 업장을 검색해주세요!</h1>
-          <p>회사명을 검색한 뒤 지역과 업종을 비교해 정확한 사업장을 직접 조회하고<br />추가로 궁금한 점은 자세히 물어보기 버튼을 통해 돈워리에게 질문하세요.</p>
+          <span className="eyebrow">{m.page.eyebrow}</span>
+          <h1>{m.page.title}</h1>
+          <p>{m.page.intro1}<br />{m.page.intro2}</p>
         </div>
         <DataModeNotice
           dataMode={dataMode}
-          realMessage="PostgreSQL의 사업장 명부를 읽기 전용으로 조회합니다. 검색 결과는 10개씩 나누어 보여드립니다."
-          mockMessage="현재 화면의 사업장과 분석 결과는 시연을 위한 명시된 데모 데이터입니다."
+          realMessage={m.page.dataModeReal}
+          mockMessage={m.page.dataModeMock}
         />
         <CompanySearch />
       </div>

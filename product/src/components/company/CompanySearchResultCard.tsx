@@ -1,13 +1,9 @@
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import type { FavoriteEligibility } from "@/components/favorite/favoriteAuth";
 import type { CompanySearchResult } from "@/domain/company";
-
-const MATCH_LABEL = {
-  exact: "정확히 일치",
-  normalized: "표기 정규화 일치",
-  partial: "일부 일치",
-  alias: "다른 표기 일치",
-} as const;
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { companyMessages } from "@/i18n/messages/company";
 
 export function CompanySearchResultCard({
   company,
@@ -25,6 +21,7 @@ export function CompanySearchResultCard({
   favoriteEligibility: FavoriteEligibility;
   onFavoriteChange: (companyId: string, isFavorite: boolean) => void;
 }) {
+  const m = useMessages(companyMessages).card;
   return (
     <article className="company-result-card">
       <div className="company-result-main">
@@ -35,16 +32,16 @@ export function CompanySearchResultCard({
           <div className="company-title-row">
             <h3>{company.company_name}</h3>
             {/* 지역만 골라 찾은 결과에는 이름 일치 여부가 없다. 검색어가 있을 때만 붙인다. */}
-            {query ? <span className="match-label">{MATCH_LABEL[company.match_type]}</span> : null}
+            {query ? <span className="match-label">{m.match[company.match_type]}</span> : null}
           </div>
           <dl className="company-meta-list">
             <div>
-              <dt>지역</dt>
-              <dd>{company.region ?? "정보 없음"}</dd>
+              <dt>{m.region}</dt>
+              <dd>{company.region ?? m.noInfo}</dd>
             </div>
             <div>
-              <dt>업종</dt>
-              <dd>{company.industry ?? "정보 없음"}</dd>
+              <dt>{m.industry}</dt>
+              <dd>{company.industry ?? m.noInfo}</dd>
             </div>
           </dl>
         </div>
@@ -54,9 +51,13 @@ export function CompanySearchResultCard({
           type="button"
           className="button button-dark"
           onClick={() => onSelect(company.company_id)}
-          aria-label={`${company.company_name}, ${company.region ?? "지역 정보 없음"}, ${company.industry ?? "업종 정보 없음"} 선택`}
+          aria-label={format(m.selectAria, {
+            name: company.company_name,
+            region: company.region ?? m.noRegion,
+            industry: company.industry ?? m.noIndustry,
+          })}
         >
-          이 사업장 선택
+          {m.select}
         </button>
         <FavoriteButton
           companyId={company.company_id}

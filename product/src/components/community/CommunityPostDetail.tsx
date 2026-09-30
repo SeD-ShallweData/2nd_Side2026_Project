@@ -7,6 +7,9 @@ import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/common/Asy
 import { companyContextLabel, relativeTimeLabel } from "@/components/community/communityFormat";
 import { CommunityPostDeleteButton } from "@/components/community/CommunityPostDeleteButton";
 import { CommunityReportForm } from "@/components/community/CommunityReportForm";
+import { format } from "@/i18n/defineMessages";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { communityMessages } from "@/i18n/messages/community";
 import { CommunityApiError, getCommunityPost } from "@/services/communityClient";
 
 interface LoadedPost {
@@ -17,6 +20,8 @@ interface LoadedPost {
 }
 
 export function CommunityPostDetail({ postId }: { postId: string }) {
+  const m = useMessages(communityMessages);
+  const loadFailedMessage = m.detail.loadFailed;
   const [reloadToken, setReloadToken] = useState(0);
   const [loaded, setLoaded] = useState<LoadedPost | null>(null);
 
@@ -34,22 +39,22 @@ export function CommunityPostDetail({ postId }: { postId: string }) {
           key: requestKey,
           post: null,
           notFound,
-          error: notFound ? null : caught instanceof Error ? caught.message : "게시글을 불러오지 못했습니다.",
+          error: notFound ? null : caught instanceof Error ? caught.message : loadFailedMessage,
         });
       });
     return () => controller.abort();
-  }, [requestKey, postId]);
+  }, [requestKey, postId, loadFailedMessage]);
 
   const post = loading ? null : loaded?.post ?? null;
 
   return (
-    <section aria-label="커뮤니티 게시글 상세" aria-live="polite" aria-busy={loading}>
-      {loading ? <LoadingSkeleton label="게시글을 불러오고 있습니다." /> : null}
+    <section aria-label={m.detail.aria} aria-live="polite" aria-busy={loading}>
+      {loading ? <LoadingSkeleton label={m.detail.loading} /> : null}
       {!loading && loaded?.notFound ? (
         <EmptyState
-          title="게시글을 찾을 수 없습니다"
-          description="삭제되었거나 공개되지 않은 게시글입니다. 커뮤니티 목록에서 다시 확인해 주세요."
-          action={<Link href="/community" className="button button-dark">커뮤니티 목록으로</Link>}
+          title={m.detail.notFoundTitle}
+          description={m.detail.notFoundDescription}
+          action={<Link href="/community" className="button button-dark">{m.detail.backToList}</Link>}
         />
       ) : null}
       {!loading && loaded?.error ? (
@@ -59,22 +64,22 @@ export function CommunityPostDetail({ postId }: { postId: string }) {
         <>
           <article className="community-post-card">
             <div>
-              <span>{post.category_label}</span>
+              <span>{m.categories[post.category] ?? post.category_label}</span>
               <small>
-                {[companyContextLabel(post.company_context), post.author_label ?? "익명", relativeTimeLabel(post.created_at)]
+                {[companyContextLabel(post.company_context, m.format), post.author_label ?? m.post.anonymous, relativeTimeLabel(post.created_at, m.format)]
                   .filter((part): part is string => Boolean(part))
                   .join(" · ")}
-                {post.updated_at === post.created_at ? "" : ` · ${relativeTimeLabel(post.updated_at)} 수정됨`}
+                {post.updated_at === post.created_at ? "" : ` · ${format(m.post.edited, { time: relativeTimeLabel(post.updated_at, m.format) })}`}
               </small>
             </div>
             <h2>{post.title}</h2><p className="community-post-body">{post.body}</p>
-            <strong>{post.like_count === null ? null : `공감 ${post.like_count}　`}댓글 {post.comment_count}</strong>
+            <strong>{post.like_count === null ? null : `${format(m.post.likes, { count: post.like_count })}　`}{format(m.post.comments, { count: post.comment_count })}</strong>
           </article>
-          <p className="field-help">댓글과 공감은 아직 제공하지 않습니다. 위 숫자는 현재 표시용 값입니다.</p>
+          <p className="field-help">{m.detail.countsNote}</p>
           <div className="community-post-actions">
             {post.viewer_permissions.can_edit ? (
               <Link href={`/community/${encodeURIComponent(post.post_id)}/edit`} className="button button-outline button-small">
-                게시글 수정
+                {m.detail.edit}
               </Link>
             ) : null}
             {post.viewer_permissions.can_delete ? (
@@ -83,7 +88,7 @@ export function CommunityPostDetail({ postId }: { postId: string }) {
             {post.capabilities.reports && post.viewer_permissions.can_report ? (
               <CommunityReportForm key={post.post_id} postId={post.post_id} />
             ) : null}
-            <Link href="/community" className="button button-outline button-small">목록으로</Link>
+            <Link href="/community" className="button button-outline button-small">{m.detail.list}</Link>
           </div>
         </>
       ) : null}

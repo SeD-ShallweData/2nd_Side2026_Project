@@ -6,6 +6,7 @@ let pathname = "/";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname,
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
 }));
 vi.mock("next/link", () => ({
   default: ({ children, href, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { children: ReactNode; href: string }) => (

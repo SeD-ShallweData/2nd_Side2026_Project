@@ -1,28 +1,41 @@
+import type { MessageShape } from "@/i18n/defineMessages";
+import { favoriteMessages } from "@/i18n/messages/favorite";
 import { FavoriteApiError } from "@/services/favoriteClient";
+
+export type FavoriteErrorMessages = MessageShape<typeof favoriteMessages.ko>["errors"];
 
 /*
  * 서버 메시지를 그대로 보여주지 않는다. 예를 들어 503 메시지는 "데이터베이스가
  * 연결되지 않았다"는 내부 사정을 담고 있어, 사용자에게는 일반적인 재시도 안내로
  * 바꿔서 보여준다. code 는 화면에 노출하지 않는다.
+ * 문구는 화면이 넘겨준 현재 언어 사전에서 고른다. 넘기지 않으면 한국어다.
  */
-export function describeFavoriteError(error: unknown): string {
+export function describeFavoriteError(error: unknown, t: FavoriteErrorMessages = favoriteMessages.ko.errors): string {
   if (error instanceof FavoriteApiError) {
     switch (error.code) {
       case "AUTHENTICATION_REQUIRED":
-        return "로그인이 필요한 기능입니다.";
+        return t.loginRequired;
       case "FORBIDDEN":
-        return "일반 사용자 전용 기능입니다.";
+        return t.userOnly;
       case "COMPANY_NOT_FOUND":
-        return "해당 사업장을 찾을 수 없습니다.";
+        return t.notFound;
       case "CROSS_SITE_REQUEST_REJECTED":
-        return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+        return t.requestFailed;
       default:
-        return error.retryable
-          ? "현재 즐겨찾기 기능을 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."
-          : "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+        return error.retryable ? t.unavailable : t.requestFailed;
     }
   }
-  return "네트워크 문제로 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  return t.network;
+}
+
+/*
+ * favoriteAuth 가 돌려주는 안내 문구는 한국어 원문이다. 같은 한국어를 가진 키를 찾아
+ * 현재 언어 문구로 바꾼다. 모르는 문구면 그대로 둔다.
+ */
+export function localizeFavoriteReason(message: string, t: FavoriteErrorMessages): string {
+  const source = favoriteMessages.ko.errors;
+  const key = (Object.keys(source) as (keyof typeof source)[]).find((candidate) => source[candidate] === message);
+  return key ? t[key] : message;
 }
 
 export function favoriteErrorRequiresLogin(error: unknown): boolean {

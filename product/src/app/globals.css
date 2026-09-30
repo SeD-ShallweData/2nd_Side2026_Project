@@ -4069,7 +4069,9 @@ summary:focus-visible {
 @media (max-width: 640px) {
   body { padding-bottom: 60px; }
   .consumer-main-nav { display: none; }
-  .consumer-header-inner { min-height: 64px; }
+  /* 메뉴가 빠지면 로고와 오른쪽 영역 두 칸만 남는다. 1fr·1fr 로 반씩 나누면
+     긴 로고 글자(CoAmong)가 오른쪽 버튼과 겹친다. */
+  .consumer-header-inner { min-height: 64px; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
   .consumer-header-lead { gap: 10px; }
   .consumer-mode-switch { font-size: .68rem; padding: 6px 10px; }
   .brand-mark { width: 44px; height: 44px; }
@@ -5150,4 +5152,66 @@ summary:focus-visible {
 @media (max-width: 900px) {
   .prompt-studio-layout { grid-template-columns: 1fr; }
   .prompt-studio-editor textarea { min-height: 18rem; }
+}
+
+/* ── 화면 언어 ─────────────────────────────────────────── */
+/* keep-all 은 한국어 어절을 지키지만, 띄어쓰기가 없는 중국어·태국어에서는 줄바꿈을 막아
+   글자가 화면 밖으로 넘친다. 두 언어는 브라우저 기본 줄바꿈으로 돌린다. */
+html[data-locale="zh"] body,
+html[data-locale="th"] body { word-break: normal; overflow-wrap: anywhere; }
+html[data-locale="zh"] body { font-family: Pretendard, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif; }
+html[data-locale="th"] body { font-family: "Noto Sans Thai", Thonburi, "Leelawadee UI", Tahoma, system-ui, sans-serif; line-height: 1.75; }
+html[data-locale="vi"] body { font-family: Pretendard, "Noto Sans", "Segoe UI", system-ui, sans-serif; }
+
+/* 쉬운 한국어: 고령 동포 근로자를 위해 글자를 키운다(rem 기준 전체 확대). */
+html[data-locale="ko-easy"] { font-size: 118.75%; }
+html[data-locale="ko-easy"] body { line-height: 1.75; }
+
+.language-switcher { position: relative; }
+.language-switcher-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line-strong); border-radius: 999px; background: var(--white);
+  color: var(--ink); cursor: pointer; font-size: 0.78rem; font-weight: 800; padding: 6px 12px; white-space: nowrap;
+}
+.language-switcher-toggle:hover { border-color: var(--ink); }
+.language-switcher-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60;
+  width: min(20rem, calc(100vw - 32px)); max-height: min(34rem, 80vh); overflow-y: auto;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--white); box-shadow: var(--shadow-lg); padding: 8px;
+}
+.language-switcher-menu ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.language-switcher-menu li { position: relative; }
+.language-switcher-menu button {
+  display: grid; gap: 2px; width: 100%; border: 0; border-radius: 10px; background: transparent;
+  color: var(--ink); cursor: pointer; padding: 9px 11px; text-align: left;
+}
+.language-switcher-menu button:hover, .language-switcher-menu button:focus-visible { background: var(--surface); }
+.language-switcher-menu button.is-current { background: var(--surface); box-shadow: inset 3px 0 0 var(--ink); }
+.language-switcher-menu strong { font-size: 0.85rem; }
+.language-switcher-menu small { color: var(--muted); font-size: 0.7rem; line-height: 1.5; }
+.language-switcher-pending { border-top: 1px solid var(--line); margin-top: 6px !important; padding-top: 6px !important; }
+.language-switcher-pending button { cursor: help; opacity: 0.62; }
+.language-pending-tip,
+.voice-pending-tip {
+  position: absolute; z-index: 61; display: none; width: min(17rem, calc(100vw - 48px));
+  border-radius: 10px; background: var(--ink); color: var(--white); font-size: 0.72rem; font-weight: 600;
+  line-height: 1.55; padding: 9px 11px; pointer-events: none;
+}
+.language-pending-tip { right: 8px; top: calc(100% - 2px); }
+.language-switcher-pending li:hover .language-pending-tip,
+.language-switcher-pending li:focus-within .language-pending-tip { display: block; }
+
+.voice-pending { position: relative; display: inline-flex; }
+.voice-pending-button {
+  border: 1px dashed var(--line-strong); border-radius: 999px; background: var(--white);
+  color: var(--muted); cursor: help; font-size: 0.7rem; font-weight: 800; padding: 6px 10px; white-space: nowrap;
+}
+.voice-pending-tip { bottom: calc(100% + 6px); left: 0; }
+.voice-pending:hover .voice-pending-tip,
+.voice-pending:focus-within .voice-pending-tip { display: block; }
+
+/* 좁은 화면에서는 로고와 겹치지 않도록 지구본만 보인다. 현재 언어는 aria-label 로 읽힌다. */
+@media (max-width: 720px) {
+  .language-switcher-toggle { padding: 6px 9px; }
+  .language-switcher-toggle span:last-child { display: none; }
 }

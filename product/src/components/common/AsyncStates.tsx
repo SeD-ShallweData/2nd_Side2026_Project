@@ -1,10 +1,15 @@
-import type { ReactNode } from "react";
+"use client";
 
-export function LoadingSkeleton({ label = "정보를 불러오는 중입니다." }: { label?: string }) {
+import type { ReactNode } from "react";
+import { useMessages } from "@/i18n/LocaleProvider";
+import { commonMessages } from "@/i18n/messages/common";
+
+export function LoadingSkeleton({ label }: { label?: string }) {
+  const m = useMessages(commonMessages).async;
   return (
     <div className="loading-card" role="status" aria-live="polite">
       <span className="spinner" aria-hidden="true" />
-      <span>{label}</span>
+      <span>{label ?? m.loading}</span>
     </div>
   );
 }
@@ -37,16 +42,17 @@ export function ErrorState({
   message: string;
   onRetry?: () => void;
 }) {
+  const m = useMessages(commonMessages).async;
   return (
     <div className="state-card state-error" role="alert">
       <span className="state-icon" aria-hidden="true">
         !
       </span>
-      <h2>정보를 불러오지 못했습니다</h2>
+      <h2>{m.errorTitle}</h2>
       <p>{message}</p>
       {onRetry ? (
         <button className="button button-outline" type="button" onClick={onRetry}>
-          다시 시도
+          {m.retry}
         </button>
       ) : null}
     </div>
