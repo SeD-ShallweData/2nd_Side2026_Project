@@ -236,15 +236,7 @@ export function SiteHeader() {
             </Link>
           );
         })}
-        {user?.role === "user" ? (
-          <Link
-            href="/favorites"
-            className={isCurrentNavPath(pathname, "/favorites") ? "is-current" : undefined}
-            aria-current={isCurrentNavPath(pathname, "/favorites") ? "page" : undefined}
-          >
-            {m.favorites}
-          </Link>
-        ) : null}
+        {/* 즐겨찾기는 헤더의 이름 메뉴에 있으므로 하단 메뉴에는 두지 않는다. 하단 메뉴는 6칸 격자에 맞춘다. */}
       </nav>
     </>
   );
