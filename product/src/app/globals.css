@@ -2769,6 +2769,25 @@ summary:focus-visible {
   font-size: 0.58rem;
 }
 
+/* 외국어 화면: 사전 문장 아래에 숫자가 든 한국어 원문을 작게 함께 둔다. */
+.contract-results .contract-korean-original {
+  display: block;
+  margin-top: 4px;
+  border-left: 2px solid var(--line-strong);
+  padding-left: 8px;
+  color: var(--ink-soft);
+  font-size: 0.62rem;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.contract-results .contract-korean-original > span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.56rem;
+  font-weight: 700;
+}
+
 .contract-questions,
 .contract-warning {
   margin-top: 18px;

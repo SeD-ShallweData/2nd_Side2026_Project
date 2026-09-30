@@ -12,6 +12,7 @@
 | 상담 번역 안내·동의 번역 문장(2단계) | `chat.ts` 의 `translation`·`consent.translation` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | — |
 | 상담 번역 프롬프트(모델 번역 품질) | `product/prompts/translate/system.md` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | — |
 | 화면별 사전 | `chat.ts` `landing.ts` `common.ts` `company.ts` `favorite.ts` `worksite.ts` `contract.ts` `auth.ts` `community.ts` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 |
+| 계약서 진단 결과(항목 이름·안내·요약·질문·검토 한계·법률 이름 괄호) | `contractVerdict.ts` | 검증 필요 | 검증 필요 | 검증 필요 | 검증 필요 | — |
 
 ## 검수 시 확인할 것
 1. 판정하지 않는 표현이 유지되는가("누락 가능"이 "위법"·"없음"으로 바뀌지 않았는가).
