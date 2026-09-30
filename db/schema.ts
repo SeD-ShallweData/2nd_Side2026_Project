@@ -181,7 +181,7 @@ export const promptVersions = pgTable(
   (t) => [
     unique("prompt_versions_name_version_uq").on(t.name, t.version),
     uniqueIndex("prompt_versions_one_active_uq").on(t.name).where(sql`${t.status} = 'active'`),
-    check("prompt_versions_name_ck", sql`${t.name} in ('chat/system','inspector/system','rewrite/system')`),
+    check("prompt_versions_name_ck", sql`${t.name} in ('chat/system','inspector/system','rewrite/system','translate/system')`),
     check("prompt_versions_status_ck", sql`${t.status} in ('draft','active','retired')`),
     check("prompt_versions_body_ck", sql`char_length(${t.body}) between 1 and 20000`),
     check("prompt_versions_reason_ck", sql`char_length(btrim(${t.reason})) between 2 and 300`),
@@ -503,6 +503,13 @@ export const conversationMessages = pgTable(
     role: text().notNull(),
     messageIndex: smallint("message_index").notNull(),
     content: text().notNull(),
+    /**
+     * 화면 언어가 한국어가 아닐 때만 채운다. user 는 한국어로 옮긴 질문, assistant 는 번역 전 한국어 답변이다.
+     * content 는 사용자에게 보인 문장(원문 질문 · 번역 답변)이다. null 이면 content 가 한국어 원문이다.
+     */
+    contentKo: text("content_ko"),
+    /** 화면 언어(ko 외). null 이면 한국어. */
+    locale: text(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -512,6 +519,8 @@ export const conversationMessages = pgTable(
     check("conversation_messages_role_ck", sql`${t.role} in ('user','assistant')`),
     check("conversation_messages_sequence_ck", sql`${t.messageIndex} in (1, 2)`),
     check("conversation_messages_content_ck", sql`char_length(${t.content}) between 1 and 20000`),
+    check("conversation_messages_content_ko_ck", sql`${t.contentKo} is null or char_length(${t.contentKo}) between 1 and 20000`),
+    check("conversation_messages_locale_ck", sql`${t.locale} is null or ${t.locale} in ('en','zh','vi','th')`),
   ],
 );
 
@@ -758,6 +767,13 @@ export const worksiteTips = pgTable(
     title: text().notNull(),
     body: text(),
     firmId: text("firm_id").references(() => firms.firmId, { onDelete: "set null" }),
+    /** 제보자가 쓴 언어로 추정한 값. null 이면 한국어. */
+    sourceLanguage: text("source_language"),
+    /** 한국어가 아닌 제보만 저장 시점에 기계 번역한 한국어본. 감독관 화면에 원문과 나란히 보인다. */
+    titleKo: text("title_ko"),
+    bodyKo: text("body_ko"),
+    /** not_needed: 한국어 제보 · translated: 번역본 있음 · failed: 번역 실패(원문만 있음) */
+    translationStatus: text("translation_status").notNull().default("not_needed"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -767,6 +783,8 @@ export const worksiteTips = pgTable(
     index("worksite_tips_status_submitted_idx").on(t.status, t.submittedAt.desc()),
     check("worksite_tips_category_ck", sql`${t.category} in ('wage','safety')`),
     check("worksite_tips_status_ck", sql`${t.status} in ('received','in_progress','completed')`),
+    check("worksite_tips_translation_status_ck", sql`${t.translationStatus} in ('not_needed','translated','failed')`),
+    check("worksite_tips_source_language_ck", sql`${t.sourceLanguage} is null or ${t.sourceLanguage} ~ '^[a-z]{2,3}$'`),
   ],
 );
 
