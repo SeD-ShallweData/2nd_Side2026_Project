@@ -160,7 +160,7 @@ export const landingMessages = defineMessages({
       titleMarkAfter: "",
       leadLine1: "From public workplace information to contracts and labor counseling.",
       leadLine2: "Start the checks you weren't sure about, all in one place.",
-      ctaChat: "Ask Donwori AI",
+      ctaChat: "Ask MoneyWorry AI",
       ctaCompanies: "See risk factors for a workplace you're curious about",
       facts: {
         riskTerm: "Risk info",
@@ -277,7 +277,7 @@ export const landingMessages = defineMessages({
       titleMarkAfter: " 提前做好准备",
       leadLine1: "从工作单位的公开信息到合同、劳动咨询。",
       leadLine2: "不知从何查起的事,在这里一站式开始。",
-      ctaChat: "向 Donwori AI 咨询",
+      ctaChat: "向 MoneyWorry AI 咨询",
       ctaCompanies: "查看想了解的工作单位的风险因素",
       facts: {
         riskTerm: "风险信息",
@@ -394,7 +394,7 @@ export const landingMessages = defineMessages({
       titleMarkAfter: "",
       leadLine1: "Từ thông tin công khai của nơi làm việc đến hợp đồng và tư vấn lao động.",
       leadLine2: "Bắt đầu những việc bạn còn băn khoăn ngay tại một nơi.",
-      ctaChat: "Hỏi Donwori AI",
+      ctaChat: "Hỏi MoneyWorry AI",
       ctaCompanies: "Xem các yếu tố rủi ro của nơi làm việc bạn quan tâm",
       facts: {
         riskTerm: "Thông tin rủi ro",
@@ -511,7 +511,7 @@ export const landingMessages = defineMessages({
       titleMarkAfter: "",
       leadLine1: "ตั้งแต่ข้อมูลสาธารณะของสถานที่ทำงาน ไปจนถึงสัญญาจ้างและการปรึกษาด้านแรงงาน",
       leadLine2: "เริ่มตรวจสอบเรื่องที่เคยไม่รู้จะเริ่มอย่างไรได้ในที่เดียว",
-      ctaChat: "ปรึกษา Donwori AI",
+      ctaChat: "ปรึกษา MoneyWorry AI",
       ctaCompanies: "ดูปัจจัยเสี่ยงของสถานที่ทำงานที่สนใจ",
       facts: {
         riskTerm: "ข้อมูลความเสี่ยง",

@@ -851,6 +851,12 @@ summary:focus-visible {
   padding: 30px;
 }
 
+/* 로그인·회원가입 폼은 좁게, 가운데에 둔다(다른 search-form은 그대로) */
+.search-form.auth-form {
+  max-width: 480px;
+  margin-inline: auto;
+}
+
 .search-form > label {
   display: block;
   margin-bottom: 9px;
@@ -2347,10 +2353,13 @@ summary:focus-visible {
   outline: 0;
 }
 
+.chat-input-wrap { position: relative; }
+
+/* 입력창 오른쪽 아래 안쪽. 입력창의 오른쪽 안쪽 여백(50px)이 이 버튼 자리다. */
 .chat-send {
   position: absolute;
-  right: 27px;
-  bottom: 26px;
+  right: 10px;
+  bottom: 10px;
   display: flex;
   width: 36px;
   height: 36px;
@@ -3407,7 +3416,9 @@ summary:focus-visible {
   color: var(--muted);
 }
 
-.community-shell {
+.community-shell,
+/* 현장 신고 탭도 커뮤니티 탭과 같은 폭으로 둔다(10-01). */
+.worksite-page .narrow-shell {
   width: min(960px, calc(100% - 40px));
 }
 
@@ -4184,7 +4195,7 @@ summary:focus-visible {
   .consumer-mode-switch { font-size: .68rem; padding: 6px 10px; }
   .brand-mark { width: 44px; height: 44px; }
   .brand-word { font-size: 1.35rem; }
-  .consumer-mobile-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; display: grid; grid-template-columns: repeat(6,1fr); border-top: 1px solid var(--line); background: rgb(255 255 255 / 96%); box-shadow: 0 -8px 25px rgb(8 31 58 / 8%); }
+  .consumer-mobile-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; display: grid; grid-template-columns: repeat(5,1fr); border-top: 1px solid var(--line); background: rgb(255 255 255 / 96%); box-shadow: 0 -8px 25px rgb(8 31 58 / 8%); }
   .consumer-mobile-nav a { padding: 12px 3px; text-align: center; color: var(--muted); font-size: .66rem; font-weight: 850; }.consumer-mobile-nav a:last-child { background: var(--brand-soft); color: var(--ink); }
   .consumer-mobile-nav a.is-current { background: var(--surface); color: var(--ink); }
   .consumer-floating-chat { display: none; }
@@ -4811,14 +4822,14 @@ summary:focus-visible {
 .worksite-form-intro, .worksite-list-toolbar, .worksite-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .worksite-form-intro { margin-bottom: 22px; }
 .worksite-form-intro h2, .worksite-list-toolbar h2, .worksite-detail-head h2 { margin: 3px 0 0; font-size: 1.25rem; }
-.worksite-form-intro p, .worksite-list-toolbar p { max-width: 300px; margin: 5px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.6; }
+.worksite-form-intro p, .worksite-list-toolbar p { max-width: 3000px; margin: 5px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.6; }
 .worksite-tip-form > label, .worksite-upload-field > label { display: block; margin-top: 16px; color: var(--ink); font-size: .78rem; font-weight: 850; }
-.worksite-tip-form input:not([type="file"]), .worksite-tip-form textarea { display: block; width: 100%; margin-top: 7px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-warm); padding: 11px 12px; color: var(--ink); }
+.worksite-tip-form input:not([type="file"]), .worksite-tip-form textarea, .worksite-tip-form select { display: block; width: 100%; margin-top: 7px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-warm); padding: 11px 12px; color: var(--ink); }
 .worksite-tip-form textarea { resize: vertical; }
-.worksite-tip-form input:focus, .worksite-tip-form textarea:focus { border-color: var(--ink); outline: 3px solid rgb(255 214 0 / 20%); }
+.worksite-tip-form input:focus, .worksite-tip-form textarea:focus, .worksite-tip-form select:focus { border-color: var(--ink); outline: 3px solid rgb(255 214 0 / 20%); }
 .field-optional { color: var(--muted); font-size: .7rem; font-weight: 600; }
 .worksite-upload-field { margin-top: 16px; border: 1px dashed var(--line-strong); border-radius: 10px; background: var(--surface); padding: 13px; }
-.worksite-upload-field input[type="file"] { display: block; margin-top: 9px; color: var(--muted); font-size: .75rem; }
+.worksite-upload-field input[type="file"] { display: block; width: 100%; margin-top: 9px; color: var(--muted); font-size: .75rem; }
 .worksite-photo-list { display: grid; gap: 5px; margin: 10px 0 0; padding: 0; list-style: none; color: var(--ink-soft); font-size: .75rem; }
 .worksite-photo-list li { display: flex; justify-content: space-between; gap: 12px; border-radius: 7px; background: var(--white); padding: 7px 9px; }
 .worksite-photo-list span { color: var(--muted); }
@@ -5137,6 +5148,22 @@ summary:focus-visible {
   text-align: left;
 }
 
+/* 로그인 박스처럼 올리기 상자와 안내 띠만 좁혀 가운데에 둔다(10-01). 진단 결과는 전체 폭을 쓴다.
+   600px 는 버튼 두 개(14rem × 2 + 0.75rem)와 안쪽 여백(34px × 2)이 한 줄에 들어가는 폭이다. */
+.refresh-contract-page .contract-upload,
+.refresh-contract-page .mode-banner {
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+}
+/* 격자 칸 안의 상자와 그 안쪽 칸은 기본값으로 안쪽 내용(460px)보다 좁아지지 않아
+   모바일에서 화면 밖으로 밀렸다. 칸을 화면 폭 안에 가두고, 좁으면 버튼을 한 줄에 하나씩 쌓는다. */
+.refresh-contract-page .contract-upload { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 640px) {
+  .refresh-contract-page .contract-upload { padding: 24px 18px; }
+  .refresh-contract-page .contract-upload .upload-copy { gap: 16px; justify-content: center; }
+}
+
 
 /* 제목 상자의 기본 760px 제한 때문에 '계약서에서 놓친 항목이 있나요?' 와
    '현장의 목소리를 안전하게 전달하세요' 가 두 줄로 접혔다. 이 두 화면에서만
@@ -5438,6 +5465,8 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
 .language-switcher-pending li:hover .language-pending-tip,
 .language-switcher-pending li:focus-within .language-pending-tip { display: block; }
 
+/* 입력창 아랫선에 붙지 않도록 한 줄 띄운다. */
+.chat-voice-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .voice-pending { position: relative; display: inline-flex; }
 .voice-pending-button {
   border: 1px dashed var(--line-strong); border-radius: 999px; background: var(--white);
@@ -5451,4 +5480,52 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
 @media (max-width: 720px) {
   .language-switcher-toggle { padding: 6px 9px; }
   .language-switcher-toggle span:last-child { display: none; }
+}
+
+/* ── 모바일 가운데 정렬(10-01) ─────────────────────────────
+   제목·짧은 소개 문단·안내 띠·빈 화면 안내·버튼 묶음만 가운데로 둔다.
+   상담 말풍선·답변, 목록·체크리스트, 입력 양식, 표·진단 결과·위험 카드·게시글은
+   줄 시작이 흔들리면 읽기 어려워 왼쪽 정렬을 그대로 둔다. */
+@media (max-width: 640px) {
+  /* 페이지 제목 묶음(상담 탭처럼 왼쪽으로 둔 곳 포함) */
+  .page-heading,
+  .page-heading-left,
+  .refresh-chat-shell > .page-heading { margin-inline: auto; text-align: center; }
+
+  /* 첫 화면 소개와 각 절의 제목 묶음 */
+  .refresh-hero-copy { text-align: center; }
+  .refresh-hero-copy > p,
+  .refresh-section-row p,
+  .refresh-split-section > div > p { margin-inline: auto; }
+  .refresh-section-row { flex-direction: column; align-items: center; text-align: center; }
+  .refresh-split-section > div:first-child { text-align: center; }
+  .refresh-button-row,
+  .refresh-hero-copy .refresh-button-row { justify-content: center; }
+
+  /* 첫 화면의 세 단계 소개 카드(아이콘·번호 배지도 가운데로) */
+  .refresh-step-grid article { text-align: center; }
+  .refresh-step-grid i { margin-inline: auto; }
+  .refresh-step-grid b { left: 50%; transform: translateX(-50%); white-space: nowrap; }
+
+  /* 안내 띠: 두 줄로 접히면 글자도 가운데에 모은다 */
+  .mock-banner,
+  .mode-banner,
+  .worksite-privacy-strip { flex-wrap: wrap; justify-content: center; text-align: center; }
+
+  /* 양식·목록의 머리 문단(제목 + 한두 줄 설명) */
+  .worksite-form-intro,
+  .worksite-list-toolbar { flex-direction: column; align-items: center; text-align: center; }
+
+  /* 빈 화면·상태 안내 */
+  .state-card,
+  .worksite-state-card,
+  .community-empty,
+  .chat-company-help { text-align: center; }
+
+  /* 버튼 묶음 */
+  .contract-actions,
+  .community-search-actions { justify-content: center; }
+  /* 520px 이하는 본문 줄바꿈을 풀어 두었다(위 520px 블록). 가운데로 모은 제목은 어절이 쪼개지면
+     "확/인하세요"처럼 읽혀 제목과 짧은 소개 문단만 어절 단위로 되돌린다. 띄어쓰기가 없는 중국어·태국어는 제외한다. */
+  html:not([data-locale="zh"]):not([data-locale="th"]) :is(.page-heading h1, .page-heading p, .refresh-hero-copy h1, .refresh-hero-copy > p, .refresh-section-row h2, .refresh-section-row p, .refresh-split-section h2, .refresh-split-section > div > p, .refresh-step-grid h3, .refresh-step-grid p) { word-break: keep-all; }
 }

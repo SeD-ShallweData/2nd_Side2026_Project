@@ -103,7 +103,7 @@ export function SignupForm() {
   }
 
   return (
-    <form className="search-form" onSubmit={handleSubmit} noValidate>
+    <form className="search-form auth-form" onSubmit={handleSubmit} noValidate>
       <label htmlFor={`${fieldId}-name`}>{f.name}</label>
       <input
         id={`${fieldId}-name`}

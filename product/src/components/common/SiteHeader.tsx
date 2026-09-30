@@ -21,8 +21,8 @@ const NAV_ITEMS = [
   { href: "/worksite-tips", key: "tips" },
 ] as const;
 
+// 모바일도 첫 화면은 로고로 간다.
 const MOBILE_NAV_ITEMS = [
-  { href: "/", key: "home" },
   { href: "/companies", key: "companies" },
   { href: "/contracts", key: "contracts" },
   { href: "/community", key: "community" },
@@ -236,15 +236,7 @@ export function SiteHeader() {
             </Link>
           );
         })}
-        {user?.role === "user" ? (
-          <Link
-            href="/favorites"
-            className={isCurrentNavPath(pathname, "/favorites") ? "is-current" : undefined}
-            aria-current={isCurrentNavPath(pathname, "/favorites") ? "page" : undefined}
-          >
-            {m.favorites}
-          </Link>
-        ) : null}
+        {/* 즐겨찾기는 헤더의 이름 메뉴에 있으므로 하단 메뉴에는 두지 않는다. 하단 메뉴는 5칸 격자에 맞춘다. */}
       </nav>
     </>
   );

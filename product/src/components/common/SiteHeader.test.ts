@@ -25,6 +25,8 @@ describe("공통 사이트 헤더", () => {
     expect(html).toContain("consumer-header");
     // 첫 화면은 로고가 담당하므로 가운데 메뉴에 '서비스 소개'를 두지 않는다.
     expect(html).not.toContain("서비스 소개");
+    // 모바일 하단 메뉴에도 첫 화면('소개') 링크를 두지 않는다. 첫 화면 링크는 로고 하나뿐이다.
+    expect(html.match(/href="\/"/g)).toHaveLength(1);
     expect(html).toContain('href="/" class="brand-link"');
     expect(html).toContain("계약서 진단");
     expect(html).toContain('href="/worksite-tips"');

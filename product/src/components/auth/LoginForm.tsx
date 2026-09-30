@@ -138,7 +138,7 @@ export function LoginForm() {
   }
 
   return (
-    <form className="search-form" onSubmit={handleSubmit} noValidate>
+    <form className="search-form auth-form" onSubmit={handleSubmit} noValidate>
       <label htmlFor={`${fieldId}-email`}>{f.email}</label>
       <input
         id={`${fieldId}-email`}
