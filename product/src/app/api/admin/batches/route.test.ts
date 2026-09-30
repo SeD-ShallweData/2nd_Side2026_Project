@@ -68,6 +68,7 @@ describe("관리자 배치 현황 API", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(state.listBatchStatuses).toHaveBeenCalledOnce();
+    expect(state.listBatchStatuses).toHaveBeenCalledWith({ includeDomains: true });
     expect(await response.json()).toMatchObject({ selection_mode: "auto", batches: [] });
   });
 
@@ -88,5 +89,13 @@ describe("관리자 배치 현황 API", () => {
       drift: { source: "manual", checked_at: "2026-09-29", result: "aligned", warning_count: 0, unverifiable_count: 6 },
       manageable: expect.any(Boolean),
     });
+  });
+
+  it("?fields=batches 는 등급 집계 없이 전환 목록만 요청한다", async () => {
+    const response = await GET(new Request("http://localhost/api/admin/batches?fields=batches", {
+      headers: new Headers({ cookie: "donworry_session=admin" }),
+    }));
+    expect(response.status).toBe(200);
+    expect(state.listBatchStatuses).toHaveBeenCalledWith({ includeDomains: false });
   });
 });

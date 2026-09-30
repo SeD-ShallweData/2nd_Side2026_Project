@@ -17,6 +17,11 @@ export interface BatchStatus {
   is_pinned: boolean;
 }
 
+/** 적재가 끝난 배치만 전환 후보다. 최종 판정은 DB 함수(ops_activate_batch)가 다시 한다. */
+export function isServableBatch(batch: BatchStatus): boolean {
+  return Boolean(batch.data_as_of) && batch.n_scored > 0 && batch.n_queue > 0 && batch.n_safe > 0;
+}
+
 export interface BatchStatusListResponse {
   /** pinned: 운영자가 고정한 배치를 서비스한다. auto: 기준월이 가장 최신인 배치를 서비스한다. */
   selection_mode: "auto" | "pinned";

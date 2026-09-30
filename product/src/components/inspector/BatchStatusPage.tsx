@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { OpsReasonForm } from "@/components/admin/OpsReasonForm";
 import { BatchDomainPanels, DriftCheckCard } from "@/components/inspector/BatchDefinitionPanels";
-import type { BatchStatus, BatchStatusListResponse } from "@/domain/batch";
+import { isServableBatch, type BatchStatus, type BatchStatusListResponse } from "@/domain/batch";
 import { postJson, readApiResponse } from "@/utils/clientApi";
 
 function dateLabel(value: string | null, fallback = "미확정"): string {
@@ -15,10 +15,6 @@ function timestampLabel(value: string): string {
   return new Date(value).toLocaleString("ko-KR");
 }
 
-/** 적재가 끝난 배치만 전환 후보다. 최종 판정은 DB 함수가 다시 한다. */
-function canServe(batch: BatchStatus): boolean {
-  return Boolean(batch.data_as_of) && batch.n_scored > 0 && batch.n_queue > 0 && batch.n_safe > 0;
-}
 
 type PendingChange = { kind: "activate"; batch: BatchStatus } | { kind: "deactivate" };
 
@@ -162,7 +158,7 @@ export function BatchStatusPage({
                     <td className="batch-scale-cell"><div><span>채점 {batch.n_scored.toLocaleString("ko-KR")}</span><span>위험큐 {batch.n_queue.toLocaleString("ko-KR")}</span><span>안정판정 {batch.n_safe.toLocaleString("ko-KR")}</span></div></td>
                     {manageable ? (
                       <td>
-                        {!batch.is_active && canServe(batch) ? (
+                        {!batch.is_active && isServableBatch(batch) ? (
                           <button
                             type="button"
                             className="button button-outline batch-switch-button"

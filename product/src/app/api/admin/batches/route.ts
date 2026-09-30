@@ -14,7 +14,9 @@ export async function GET(request: Request): Promise<NextResponse> {
       await getOptionalSessionUser(getSessionTokenFromRequest(request)),
     );
     requireUserRole(user, ["admin"]);
-    return noStoreJson({ ...(await listBatchStatuses()), manageable: isOpsConsoleEnabled() });
+    // ?fields=batches: 모델 운영 패널처럼 전환에 필요한 목록만 읽는다(큰 등급 집계 생략).
+    const includeDomains = new URL(request.url).searchParams.get("fields") !== "batches";
+    return noStoreJson({ ...(await listBatchStatuses({ includeDomains })), manageable: isOpsConsoleEnabled() });
   } catch (error) {
     return noStoreError(error);
   }

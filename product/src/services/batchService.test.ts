@@ -243,4 +243,12 @@ describe("배치 현황 조회", () => {
     expect(result.drift).toBe(LATEST_DRIFT_CHECK);
     expect(result.drift).toMatchObject({ source: "manual", checked_at: "2026-09-29", result: "aligned" });
   });
+
+  it("includeDomains=false 면 큰 등급 집계를 돌리지 않는다(모델 운영 패널용)", async () => {
+    route();
+    const result = await listBatchStatuses({ now: NOW, includeDomains: false });
+    expect(result.domains).toBeUndefined();
+    expect(result.current?.batch_id).toBe(7);
+    expect(queryReadOnlyMock).toHaveBeenCalledOnce();
+  });
 });

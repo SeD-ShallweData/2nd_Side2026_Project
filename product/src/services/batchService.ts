@@ -228,7 +228,14 @@ export async function buildSafetyDomain(today: string): Promise<BatchDomainStatu
   };
 }
 
-export async function listBatchStatuses(now: Date = new Date()): Promise<BatchStatusListResponse> {
+export interface ListBatchStatusOptions {
+  now?: Date;
+  /** false 면 등급 분포·도메인 현황 계산을 건너뛴다(전환 버튼만 필요한 화면용). */
+  includeDomains?: boolean;
+}
+
+export async function listBatchStatuses(options: ListBatchStatusOptions | Date = {}): Promise<BatchStatusListResponse> {
+  const { now = new Date(), includeDomains = true } = options instanceof Date ? { now: options } : options;
   const rows = await queryReadOnly<BatchStatus>(
     `WITH current_batch AS (
        SELECT id
@@ -257,13 +264,13 @@ export async function listBatchStatuses(now: Date = new Date()): Promise<BatchSt
 
   const current = rows.find((row) => row.is_active) ?? null;
   const today = seoulToday(now);
-  const domains = await Promise.all([buildWageDomain(current, today), buildSafetyDomain(today)]);
+  const domains = includeDomains ? await Promise.all([buildWageDomain(current, today), buildSafetyDomain(today)]) : undefined;
 
   return {
     selection_mode: rows.some((row) => row.is_pinned) ? "pinned" : "auto",
     current,
     batches: rows,
-    domains,
+    ...(domains ? { domains } : {}),
     drift: LATEST_DRIFT_CHECK,
     generated_at: now.toISOString(),
   };
