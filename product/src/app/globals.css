@@ -4218,7 +4218,7 @@ summary:focus-visible {
   .brand-mark { width: 44px; height: 44px; }
   .brand-word { font-size: 1.35rem; }
   .consumer-mobile-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 100; display: grid; grid-template-columns: repeat(5,1fr); border-top: 1px solid var(--line); background: rgb(255 255 255 / 96%); box-shadow: 0 -8px 25px rgb(8 31 58 / 8%); }
-  .consumer-mobile-nav a { padding: 12px 3px; text-align: center; color: var(--muted); font-size: .66rem; font-weight: 850; }.consumer-mobile-nav a:last-child { background: var(--brand-soft); color: var(--ink); }
+  .consumer-mobile-nav a { padding: 12px 3px; text-align: center; color: var(--muted); font-size: .66rem; font-weight: 850; }.consumer-mobile-nav a.is-chat { background: var(--brand-soft); color: var(--ink); }
   .consumer-mobile-nav a.is-current { background: var(--surface); color: var(--ink); }
   .consumer-floating-chat { display: none; }
 }
@@ -5517,8 +5517,17 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
 
 /* 좁은 화면에서는 로고와 겹치지 않도록 지구본만 보인다. 현재 언어는 aria-label 로 읽힌다. */
 @media (max-width: 720px) {
-  .language-switcher-toggle { padding: 6px 9px; }
-  .language-switcher-toggle span:last-child { display: none; }
+  /* 지구본만 남으면 정사각 원으로 만들고 선 아이콘을 정가운데에 둔다. */
+  .language-switcher-toggle { width: 36px; height: 36px; justify-content: center; gap: 0; padding: 0; line-height: 1; }
+  .language-switcher-toggle .lang-globe-emoji,
+  .language-switcher-toggle .lang-current-name { display: none; }
+  .language-switcher-toggle .lang-globe-icon { display: block; }
+  /* 헤더의 Co끼리 글자를 조금 키운다 */
+  .brand-word { font-size: 1.7rem; }
+  /* 지구본이 화면 오른쪽 끝이 아니라 메뉴가 왼쪽 화면 밖으로 나갔다. 좁은 화면에서는
+     메뉴를 헤더(position: sticky) 기준으로 놓고 헤더 아래에 화면 폭에 맞춰 펼친다. */
+  .language-switcher { position: static; }
+  .language-switcher-menu { left: 13px; right: 13px; width: auto; top: calc(100% + 6px); }
 }
 
 /* ── 모바일 가운데 정렬(10-01) ─────────────────────────────
@@ -5567,4 +5576,139 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
   /* 520px 이하는 본문 줄바꿈을 풀어 두었다(위 520px 블록). 가운데로 모은 제목은 어절이 쪼개지면
      "확/인하세요"처럼 읽혀 제목과 짧은 소개 문단만 어절 단위로 되돌린다. 띄어쓰기가 없는 중국어·태국어는 제외한다. */
   html:not([data-locale="zh"]):not([data-locale="th"]) :is(.page-heading h1, .page-heading p, .refresh-hero-copy h1, .refresh-hero-copy > p, .refresh-section-row h2, .refresh-section-row p, .refresh-split-section h2, .refresh-split-section > div > p, .refresh-step-grid h3, .refresh-step-grid p) { word-break: keep-all; }
+}
+
+/* 모바일에서만 줄을 바꾸는 자리. 넓은 화면에서는 숨긴다. */
+.mobile-break { display: none; }
+/* 화면 폭에 따라 하나만 보이는 글자 */
+.mobile-only { display: none; }
+
+/* 소비자 footer: 동아리 로고와 이름을 박스 가운데에 두고 로고를 키운다. */
+.consumer-footer-grid > div > p:first-child { margin-top: 0; }
+.consumer-footer-right { align-items: center; }
+.consumer-footer-right .consumer-footer-note { text-align: center; }
+.footer-club-link { display: block; border-radius: 8px; }
+.footer-club-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; }
+.consumer-footer-right .footer-club-logo { height: 96px; }
+
+@media (max-width: 560px) {
+  .mobile-break { display: inline; }
+  /* 히어로 첫 줄과 이용 흐름 제목은 한 줄에 들어가도록 화면 폭에 맞춰 글자를 줄인다. */
+  .refresh-hero-copy h1 > span { white-space: nowrap; font-size: clamp(1rem, 5.6vw, 1.38rem); }
+  #flow-title { white-space: nowrap; font-size: clamp(1.1rem, 5.6vw, 2rem); }
+  /* "미리 대비하는" 은 한 줄을 따로 쓰고 위아래로 한 줄씩 띄운다. */
+  .refresh-hero-copy h1 mark .hero-mark-lead { display: block; margin: 0.9em 0; }
+  .refresh-hero-copy h1 mark .refresh-brand-word { margin-left: 0; }
+  /* 커뮤니티 미리보기 글은 조금 작게 */
+  .refresh-post-grid h3 { font-size: .88rem; }
+  .refresh-post-grid p { font-size: .7rem; }
+  /* 상담 예시 질문은 박스 가운데에 둔다 */
+  .refresh-prompt-list a { justify-content: center; gap: 8px; margin-inline: auto; width: 100%; text-align: center; }
+  /* '안심하세요!' 안내 띠: 배지와 문장을 가운데로 모은다 */
+  .mode-banner,
+  .worksite-privacy-strip { align-items: center; max-width: none; text-align: center; }
+  /* 계약서 '파일 찾아보기'·'선택한 파일 검토' 는 각각 한 줄을 다 쓴다 */
+  .contract-actions { flex-direction: column; align-items: stretch; }
+  .contract-actions .button { width: 100%; }
+  .contract-upload .contract-actions { flex-direction: column; align-items: stretch; }
+  .contract-upload .contract-actions > .button,
+  .contract-upload .contract-actions > label.button { width: 100%; }
+  /* 업로드 아이콘을 아래 '파일 찾아보기' 버튼의 왼쪽 끝과 같은 곳에서 시작한다. 글자는 남은 칸 가운데. */
+  .refresh-contract-page .contract-upload .upload-copy,
+  .contract-upload .upload-copy { width: 100%; justify-content: flex-start; gap: 12px; }
+  /* 글자는 왼쪽 정렬한 묶음을 화면 가운데에 둔다. 왼쪽 아이콘(약 58px)+간격(12px)만큼
+     오른쪽에도 같은 여백을 주어 가운데를 맞춘다. 위치는 --upload-text-shift 로 조정한다. */
+  .contract-upload .upload-copy { --upload-text-shift: 40px; padding-right: var(--upload-text-shift); }
+  /* 글자 묶음은 줄어들지 않게 넓게 잡고 각 줄을 한 줄로 둔다 */
+  .contract-upload .upload-copy > div { flex: 1 0 auto; margin-inline: auto; text-align: left; }
+  .contract-upload .upload-copy h3,
+  .contract-upload .upload-copy p { white-space: nowrap; }
+  /* 커뮤니티 안내 띠: '안내' 배지와 문장을 한 줄에 둔다 */
+  .mode-banner,
+  .worksite-privacy-strip,
+  .mock-banner.community-banner { flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 8px; max-width: none; padding: 10px 12px; font-size: clamp(.6rem, 2.8vw, .84rem); white-space: nowrap; }
+  /* 커뮤니티 소개 두 문장은 각각 한 줄에 들어오도록 화면 폭에 맞춰 글자를 줄인다 */
+  .page-heading p.community-intro { white-space: nowrap; font-size: clamp(.6rem, 3.4vw, .95rem); }
+  /* 사업장 검색 소개 두 문장도 같은 규칙. 문장이 더 길어 글자를 더 줄인다. */
+  .page-heading p.companies-intro { white-space: nowrap; font-size: clamp(.55rem, 2.55vw, .95rem); }
+  .field-help.companies-help { white-space: nowrap; font-size: clamp(.55rem, 2.55vw, .85rem); }
+  .mobile-only { display: inline; }
+  .desktop-only { display: none; }
+  /* 현장 신고 화면 틀은 .worksite-page .narrow-shell(좌우 20px)이 더 강해 모바일에서 계약서 화면(좌우 13px)보다
+     좁았다. 다른 화면과 같은 폭으로 맞춰 안내 띠·상자 너비가 계약서와 같게 한다. */
+  .worksite-page .narrow-shell { width: min(100% - 26px, 1160px); }
+  /* 커뮤니티 검색창의 '게시글 검색' 은 칸 가운데에 */
+  .community-search-field { width: 100%; }
+  .community-search-field input { text-align: center; font-size: 1rem; }
+  /* 커뮤니티 분류 버튼 다섯 개를 한 줄에 */
+  .community-toolbar { flex-wrap: nowrap; justify-content: center; gap: 4px; }
+  /* 버튼 줄도 안내 띠·검색창과 같은 너비로 펼친다. 글자 길이에 맞춰 칸을 나눈다. */
+  .community-toolbar { width: 100%; }
+  .community-toolbar > button:not(.button) { flex: 1 1 auto; padding: 6px 6px; font-size: clamp(.6rem, 2.9vw, .78rem); white-space: nowrap; }
+  /* 맨 아래 노란 영역의 제목은 조금 작게 */
+  .refresh-final-cta h2 { font-size: 30px; }
+  /* footer 안내 문장은 가운데에, 남색 배경 시작선에 바로 붙인다 */
+  /* 아래 여백도 위와 같은 14px. 화면 아래 고정 메뉴(약 42px)에 가리지 않게 그 높이를 더한다. */
+  .consumer-footer { padding-top: 14px; padding-bottom: calc(14px + 42px); }
+  .consumer-footer-grid > div > p { margin: 0 auto; text-align: center; }
+}
+
+/* ── 홈 화면 애니메이션 ─────────────────────────────────────
+   첫 화면은 들어올 때 위에서부터 차례로 떠오르고, 아래 절의 제목·카드는 스크롤해서 보일 때 떠오른다.
+   스크롤 연동은 CSS(animation-timeline: view())만 쓴다. 지원하지 않는 브라우저에서는 애니메이션 없이
+   처음부터 보인다. 기기에서 '동작 줄이기'를 켠 사용자에게는 아무 움직임도 주지 않는다. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes home-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  @keyframes home-sweep { from { transform: rotate(-1deg) scaleX(0); } to { transform: rotate(-1deg) scaleX(1); } }
+  @keyframes home-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+  .refresh-hero-copy > .eyebrow,
+  .refresh-hero-copy h1 > span,
+  .refresh-hero-copy h1 mark,
+  .refresh-hero-copy > p,
+  .refresh-hero-copy .refresh-button-row,
+  .refresh-hero-facts { animation: home-rise .6s cubic-bezier(.2, .7, .2, 1) both; }
+  .refresh-hero-copy h1 > span { animation-delay: .08s; }
+  .refresh-hero-copy h1 mark { animation-delay: .18s; }
+  .refresh-hero-copy > p { animation-delay: .32s; }
+  .refresh-hero-copy .refresh-button-row { animation-delay: .44s; }
+  .refresh-hero-facts { animation-delay: .56s; }
+  .refresh-hero-visual { animation: home-rise .7s .3s cubic-bezier(.2, .7, .2, 1) both; }
+
+  /* Co끼리 아래 노란 밑줄이 왼쪽에서 그어진다 */
+  .refresh-hero-copy h1 mark .refresh-brand-word::before { transform-origin: left center; animation: home-sweep .6s .7s cubic-bezier(.2, .7, .2, 1) both; }
+
+  /* 상담 버튼의 돈워리 캐릭터가 살짝 들썩인다 */
+  .consult-cta img { animation: home-bob 2.8s 1.4s ease-in-out infinite; }
+
+  @supports (animation-timeline: view()) {
+    .refresh-flow .section-heading,
+    .refresh-section-row,
+    .refresh-split-section > div,
+    .refresh-step-grid article,
+    .refresh-risk-card,
+    .refresh-post-grid article {
+      animation: home-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 22%;
+    }
+  }
+}
+
+/* 헤더 로그인: 사람 모양 원형 버튼. 색은 기존 로그인 버튼(.button-dark)과 같다. */
+.lang-globe-icon { display: none; }
+.header-login-icon {
+  display: none; flex: none; width: 36px; height: 36px; align-items: center; justify-content: center;
+  border-radius: 999px; background: var(--ink); color: var(--white);
+}
+.header-login-icon:hover { opacity: 0.88; }
+.header-login-icon:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+@media (max-width: 720px) {
+  .header-login-text { display: none; }
+  .header-login-icon { display: inline-flex; }
+}
+
+@media (min-width: 561px) and (max-width: 760px) {
+  /* 위와 같은 이유로 중간 폭에서도 다른 화면 틀(좌우 14px)과 맞춘다. */
+  .worksite-page .narrow-shell { width: min(100% - 28px, 680px); }
 }

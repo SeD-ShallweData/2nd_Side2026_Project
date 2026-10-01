@@ -61,7 +61,7 @@ export const commonMessages = defineMessages({
       consumerLine1: "Co끼리는 공개 데이터에서 관측된 사실과 공식 노동 정보를 연결하여 제공하며",
       consumerLine2: "회사의 안전·위법 여부나 입사 결정을 확정하지 않습니다.",
       clubLogoAlt: "SeD 동아리 로고",
-      clubName: "인천대학교 데이터사이언스 연합 동아리 SeD(Shall we Data?)",
+      clubName: "인천대학교 데이터사이언스 연합 동아리\nSeD(Shall we Data?)",
     },
     notFound: {
       title: "요청한 사업장을 찾을 수 없습니다",

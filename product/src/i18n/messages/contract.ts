@@ -11,11 +11,11 @@ export const contractMessages = defineMessages({
     page: {
       metaTitle: "근로계약서 확인",
       eyebrow: "근로계약서 확인 및 분석",
-      heading: "계약서에서 놓친 항목이 있나요?",
-      intro: "파일을 올리면 확인된 항목과 누락 가능 항목, 회사에 다시 물어볼 질문을 구분합니다.",
+      heading: "계약서에서\n놓친 항목이 있나요?",
+      intro: "파일을 올리면 확인된 항목과 누락 가능 항목,\n회사에 다시 물어볼 질문을 구분합니다.",
       realBadge: "안심하세요!",
       demoBadge: "DEMO",
-      realBanner: "업로드한 파일은 계약서 분석에만 쓰이고 별도의 저장소에 남지 않습니다.",
+      realBanner: "업로드한 파일은 별도의 저장소에 남지 않습니다.",
       demoBanner: "데모 모드에서는 파일 내용을 분석하지 않고 명시된 시나리오 결과만 제공합니다.",
     },
     panel: {

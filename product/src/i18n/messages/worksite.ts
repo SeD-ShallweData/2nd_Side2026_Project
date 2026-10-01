@@ -11,7 +11,7 @@ export const worksiteMessages = defineMessages({
   ko: {
     metaTitle: "현장 신고",
     gate: {
-      guestTitle: "로그인 후 현장 신고를 접수할 수 있습니다.",
+      guestTitle: "로그인 후 이용 가능합니다.",
       guestBody: "제보 내용과 사진은 공개 커뮤니티에 게시되지 않고 근로감독관 확인용으로만 전달됩니다.",
       notEligibleTitle: "현재 계정은 현장 신고 대상이 아닙니다.",
       notEligibleBody: "현장 신고는 일반 사용자 계정으로 접수하고 근로감독관 계정에서 확인합니다.",
@@ -105,10 +105,10 @@ export const worksiteMessages = defineMessages({
     page: {
       sessionFailed: "로그인 상태를 확인하지 못했습니다.",
       eyebrow: "현장 위험 요소 제보",
-      heading: "현장의 목소리를 안전하게 전달하세요",
-      intro: "제보는 공개 커뮤니티와 분리되어 근로감독관 확인용으로만 전달됩니다.",
+      heading: "현장의 목소리를\n안전하게 전달하세요",
+      intro: "제보는 공개 커뮤니티와 분리되어\n근로감독관 확인용으로만 전달됩니다.",
       privacyTitle: "안심하세요!",
-      privacyBody: "제보자의 이메일과 내부 식별정보는 화면에 표시하지 않습니다.",
+      privacyBody: "제보자의 개인정보는 표시되지 않습니다.",
       retry: "다시 시도",
       sessionLoading: "로그인 상태를 확인하는 중입니다.",
     },

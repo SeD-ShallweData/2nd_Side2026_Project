@@ -54,8 +54,15 @@ export function LanguageSwitcher() {
         aria-label={`${m.selectorAria}: ${LOCALE_NATIVE_NAMES[locale]}`}
         onClick={() => setOpen((value) => !value)}
       >
-        <span aria-hidden="true">🌐</span>
-        <span>{LOCALE_NATIVE_NAMES[locale]}</span>
+        {/* 넓은 화면은 이모지, 좁은 화면은 원 가운데에 정확히 맞는 선 아이콘을 쓴다(이모지는 글꼴마다 중심이 어긋난다). */}
+        <span className="lang-globe-emoji" aria-hidden="true">🌐</span>
+        <svg className="lang-globe-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+          <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9M12 3c-2.6 2.6-3.9 5.6-3.9 9s1.3 6.4 3.9 9" />
+          </g>
+        </svg>
+        <span className="lang-current-name">{LOCALE_NATIVE_NAMES[locale]}</span>
       </button>
       {open ? (
         <div className="language-switcher-menu" id={listId} role="group" aria-label={m.selectorAria}>

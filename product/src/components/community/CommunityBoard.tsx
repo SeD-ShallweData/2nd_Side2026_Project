@@ -109,7 +109,7 @@ export function CommunityBoard() {
           </select>
         </label>
         <div className="community-search-actions">
-          <label className="community-search-field"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => changeQuery(event.target.value)} placeholder={m.board.searchPlaceholder} aria-label={m.board.searchAria} /></label>
+          <label className="community-search-field"><input value={query} onChange={(event) => changeQuery(event.target.value)} placeholder={`⌕ ${m.board.searchPlaceholder}`} aria-label={m.board.searchAria} /></label>
           {result?.capabilities.write ? <Link href="/community/new" className="button button-dark">{m.board.write}</Link> : null}
         </div>
       </div>

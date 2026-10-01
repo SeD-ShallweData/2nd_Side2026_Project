@@ -18,8 +18,8 @@ export default async function CompaniesPage() {
       <div className="shell narrow-shell">
         <div className="page-heading">
           <span className="eyebrow">{m.page.eyebrow}</span>
-          <h1>{m.page.title}</h1>
-          <p>{m.page.intro1}<br />{m.page.intro2}</p>
+          <h1><span className="desktop-only">{m.page.title}</span><span className="mobile-only">{m.page.titleMobile ?? m.page.title}</span></h1>
+          <p className="companies-intro">{m.page.intro1}<br />{m.page.intro2}</p>
         </div>
         <DataModeNotice
           dataMode={dataMode}

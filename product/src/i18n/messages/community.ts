@@ -12,8 +12,8 @@ export const communityMessages = defineMessages({
     eyebrow: "익명 커뮤니티",
     page: {
       metaTitle: "커뮤니티",
-      title: "일하는 사람들의 확인 경험",
-      description: "혼자 묻기 어려웠던 질문과 확인 경험을 나눕니다. 일하는 사람들의 경험과 질문을 나누는 공간입니다.",
+      title: "일하는 사람들의\n확인 경험",
+      description: "혼자 묻기 어려웠던 질문과 확인 경험을 나눕니다.\n일하는 사람들의 경험과 질문을 나누는 공간입니다.",
       bannerTag: "안내",
       banner: "로그인 사용자는 게시글 작성과 신고를 이용할 수 있습니다.",
     },

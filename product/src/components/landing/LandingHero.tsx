@@ -12,7 +12,7 @@ export function LandingHero({ m = landingMessages.ko }: { m?: LandingMessages })
           <span className="eyebrow">{h.eyebrow}</span>
           <h1 id="home-title">
             <span>{h.titleLine1}</span>
-            <mark>{h.titleMarkBefore}<span className="refresh-brand-word">{m.brand}</span>{h.titleMarkAfter || null}</mark>
+            <mark><span className="hero-mark-lead">{h.titleMarkBefore}</span><span className="refresh-brand-word">{m.brand}</span>{h.titleMarkAfter || null}</mark>
           </h1>
           <p>{h.leadLine1}<br />{h.leadLine2}</p>
           <div className="refresh-button-row">

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { withMobileBreaks } from "@/components/common/MobileBreaks";
 import { CommunityBoard } from "@/components/community/CommunityBoard";
 import { communityMessages } from "@/i18n/messages/community";
 import { getMessages } from "@/i18n/server";
@@ -15,10 +16,10 @@ export default async function CommunityPage() {
       <div className="shell community-shell">
         <div className="page-heading community-heading">
           <span className="eyebrow">{m.eyebrow}</span>
-          <h1>{m.page.title}</h1>
-          <p>{m.page.description}</p>
+          <h1>{withMobileBreaks(m.page.title)}</h1>
+          <p className="community-intro">{withMobileBreaks(m.page.description)}</p>
         </div>
-        <div className="mock-banner" role="status"><span>{m.page.bannerTag}</span>{m.page.banner}</div>
+        <div className="mock-banner community-banner" role="status"><span>{m.page.bannerTag}</span>{m.page.banner}</div>
         <CommunityBoard />
       </div>
     </div>
