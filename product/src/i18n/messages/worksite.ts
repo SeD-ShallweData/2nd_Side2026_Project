@@ -108,7 +108,7 @@ export const worksiteMessages = defineMessages({
       heading: "현장의 목소리를\n안전하게 전달하세요",
       intro: "제보는 공개 커뮤니티와 분리되어\n근로감독관 확인용으로만 전달됩니다.",
       privacyTitle: "안심하세요!",
-      privacyBody: "제보자의 이메일과 내부 식별정보는 화면에 표시하지 않습니다.",
+      privacyBody: "제보자의 개인정보는 표시되지 않습니다.",
       retry: "다시 시도",
       sessionLoading: "로그인 상태를 확인하는 중입니다.",
     },
