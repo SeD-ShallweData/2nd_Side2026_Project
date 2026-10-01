@@ -3352,6 +3352,11 @@ summary:focus-visible {
   font-size: 0.68rem;
 }
 
+/* 동의 줄은 제목과 안내를 한 줄에 이어 쓰고 위아래 여백을 줄인다. */
+.chat-compare-toggle.chat-consent-toggle { padding-top: 6px; padding-bottom: 6px; }
+.chat-consent-toggle .consent-line { display: block; line-height: 1.45; }
+.chat-consent-toggle .consent-line small { color: var(--muted); font-weight: 600; }
+
 /* 필수 동의 체크박스. 체크 전에도 흐린 체크 표시를 넣어 눌러야 하는 칸임을 알린다. */
 .chat-consent-toggle input {
   appearance: none;

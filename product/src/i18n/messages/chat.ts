@@ -311,7 +311,7 @@ export const chatMessages = defineMessages({
       placeholderGeneral: "궁금한 것을 쓰세요",
     },
     notice: {
-      consentRequired: "먼저 아래 동의 칸을 눌러 주세요.",
+      consentRequired: "먼저 위 동의 칸을 눌러 주세요.",
     },
   },
   en: {

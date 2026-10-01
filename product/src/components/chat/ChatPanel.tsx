@@ -812,8 +812,11 @@ export function ChatPanel({
           disabled={loading}
         />
         <span>
-          <strong>{m.consent.title}</strong>
-          <small>{format(m.consent.body, { contractExtra: contractReview ? m.consent.contractExtra : "" })}</small>
+          {/* 제목과 전송 내용 안내를 한 줄에 둔다. 안내는 괄호 안에 연한 글자로 붙인다. */}
+          <span className="consent-line">
+            <strong>{m.consent.title}</strong>{" "}
+            <small>({format(m.consent.body, { contractExtra: contractReview ? m.consent.contractExtra : "" }).replace(/[.。]\s*$/, "")})</small>
+          </span>
           {isImplementedForeignLocale(locale) ? (
             <>
               <small>{m.consent.translation}</small>
