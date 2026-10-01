@@ -5634,6 +5634,9 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
   .field-help.companies-help { white-space: nowrap; font-size: clamp(.55rem, 2.55vw, .85rem); }
   .mobile-only { display: inline; }
   .desktop-only { display: none; }
+  /* 현장 신고 화면 틀은 .worksite-page .narrow-shell(좌우 20px)이 더 강해 모바일에서 계약서 화면(좌우 13px)보다
+     좁았다. 다른 화면과 같은 폭으로 맞춰 안내 띠·상자 너비가 계약서와 같게 한다. */
+  .worksite-page .narrow-shell { width: min(100% - 26px, 1160px); }
   /* 커뮤니티 검색창의 '게시글 검색' 은 칸 가운데에 */
   .community-search-field { width: 100%; }
   .community-search-field input { text-align: center; font-size: 1rem; }
@@ -5701,4 +5704,9 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
 @media (max-width: 720px) {
   .header-login-text { display: none; }
   .header-login-icon { display: inline-flex; }
+}
+
+@media (min-width: 561px) and (max-width: 760px) {
+  /* 위와 같은 이유로 중간 폭에서도 다른 화면 틀(좌우 14px)과 맞춘다. */
+  .worksite-page .narrow-shell { width: min(100% - 28px, 680px); }
 }
