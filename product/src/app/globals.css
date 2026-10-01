@@ -2344,7 +2344,7 @@ summary:focus-visible {
   border-radius: 14px;
   background: var(--surface-warm);
   color: var(--ink);
-  padding: 12px 50px 12px 13px;
+  padding: 12px 70px 12px 13px;
 }
 
 .chat-form textarea:focus {
@@ -2355,11 +2355,11 @@ summary:focus-visible {
 
 .chat-input-wrap { position: relative; }
 
-/* 입력창 오른쪽 아래 안쪽. 입력창의 오른쪽 안쪽 여백(50px)이 이 버튼 자리다. */
+/* 입력창 오른쪽 아래 안쪽. 버튼이 오른쪽 끝에서 61px(25px + 36px)까지 차지하므로 입력창 오른쪽 안쪽 여백(70px)이 이 자리를 비워 둔다. */
 .chat-send {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
+  right: 25px;
+  bottom: 20px;
   display: flex;
   width: 36px;
   height: 36px;
