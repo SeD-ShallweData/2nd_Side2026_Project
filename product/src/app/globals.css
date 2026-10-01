@@ -3352,6 +3352,23 @@ summary:focus-visible {
   font-size: 0.68rem;
 }
 
+/* 필수 동의 체크박스. 체크 전에도 흐린 체크 표시를 넣어 눌러야 하는 칸임을 알린다. */
+.chat-consent-toggle input {
+  appearance: none;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  background: var(--white) center / 12px 12px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.2 4.8 9 10 3' fill='none' stroke='%23b8bfc9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  cursor: pointer;
+}
+.chat-consent-toggle input:checked {
+  background-color: var(--ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.2 4.8 9 10 3' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.chat-consent-toggle input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
 .chat-compare-toggle:has(input:disabled) {
   cursor: not-allowed;
   opacity: 0.65;
@@ -5476,6 +5493,14 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
 
 /* 입력창 아랫선에 붙지 않도록 한 줄 띄운다. */
 .chat-voice-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+/* SKT 비교 선택(왼쪽)과 음성 버튼(오른쪽)을 한 줄에 둔다. 좁으면 음성 버튼이 아랫줄 오른쪽으로 내려간다. */
+.chat-tool-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.chat-tool-row .chat-voice-row { margin: 0 0 0 auto; }
+/* 오른쪽 끝에 붙은 버튼의 설명 풍선이 화면 밖으로 나가지 않게 오른쪽에 맞춘다. */
+.chat-tool-row .voice-pending-tip { left: auto; right: 0; }
+.chat-compare-toggle.chat-compare-inline { margin: 0; padding: 0; border: 0; background: none; text-align: left; }
+.chat-compare-inline strong { font-size: 0.7rem; }
+.chat-compare-inline small { font-size: 0.62rem; }
 .voice-pending { position: relative; display: inline-flex; }
 .voice-pending-button {
   border: 1px dashed var(--line-strong); border-radius: 999px; background: var(--white);

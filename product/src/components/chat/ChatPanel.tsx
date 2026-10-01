@@ -804,22 +804,7 @@ export function ChatPanel({
         </div>
       </section> : null}
 
-      {executionMode === "dual_api" ? (
-        <label className="chat-compare-toggle">
-          <input
-            type="checkbox"
-            checked={compare}
-            onChange={(event) => setCompare(event.target.checked)}
-            disabled={loading}
-          />
-          <span>
-            <strong>{m.compareToggle.title}</strong>
-            <small>{m.compareToggle.note}</small>
-          </span>
-        </label>
-      ) : null}
-
-      <label className="chat-compare-toggle">
+      <label className="chat-compare-toggle chat-consent-toggle">
         <input
           type="checkbox"
           checked={externalProcessingConsent}
@@ -896,6 +881,22 @@ export function ChatPanel({
         />
           <button type="submit" className="chat-send" disabled={loading || !draft.trim() || !externalProcessingConsent} aria-label={m.input.sendAria}><span aria-hidden="true">↑</span></button>
         </div>
+        {/* 입력창 아래 한 줄: 왼쪽은 SKT 비교 선택, 오른쪽은 음성 버튼. */}
+        <div className="chat-tool-row">
+        {executionMode === "dual_api" ? (
+          <label className="chat-compare-toggle chat-compare-inline">
+            <input
+              type="checkbox"
+              checked={compare}
+              onChange={(event) => setCompare(event.target.checked)}
+              disabled={loading}
+            />
+            <span>
+              <strong>{m.compareToggle.title}</strong>
+              <small>{m.compareToggle.note}</small>
+            </span>
+          </label>
+        ) : null}
         {/* 음성 입력·읽어 주기는 아직 준비 중이다. 비활성 표시만 두고 누르면 아무 일도 하지 않는다. */}
         <div className="chat-voice-row">
         <span className="voice-pending">
@@ -926,6 +927,7 @@ export function ChatPanel({
             {lm.voicePending} · {lm.voicePendingReason}
           </span>
         </span>
+        </div>
         </div>
       </form>
       {!activeCompanyId ? (
