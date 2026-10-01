@@ -1,5 +1,6 @@
 "use client";
 
+import { withMobileBreaks } from "@/components/common/MobileBreaks";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import type { SessionResponse } from "@/app/api/auth/authApiContract";
 import type {
@@ -46,7 +47,6 @@ export function SessionGate({ session }: { session: SessionResponse }) {
     return (
       <div className="worksite-state-card">
         <strong>{m.guestTitle}</strong>
-        <p>{m.guestBody}</p>
       </div>
     );
   }
@@ -149,8 +149,8 @@ export function WorksiteTipForm() {
   return (
     <form className="worksite-tip-form" onSubmit={submit}>
       <div className="worksite-form-intro">
-        <div><span className="eyebrow">{m.eyebrow}</span><h2>{m.heading}</h2></div>
-        <p>{m.intro}</p>
+        <div><span className="eyebrow">{m.eyebrow}</span><h2>{withMobileBreaks(m.heading)}</h2></div>
+        <p>{withMobileBreaks(m.intro)}</p>
       </div>
       <div className="worksite-guidance">
         <strong>{m.guidanceTitle}</strong>
@@ -296,7 +296,7 @@ function InspectorTipList() {
 
   return (
     <div className="worksite-inspector-view">
-      <div className="worksite-list-toolbar"><div><span className="eyebrow">{m.eyebrow}</span><h2>{m.heading}</h2><p>{m.intro}</p></div><strong>{format(m.total, { count: total.toLocaleString(intlLocale(locale)) })}</strong></div>
+      <div className="worksite-list-toolbar"><div><span className="eyebrow">{m.eyebrow}</span><h2>{withMobileBreaks(m.heading)}</h2><p>{withMobileBreaks(m.intro)}</p></div><strong>{format(m.total, { count: total.toLocaleString(intlLocale(locale)) })}</strong></div>
       {loading ? <div className="worksite-state-card">{m.loading}</div> : null}
       {error ? <p className="field-error" role="alert">{error}</p> : null}
       {!loading && items.length === 0 ? <div className="worksite-state-card"><strong>{m.emptyTitle}</strong><p>{m.emptyBody}</p></div> : null}
@@ -342,6 +342,6 @@ export function WorksiteTipPage() {
   const isInspector = role === "inspector";
 
   return (
-    <div className="page-section worksite-page"><div className="shell narrow-shell"><div className="page-heading"><span className="eyebrow">{m.eyebrow}</span><h1>{m.heading}</h1>{!isInspector ? <p>{m.intro}</p> : null}</div>{!isAdmin && !isInspector ? <div className="worksite-privacy-strip"><strong>{m.privacyTitle}</strong><span>{m.privacyBody}</span></div> : null}{error ? <div className="worksite-state-card"><strong>{m.sessionFailed}</strong><p>{error}</p><button type="button" className="button button-outline" onClick={() => { setError(null); setRetry((value) => value + 1); }}>{m.retry}</button></div> : session ? <SessionGate session={session} /> : <div className="worksite-state-card">{m.sessionLoading}</div>}</div></div>
+    <div className="page-section worksite-page"><div className="shell narrow-shell"><div className="page-heading"><span className="eyebrow">{m.eyebrow}</span><h1>{withMobileBreaks(m.heading)}</h1>{!isInspector ? <p>{withMobileBreaks(m.intro)}</p> : null}</div>{!isAdmin && !isInspector ? <div className="worksite-privacy-strip"><strong>{m.privacyTitle}</strong><span>{m.privacyBody}</span></div> : null}{error ? <div className="worksite-state-card"><strong>{m.sessionFailed}</strong><p>{error}</p><button type="button" className="button button-outline" onClick={() => { setError(null); setRetry((value) => value + 1); }}>{m.retry}</button></div> : session ? <SessionGate session={session} /> : <div className="worksite-state-card">{m.sessionLoading}</div>}</div></div>
   );
 }

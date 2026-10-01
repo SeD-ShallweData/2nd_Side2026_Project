@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { withMobileBreaks } from "@/components/common/MobileBreaks";
 import { format } from "@/i18n/defineMessages";
 import { landingMessages, type LandingMessages } from "@/i18n/messages/landing";
 
@@ -8,6 +9,7 @@ import { landingMessages, type LandingMessages } from "@/i18n/messages/landing";
  * 넘기지 않으면(테스트 등) 한국어로 그린다.
  */
 type Props = { m?: LandingMessages };
+
 
 const STEP_KEYS = [
   { number: "01", icon: "⌕", key: "company" },
@@ -30,11 +32,11 @@ export function FeatureSection({ m = landingMessages.ko }: Props) {
   return (
     <section className="section refresh-flow" aria-labelledby="flow-title">
       <div className="shell">
-        <div className="section-heading"><span className="eyebrow">{f.eyebrow}</span><h2 id="flow-title">{f.title}</h2><p>{f.desc}</p></div>
+        <div className="section-heading"><span className="eyebrow">{f.eyebrow}</span><h2 id="flow-title">{f.title}</h2><p>{withMobileBreaks(f.desc)}</p></div>
         <div className="refresh-step-grid">
           {STEP_KEYS.map((step) => {
             const copy = f.steps[step.key];
-            return <article key={step.number}><i>{step.icon}</i><span>{format(f.stepLabel, { number: step.number })}</span><h3>{copy.title}</h3><p>{copy.body}</p><b>{copy.tag}</b></article>;
+            return <article key={step.number}><i>{step.icon}</i><span>{format(f.stepLabel, { number: step.number })}</span><h3>{copy.title}</h3><p>{withMobileBreaks(copy.body)}</p><b>{copy.tag}</b></article>;
           })}
         </div>
       </div>
@@ -53,7 +55,7 @@ export function RiskPreviewSection({ m = landingMessages.ko }: Props) {
   return (
     <section className="section refresh-risk-showcase" aria-labelledby="risk-preview-title">
       <div className="shell">
-        <div className="refresh-section-row"><div><span className="eyebrow">{r.eyebrow}</span><h2 id="risk-preview-title">{r.title}</h2><p>{r.desc}</p></div><Link href="/companies" className="button button-outline">{r.searchCta} →</Link></div>
+        <div className="refresh-section-row"><div><span className="eyebrow">{r.eyebrow}</span><h2 id="risk-preview-title">{withMobileBreaks(r.title)}</h2><p>{r.desc}</p></div><Link href="/companies" className="button button-outline">{r.searchCta} →</Link></div>
         <div className="refresh-risk-preview" aria-label={r.previewAria}>
           <article className="refresh-risk-card is-watch">
             <header><div><small>{r.wage.scope}</small><h3>{r.wage.title}</h3></div><strong>{r.wage.status}</strong></header>
@@ -101,7 +103,7 @@ export function ConsultPreviewSection({ m = landingMessages.ko }: Props) {
   const c = m.consult;
   return (
     <section className="section refresh-consult-preview" aria-labelledby="consult-preview-title"><div className="shell refresh-split-section">
-      <div><span className="eyebrow">{c.eyebrow}</span><h2 id="consult-preview-title">{c.titleLine1}<br />{c.titleLine2}</h2><p>{c.desc}</p><div className="refresh-prompt-list"><Link href={chatPromptHref(c.prompt1)}>{c.prompt1Label} <span>→</span></Link><Link href={chatPromptHref(c.prompt2)}>{c.prompt2Label} <span>→</span></Link></div></div>
+      <div><span className="eyebrow">{c.eyebrow}</span><h2 id="consult-preview-title">{c.titleLine1}<br />{c.titleLine2}</h2><p>{withMobileBreaks(c.desc)}</p><div className="refresh-prompt-list"><Link href={chatPromptHref(c.prompt1)}>{c.prompt1Label} <span>→</span></Link><Link href={chatPromptHref(c.prompt2)}>{c.prompt2Label} <span>→</span></Link></div></div>
       <div className="refresh-answer-preview"><header><span>{c.compareTitle}</span><small>{c.compareNote}</small></header><div><article><b>Upstage Solar</b><h3>{c.solar.title}</h3><ol><li>{c.solar.step1}</li><li>{c.solar.step2}</li><li>{c.solar.step3}</li></ol><small>{c.solar.foot}</small></article><article><b>SKT A.X</b><h3>{c.ax.title}</h3><p>{c.ax.body}</p><small>{c.ax.foot}</small></article></div></div>
     </div></section>
   );

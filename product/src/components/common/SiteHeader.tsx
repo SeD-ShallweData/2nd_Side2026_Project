@@ -22,12 +22,13 @@ const NAV_ITEMS = [
 ] as const;
 
 // 모바일도 첫 화면은 로고로 간다.
+// AI 상담을 다섯 칸의 가운데에 둔다.
 const MOBILE_NAV_ITEMS = [
   { href: "/companies", key: "companies" },
   { href: "/contracts", key: "contracts" },
+  { href: "/chat", key: "chat" },
   { href: "/community", key: "community" },
   { href: "/worksite-tips", key: "tips" },
-  { href: "/chat", key: "chat" },
 ] as const;
 
 // "/" 는 정확히 일치할 때만 현재 탭이다. 접두사로 보면 모든 경로가 홈이 된다.
@@ -208,6 +209,7 @@ export function SiteHeader() {
             })}
             {/* 즐겨찾기는 일반 사용자 전용이라 오른쪽 이름 메뉴(AccountMenu) 안에 둔다. */}
           </nav>
+          {/* 언어 선택 지구본을 먼저, 로그인(또는 이름 메뉴)을 맨 오른쪽에 둔다. */}
           <div className="consumer-header-side" style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <LanguageSwitcher />
             {sessionState.status === "loading" ? null : user ? (
@@ -222,7 +224,17 @@ export function SiteHeader() {
                 />
               </div>
             ) : (
-              <Link href="/login" className="button button-dark button-small">{m.login}</Link>
+              <>
+              {/* 넓은 화면은 글자 버튼, 좁은 화면은 사람 모양 원형 버튼을 보인다. */}
+              <Link href="/login" className="button button-dark button-small header-login-text">{m.login}</Link>
+              <Link href="/login" className="header-login-icon" aria-label={m.login} title={m.login}>
+                {/* 사람 모양 아이콘. 글자는 aria-label 로 읽힌다. */}
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="8" r="4" fill="currentColor" />
+                  <path d="M4 20.5c0-4.1 3.6-6.5 8-6.5s8 2.4 8 6.5" fill="currentColor" />
+                </svg>
+              </Link>
+              </>
             )}
           </div>
         </div>
@@ -243,7 +255,7 @@ export function SiteHeader() {
             <Link
               key={item.href}
               href={item.href === "/chat" ? chatHrefForPath(pathname) : item.href}
-              className={current ? "is-current" : undefined}
+              className={[item.key === "chat" ? "is-chat" : "", current ? "is-current" : ""].filter(Boolean).join(" ") || undefined}
               aria-current={current ? "page" : undefined}
             >
               {m.mobileNav[item.key]}

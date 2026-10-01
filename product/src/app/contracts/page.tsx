@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { withMobileBreaks } from "@/components/common/MobileBreaks";
 import { ContractReviewPanel } from "@/components/contract/ContractReviewPanel";
 import { getContractDataMode } from "@/config/dataMode";
 import { contractMessages } from "@/i18n/messages/contract";
@@ -17,8 +18,8 @@ export default async function ContractsPage() {
       <div className="shell narrow-shell">
         <div className="page-heading">
           <span className="eyebrow">{m.eyebrow}</span>
-          <h1>{m.heading}</h1>
-          <p>{m.intro}</p>
+          <h1>{withMobileBreaks(m.heading)}</h1>
+          <p>{withMobileBreaks(m.intro)}</p>
         </div>
         <div className={`mode-banner mode-banner-${dataMode}`} role="status">
           <span>{dataMode === "real" ? m.realBadge : m.demoBadge}</span>

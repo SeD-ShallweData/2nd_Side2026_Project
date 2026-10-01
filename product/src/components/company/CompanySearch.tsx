@@ -298,7 +298,7 @@ export function CompanySearch() {
             {validation}
           </p>
         ) : (
-          <p className="field-help" id={`${inputId}-help`}>
+          <p className="field-help companies-help" id={`${inputId}-help`}>
             {m.help}
           </p>
         )}

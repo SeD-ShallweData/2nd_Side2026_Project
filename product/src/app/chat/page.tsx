@@ -35,7 +35,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
           <p>
             {m.intro}
             <br />
-            {executionMode === "dual_api" ? m.introDual : m.introTools}{" "}
+            {executionMode === "dual_api" ? null : <>{m.introTools}{" "}</>}
             {m.finalJudgment}
           </p>
         </div>

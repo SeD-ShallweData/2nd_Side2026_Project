@@ -115,7 +115,7 @@ describe("현장 신고 화면의 역할별 분기", () => {
     expect(userHtml).not.toContain("현장 제보 목록");
 
     const guestHtml = renderGate({ authenticated: false, user: null, expires_at: null });
-    expect(guestHtml).toContain("로그인 후 현장 신고를 접수할 수 있습니다.");
+    expect(guestHtml).toContain("로그인 후 이용 가능합니다.");
     expect(guestHtml).not.toContain("현장 제보 목록");
   });
 });
