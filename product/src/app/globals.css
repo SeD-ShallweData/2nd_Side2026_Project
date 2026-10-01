@@ -5627,8 +5627,6 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
   .mode-banner,
   .worksite-privacy-strip,
   .mock-banner.community-banner { flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 8px; max-width: none; padding: 10px 12px; font-size: clamp(.6rem, 2.8vw, .84rem); white-space: nowrap; }
-  /* 현장 신고 안내는 문장이 길다. 띠·배지 크기는 계약서 안내와 같게 두고 문장 글자만 줄여 한 줄에 맞춘다. */
-  .worksite-privacy-strip > span { font-size: clamp(.55rem, 2.35vw, .84rem); }
   /* 커뮤니티 소개 두 문장은 각각 한 줄에 들어오도록 화면 폭에 맞춰 글자를 줄인다 */
   .page-heading p.community-intro { white-space: nowrap; font-size: clamp(.6rem, 3.4vw, .95rem); }
   /* 사업장 검색 소개 두 문장도 같은 규칙. 문장이 더 길어 글자를 더 줄인다. */
