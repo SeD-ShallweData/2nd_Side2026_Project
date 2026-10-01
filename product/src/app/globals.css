@@ -5642,7 +5642,9 @@ html[data-locale="ko-easy"] body { line-height: 1.75; }
   .community-search-field input { text-align: center; font-size: 1rem; }
   /* 커뮤니티 분류 버튼 다섯 개를 한 줄에 */
   .community-toolbar { flex-wrap: nowrap; justify-content: center; gap: 4px; }
-  .community-toolbar > button:not(.button) { flex: 0 1 auto; padding: 6px 8px; font-size: clamp(.6rem, 2.9vw, .78rem); white-space: nowrap; }
+  /* 버튼 줄도 안내 띠·검색창과 같은 너비로 펼친다. 글자 길이에 맞춰 칸을 나눈다. */
+  .community-toolbar { width: 100%; }
+  .community-toolbar > button:not(.button) { flex: 1 1 auto; padding: 6px 6px; font-size: clamp(.6rem, 2.9vw, .78rem); white-space: nowrap; }
   /* 맨 아래 노란 영역의 제목은 조금 작게 */
   .refresh-final-cta h2 { font-size: 30px; }
   /* footer 안내 문장은 가운데에, 남색 배경 시작선에 바로 붙인다 */
